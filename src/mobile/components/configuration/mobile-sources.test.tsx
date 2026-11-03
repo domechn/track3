@@ -1,13 +1,17 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MobileSources } from "@/mobile/components/configuration/mobile-sources";
 import type { ExchangeRow } from "@/components/configuration/types";
 import { detectPublicIp } from "@/middlelayers/public-ip";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 vi.mock("@/middlelayers/public-ip", () => ({ detectPublicIp: vi.fn() }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 
-beforeEach(() => vi.mocked(detectPublicIp).mockReset().mockResolvedValue({ address: "8.8.8.8", version: 4 }));
+beforeEach(() => {
+  vi.mocked(detectPublicIp).mockReset().mockResolvedValue({ address: "8.8.8.8", version: 4 });
+  vi.mocked(openUrl).mockReset().mockResolvedValue(undefined);
+});
 
 const props = {
   exchanges: [{ type: "binance", apiKey: "private-key-1234", secret: "secret", active: true }],
@@ -140,6 +144,95 @@ describe("mobile data sources", () => {
     expect(screen.getByRole("button", { name: "Add exchange" })).toBeInTheDocument();
   });
 
+  it("shows an exchange-specific empty panel in normal settings", () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="exchange" exchanges={[]} />);
+    expect(screen.getByText("No exchanges yet")).toBeVisible();
+    expect(screen.getByText("Add one to start reading balances. Nothing leaves this device.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add exchange" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Add source" })).toBeNull();
+  });
+
+  it("keeps IP actions beside the detected address in the fidelity editor", async () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="exchange" addRequest={1} />);
+    fireEvent.click(screen.getByRole("button", { name: /Continue with Binance/ }));
+    const info = await screen.findByRole("group", { name: "Your public IP:" });
+    await waitFor(() => expect(screen.getByText("8.8.8.8")).toBeVisible());
+    expect(info.querySelector(".fidelity-ip-top .fidelity-ip-controls")).not.toBeNull();
+    expect(info).not.toHaveTextContent("On cellular and Wi-Fi");
+  });
+
+  it("confirms a valid Ethereum address and keeps it editable", () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="wallet" addRequest={1} />);
+    fireEvent.click(screen.getByRole("button", { name: /ETH Pro\s*Ethereum/ }));
+    const address = screen.getByRole("textbox", { name: "Address" });
+    fireEvent.change(address, { target: { value: "0x4f2a8c1e9b07d3a5c6e41f8b2d90a7c3e5b1a91c" } });
+    expect(screen.getByText("Valid Ethereum address")).toBeVisible();
+    expect(address).not.toHaveAttribute("aria-invalid", "true");
+    fireEvent.change(address, { target: { value: "invalid" } });
+    expect(screen.queryByText("Valid Ethereum address")).toBeNull();
+  });
+
+  it("keeps an invalid Ethereum address visible until corrected", () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="wallet" addRequest={1} />);
+    fireEvent.click(screen.getByRole("button", { name: /ETH Pro\s*Ethereum/ }));
+    const address = screen.getByRole("textbox", { name: "Address" });
+    fireEvent.change(address, { target: { value: "0x4f2a8c1e9b07d3a5c6e41f8b2d90zz" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add wallet" }));
+    expect(address).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: "Add wallet" })).toBeDisabled();
+    fireEvent.change(address, { target: { value: "0x4f2a8c1e9b07d3a5c6e41f8b2d90a7c3e5b1a91c" } });
+    expect(screen.getByRole("button", { name: "Add wallet" })).toBeEnabled();
+  });
+
+  it("shows and disables the wallet saving state while validation is pending", async () => {
+    let finish!: () => void;
+    const save = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    render(<MobileSources {...props} fidelityLayout selectedKind="wallet" addRequest={1} onSaveWallet={save} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Address" }), {
+      target: { value: "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add wallet" }));
+    expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled();
+    expect(screen.getByRole("textbox", { name: "Address" })).toBeDisabled();
+    await act(async () => finish());
+    expect(save).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog", { name: "Edit data source" })).not.toBeInTheDocument();
+  });
+
+  it("opens source setup documentation through the native opener", () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="exchange" addRequest={1} />);
+    fireEvent.click(screen.getByRole("button", { name: /How to create a read-only API key/ }));
+    expect(openUrl).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\/.+\.dev\/docs\/$/));
+  });
+
+  it("opens the broker setup guide through the native opener", () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="broker" addRequest={1} />);
+    fireEvent.click(screen.getByRole("button", { name: /How to set up a Flex Query/ }));
+    expect(openUrl).toHaveBeenCalledWith("https://track3.dev/docs/");
+  });
+
+  it("disables broker submission while its query ID is invalid", () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="broker" addRequest={1} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Flex Query ID" }), { target: { value: "912x04" } });
+    fireEvent.change(screen.getByLabelText("Flex token"), { target: { value: "fixture-token" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save and test/ }));
+    expect(screen.getByRole("textbox", { name: "Flex Query ID" })).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: /Save and test/ })).toBeDisabled();
+    fireEvent.change(screen.getByRole("textbox", { name: "Flex Query ID" }), { target: { value: "912406" } });
+    expect(screen.getByRole("button", { name: /Save and test/ })).toBeEnabled();
+  });
+
+  it("shows every visible OKX credential issue after a failed submission", () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="exchange" addRequest={1} />);
+    fireEvent.click(screen.getByRole("button", { name: /OKX/ }));
+    fireEvent.change(screen.getByLabelText("API secret"), { target: { value: "short-secret" } });
+    fireEvent.click(screen.getByRole("button", { name: /Save and test/ }));
+    expect(screen.getByText("API key is required")).toBeVisible();
+    expect(screen.getByText(/That secret looks too short/)).toBeVisible();
+    expect(screen.getByText(/OKX needs the passphrase/)).toBeVisible();
+    expect(props.onSaveExchange).not.toHaveBeenCalled();
+  });
+
   it("offers custom assets in the first-source picker", () => {
     const addCustomAsset = vi.fn();
     render(<MobileSources {...props} exchanges={[]} onAddCustomAsset={addCustomAsset} />);
@@ -231,5 +324,24 @@ describe("mobile data sources", () => {
       brokers={[{ type: "ibkr", token: "secret", queryId: "12345", active: true }]} />);
     fireEvent.click(screen.getByText(name, { exact: true }).closest("button")!);
     expect(screen.getByRole("textbox", { name: field })).toHaveAttribute("readonly");
+  });
+
+  it.each([
+    ["exchange", "Binance", "API key"],
+    ["wallet", "BTC", "Address"],
+    ["broker", "IBKR", "Flex Query ID"],
+  ])("keeps an edited %s identity fixed in the fidelity editor", async (kind, name, field) => {
+    render(<MobileSources {...props}
+      fidelityLayout selectedKind={kind as "exchange" | "wallet" | "broker"}
+      wallets={[{ type: "btc", address: "bc1qexample", active: true }]}
+      brokers={[{ type: "ibkr", token: "secret", queryId: "12345", active: true }]} />);
+    fireEvent.click(await screen.findByRole("button", { name: new RegExp(`^${name} `) }));
+    expect(screen.getByRole("textbox", { name: field })).toHaveAttribute("readonly");
+    if (kind === "wallet") {
+      expect(screen.getByRole("heading", { name: "Edit wallet" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Save" })).toBeVisible();
+      expect(screen.getByRole("button", { name: /ETH ProEthereum/ })).toBeDisabled();
+    }
+    if (kind === "broker") expect(screen.getByRole("heading", { name: "Edit broker" })).toBeVisible();
   });
 });

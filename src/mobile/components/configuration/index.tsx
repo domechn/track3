@@ -46,10 +46,8 @@ import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/r
 import { classifySourceError } from "@/middlelayers/datafetch/utils/source-failure";
 import { configurationFromForm, configurationToForm, initialConfiguration } from "@/middlelayers/ui-state/config-form";
 import { isIOS } from "@/utils/platform";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 
-import { AutoRetrySetting } from "@/components/configuration/auto-retry-setting";
-import { Switch as MobileSwitch } from "@/mobile/components/ui/switch";
 import { SummaryCards } from "@/components/configuration/summary-cards";
 import { GeneralSettings } from "@/mobile/components/configuration/general-settings";
 import { ExchangeSection } from "@/components/configuration/exchange-section";
@@ -116,6 +114,7 @@ const App = ({
   const { toast } = useToast();
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const warmStartPreferCurrency =
     initialPreferCurrency || getCachedPreferCurrency();
 
@@ -139,6 +138,7 @@ const App = ({
     useState(false);
   const [addWalletDialogOpen, setAddWalletDialogOpen] = useState(false);
   const [attachModalOpen, setAttachModalOpen] = useState(false);
+  const [attachFromMenu, setAttachFromMenu] = useState(false);
   const [attachModalTargetIdx, setAttachModalTargetIdx] = useState(-1);
 
   const [saveCexConfigLoading, setSaveCexConfigLoading] = useState(false);
@@ -146,6 +146,7 @@ const App = ({
     useState(false);
   const [saveWalletConfigLoading, setSaveWalletConfigLoading] = useState(false);
   const [refreshCurrencyLoading, setRefreshCurrencyLoading] = useState(false);
+  const [currencyRateError, setCurrencyRateError] = useState(false);
 
   const [isPro, setIsPro] = useState(false);
   const [proLicense, setProLicense] = useState("");
@@ -158,6 +159,7 @@ const App = ({
     [x: string]: string;
   }>({});
   const [quickLookTitle, setQuickLookTitle] = useState("");
+  const [quickLookRefresh, setQuickLookRefresh] = useState<() => void>();
 
   const [addExchangeConfig, setAddExchangeConfig] = useState<
     ExchangeDraft | undefined
@@ -427,6 +429,7 @@ const App = ({
 
   // ---- QuickLook handlers ----
   async function handleQuickLookExchange(ex: ExchangeRow) {
+    setQuickLookRefresh(() => () => { void handleQuickLookExchange(ex); });
     setQuickLookTitle(ex.alias ?? ex.type);
     setQuickLookData([]);
     setQuickLookLogoMap({});
@@ -471,6 +474,7 @@ const App = ({
   }
 
   async function handleQuickLookWallet(wallet: WalletRow) {
+    setQuickLookRefresh(() => () => { void handleQuickLookWallet(wallet); });
     setQuickLookTitle(wallet.alias ?? `${wallet.type.toUpperCase()} Wallet`);
     setQuickLookData([]);
     setQuickLookLogoMap({});
@@ -531,6 +535,7 @@ const App = ({
   }
 
   async function handleQuickLookStockBroker(broker: StockBrokerRow) {
+    setQuickLookRefresh(() => () => { void handleQuickLookStockBroker(broker); });
     setQuickLookTitle(broker.alias ?? broker.type);
     setQuickLookData([]);
     setQuickLookLogoMap({});
@@ -640,13 +645,12 @@ const App = ({
   }
 
   function onUpdateCurrencyRatesClick() {
+    setCurrencyRateError(false);
     updateCurrencyRates()
       .then(() => notifyConfigurationSaved())
       .catch((e) => {
-        toast({
-          description: safeError(e),
-          variant: "destructive",
-        });
+        if (isIOS() && searchParams.get("section") === "currency") setCurrencyRateError(true);
+        else toast({ description: safeError(e), variant: "destructive" });
       });
   }
 
@@ -1070,9 +1074,16 @@ const App = ({
 
   const mobileSection = searchParams.get("section");
   const [sourceTab, setSourceTab] = useState<"exchanges" | "wallets" | "brokers" | "custom">("exchanges");
+  const [sourceAddRequest, setSourceAddRequest] = useState(0);
+  const sourceSummary = t("fidelity.settings.sources.summaryRich")
+    .replace("{exchanges}", String(exchanges.length))
+    .replace("{wallets}", String(wallets.length))
+    .replace("{brokers}", String(stockBrokers.length))
+    .replace("{custom}", String(others.length));
   if (isIOS()) {
     return mobileSection === "currency" ? (
       <GeneralSettings
+        fidelityLayout
         groupUSD={groupUSD}
         onGroupUSDChange={onGroupUSDSelectChange}
         hideInactive={hideInactive}
@@ -1085,23 +1096,37 @@ const App = ({
         preferredCurrencyDetail={preferredCurrencyDetail}
         onPreferCurrencyChange={onPreferCurrencyChanged}
         refreshCurrencyLoading={refreshCurrencyLoading}
+        rateError={currencyRateError}
         onUpdateCurrencyRatesClick={onUpdateCurrencyRatesClick}
       />
     ) : (
-      <div className="space-y-6">
-      {mobileSection === "sources" && <AutoRetrySetting t={t} switchComponent={MobileSwitch} />}
-      {mobileSection === "sources" && exchanges.length + wallets.length + stockBrokers.length + others.length > 0 && <>
-        <p className="t3-mobile-source-summary">{t("settings.phase6.sourceSummary").replace("{count}", String(exchanges.length + wallets.length + stockBrokers.length + others.length))}</p>
+      <div className={mobileSection === "sources" ? "fidelity-settings-sources" : "space-y-6"}>
+      {mobileSection === "sources" && <>
+        <p className="fidelity-settings-source-summary">{exchanges.length + wallets.length + stockBrokers.length + others.length === 0
+          && sourceTab === "exchanges" && !(location.state as { fromOnboarding?: boolean } | null)?.fromOnboarding
+          ? t("fidelity.settings.sources.emptySummaryExchange")
+          : sourceSummary.split(/(<b>.*?<\/b>)/g).map((part, index) =>
+            part.startsWith("<b>") ? <strong key={index}>{part.slice(3, -4)}</strong> : part)}</p>
+        <button type="button" className="fidelity-settings-add"
+          aria-label={sourceTab === "custom" ? t("config.addSymbol") : undefined} onClick={() => {
+          if (sourceTab === "custom") setAddOtherRequest((request) => request + 1);
+          else setSourceAddRequest((request) => request + 1);
+        }}><svg viewBox="0 0 18 18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M9 3.5v11M3.5 9h11" /></svg>{t(({ exchanges: "fidelity.settings.sources.addExchange", wallets: "fidelity.settings.sources.addWallet",
+          brokers: "fidelity.settings.sources.addBroker", custom: "fidelity.settings.sources.addCustom" })[sourceTab])}</button>
         <div role="tablist" aria-label={t("settings.phase6.sources")} className="t3-mobile-source-tabs">
           {(["exchanges", "wallets", "brokers", "custom"] as const).map((tab) =>
             <button key={tab} type="button" role="tab" aria-label={t(`settings.phase6.sourceTab.${tab}`)}
               aria-selected={sourceTab === tab} onClick={() => setSourceTab(tab)}>
-              {t(`settings.phase6.sourceTab.${tab}`)}
+              {tab === "custom" ? t("fidelity.settings.sources.customTab") : t(`settings.phase6.sourceTab.${tab}`)}
               <span aria-hidden="true">{({ exchanges: exchanges.length, wallets: wallets.length, brokers: stockBrokers.length, custom: others.length })[tab]}</span>
             </button>)}
         </div>
       </>}
       {(mobileSection !== "sources" || sourceTab !== "custom") && <MobileSources
+        fidelityLayout={mobileSection === "sources"}
+        fromOnboarding={Boolean((location.state as { fromOnboarding?: boolean } | null)?.fromOnboarding)}
+        baseCurrency={preferredCurrencyDetail}
+        addRequest={sourceAddRequest}
         selectedKind={mobileSection === "sources" ? sourceTab === "exchanges" ? "exchange" : sourceTab === "wallets" ? "wallet" : "broker" : undefined}
         formatError={safeError}
         exchanges={exchanges}
@@ -1126,7 +1151,10 @@ const App = ({
         onAddCustomAsset={() => { setSourceTab("custom"); setAddOtherRequest((request) => request + 1); }}
       />}
       {(mobileSection !== "sources" || sourceTab === "custom" || exchanges.length + wallets.length + stockBrokers.length + others.length === 0) && <MobileOthers
+        fidelityLayout={mobileSection === "sources" && sourceTab === "custom"}
         others={others}
+        attachOptions={[...cexAttachOptions, ...walletAttachOptions]}
+        attachLabel={getAttachDisplayLabel}
         editSymbol={searchParams.get("edit") ?? undefined}
         baseCurrency={customPriceCurrency}
         addRequest={addOtherRequest}
@@ -1140,7 +1168,7 @@ const App = ({
           }
         }}
         onRemove={handleRemoveOther}
-        onAttach={(index) => { setAttachModalTargetIdx(index); setAttachModalOpen(true); }}
+        onAttach={(index, fromMenu) => { setAttachModalTargetIdx(index); setAttachFromMenu(Boolean(fromMenu)); setAttachModalOpen(true); }}
       />}
       <AttachModal
         open={attachModalOpen}
@@ -1149,6 +1177,9 @@ const App = ({
         cexOptions={cexAttachOptions}
         walletOptions={walletAttachOptions}
         onSelect={handleAttachSelect}
+        fidelityLayout={mobileSection === "sources" && !attachFromMenu}
+        assetName={others[attachModalTargetIdx]?.symbol ?? ""}
+        pausedValues={exchanges.filter((item) => !item.active).map((item) => `cex:${item.type}:${item.apiKey}`)}
       />
       <QuickLookDialog
         open={quickLookOpen}
@@ -1157,6 +1188,8 @@ const App = ({
         loading={quickLookLoading}
         data={quickLookData}
         logoMap={quickLookLogoMap}
+        fidelityLayout={mobileSection === "sources"}
+        onRefresh={quickLookRefresh}
       />
       </div>
     );

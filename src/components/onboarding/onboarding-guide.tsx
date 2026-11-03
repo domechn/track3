@@ -1,5 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog"
 import { motion, useReducedMotion } from "framer-motion"
+import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons"
 import { useEffect, useId, useRef, useState } from "react"
 import { useTranslation } from "@/i18n"
 import { getAccessibleMotionProps } from "@/components/motion"
@@ -11,6 +12,7 @@ import guideArt2 from "./guide-art-2.svg?raw"
 import guideArt3 from "./guide-art-3.svg?raw"
 import guideArt4 from "./guide-art-4.svg?raw"
 import guideArt5 from "./guide-art-5.svg?raw"
+import PhoneFidelityArt from "./phone-fidelity-art"
 import "./onboarding.css"
 
 const steps = ["welcome", "sources", "history", "deeper", "backup"] as const
@@ -19,12 +21,15 @@ const ease = [0.2, 0.8, 0.2, 1] as const
 type Variant = "desktop" | "ios"
 type CloseReason = "completed" | "skipped"
 
-export default function OnboardingGuide({ open, variant, step, onStep, onClose }: {
+export default function OnboardingGuide({ open, variant, step, onStep, onClose, confirmReplay = false, onConfirmReplay, onCancelReplay }: {
   open: boolean
   variant: Variant
   step: number
   onStep: (step: number) => void
   onClose: (reason: CloseReason) => void
+  confirmReplay?: boolean
+  onConfirmReplay?: () => void
+  onCancelReplay?: () => void
 }) {
   const { t } = useTranslation()
   const initialReduced = useReducedMotion()
@@ -44,7 +49,8 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
   const last = step === steps.length - 1
   const [fullScreenSheet, setFullScreenSheet] = useState(() => variant === "ios" && (window.innerWidth < 700 || window.innerHeight < 500))
   const [fidelityDesktop, setFidelityDesktop] = useState(() => variant === "desktop" && window.innerWidth >= 1400)
-  const count = t("onboarding.stepCount").replace("{current}", String(step + 1)).replace("{total}", String(steps.length))
+  const phoneFidelity = variant === "ios" && fullScreenSheet && window.innerWidth >= 380 && window.innerHeight >= 700
+  const count = t(phoneFidelity ? "fidelity.guide.stepCount" : "onboarding.stepCount").replace("{current}", String(step + 1)).replace("{total}", String(steps.length))
 
   useEffect(() => {
     if (variant !== "desktop") return
@@ -109,6 +115,19 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
   const skipButton = <button type="button" data-testid="onboarding-skip" className="ob-ios-text-btn" onClick={skip}>{label}</button>
   const next = <button type="button" ref={nextRef} data-testid={last ? "onboarding-cta-add-source" : "onboarding-next"} className="ob-ios-primary" onClick={last ? complete : () => go(1)}>{primary}</button>
 
+  if (confirmReplay) return <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onCancelReplay?.() }}>
+    <Dialog.Portal>
+      <Dialog.Overlay className="fidelity-guide-confirm-overlay" />
+      <Dialog.Content className="fidelity-guide-confirm" data-testid="onboarding-dialog" data-step="welcome"
+        aria-describedby="fidelity-guide-confirm-description"
+        onEscapeKeyDown={(event) => { event.preventDefault(); onCancelReplay?.() }}>
+        <Dialog.Title>{t("fidelity.b.about.replayConfirmTitle")}</Dialog.Title>
+        <Dialog.Description id="fidelity-guide-confirm-description">{t("fidelity.b.about.replayConfirmBody")}</Dialog.Description>
+        <button type="button" className="is-primary" onClick={onConfirmReplay}>{t("fidelity.b.about.startGuide")}</button>
+        <button type="button" onClick={onCancelReplay}>{t("common.cancel")}</button>
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>
   if (fidelityDesktop) {
     return <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) skip() }}>
       <Dialog.Portal>
@@ -163,7 +182,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
           data-closing={closing}
           data-step={id}
           data-variant={variant}
-          className={`ob-dialog ${variant === "ios" ? "ios-onboarding" : "ob-desktop"}`}
+          className={`ob-dialog ${variant === "ios" ? "ios-onboarding" : "ob-desktop"}${phoneFidelity ? " fd-guide" : ""}`}
           {...(reduced
             ? { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: .15, ease: "linear" as const } }
             : fullScreenSheet
@@ -188,6 +207,32 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
             if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) go(dx < 0 ? 1 : -1)
           }}
         >
+          {phoneFidelity ? <>
+            <div className="fd-guide-top">
+              <div className="fd-guide-brand"><span className="fd-guide-logo" aria-hidden="true"><i /><i /><i /></span>Track3</div>
+              <span className="fd-guide-count">{count}</span>
+              <button type="button" data-testid="onboarding-skip" className="fd-guide-skip" onClick={skip}>{t(last ? "fidelity.guide.close" : "onboarding.skip")}</button>
+            </div>
+            <div className="fd-guide-stage">
+              <div className="fd-guide-art" data-testid={`onboarding-illustration-${id}`} aria-hidden="true"><PhoneFidelityArt step={step} t={t} />
+                {id === "deeper" && <svg className="fd-guide-ring" viewBox="0 0 480 290" aria-hidden="true"><circle className="fd-guide-pulse" cx="376" cy="128" r="35" fill="none" stroke="#d9a441" strokeWidth="2" /></svg>}
+              </div>
+              <div className="ob-text fd-guide-copy" role="region" aria-label={t(`fidelity.guide.eyebrow.${id}`)} tabIndex={0}>
+                <div className="fd-guide-eyebrow">{t(`fidelity.guide.eyebrow.${id}`)}</div>
+                <Dialog.Title id={titleId} className="ob-title">{t(`fidelity.guide.title.${id}`)}</Dialog.Title>
+                <Dialog.Description className="ob-desc">{t(`fidelity.guide.body.${id}`)}</Dialog.Description>
+              </div>
+            </div>
+            <div className="fd-guide-foot">
+              <div className="fd-guide-dots" data-testid="onboarding-progress" aria-hidden="true">{steps.map((item, index) => <span key={item} className={index === step ? "active" : ""} />)}</div>
+              <div className="fd-guide-actions">
+                <button type="button" data-testid="onboarding-back" className="fd-guide-back" disabled={step === 0} onClick={() => go(-1)}><ChevronLeftIcon aria-hidden="true" />{t("onboarding.back")}</button>
+                <button type="button" ref={nextRef} data-testid={last ? "onboarding-cta-add-source" : "onboarding-next"} className="fd-guide-next" onClick={last ? complete : () => go(1)}>
+                  {last && <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M9 3.5v11M3.5 9h11" /></svg>}{t(last ? "onboarding.addFirstSource" : "onboarding.next")}{!last && <ChevronRightIcon aria-hidden="true" />}
+                </button>
+              </div>
+            </div>
+          </> : <>
           {variant === "ios" && <div className="ob-ios-bar">{back}{skipButton}</div>}
           <motion.div key={`art-${id}-${reduced}`} className="ob-art" aria-hidden="true" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reduced ? .15 : .24, ease: reduced ? "linear" : ease }}>
             <Illustration id={id} variant={variant} reduced={reduced} />
@@ -215,6 +260,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose }
               </div> : next}
             </div>
           </div>
+          </>}
           <div aria-live="polite" className="sr-only" data-testid="onboarding-live">{announcement}</div>
         </motion.div>
       </Dialog.Content>

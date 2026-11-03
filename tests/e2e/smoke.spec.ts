@@ -38,11 +38,11 @@ test("a second device pulls history from the first device", async ({ browser }) 
     await installTauriBridge(second, s3);
 
     await second.goto("/#/history");
-    await expect(second.getByText("Total 2 records")).toBeVisible();
-    await second.getByTestId("history-delete-latest").locator("xpath=ancestor::tr").hover();
-    await second.getByTestId("history-delete-latest").click();
-    await second.getByRole("button", { name: "Confirm" }).click();
-    await expect(second.getByText("Total 1 records")).toBeVisible();
+    await expect(second.getByTestId("history-snapshot-row")).toHaveCount(2);
+    await second.getByTestId("history-desktop-detail").getByRole("button", { name: "Delete", exact: true }).click();
+    await second.getByRole("alertdialog", { name: "Delete this snapshot?" })
+      .getByRole("button", { name: "Delete snapshot" }).click();
+    await expect(second.getByTestId("history-snapshot-row")).toHaveCount(1);
 
     const enable = async (page: typeof first) => {
       await page.goto("/#/settings/sync");
@@ -60,7 +60,7 @@ test("a second device pulls history from the first device", async ({ browser }) 
     await expect(first.getByLabel(/Name for device/)).toBeVisible({ timeout: 15000 });
     await enable(second);
     await second.goto("/#/history");
-    await expect(second.getByText("Total 2 records")).toBeVisible({ timeout: 15000 });
+    await expect(second.getByTestId("history-snapshot-row")).toHaveCount(2, { timeout: 15000 });
   } finally {
     await firstContext.close();
     await secondContext.close();
@@ -88,8 +88,8 @@ test("portfolio, refresh, history undo, and assistant SSE work in a browser", as
   await expect(page.getByText("$84,000.00").first()).toBeVisible();
 
   await page.goto("/#/history");
-  await expect(page.getByRole("heading", { name: "Historical Data" })).toBeVisible();
-  await expect(page.getByText("Total 3 records")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "History", exact: true })).toBeVisible();
+  await expect(page.getByTestId("history-snapshot-row")).toHaveCount(3);
   await page.evaluate(() => {
     if (!document.querySelector("[data-testid=history-content]")) {
       throw new Error("history content missing");
@@ -103,12 +103,12 @@ test("portfolio, refresh, history undo, and assistant SSE work in a browser", as
       }
     }).observe(document.body, { attributes: true, childList: true, subtree: true });
   });
-  await page.getByTestId("history-delete-latest").locator("xpath=ancestor::tr").hover();
-  await page.getByTestId("history-delete-latest").click();
-  await page.getByRole("button", { name: "Confirm" }).click();
-  await expect(page.getByText("Total 2 records")).toBeVisible();
+  await page.getByTestId("history-desktop-detail").getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("alertdialog", { name: "Delete this snapshot?" })
+    .getByRole("button", { name: "Delete snapshot" }).click();
+  await expect(page.getByTestId("history-snapshot-row")).toHaveCount(2);
   await page.getByRole("button", { name: "Undo" }).click();
-  await expect(page.getByText("Total 3 records")).toBeVisible();
+  await expect(page.getByTestId("history-snapshot-row")).toHaveCount(3);
   expect(await page.evaluate(() => (window as any).__historyLoadingFlash)).toBe(false);
 
   await page.goto("/#/assistant");

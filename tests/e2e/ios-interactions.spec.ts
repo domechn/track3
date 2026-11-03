@@ -48,8 +48,8 @@ test("long press selection is limited to editable and explicitly selectable cont
     return result;
   });
   expect(styles).toEqual(["none", "text", "text"]);
-  await expect(page.locator("canvas").first()).toHaveCSS("user-select", "none");
-  expect(await page.locator("canvas").first().evaluate((node) => {
+  await expect(page.locator(".fd-overview-chart").first()).toHaveCSS("user-select", "none");
+  expect(await page.locator(".fd-overview-chart").first().evaluate((node) => {
     const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
     node.dispatchEvent(event);
     return event.defaultPrevented;
@@ -64,21 +64,22 @@ test("long press selection is limited to editable and explicitly selectable cont
   }))).toEqual({ select: "none", highlight: "rgba(0, 0, 0, 0)" });
   await sheet.getByRole("button", { name: "Close" }).click();
   await page.goto("/#/goals");
-  await page.getByRole("button", { name: "Add alert" }).click();
-  expect(await page.getByRole("dialog", { name: "Add alert" }).getByRole("heading", { name: "New rule" }).evaluate((node) =>
+  await page.getByRole("button", { name: "Add rule" }).first().click();
+  expect(await page.getByRole("dialog", { name: "Add rule" }).locator(".pf-editor-head b").evaluate((node) =>
     getComputedStyle(node).userSelect)).toBe("none");
 });
 
 test("empty portfolio keeps More and source setup reachable", async ({ page }) => {
   await installTauriBridge(page, { emptyPortfolio: true });
   await page.goto("/#/overview");
-  await expect(page.getByText("Your portfolio starts here")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Add your first source" })).toBeVisible({ timeout: 30_000 });
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await expect(page.locator(".mobile-more-hub")).toBeVisible();
   await page.getByRole("link", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await page.getByRole("link", { name: "Data sources" }).click();
-  await expect(page.getByRole("button", { name: "Add source" })).toBeVisible();
+  await page.getByRole("button", { name: "Add exchange" }).first().click();
+  await expect(page.getByRole("dialog", { name: "Edit data source" })).toBeVisible();
 });
 
 test("backup folder path remains selectable for copying", async ({ page }) => {
@@ -94,17 +95,17 @@ test("tab taps open roots and Back restores route and tab scroll", async ({ page
   await page.setViewportSize({ width: 390, height: 568 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
-  await expect(page.locator(".t3-holdings-row").first()).toBeVisible({ timeout: 30_000 });
-  await page.locator(".t3-holdings-row").first().scrollIntoViewIfNeeded();
+  await expect(page.locator(".fd-overview-holdings .fd-overview-row").first()).toBeVisible({ timeout: 30_000 });
+  await page.locator(".fd-overview-holdings .fd-overview-row").first().scrollIntoViewIfNeeded();
   await page.evaluate(() => scrollTo(0, Math.max(scrollY, 450)));
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
   const before = await page.evaluate(() => scrollY);
-  await page.locator(".t3-holdings-row").first().click();
+  await page.locator(".fd-overview-holdings .fd-overview-row").first().click();
   await expect(page).toHaveURL(/#\/coins\//);
   await clickCoinBack(page);
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before - 2);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
-  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20);
+  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50, { timeout: 30_000 });
   await page.evaluate(() => scrollTo(0, 450));
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
@@ -119,17 +120,30 @@ test("tab taps open roots and Back restores route and tab scroll", async ({ page
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await expect(page).toHaveURL(/#\/more$/);
   await expect(page.locator(".mobile-more-hub")).toBeVisible();
-  await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
-  await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
+  const historyTab = page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" });
+  await historyTab.click();
+  await expect(historyTab).toHaveAttribute("aria-current", "page");
+  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
+  await historyTab.click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+});
+
+test("History tab opens Analytics after its first load", async ({ page }) => {
+  await installTauriBridge(page, { richPortfolio: true });
+  await page.goto("/#/history");
+  await expect(page.locator(".history-mobile-list")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Analytics" }).click();
+  await expect(page).toHaveURL(/#\/summary$/);
+  await expect(page.locator("#app-main-content")).toHaveAttribute("data-route", "/summary", { timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Summary", exact: true })).toBeVisible({ timeout: 15_000 });
 });
 
 test("Back to an expanded Overview rank list restores its scroll", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 568 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
-  await page.getByRole("button", { name: "Show More: More analytics" }).click();
-  const row = page.locator(".top-coins-rank-mobile .mobile-list-row").first();
+  await page.getByRole("button", { name: /Show more \(/ }).click();
+  const row = page.locator(".fd-overview-rank .fd-overview-row").first();
   await row.scrollIntoViewIfNeeded();
   const before = await page.evaluate(() => scrollY);
   expect(before).toBeGreaterThan(300);
@@ -137,10 +151,10 @@ test("Back to an expanded Overview rank list restores its scroll", async ({ page
   await expect(page).toHaveURL(/#\/coins\//);
   await clickCoinBack(page);
   await expect(page).toHaveURL(/#\/overview$/);
-  await expect(page.getByRole("button", { name: "Show Less: Less analytics" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show fewer" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before - 2);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
-  await expect(page.getByRole("button", { name: "Show More: More analytics" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Show more \(/ })).toBeVisible();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
 });
 
@@ -187,28 +201,41 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await page.setViewportSize({ width: 390, height: 568 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
-  await expect(page.getByRole("button", { name: "Choose date range" })).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator(".t3-holdings-row").first()).toBeVisible({ timeout: 30_000 });
-  await page.evaluate(() => scrollTo(0, 250));
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(250);
-  await page.getByRole("button", { name: "Choose date range" }).click();
-  const dialog = page.getByRole("dialog", { name: "Choose date range" });
+  await expect(page.getByRole("button", { name: "Custom range" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".fd-overview-holdings .fd-overview-row").first()).toBeVisible({ timeout: 30_000 });
+  // The range button scrolls with the page, so keep it in view when testing the sheet.
+  await page.evaluate(() => scrollTo(0, 50));
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(50);
+  await page.getByRole("button", { name: "Custom range" }).click();
+  const dialog = page.getByRole("dialog", { name: "Date range" });
   await expect(dialog).toBeVisible();
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(50);
   await dialog.getByRole("button", { name: "Close" }).click();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(250);
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(50);
   await page.goto("/#/goals");
-  await expect(page.getByRole("button", { name: "Add alert" })).toBeVisible();
-  await page.evaluate(() => scrollTo(0, 150));
+  await page.evaluate(async () => {
+    for (let index = 0; index < 7; index += 1) {
+      await (window as any).__e2eInvoke("plugin:sql|execute", {
+        query: "INSERT INTO alert_rules (kind, asset_type, symbol, comparator, threshold, window, enabled, cooldown_seconds) VALUES ('total_value_target', NULL, NULL, 'gte', ?, NULL, 1, 3600)",
+        values: [100_000 + index * 10_000],
+      });
+    }
+  });
+  await page.reload();
+  await expect(page.locator(".pf-goal-row")).toHaveCount(7);
+  const editRule = page.locator(".pf-goal-row").nth(2).getByRole("button", { name: /Edit/ });
+  await editRule.scrollIntoViewIfNeeded();
   const before = await page.evaluate(() => scrollY);
-  await page.getByRole("button", { name: "Add alert" }).click();
-  await page.getByRole("dialog", { name: "Add alert" }).getByRole("button", { name: "Cancel" }).click();
+  expect(before).toBeGreaterThan(100);
+  await editRule.click();
+  await page.getByRole("dialog", { name: "Edit rule" }).getByRole("button", { name: "Cancel" }).click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(before);
   await page.goto("/#/history");
   const historyRow = page.locator(".history-mobile-snapshot-button").first();
   await historyRow.scrollIntoViewIfNeeded();
   const historyScroll = await page.evaluate(() => scrollY);
   await historyRow.click();
-  await page.getByRole("dialog", { name: /snapshot details/i }).getByRole("button", { name: "Close" }).click();
+  await page.getByRole("dialog", { name: /snapshot details/i }).getByRole("button", { name: "Back" }).click();
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(historyScroll);
   await page.goto("/#/summary");
   await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
@@ -223,18 +250,17 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(summaryScroll);
 });
 
-test("History controls and Settings links preserve their page scroll", async ({ page }) => {
+test("History paging stays bounded and Settings links preserve their page scroll", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 568 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/history");
-  const rows = page.locator(".history-rows-trigger");
+  const rows = page.locator(".fidelity-history-pager button");
   await rows.scrollIntoViewIfNeeded();
   const historyScroll = await page.evaluate(() => scrollY);
   expect(historyScroll).toBeGreaterThan(0);
   await rows.click();
-  await expect(page.getByRole("option", { name: "50" })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(historyScroll);
+  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(10);
+  await expect(page.getByText("51–60 of 60")).toBeVisible();
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await page.locator(".mobile-more-hub").getByRole("link", { name: "Settings" }).click();
   await expect(page).toHaveURL(/#\/settings$/);
@@ -246,7 +272,7 @@ test("History controls and Settings links preserve their page scroll", async ({ 
   expect(settingsScroll).toBeGreaterThan(0);
   await backup.click();
   await expect(page).toHaveURL(/#\/settings\/data\?section=backup$/);
-  await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup");
+  await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup & data");
   await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(settingsScroll);
@@ -255,7 +281,7 @@ test("History controls and Settings links preserve their page scroll", async ({ 
 test("rich History and Overview scrolling stay bounded without rebuilding charts", async ({ page, context }) => {
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/history");
-  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20);
+  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50, { timeout: 30_000 });
   const rowVisibility = await page.locator(".history-mobile-snapshot").first().evaluate((node) =>
     getComputedStyle(node).getPropertyValue("content-visibility"));
   const cdp = await context.newCDPSession(page);
@@ -272,7 +298,10 @@ test("rich History and Overview scrolling stay bounded without rebuilding charts
     layouts: metric(historyEnd.metrics, "LayoutCount") - metric(historyStart.metrics, "LayoutCount"),
   };
   await page.goto("/#/overview");
-  await expect(page.locator("canvas").first()).toBeVisible();
+  await expect(page.locator(".fd-overview-chart").first()).toBeVisible();
+  await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0, { timeout: 15_000 });
+  await page.evaluate(() => new Promise<void>((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   const start = await cdp.send("Performance.getMetrics");
   await page.evaluate(() => {
     const state = window as Window & { __perf?: { tasks: number; canvasAdds: number; canvasContexts: number } };
@@ -296,6 +325,7 @@ test("rich History and Overview scrolling stay bounded without rebuilding charts
     await page.evaluate((y) => scrollTo(0, y), step * 250);
   }
   await page.evaluate(() => scrollTo(0, 0));
+  await page.getByRole("button", { name: "Custom range" }).click();
   await page.getByRole("switch", { name: "Percent" }).click();
   const end = await cdp.send("Performance.getMetrics");
   const results = {
@@ -364,30 +394,42 @@ for (const width of [320, 375, 390, 430]) {
       expect(cells.overflow, JSON.stringify(cells)).toBeLessThanOrEqual(0);
       await rank.getByRole("button", { name: "Close" }).click();
       await page.goto("/#/overview");
-      await page.getByRole("button", { name: "Show More" }).click();
-      for (const shortRow of await page.locator(".top-coins-rank-mobile .mobile-list-row").all()) {
-        const symbol = shortRow.locator(".mobile-list-label .truncate");
+      await page.locator(".fd-overview-more").click();
+      for (const shortRow of await page.locator(".fd-overview-rank .fd-overview-row").all()) {
+        const symbol = shortRow.locator("span:first-child b");
         const text = (await symbol.textContent())?.trim() ?? "";
         if (text.length > 4) continue;
-        const size = await symbol.evaluate((node) => ({ client: node.clientWidth, scroll: node.scrollWidth }));
-        expect(size.client, `Overview ${text} at ${width}px`).toBeGreaterThan(0);
-        expect(size.scroll, `Overview ${text} at ${width}px`).toBeLessThanOrEqual(size.client);
+        const bounds = await symbol.evaluate((node) => {
+          const glyphs = document.createRange();
+          glyphs.selectNodeContents(node);
+          const textRects = Array.from(glyphs.getClientRects());
+          const label = node.parentElement!.getBoundingClientRect();
+          const row = node.closest(".fd-overview-row")!.getBoundingClientRect();
+          return { lines: textRects.length, textWidth: textRects[0]?.width ?? 0,
+            textRight: textRects[0]?.right ?? 0, right: label.right, rowRight: row.right };
+        });
+        expect(bounds.lines, `Overview ${text} at ${width}px`).toBe(1);
+        expect(bounds.textWidth, `Overview ${text} at ${width}px`).toBeGreaterThan(0);
+        expect(bounds.textRight, `Overview ${text} at ${width}px`).toBeLessThanOrEqual(bounds.right);
+        expect(bounds.right, `Overview ${text} at ${width}px`).toBeLessThanOrEqual(bounds.rowRight);
       }
       await page.goto("/#/history");
       await expect(page.locator(".history-mobile-snapshot-button").first()).toBeVisible();
       await page.locator(".history-mobile-snapshot-button").first().click();
       const detail = page.getByRole("dialog", { name: /snapshot details/i });
-      await detail.getByRole("button", { name: "Delete snapshot" }).click();
-      await page.getByRole("alertdialog").getByRole("button", { name: "Confirm" }).click();
+      await detail.getByRole("button", { name: "Delete", exact: true }).click();
+      await page.getByRole("alertdialog").getByRole("button", { name: "Delete snapshot" }).click();
       const undo = page.getByRole("button", { name: "Undo" });
-      const close = page.locator("[toast-close]").last();
       await expect(undo).toBeVisible();
       const undoBox = (await undo.boundingBox())!;
-      const closeBox = (await close.boundingBox())!;
       expect(await undo.evaluate((node) => getComputedStyle(node).marginLeft)).toBe("0px");
-      expect(undoBox.x + undoBox.width <= closeBox.x || closeBox.x + closeBox.width <= undoBox.x ||
-        undoBox.y + undoBox.height <= closeBox.y || closeBox.y + closeBox.height <= undoBox.y).toBe(true);
-      expect(Math.max(undoBox.y + undoBox.height, closeBox.y + closeBox.height)).toBeLessThanOrEqual(
+      const close = page.locator(".ios-d3-toast-viewport [toast-close]").last();
+      await expect(close).toBeVisible();
+      expect(undoBox.x + undoBox.width).toBeLessThanOrEqual((await close.boundingBox())!.x);
+      expect(undoBox.y + undoBox.height).toBeLessThanOrEqual(
+        (await page.locator(".mobile-tab-bar").boundingBox())!.y);
+      const closeBox = (await close.boundingBox())!;
+      expect(closeBox.y + closeBox.height).toBeLessThanOrEqual(
         (await page.locator(".mobile-tab-bar").boundingBox())!.y);
     });
   }
@@ -399,10 +441,9 @@ test("Chinese long undo toast leaves the close target clear", async ({ page }) =
   await installTauriBridge(page);
   await page.goto("/#/history");
   await page.locator(".history-mobile-snapshot-button").first().click();
-  await page.getByRole("dialog").getByRole("button", { name: "删除快照" }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: /确认/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "删除", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: /删除快照/ }).click();
   const undo = page.getByRole("button", { name: "撤销" });
-  const close = page.getByRole("button", { name: "关闭" });
   await expect(undo).toBeVisible();
   await page.locator(".mobile-toast-copy").last().evaluate((node) => {
     node.textContent = "已删除记录；这是一段很长的提示文字，用来检查窄屏幕上的操作按钮布局。";
@@ -410,10 +451,11 @@ test("Chinese long undo toast leaves the close target clear", async ({ page }) =
   expect(await page.locator(".mobile-toast-copy").last().evaluate((node) =>
     getComputedStyle(node).userSelect)).toBe("text");
   const a = (await undo.boundingBox())!;
-  const b = (await close.boundingBox())!;
-  expect(a.x + a.width <= b.x || b.x + b.width <= a.x ||
-    a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
-  expect(Math.max(a.y + a.height, b.y + b.height)).toBeLessThanOrEqual(
+  const close = page.locator(".ios-d3-toast-viewport [toast-close]").last();
+  await expect(close).toBeVisible();
+  const closeBox = (await close.boundingBox())!;
+  expect(a.x + a.width).toBeLessThanOrEqual(closeBox.x);
+  expect(a.y + a.height).toBeLessThanOrEqual(
     (await page.locator(".mobile-tab-bar").boundingBox())!.y);
 });
 
@@ -421,12 +463,12 @@ test("an active root tap does not discard scroll on the next programmatic route 
   await page.setViewportSize({ width: 390, height: 568 });
   await installTauriBridge(page, { emptyPortfolio: true });
   await page.goto("/#/overview");
-  await expect(page.getByRole("button", { name: "Add your first source" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add an exchange" })).toBeVisible();
   await page.evaluate(() => { document.querySelector<HTMLElement>("#app-main-content")!.style.minHeight = "1400px"; });
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
   await page.evaluate(() => scrollTo(0, 220));
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(220);
-  await page.getByRole("button", { name: "Add your first source" }).evaluate((node: HTMLElement) => node.click());
+  await page.getByRole("button", { name: "Add an exchange" }).evaluate((node: HTMLElement) => node.click());
   await expect(page).toHaveURL(/#\/settings\/configuration$/);
   await expect(page.getByRole("heading", { name: "Data sources" })).toBeVisible();
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
@@ -439,7 +481,7 @@ test("an active root tap clears a route fragment and scrolls to the top", async 
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview#details");
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
-  await expect(page.locator(".t3-holdings-row").first()).toBeVisible();
+  await expect(page.locator(".fd-overview-holdings .fd-overview-row").first()).toBeVisible();
   await page.evaluate(() => scrollTo(0, 220));
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(220);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();

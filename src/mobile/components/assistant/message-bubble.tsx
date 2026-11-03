@@ -2,15 +2,21 @@ import { useEffect, useRef, useState } from "react";
 import {
   ChatBubbleIcon,
   ChevronDownIcon,
+  CopyIcon,
   PersonIcon,
+  CheckIcon,
 } from "@radix-ui/react-icons";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/mobile/i18n";
 import MarkdownRenderer from "@/components/assistant/markdown-renderer";
 import type { AssistantBlock, ChatMessage } from "@/components/assistant/use-chat";
 import UsageLabel from "@/components/assistant/usage-label";
 import ActionCard from "@/components/assistant/action-card";
+import PhoneActionCard from "@/mobile/components/assistant/phone-action-card";
 import { isIOS } from "@/utils/platform";
+import { FidelityIcon } from "@/mobile/components/fidelity-icon";
+import type { CurrencyRateDetail } from "@/middlelayers/types";
 
 function stripThinkTags(s: string): string {
   return s.replace(/<\/?think\s*>/gi, "").trim();
@@ -131,15 +137,35 @@ function mergeBlocks(blocks: AssistantBlock[]): AssistantBlock[] {
 
 function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: boolean, hasResponseStarted?: boolean,
   onDecideAction?: (id: string, decision: "approve" | "reject") => void, canDecideAction?: boolean,
-  t?: (key: string) => string) {
+  t?: (key: string) => string, onRetry?: () => void, baseCurrency?: CurrencyRateDetail) {
   if (block.kind === "think") {
     return <ThinkBlock key={idx} text={block.text} isStreaming={isStreaming} hasResponseStarted={hasResponseStarted} />;
   }
   if (block.kind === "text") {
     if (!block.text) return null;
+    const errorAt = isIOS() ? block.text.indexOf("[error]") : -1;
+    if (errorAt >= 0) {
+      const before = block.text.slice(0, errorAt).trim();
+      const detail = block.text.slice(errorAt + 7).trim();
+      return <div key={idx}>
+        {before && <MarkdownRenderer content={stripThinkTags(before)} signedValues />}
+        <div className="fidelity-chat-error" role="alert">
+          <FidelityIcon name="alert" />
+          <div>
+            <strong>{t?.("fidelity.assistant.requestFailed")}</strong>
+            <p>{t?.("fidelity.assistant.messageSaved")}</p>
+            <div className="fidelity-chat-error-actions">
+              <button type="button" onClick={onRetry}><FidelityIcon name="refresh" />{t?.("fidelity.assistant.retry")}</button>
+              <Link to="/settings/assistant">{t?.("fidelity.assistant.aiSettings")}</Link>
+            </div>
+            <p className="fidelity-chat-error-detail">{t?.("fidelity.assistant.details").replace("{detail}", detail)}</p>
+          </div>
+        </div>
+      </div>;
+    }
     return (
       <div key={idx} className="markdown-content">
-        <MarkdownRenderer content={stripThinkTags(block.text)} />
+        <MarkdownRenderer content={stripThinkTags(block.text)} signedValues={isIOS()} />
       </div>
     );
   }
@@ -166,12 +192,20 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
       </div>
     );
     return isIOS()
-      ? <details key={idx} className="ios-d3-tool-activity rounded-lg border px-3">
+      ? <details key={idx} className="ios-d3-tool-activity fidelity-tool-activity">
           <summary className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
-            <span className={`ios-d3-tool-status ios-d3-tool-status-${state}`} aria-hidden="true" />
-            <span>{t?.("assistant.chat.toolActivity")}</span>
-            <span className="text-muted-foreground">{t?.(activities.length === 1 ? "assistant.chat.toolSummary.one" : "assistant.chat.toolSummary.many")
+            <span className="sr-only">{t?.("assistant.chat.toolActivity")}</span>
+            <span className="sr-only">{t?.(activities.length === 1 ? "assistant.chat.toolSummary.one" : "assistant.chat.toolSummary.many")
               ?.replace("{count}", String(activities.length)).replace("{status}", t?.(`assistant.chat.toolStatus.${state}`) ?? state)}</span>
+            <span className="fidelity-tool-pills">
+              {activities.map((activity) => <span key={activity.taskId}
+                className={`fidelity-tool-pill is-${activity.status}`}>
+                <span className={`ios-d3-tool-status ios-d3-tool-status-${activity.status === "completed" ? "done" : activity.status}`} aria-hidden="true" />
+                <span>{activity.description}</span>
+                <small>{activity.status === "completed" && activity.resultPreview
+                  ? activity.resultPreview : t?.(`assistant.chat.toolStatus.${activity.status === "completed" ? "done" : activity.status}`)}</small>
+              </span>)}
+            </span>
             <ChevronDownIcon className="ios-d3-tool-chevron ml-auto h-4 w-4" aria-hidden="true" />
           </summary>
           {content}
@@ -179,30 +213,44 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
       : <div key={idx}>{content}</div>;
   }
   if (block.kind === "pending_action") {
-    return <ActionCard key={block.id} action={block} onDecide={onDecideAction} canDecide={canDecideAction} />;
+    return isIOS()
+      ? <PhoneActionCard key={block.id} action={block} onDecide={onDecideAction} canDecide={canDecideAction} baseCurrency={baseCurrency} />
+      : <ActionCard key={block.id} action={block} onDecide={onDecideAction} canDecide={canDecideAction} />;
   }
 }
 
 export default function MessageBubble({
   message,
+  at,
   isStreaming,
   pricePerMillionTokens,
   inputPricePerMillionTokens,
   outputPricePerMillionTokens,
   onDecideAction,
   canDecideAction,
+  model,
+  onRetry,
+  precedingApprovedAlert,
+  baseCurrency,
 }: {
   message: ChatMessage;
+  at?: string;
   isStreaming?: boolean;
   pricePerMillionTokens?: number;
   inputPricePerMillionTokens?: number;
   outputPricePerMillionTokens?: number;
   onDecideAction?: (id: string, decision: "approve" | "reject") => void;
   canDecideAction?: boolean;
+  model?: string;
+  onRetry?: () => void;
+  precedingApprovedAlert?: { symbol: string; threshold: number };
+  baseCurrency?: CurrencyRateDetail;
 }) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
   const blocks = isUser ? [] : mergeBlocks(message.blocks);
+  const messageAt = at;
+  const time = messageAt ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(messageAt)) : null;
 
   return (
     <div
@@ -238,7 +286,7 @@ export default function MessageBubble({
           </p>
       ) : (
           <div className="space-y-3">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="assistant-message-label text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               {t("assistant.chat.title")}
             </div>
             {blocks.length === 0 && isStreaming ? (
@@ -259,10 +307,18 @@ export default function MessageBubble({
                 {t("assistant.chat.thinking")}
               </p>
             ) : (
-              blocks.map((b, i) => renderAssistantBlock(
+              <>
+              {isIOS() && precedingApprovedAlert && <div className="fidelity-created-chip"><CheckIcon aria-hidden="true" />
+                <strong>{t("fidelity.assistant.createdAlert")}</strong>
+                <span>{t("fidelity.assistant.createdAlertDetail").replace("{symbol}", precedingApprovedAlert.symbol)
+                  .replace("{threshold}", new Intl.NumberFormat("en-US", { style: "currency", currency: "USD",
+                    minimumFractionDigits: Number.isInteger(precedingApprovedAlert.threshold) ? 0 : 2,
+                    maximumFractionDigits: 2 }).format(precedingApprovedAlert.threshold))}</span></div>}
+              {blocks.map((b, i) => renderAssistantBlock(
                 b, i, isStreaming, blocks.slice(i + 1).some((later) => later.kind === "text"),
-                onDecideAction, canDecideAction, t,
-              ))
+                onDecideAction, canDecideAction, t, onRetry, baseCurrency,
+              ))}
+              </>
             )}
             {!isStreaming && !blocks.some((block) => block.kind === "pending_action" ||
               (block.kind === "text" && stripThinkTags(block.text))) && (
@@ -271,9 +327,20 @@ export default function MessageBubble({
           </div>
         )}
       </div>
-      {!isUser && message.usage && <div className="ios-d3-chat-bubble-usage basis-full pl-9">
-        <UsageLabel usage={message.usage} pricePerMillionTokens={pricePerMillionTokens}
-          inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} />
+      {isUser && time && <span className="fidelity-chat-message-time">{time}</span>}
+      {!isUser && message.usage && !(isIOS() && blocks.some((block) => block.kind === "pending_action" && block.status === "approved")) && <div className="ios-d3-chat-bubble-usage basis-full pl-9">
+        {isIOS() ? <div className="fidelity-chat-usage">
+          <svg aria-hidden="true" viewBox="0 0 16 16" fill="none"><path d="m8 1 1.5 5.5L15 8l-5.5 1.5L8 15l-1.5-5.5L1 8l5.5-1.5L8 1Z" stroke="currentColor" /></svg>
+          <span>{model} · {message.usage.promptTokens.toLocaleString("en-US")} in · {message.usage.completionTokens.toLocaleString("en-US")} out
+            {pricePerMillionTokens !== undefined || inputPricePerMillionTokens !== undefined || outputPricePerMillionTokens !== undefined
+              ? ` · about $${((message.usage.promptTokens * (inputPricePerMillionTokens ?? pricePerMillionTokens ?? 0) +
+                message.usage.completionTokens * (outputPricePerMillionTokens ?? pricePerMillionTokens ?? 0)) / 1_000_000).toFixed(3)}` : ""}
+          </span>
+          <button type="button" aria-label={t("common.copy")} onClick={() => {
+            void navigator.clipboard?.writeText(blocks.flatMap((block) => block.kind === "text" ? [block.text] : []).join("\n\n")).catch(() => {});
+          }}><CopyIcon aria-hidden="true" /></button>
+        </div> : <UsageLabel usage={message.usage} pricePerMillionTokens={pricePerMillionTokens}
+          inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} />}
       </div>}
       {isUser && (
         <span

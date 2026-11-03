@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Rebalance from "@/mobile/components/rebalance";
 import { DataChangedContext } from "@/contexts/data-changed";
@@ -41,6 +42,7 @@ vi.mock("@/middlelayers/rebalance", async (importOriginal) => ({
 }));
 
 const currency = { currency: "USD", rate: 1, alias: "USD", symbol: "$" };
+const originalWidth = window.innerWidth;
 const assets = [
   { symbol: "BTC", assetType: "crypto" as const, amount: 2, value: 60, price: 30 },
   { symbol: "ETH", assetType: "crypto" as const, amount: 1, value: 20, price: 20 },
@@ -49,6 +51,16 @@ const assets = [
 function setNarrowTouch() {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query === MOBILE_MEDIA_QUERY,
+    media: query, onchange: null, addListener: () => {}, removeListener: () => {},
+    addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+  }));
+}
+
+function setPhone() {
+  vi.mocked(isIOS).mockReturnValue(true);
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query === MOBILE_MEDIA_QUERY || query === "(max-width: 760px)",
     media: query, onchange: null, addListener: () => {}, removeListener: () => {},
     addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   }));
@@ -70,10 +82,99 @@ beforeEach(() => {
 
 afterEach(() => {
   localStorage.removeItem(localeLocalStorageKey);
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
   vi.restoreAllMocks();
 });
 
 describe("Rebalance page", () => {
+  it("starts an unsaved phone plan at the established zero tolerance and restores it after deletion", async () => {
+    setPhone();
+    render(<Rebalance currency={currency} />);
+    await screen.findByRole("spinbutton", { name: "Target percentage for BTC" });
+    expect(screen.getByRole("button", { name: "0.0 pts" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Tolerance").closest(".pf-field")!.querySelectorAll(".pf-segment button")).toHaveLength(5);
+    fireEvent.click(within(document.querySelector(".pf-preset-row") as HTMLElement).getByRole("button", { name: "Equal weights" }));
+    fireEvent.click(screen.getByRole("button", { name: "Plan actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save targets" }));
+    await waitFor(() => expect(saveRebalanceProfile).toHaveBeenCalledWith(expect.objectContaining({ tolerancePercent: 0 })));
+    fireEvent.click(screen.getByRole("button", { name: "Plan actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete targets" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(deleteRebalanceProfile).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "0.0 pts" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps target typing intact and saves only after an explicit tap", async () => {
+    setPhone();
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [
+        { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 },
+        { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 50 },
+      ], tolerancePercent: 0,
+    });
+    const user = userEvent.setup();
+    render(<Rebalance currency={currency} />);
+    const btc = await screen.findByRole("spinbutton", { name: "Target percentage for BTC" });
+    await user.clear(btc);
+    await user.type(btc, "25");
+    expect(btc).toHaveValue(25);
+    expect(saveRebalanceProfile).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Equal weights" }));
+    expect(saveRebalanceProfile).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Plan actions" }));
+    await user.click(screen.getByRole("button", { name: "Save targets" }));
+    await waitFor(() => expect(saveRebalanceProfile).toHaveBeenCalledTimes(1));
+  });
+
+  it("keeps a saved phone profile until deletion is confirmed", async () => {
+    setPhone();
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 100 }],
+      tolerancePercent: 0,
+    });
+    const user = userEvent.setup();
+    render(<Rebalance currency={currency} />);
+    await user.clear(await screen.findByRole("spinbutton", { name: "Target percentage for BTC" }));
+    expect(deleteRebalanceProfile).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Plan actions" }));
+    await user.click(screen.getByRole("button", { name: "Delete targets" }));
+    expect(deleteRebalanceProfile).not.toHaveBeenCalled();
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+    expect(deleteRebalanceProfile).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Delete targets" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(deleteRebalanceProfile).toHaveBeenCalledTimes(1));
+  });
+
+  it("opens advanced phone setup for a synced type and cash profile", async () => {
+    setPhone();
+    vi.mocked(getRebalanceProfile).mockResolvedValue({
+      targets: [
+        { kind: "type", assetType: "crypto", percent: 60 },
+        { kind: "cash", percent: 40 },
+      ], tolerancePercent: 3,
+    });
+    const user = userEvent.setup();
+    render(<Rebalance currency={currency} />);
+    await user.click(await screen.findByRole("button", { name: "Plan actions" }));
+    await user.click(await screen.findByRole("button", { name: "Advanced setup" }));
+    expect(screen.getByText("Manual setup").closest("details")).toHaveAttribute("open");
+    expect(screen.getAllByLabelText("Target kind")[0]).toHaveValue("type");
+    expect(screen.getByLabelText("New cash (USD)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Trade mode")).toBeInTheDocument();
+    expect(screen.getByLabelText("Tolerance band (%)")).toHaveValue(3);
+  });
+
+  it("does not claim a missing profile when saved targets could not be read", async () => {
+    setPhone();
+    vi.mocked(getRebalanceProfile).mockRejectedValue(new Error("Invalid saved targets"));
+    const user = userEvent.setup();
+    render(<Rebalance currency={currency} />);
+    await screen.findByRole("alert");
+    expect(document.querySelector(".pf-rules .pf-card-head")).toHaveTextContent("Saved state unavailable");
+    await user.click(screen.getByRole("button", { name: "Plan actions" }));
+    expect(screen.getByRole("button", { name: "Delete targets" })).toBeInTheDocument();
+  });
   it("summarizes the current plan on mobile", async () => {
     vi.mocked(getRebalanceProfile).mockResolvedValue({
       targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 100 }],

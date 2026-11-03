@@ -5,12 +5,12 @@ import { remove } from "@tauri-apps/plugin-fs";
 import { appDataDir } from "@tauri-apps/api/path";
 import {
   KeyboardIcon,
-  PaperPlaneIcon,
   ReloadIcon,
   StopIcon,
   Cross2Icon,
 } from "@radix-ui/react-icons";
 import { isIOS } from "@/utils/platform";
+import { FidelityIcon } from "@/mobile/components/fidelity-icon";
 
 type ImageAttachment = {
   id: string;
@@ -221,7 +221,7 @@ export default function ChatComposer({
                 }
               }
             }}
-            placeholder={t("assistant.chat.placeholder")}
+            placeholder={t(isIOS() ? "fidelity.assistant.chatPlaceholder" : "assistant.chat.placeholder")}
             rows={1}
             disabled={disabled}
             className="min-h-[36px] touch:min-h-11 max-h-40 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm leading-relaxed focus-visible:outline-none disabled:opacity-50"
@@ -251,7 +251,7 @@ export default function ChatComposer({
               data-testid="chat-send"
               className="inline-flex h-9 w-9 touch:h-11 touch:w-11 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm transition-all duration-200 ease-out hover:bg-primary/90 active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
             >
-              <PaperPlaneIcon className="h-3.5 w-3.5" />
+              <FidelityIcon name="send" className="h-3.5 w-3.5" />
             </button>
           )}
         </div>

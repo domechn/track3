@@ -21,6 +21,7 @@ import type { GeneralSettingsProps } from "@/components/configuration/types";
 import { isIOS } from "@/utils/platform";
 import { InsetGroup, ListRow } from "@/mobile/components/mobile";
 import { ModalPage } from "@/mobile/components/mobile/overlays";
+import { FidelityCurrency } from "@/mobile/components/configuration/fidelity-currency";
 
 const defaultBaseCurrency = "USD";
 
@@ -44,10 +45,20 @@ const GeneralSettings = memo(function GeneralSettings({
   onPreferCurrencyChange,
   refreshCurrencyLoading,
   onUpdateCurrencyRatesClick,
-}: GeneralSettingsProps) {
+  fidelityLayout = false,
+  rateError = false,
+}: GeneralSettingsProps & { fidelityLayout?: boolean; rateError?: boolean }) {
   const { t } = useTranslation();
   const mobile = isIOS();
   const [picker, setPicker] = useState<"size" | "currency">();
+
+  if (mobile && fidelityLayout) return <FidelityCurrency groupUSD={groupUSD} onGroupUSDChange={onGroupUSDChange}
+    hideInactive={hideInactive} onHideInactiveChange={onHideInactiveChange}
+    querySize={querySize} onQuerySizeChange={onQuerySizeChange}
+    preferCurrency={preferCurrency} preferCurrencyLoading={preferCurrencyLoading}
+    preferCurrencyOptions={preferCurrencyOptions} preferredCurrencyDetail={preferredCurrencyDetail}
+    onPreferCurrencyChange={onPreferCurrencyChange} refreshCurrencyLoading={refreshCurrencyLoading}
+    onUpdateCurrencyRatesClick={onUpdateCurrencyRatesClick} rateError={rateError} />;
 
   if (mobile) return <div className="ios-d3-mobile-general">
     <InsetGroup>

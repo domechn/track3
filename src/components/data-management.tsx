@@ -381,7 +381,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
                 onCheckedChange={(v) => setExportConfiguration(!!v)}
                 aria-label={t("data.includeConfig")}
               />
-              <Label htmlFor="exportConfigurationCheckbox" className="min-w-0 flex-1 cursor-pointer text-sm">
+              <Label htmlFor="exportConfigurationCheckbox" className="data-export-configuration-label min-w-0 flex-1 cursor-pointer text-sm">
                 <span className="block">{t("data.phase6.configuration")}</span>
                 <span className="block text-xs font-normal text-muted-foreground">{t("data.phase6.configDetail")}</span>
               </Label>

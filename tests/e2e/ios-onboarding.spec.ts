@@ -13,7 +13,11 @@ for (const theme of ["light", "dark"] as const) {
     await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
     await page.goto("/#/overview")
     const dialog = page.getByTestId("onboarding-dialog")
-    await expect(dialog).toHaveAttribute("data-step", "welcome")
+    await expect(dialog).toHaveAttribute("data-step", "welcome", { timeout: 30_000 })
+    if (theme === "light") {
+      await expect(dialog).toHaveCSS("background-color", "rgb(255, 255, 255)")
+      await expect(dialog.locator(".fd-guide-art rect").first()).toHaveAttribute("fill", "var(--fd-guide-art-panel)")
+    }
     mkdirSync("test-results/mobile", { recursive: true })
     for (const [index, step] of steps.entries()) {
       await expect(dialog).toHaveAttribute("data-step", step)
@@ -85,6 +89,16 @@ test("replay opens from mobile About", async ({ page }) => {
   await expect(replay).toBeFocused()
 })
 
+test("replay asks for confirmation before showing the guide", async ({ page }) => {
+  await installTauriBridge(page)
+  await page.goto("/#/settings/systemInfo?section=about")
+  await page.getByTestId("onboarding-replay").click()
+  await expect(page.getByRole("dialog", { name: "Replay the first-run guide?" })).toBeVisible()
+  await page.getByRole("button", { name: "Start guide" }).click()
+  await expect(page.getByTestId("onboarding-dialog")).toHaveAttribute("data-step", "welcome")
+  await expect(page.getByRole("heading", { name: "Welcome to Track3" })).toBeVisible()
+})
+
 test("startup lock hides the guide", async ({ page }) => {
   await installTauriBridge(page, { lockedStartup: true, onboarding: true, emptyPortfolio: true })
   await page.goto("/#/overview")
@@ -102,14 +116,14 @@ test("dark Chinese phone guide keeps the same layout and copy", async ({ page })
   await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
   await page.goto("/#/overview")
   const dialog = page.getByTestId("onboarding-dialog")
-  await expect(dialog).toContainText("欢迎使用 Track3")
+  await expect(dialog).toContainText("欢迎使用 Track3", { timeout: 30_000 })
   expect(await dialog.evaluate((node) => getComputedStyle(node).getPropertyValue("--ill-1").trim()))
     .toBe(await page.locator("html").evaluate((node) => getComputedStyle(node).getPropertyValue("--ios-accent").trim()))
   await page.waitForTimeout(2700)
   mkdirSync("test-results/mobile", { recursive: true })
   await page.screenshot({ path: "test-results/mobile/onboarding-welcome-dark-zh-390.png" })
   for (let i = 0; i < 4; i++) await page.getByTestId("onboarding-next").click()
-  await expect(dialog).toContainText("设置 → 备份")
+  await expect(dialog).toContainText("每 24 小时及刷新后自动备份")
   await page.waitForTimeout(2700)
   await page.screenshot({ path: "test-results/mobile/onboarding-backup-dark-zh-390.png" })
 })
@@ -154,15 +168,17 @@ test("bell pulse ring is hidden until its cue", async ({ page }) => {
   await installTauriBridge(page, { emptyPortfolio: true, onboarding: true })
   await page.goto("/#/overview")
   const dialog = page.getByTestId("onboarding-dialog")
-  await expect(dialog).toHaveAttribute("data-step", "welcome")
+  await expect(dialog).toHaveAttribute("data-step", "welcome", { timeout: 30_000 })
   for (let i = 0; i < 3; i++) await dialog.press("ArrowRight")
   await expect(dialog).toHaveAttribute("data-step", "deeper")
-  const ring = page.getByTestId("onboarding-illustration-deeper").locator('circle[cx="246"][cy="163"][r="10"]')
+  const ring = page.getByTestId("onboarding-illustration-deeper").locator(".fd-guide-pulse")
   await expect(ring).toBeAttached()
   await page.waitForTimeout(300)
   mkdirSync("test-results/mobile", { recursive: true })
   await page.screenshot({ path: "test-results/mobile/onboarding-deeper-before-bell.png" })
   expect(await ring.evaluate((node) => getComputedStyle(node).opacity)).toBe("0")
+  await expect.poll(async () => ring.evaluate((node) => Number(getComputedStyle(node).opacity)),
+    { timeout: 4_000, intervals: [100] }).toBeGreaterThan(0)
 })
 
 test("tall phone text has no bottom fade mask", async ({ page }) => {

@@ -176,7 +176,7 @@ describe("Data Management", () => {
     vi.mocked(appLockEnabled).mockResolvedValue(false);
     window.location.hash = "#/settings/data?section=security";
     render(<DataManagement />);
-    const lock = await screen.findByRole("switch", { name: "App lock" });
+    const lock = await screen.findByRole("switch", { name: /Require Face ID/ });
     fireEvent.click(lock);
     await waitFor(() => expect(lock).toHaveAttribute("aria-checked", "true"));
     expect(setAppLockEnabled).toHaveBeenCalledWith(true);

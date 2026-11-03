@@ -38,6 +38,7 @@ describe("MessageBubble", () => {
     expect(details).not.toHaveAttribute("open");
     expect(details).toHaveTextContent("Read portfolio");
     expect(details?.querySelector("summary")).toHaveTextContent("1 tool · done");
+    expect(details?.querySelectorAll("summary .fidelity-tool-pill")).toHaveLength(1);
     vi.mocked(isIOS).mockReturnValue(false);
   });
 
@@ -86,6 +87,17 @@ describe("MessageBubble", () => {
     expect(screen.getByText("Hello")).toBeTruthy();
     // User bubble should have the avatar with PersonIcon
     expect(container.querySelector('svg')).toBeTruthy();
+  });
+
+  it("shows a sent message in the user's local time", () => {
+    const original = process.env.TZ;
+    process.env.TZ = "Asia/Shanghai";
+    try {
+      render(<MessageBubble message={{ role: "user", content: "Hello" }} at="2026-11-03T09:51:00.000Z" />);
+      expect(screen.getByText("17:51")).toBeVisible();
+    } finally {
+      process.env.TZ = original;
+    }
   });
 
   it("renders an assistant message with ChatBubbleIcon and label", () => {

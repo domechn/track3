@@ -4,6 +4,7 @@ import type { AssetModel, CurrencyRateDetail, QuoteColor, TDateRange } from "@/m
 import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
 import { queryHistoricalPage } from "@/middlelayers/charts";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
+import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
 import { currencyWrapper } from "@/utils/currency";
@@ -66,7 +67,13 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
       const assets = await ASSET_HANDLER.listAssetsByUUIDs([latest.id, ...(baseline ? [baseline.id] : [])]);
       const current = assets.filter((asset) => asset.uuid === latest.id);
       const previous = assets.filter((asset) => asset.uuid === baseline?.id);
-      const matrix = deriveSourceChanges(previous, current, {});
+      const wallets = [...new Set(assets.map((asset) => asset.wallet).filter((wallet): wallet is string => !!wallet))];
+      const aliases: Record<string, { wallet: string; alias: string; type: string } | undefined> =
+        await new WalletAnalyzer(async () => []).listWalletAliases(wallets).catch(() => ({}));
+      const labels = Object.fromEntries(wallets.map((wallet) => [
+        wallet, aliases[wallet]?.alias ?? aliases[wallet]?.wallet ?? wallet,
+      ]));
+      const matrix = deriveSourceChanges(previous, current, labels);
       return { latest: current, baseline: previous, at: latest.createdAt,
         baselineAt: baseline?.createdAt ?? "", matrix };
     };

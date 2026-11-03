@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import md5 from "md5";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/mobile/i18n";
 import { maskSensitive, truncateAddress } from "@/utils/attach-to";
 import { redactSecrets } from "@/middlelayers/security/redact";
-import { ChevronRightIcon, DotsHorizontalIcon, EyeOpenIcon } from "@radix-ui/react-icons";
+import { ChevronRightIcon, DotsHorizontalIcon, EyeOpenIcon, ExclamationTriangleIcon, TrashIcon, LockClosedIcon, PlusIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { FidelityIcon } from "@/mobile/components/fidelity-icon";
 import { ActionSheet, useHaptics } from "@/mobile/components/mobile";
 import { ConfirmSheet, ModalPage } from "@/mobile/components/mobile/overlays";
 import { Switch } from "@/mobile/components/ui/switch";
@@ -13,8 +15,27 @@ import { getWalletLogo } from "@/lib/utils";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import type { ExchangeRow, StockBrokerRow, WalletRow, SelectOption } from "@/components/configuration/types";
 import { PublicIpInfo } from "@/components/configuration/public-ip-info";
+import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
+import { selectFromDatabaseWithSql } from "@/middlelayers/database";
+import { partialFromRow, type PartialSnapshot, type PartialRow } from "@/middlelayers/snapshot-partial";
+import { FidelitySourceEditor } from "@/mobile/components/configuration/fidelity-source-editor";
+import { AutoRetrySetting } from "@/components/configuration/auto-retry-setting";
+import { LicenseCenter, type ProUsage } from "@/middlelayers/license";
+import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
+import type { CurrencyRateDetail } from "@/middlelayers/types";
+
+function ShieldIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 18 18" width="18" height="18" fill="none"
+    stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+    <path d="M9 1.5 15 4v4.1c0 4.1-2.4 6.6-6 8.4-3.6-1.8-6-4.3-6-8.4V4z" />
+  </svg>;
+}
 
 export type MobileSourcesProps = {
+  fidelityLayout?: boolean;
+  fromOnboarding?: boolean;
+  baseCurrency?: CurrencyRateDetail;
+  addRequest?: number;
   selectedKind?: "exchange" | "wallet" | "broker";
   exchanges: ExchangeRow[];
   wallets: WalletRow[];
@@ -41,7 +62,7 @@ export type MobileSourcesProps = {
 
 type Kind = "exchange" | "wallet" | "broker";
 type Draft = ExchangeRow | WalletRow | StockBrokerRow;
-type Editor = { kind: Kind; step: 1 | 2; draft: Draft; original?: Draft };
+type Editor = { kind: Kind; step: 1 | 2; draft: Draft; original?: Draft; fromPicker?: boolean };
 type PendingRemoval = { kind: Kind; value: Draft };
 
 const blank = {
@@ -51,7 +72,7 @@ const blank = {
 };
 
 export function MobileSources(props: MobileSourcesProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const haptic = useHaptics();
   const [editor, setEditor] = useState<Editor>();
   const [removal, setRemoval] = useState<PendingRemoval>();
@@ -61,13 +82,56 @@ export function MobileSources(props: MobileSourcesProps) {
   const [saving, setSaving] = useState(false);
   const [providerQuery, setProviderQuery] = useState("");
   const [kindPickerOpen, setKindPickerOpen] = useState(false);
-  const start = (kind: Kind, original?: Draft) => {
+  const [snapshot, setSnapshot] = useState<{ at: string; values: Record<string, number> }>();
+  const [missingSources, setMissingSources] = useState<PartialSnapshot["missing"]>([]);
+  const [usage, setUsage] = useState<ProUsage>();
+  useEffect(() => {
+    if (!props.fidelityLayout || props.selectedKind !== "wallet") return;
+    let live = true;
+    try {
+      void LicenseCenter.getInstance().getUsage().then((next) => {
+        if (live) setUsage(next);
+      }).catch(() => {});
+    } catch {
+      // Keep the source list usable while license services initialize.
+    }
+    return () => { live = false; };
+  }, [props.fidelityLayout, props.selectedKind]);
+  useEffect(() => {
+    let mounted = true;
+    void ASSET_HANDLER.listAssets(1).then((groups) => {
+      if (!mounted) return;
+      const rows = groups[0] ?? [];
+      const values: Record<string, number> = {};
+      for (const row of rows) values[row.wallet ?? ""] = (values[row.wallet ?? ""] ?? 0) + row.value;
+      setSnapshot({ at: rows[0]?.createdAt ?? "", values });
+    }).catch(() => { if (mounted) setSnapshot({ at: "", values: {} }); });
+    return () => { mounted = false; };
+  }, []);
+  useEffect(() => {
+    if (!props.fidelityLayout) return;
+    let mounted = true;
+    void selectFromDatabaseWithSql<PartialRow>(
+      "SELECT p.* FROM snapshot_partial p WHERE p.uuid = (SELECT uuid FROM assets_v2 ORDER BY createdAt DESC, id DESC LIMIT 1) LIMIT 1",
+      [],
+    ).then((rows) => {
+      if (mounted) setMissingSources(rows.length ? partialFromRow(rows[0]).missing : []);
+    }).catch(() => { if (mounted) setMissingSources([]); });
+    return () => { mounted = false; };
+  }, [props.fidelityLayout]);
+  const start = (kind: Kind, original?: Draft, fromPicker = false) => {
     haptic("selection");
     setError("");
     setErrorField(undefined);
     setProviderQuery("");
-    setEditor({ kind, step: original ? 2 : 1, original, draft: original ? { ...original } : blank[kind]() });
+    setEditor({ kind, fromPicker, step: original || (props.fidelityLayout && kind !== "exchange") ? 2 : 1,
+      original, draft: original ? { ...original } : blank[kind]() });
   };
+  useEffect(() => {
+    if (!props.addRequest) return;
+    if (props.selectedKind) start(props.selectedKind);
+    else setKindPickerOpen(true);
+  }, [props.addRequest]);
   const update = (patch: Record<string, string>) => {
     if (errorField && errorField in patch) { setError(""); setErrorField(undefined); }
     setEditor((current) => current ? { ...current, draft: { ...current.draft, ...patch } } : current);
@@ -92,6 +156,11 @@ export function MobileSources(props: MobileSourcesProps) {
       setError(t("mobile.sources.required").replace("{field}", t("config.formAddress")));
       setErrorField("address");
       return;
+    } else if (kind === "wallet" && props.fidelityLayout && (draft as WalletRow).type === "erc20" &&
+      !/^0x[0-9a-fA-F]{40}$/.test((draft as WalletRow).address)) {
+      setError(t("fidelity.settings.add.invalidEth"));
+      setErrorField("address");
+      return;
     } else if (kind === "broker") {
       const value = draft as StockBrokerRow;
       const missing = !value.token.trim() ? "token" : !value.queryId.trim() ? "queryId" : "";
@@ -100,14 +169,22 @@ export function MobileSources(props: MobileSourcesProps) {
         setErrorField(missing);
         return;
       }
+      if (props.fidelityLayout && !/^\d+$/.test(value.queryId)) {
+        setError(t("fidelity.settings.add.invalidQueryId"));
+        setErrorField("queryId");
+        return;
+      }
     }
     setSaving(true);
     setError("");
     setErrorField(undefined);
     try {
-      if (kind === "exchange") await props.onSaveExchange(draft as ExchangeRow, original as ExchangeRow | undefined);
-      if (kind === "wallet") await props.onSaveWallet(draft as WalletRow, original as WalletRow | undefined);
-      if (kind === "broker") await props.onSaveBroker(draft as StockBrokerRow, original as StockBrokerRow | undefined);
+      const pending = kind === "exchange"
+        ? props.onSaveExchange(draft as ExchangeRow, original as ExchangeRow | undefined)
+        : kind === "wallet"
+          ? props.onSaveWallet(draft as WalletRow, original as WalletRow | undefined)
+          : props.onSaveBroker(draft as StockBrokerRow, original as StockBrokerRow | undefined);
+      await pending;
       haptic("success");
       close();
     } catch (failure) {
@@ -149,9 +226,39 @@ export function MobileSources(props: MobileSourcesProps) {
   ];
   const providerOptions = sections.find((section) => section.kind === editor?.kind)?.options ?? [];
   const hasSources = props.exchanges.length + props.wallets.length + props.brokers.length > 0;
+  const sourceValue = (kind: Kind, row: Draft) => {
+    if (!row.active) return undefined;
+    const identity = kind === "exchange" ? `${row.type}-${(row as ExchangeRow).apiKey}`
+      : kind === "wallet" ? (row as WalletRow).address
+      : `ibkr:${(row as StockBrokerRow).queryId}`;
+    return snapshot?.values[md5(identity)];
+  };
+  const currency = props.baseCurrency ?? { currency: "USD", rate: 1, alias: "US dollar", symbol: "$" };
+  const money = (value: number | undefined) => value === undefined ? "—"
+    : `${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(value))}`;
+  const refreshed = snapshot?.at ? new Date(snapshot.at) : undefined;
+  const refreshLabel = refreshed ? (refreshed.toDateString() === new Date().toDateString()
+    ? `${t("fidelity.settings.sources.today")} ${new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(refreshed)}`
+    : new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(refreshed)) : "—";
   return (
-    <div className="ios-d3-sources">
-      {!hasSources && <div className="ios-d3-onboarding">
+    <div className={`ios-d3-sources${props.fidelityLayout ? " fidelity-sources" : ""}`}>
+      {!hasSources && props.fidelityLayout && <div className="fidelity-source-empty">
+        <div className="fidelity-source-empty-inner">
+        <strong>{props.fromOnboarding ? t("fidelity.settings.sources.emptyTitle")
+          : t(`fidelity.settings.sources.empty.${props.selectedKind ?? "exchange"}`)}</strong>
+        <span>{t("fidelity.settings.sources.emptyHint")}</span>
+        {props.fromOnboarding && <ol aria-label={t("mobile.sources.gettingStarted")}>
+          {[1, 2, 3].map((step) => <li key={step}><span>{step}</span>{t(`mobile.sources.step.${step}`)}</li>)}
+        </ol>}
+        <Button onClick={() => props.fromOnboarding ? setKindPickerOpen(true)
+          : props.selectedKind ? start(props.selectedKind) : setKindPickerOpen(true)}>
+          {!props.fromOnboarding && props.selectedKind && <PlusIcon aria-hidden="true" />}
+          {props.fromOnboarding || !props.selectedKind ? t("mobile.sources.addSource")
+            : t(`fidelity.settings.sources.add${props.selectedKind[0].toUpperCase()}${props.selectedKind.slice(1)}`)}
+        </Button>
+        </div>
+      </div>}
+      {!hasSources && !props.fidelityLayout && <div className="ios-d3-onboarding">
         <div className="ios-d3-onboarding-art" aria-hidden="true">
           <svg viewBox="0 0 160 160" fill="none">
             <circle cx="80" cy="80" r="68" fill="currentColor" opacity=".08" />
@@ -166,17 +273,80 @@ export function MobileSources(props: MobileSourcesProps) {
         <Button className="ios-d3-editor-primary mt-5 min-h-12 w-full" onClick={() => setKindPickerOpen(true)}>{t("mobile.sources.addSource")}</Button>
       </div>}
       {hasSources && sections.filter(({ kind }) => !props.selectedKind || kind === props.selectedKind).map(({ kind, label, add, rows, options }) => (
-        <section key={kind} aria-label={label} className="ios-d3-source-section space-y-2">
-          <div className="flex items-center justify-between gap-2">
+        <section key={kind} aria-label={label}
+          className={`ios-d3-source-section${props.fidelityLayout ? " fidelity-source-section" : " space-y-2"}`}>
+          {!props.fidelityLayout && <div className="flex items-center justify-between gap-2">
             <h2 className="ios-d3-section-heading">{label}</h2>
             <Button className="ios-d3-text-action min-h-11" variant="ghost" onClick={() => start(kind)}>{add}</Button>
-          </div>
-          <div className="ios-d3-source-group overflow-hidden rounded-2xl bg-card">
-            {rows.length === 0 ? <p className="px-4 py-5 text-sm text-muted-foreground">{t("mobile.sources.empty")}</p> : rows.map((row, index) => {
+          </div>}
+          <div className={props.fidelityLayout ? "fidelity-source-group" : "ios-d3-source-group overflow-hidden rounded-2xl bg-card"}>
+            {props.fidelityLayout && !snapshot && rows.length > 0
+              ? <>{rows.map((row, index) => <div key={`${row.type}-${index}`} className="fidelity-source-skeleton-row" aria-hidden="true">
+                <div><i /><span><i /><i /></span><i /></div><div><i /><i /></div>
+              </div>)}<div className="fidelity-source-skeleton-foot" aria-hidden="true" /></>
+              : rows.length === 0 ? <p className="px-4 py-5 text-sm text-muted-foreground">{t("mobile.sources.empty")}</p> : rows.map((row, index) => {
               const identity = kind === "exchange" ? maskSensitive((row as ExchangeRow).apiKey)
                 : kind === "wallet" ? truncateAddress((row as WalletRow).address)
                 : maskSensitive((row as StockBrokerRow).queryId);
               const name = row.alias || options.find((option) => option.value === row.type)?.label || row.type;
+              if (props.fidelityLayout) {
+                const value = sourceValue(kind, row);
+                const sourceIdentity = kind === "exchange" ? `${row.type}-${(row as ExchangeRow).apiKey}`
+                  : kind === "wallet" ? (row as WalletRow).address : `ibkr:${(row as StockBrokerRow).queryId}`;
+                const failure = missingSources.find((source) => source.wallet === md5(sourceIdentity));
+                const lastGood = failure?.lastSuccessAt ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
+                  hour: "2-digit", minute: "2-digit", hour12: false,
+                }).format(new Date(failure.lastSuccessAt)) : undefined;
+                const ending = kind === "exchange" ? t("fidelity.settings.sources.exchangeEnding").replace("{ending}", (row as ExchangeRow).apiKey.slice(-4))
+                  : kind === "broker" ? t("fidelity.settings.sources.flexId").replace("{id}", (row as StockBrokerRow).queryId.length > 6
+                    ? `${(row as StockBrokerRow).queryId.slice(0, 3)}…${(row as StockBrokerRow).queryId.slice(-3)}` : (row as StockBrokerRow).queryId)
+                  : row.type === "btc"
+                    ? `${t("fidelity.settings.sources.bitcoin")} · ${(row as WalletRow).address.slice(0, 4)}...${(row as WalletRow).address.slice(-4)}`
+                    : `${t("fidelity.settings.sources.ethereum")} · ${t("fidelity.settings.sources.erc20Tokens")}`;
+                return <div key={`${row.type}-${index}`} className={`fidelity-source-row${!row.active ? " is-paused" : ""}${failure ? " is-error" : ""}`}>
+                  <div className="fidelity-source-identity"><button type="button" className="fidelity-source-avatar-action"
+                    aria-label={t("mobile.sources.moreActions").replace("{source}", name)}
+                    onClick={() => { haptic("selection"); setMenu({ kind, value: row, name }); }}>
+                    <SourceAvatar type={row.type} label={kind === "exchange"
+                    ? ({ binance: "BN", okex: "OK", kraken: "KR", gate: "GT", coinbase: "CB", bitget: "BG",
+                      bybit: "BY", htx: "HT", mexc: "MX", backpack: "BP" } as Record<string, string>)[row.type] ?? row.type.slice(0, 2).toUpperCase()
+                    : kind === "broker" ? "IB" : row.type === "btc" ? "BTC" : "ETH"} />
+                    </button>
+                    <button type="button" className="fidelity-source-name" onClick={() => start(kind, row)}
+                      aria-label={`${name} ${identity}`}><strong>{name}</strong><small>{ending}
+                      {kind === "wallet" && row.type === "erc20" && props.isPro &&
+                        <em className="fidelity-source-pro">{t("fidelity.settings.menu.pro")}</em>}</small></button>
+                  </div>
+                  <Switch checked={row.active} aria-label={`${t("mobile.sources.toggle")} ${name}`} onCheckedChange={() => {
+                    haptic("selection");
+                    if (kind === "exchange") props.onToggleExchange(row as ExchangeRow);
+                    if (kind === "wallet") props.onToggleWallet(row as WalletRow);
+                    if (kind === "broker") props.onToggleBroker(row as StockBrokerRow);
+                  }} />
+                  <span className={`fidelity-source-status${failure ? " is-error" : row.active ? " is-active" : ""}`}><i />{t(failure
+                    ? "fidelity.settings.sources.error" : row.active ? "fidelity.settings.sources.active" : "fidelity.settings.sources.paused")}</span>
+                  <span className="fidelity-source-refresh">{failure ? lastGood
+                    ? t("fidelity.settings.sources.lastGood").replace("{time}", lastGood) : "—" : row.active ? refreshLabel : "—"}</span>
+                  <div className="fidelity-source-money"><strong className="fidelity-source-value">{money(value)}</strong>
+                    {failure && <small>{t("fidelity.settings.sources.stale")}</small>}</div>
+                  {failure && <div className="fidelity-source-error-panel"><ExclamationTriangleIcon aria-hidden="true" />
+                    <p>{t(failure.category === "auth" ? "fidelity.settings.sources.authError" : "fidelity.settings.sources.refreshError")}</p>
+                    <button type="button" onClick={() => window.dispatchEvent(new Event("portfolio:retry-source"))}>
+                      <UpdateIcon aria-hidden="true" />{t("fidelity.settings.sources.retry")}</button>
+                  </div>}
+                  <div className="fidelity-source-actions">
+                    <button type="button" className="fidelity-source-quick" aria-label={`${t("mobile.sources.quickLook")} ${name}`} disabled={!row.active || !props.isPro}
+                      onClick={() => {
+                        if (kind === "exchange") props.onQuickLookExchange?.(row as ExchangeRow);
+                        if (kind === "wallet") props.onQuickLookWallet?.(row as WalletRow);
+                        if (kind === "broker") props.onQuickLookBroker?.(row as StockBrokerRow);
+                      }}><FidelityIcon name="search" />{t("mobile.sources.quickLook")}</button>
+                    <button type="button" aria-label={`${t("goals.edit")} ${name}`} onClick={() => start(kind, row)}><FidelityIcon name="edit" /></button>
+                    <button type="button" className="is-danger" aria-label={`${t("common.delete")} ${name}`}
+                      onClick={() => setRemoval({ kind, value: row })}><FidelityIcon name="trash" /></button>
+                  </div>
+                </div>;
+              }
               return <div key={`${row.type}-${index}`} className="ios-d3-source-row flex min-w-0 items-center gap-2 px-4 py-2">
                 <SourceAvatar type={row.type} />
                 <button className="min-h-11 min-w-0 flex-1 text-left" onClick={() => start(kind, row)}>
@@ -193,12 +363,27 @@ export function MobileSources(props: MobileSourcesProps) {
                   onClick={() => { haptic("selection"); setMenu({ kind, value: row, name }); }}><DotsHorizontalIcon aria-hidden="true" /></button>
               </div>;
             })}
+            {props.fidelityLayout && rows.length > 0 && snapshot && <div className="fidelity-source-foot">
+              <span>{t("fidelity.settings.sources.activeCount").replace("{count}", String(rows.filter((row) => row.active).length))}
+                {rows.some((row) => !row.active) ? `, ${t("fidelity.settings.sources.pausedCount").replace("{count}", String(rows.filter((row) => !row.active).length))}` : ""}
+              </span>
+              <strong>{money(rows.reduce((total, row) => total + (sourceValue(kind, row) ?? 0), 0))}</strong>
+            </div>}
           </div>
         </section>
       ))}
+      {props.fidelityLayout && <details className="fidelity-source-info"><summary><ShieldIcon /><span>
+        <strong>{t("fidelity.settings.sources.readOnly")}</strong>
+        <span>{props.selectedKind === "wallet" && usage
+          ? t("fidelity.settings.sources.walletQuotaNote")
+            .replace("{used}", String(usage.usage.erc20.used + usage.usage.tron.used))
+            .replace("{limit}", String(usage.usage.erc20.limit + usage.usage.tron.limit))
+          : t(props.selectedKind === "wallet" ? "fidelity.settings.sources.walletNote"
+            : props.selectedKind === "broker" ? "fidelity.settings.sources.brokerNote" : "fidelity.settings.sources.exchangeNote")}</span>
+      </span></summary><AutoRetrySetting t={t} switchComponent={Switch} /></details>}
       {kindPickerOpen && <ActionSheet open onOpenChange={setKindPickerOpen} title={t("mobile.sources.addSource")}
         actions={[
-          ...sections.map(({ kind, add }) => ({ label: add, onClick: () => { setKindPickerOpen(false); start(kind); } })),
+          ...sections.map(({ kind, add }) => ({ label: add, onClick: () => { setKindPickerOpen(false); start(kind, undefined, true); } })),
           ...(props.onAddCustomAsset ? [{ label: t("mobile.others.add"), onClick: () => {
             setKindPickerOpen(false);
             props.onAddCustomAsset?.();
@@ -217,7 +402,20 @@ export function MobileSources(props: MobileSourcesProps) {
           { label: t("common.delete"), destructive: true,
             onClick: () => setRemoval({ kind: menu.kind, value: menu.value }) },
         ]} />}
-      {editor && <ModalPage title={t("mobile.sources.edit")} onDismiss={close}>
+      {editor && props.fidelityLayout && <FidelitySourceEditor
+        kind={editor.kind} step={editor.step} draft={editor.draft} original={editor.original}
+        exchangeOptions={providerOptions} saving={saving} error={error} errorField={errorField} fromPicker={editor.fromPicker}
+        onChoose={(type) => {
+          if (editor.kind === "exchange" && type !== editor.draft.type) {
+            const { password: _password, passphrase: _passphrase, ...rest } = editor.draft as ExchangeRow;
+            setEditor({ ...editor, step: 2, draft: { ...rest, type } });
+          } else setEditor({ ...editor, step: 2, draft: { ...editor.draft, type } });
+        }}
+        onContinue={() => setEditor({ ...editor, step: 2 })}
+        onBack={() => setEditor({ ...editor, step: 1 })}
+        onUpdate={update} onSave={() => void save()} onClose={close}
+      />}
+      {editor && !props.fidelityLayout && <ModalPage title={t("mobile.sources.edit")} onDismiss={close}>
         <div className="ios-d3-source-editor mx-auto max-w-xl space-y-6">
           <div className="ios-d3-editor-nav flex items-center justify-between">
             {!editor.original
@@ -266,18 +464,33 @@ export function MobileSources(props: MobileSourcesProps) {
           </>}
         </div>
       </ModalPage>}
-      {removal && <ConfirmSheet title={t("config.removeDialogTitle")} onDismiss={() => setRemoval(undefined)}>
-          <p className="py-2 text-center">{t("config.removeDialogDesc")}</p>
-          <Button variant="destructive" className="min-h-12 w-full" onClick={remove}>{t("common.delete")}</Button>
-          <Button variant="outline" className="min-h-12 w-full" onClick={() => setRemoval(undefined)}>{t("common.cancel")}</Button>
+      {removal && <ConfirmSheet
+        title={props.fidelityLayout ? t("fidelity.settings.sources.removeTitle").replace("{source}", removal.value.alias || removal.value.type)
+          : t("config.removeDialogTitle")}
+        className={props.fidelityLayout ? "fidelity-remove-overlay" : undefined}
+        panelClassName={props.fidelityLayout ? "fidelity-remove-sheet" : undefined}
+        onDismiss={() => setRemoval(undefined)}>
+          {props.fidelityLayout ? <>
+            <h2>{t("fidelity.settings.sources.removeTitle").replace("{source}", removal.value.alias || removal.value.type)}</h2>
+            <p>{t(removal.kind === "exchange" ? "fidelity.settings.sources.removeHint"
+              : removal.kind === "wallet" ? "fidelity.settings.sources.removeWalletHint" : "fidelity.settings.sources.removeBrokerHint")
+              .replace("{source}", removal.value.alias || removal.value.type)}</p>
+            <footer><button type="button" onClick={() => setRemoval(undefined)}>{t("common.cancel")}</button>
+              <button type="button" className="is-danger" onClick={remove}><TrashIcon aria-hidden="true" />
+                {t("fidelity.settings.sources.removeButton").replace("{source}", removal.value.alias || removal.value.type)}</button></footer>
+          </> : <>
+            <p className="py-2 text-center">{t("config.removeDialogDesc")}</p>
+            <Button variant="destructive" className="min-h-12 w-full" onClick={remove}>{t("common.delete")}</Button>
+            <Button variant="outline" className="min-h-12 w-full" onClick={() => setRemoval(undefined)}>{t("common.cancel")}</Button>
+          </>}
       </ConfirmSheet>}
     </div>
   );
 }
 
-function SourceAvatar({ type }: { type: string }) {
+function SourceAvatar({ type, label }: { type: string; label?: string }) {
   const logo = getWalletLogo(type);
-  return <span className="ios-d3-source-avatar" aria-hidden="true">{logo === UnknownLogo ? type.slice(0, 2).toUpperCase() : <img src={logo} alt="" />}</span>;
+  return <span className="ios-d3-source-avatar" aria-hidden="true">{label ?? (logo === UnknownLogo ? type.slice(0, 2).toUpperCase() : <img src={logo} alt="" />)}</span>;
 }
 
 function Field({ id, label, value, onChange, secret = false, onPaste, readOnly = false, invalid = false, error }: {

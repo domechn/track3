@@ -1,12 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
 
-test("coin price strip leaves Positions and Profit to their detail cards", async ({ page }) => {
+test("coin hero keeps price and position metrics distinct", async ({ page }) => {
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/coins/BTC");
-  const strip = page.locator(".coin-price-strip");
-  await expect(strip).toContainText("Price");
-  await expect(strip).toContainText("Total Value");
-  await expect(strip).not.toContainText("Positions");
-  await expect(strip).not.toContainText("Profit");
+  const hero = page.locator(".coin-fidelity-hero");
+  await expect(hero).toContainText("BTC price");
+  await expect(hero).toContainText("Holdings value");
+  await expect(hero.locator(".coin-fidelity-metrics.bottom")).toContainText("Positions");
 });

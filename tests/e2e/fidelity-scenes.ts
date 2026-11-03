@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import type { FakeS3 } from "../../src/middlelayers/sync/object-store";
-import { installTauriBridge as installBaseBridge } from "./tauri-bridge";
+import { installTauriBridge as installBaseBridge } from "./fidelity-captures";
+import md5 from "md5";
 
 type BaseOptions = Exclude<Parameters<typeof installBaseBridge>[1], FakeS3>;
 type SampleMode = "full" | "empty" | "loading" | "BTC" | "NVDA" | "NOVA";
@@ -1018,8 +1019,8 @@ export async function seedDesktopAiSummary(page: Page) {
   }));
 }
 
-export async function installTauriBridge(page: Page, options: BaseOptions & { fidelitySample?: SampleMode; slowBackup?: boolean; fidelitySlowSummary?: boolean; fidelitySlowCoin?: boolean; quotaUsageFixture?: "near" | "exhausted"; routeDemoR2ToFakeS3?: boolean } = {}) {
-  const { fidelitySample, slowBackup = false, fidelitySlowSummary = false, fidelitySlowCoin = false, quotaUsageFixture, routeDemoR2ToFakeS3 = false, ...baseOptions } = options;
+export async function installTauriBridge(page: Page, options: BaseOptions & { fidelitySample?: SampleMode; slowBackup?: boolean; fidelitySlowSummary?: boolean; fidelitySlowCoin?: boolean; slowRefreshPersist?: boolean; firstRunBinance?: boolean; keyRecoveryNeeded?: boolean; quotaUsageFixture?: "near" | "exhausted"; routeDemoR2ToFakeS3?: boolean } = {}) {
+  const { fidelitySample, slowBackup = false, fidelitySlowSummary = false, fidelitySlowCoin = false, slowRefreshPersist = false, firstRunBinance = false, keyRecoveryNeeded = false, quotaUsageFixture, routeDemoR2ToFakeS3 = false, ...baseOptions } = options;
   const result = await installBaseBridge(page, baseOptions);
   if (routeDemoR2ToFakeS3) await page.addInitScript(() => {
     const original = (window as any).__e2eInvoke;
@@ -1065,8 +1066,19 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
       return original(cmd, args, ...rest);
     };
   }, quotaUsageFixture);
-  if (slowBackup || fidelitySlowSummary || fidelitySlowCoin) {
-    await page.addInitScript(({ slowBackup, fidelitySlowSummary, fidelitySlowCoin }) => {
+  if (firstRunBinance) await page.evaluate(async () => {
+    await (window as any).__e2eInvoke("plugin:sql|execute", {
+      query: "INSERT INTO configuration (id, data) VALUES (10, ?)",
+      values: ["!ent:e2e:exchanges:\n  - name: binance\n    alias: Binance\n    initParams:\n      apiKey: demo-key\n      secret: demo-secret\n"],
+    });
+  });
+  if (keyRecoveryNeeded) await page.addInitScript(() => {
+    const original = (window as any).__e2eInvoke;
+    (window as any).__e2eInvoke = (cmd: string, args: unknown) =>
+      cmd === "ios_key_recovery_needed" ? Promise.resolve(true) : original(cmd, args);
+  });
+  if (slowBackup || fidelitySlowSummary || fidelitySlowCoin || slowRefreshPersist) {
+    await page.addInitScript(({ slowBackup, fidelitySlowSummary, fidelitySlowCoin, slowRefreshPersist }) => {
       const original = (window as any).__e2eInvoke;
       let backupDelayed = false;
       (window as any).__e2eInvoke = async (cmd: string, args: any, ...rest: any[]) => {
@@ -1076,15 +1088,23 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
         }
         if (fidelitySlowCoin && cmd === "plugin:sql|select" && /transactions/i.test(args.query)
           && args.values?.includes("BTC")) await new Promise((resolve) => setTimeout(resolve, 5000));
+        if (slowRefreshPersist && cmd === "persist_refresh") await new Promise((resolve) => setTimeout(resolve, 7000));
         if (slowBackup && !backupDelayed && cmd === "plugin:fs|exists" && String(args.path).includes("track3-backup")) {
           backupDelayed = true;
           await new Promise((resolve) => setTimeout(resolve, 5000));
         }
         return original(cmd, args, ...rest);
       };
-    }, { slowBackup, fidelitySlowSummary, fidelitySlowCoin });
+    }, { slowBackup, fidelitySlowSummary, fidelitySlowCoin, slowRefreshPersist });
   }
-  if (fidelitySample) await page.evaluate(async ({ sample, fidelitySample }) => {
+  const walletIds = Object.fromEntries(Object.entries({
+    binance: "binance-fidelity-binance-key",
+    okx: "okex-fidelity-okx-key",
+    ledger: "bc1qfidelityledgerwallet",
+    onchain: "0x4f0000000000000000000000000000000000a91c",
+    ibkr: "ibkr:fidelity-query",
+  }).map(([id, identity]) => [id, md5(identity)]));
+  if (fidelitySample) await page.evaluate(async ({ sample, fidelitySample, walletIds }) => {
     const invoke = (window as any).__e2eInvoke as (cmd: string, args: { query: string; values: unknown[] }) => Promise<any>;
     const db = {
       run: (query: string, values: unknown[] = []) => invoke("plugin:sql|execute", { query, values }),
@@ -1095,8 +1115,17 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
       await db.run(`INSERT INTO alert_history (kind, title, message, value, triggered_at, acknowledged_at)
         VALUES ('price', ?, 'Design fixture alert', 1, '2026-10-31T09:41:00.000Z', NULL)`, [title]);
     }
-    const sourceNames = new Map(sample.sources.map(({ id, name }) => [id, name]));
-    const displaySource = (id: string) => sourceNames.get(id) ?? id;
+    const sourceWallet = (id: string) => walletIds[id] ?? id;
+    await db.run("INSERT OR REPLACE INTO configuration (id, data) VALUES (10, ?)", [
+      "!ent:e2e:exchanges:\n  - name: binance\n    alias: Binance\n    initParams:\n      apiKey: fidelity-binance-key\n      secret: demo-secret\n  - name: okx\n    alias: OKX\n    initParams:\n      apiKey: fidelity-okx-key\n      secret: demo-secret\n      password: demo-password\n",
+    ]);
+    await db.run("INSERT OR REPLACE INTO configuration (id, data) VALUES (11, ?)", [
+      "btc:\n  addresses:\n    - address: bc1qfidelityledgerwallet\n      alias: Ledger cold wallet\nerc20:\n  addresses:\n    - address: '0x4f0000000000000000000000000000000000a91c'\n      alias: 0x4f…a91c\nsol: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n",
+    ]);
+    await db.run("INSERT OR REPLACE INTO configuration (id, data) VALUES (20, ?)", [
+      "!ent:e2e:brokers:\n  - name: ibkr\n    alias: Interactive Brokers\n    initParams:\n      token: demo-token\n      queryId: fidelity-query\n",
+    ]);
+    await db.run("INSERT OR REPLACE INTO configuration (id, data) VALUES (6, ?)", ["31"]);
     await db.run("DELETE FROM transactions");
     await db.run("DELETE FROM assets_v2");
     await db.run("UPDATE configuration SET data = ? WHERE id = 12", [
@@ -1104,7 +1133,7 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
     ]);
     const assetType = Object.fromEntries(sample.meta.map(({ sym, type }) => [sym, type === "stock" ? "stock" : "crypto"]));
     const current = sample.sources.flatMap((source) => Object.entries(source.pos).map(([symbol, amount]) => ({
-      source: displaySource(source.id), symbol, amount,
+      source: sourceWallet(source.id), symbol, amount,
     })));
     const symbols = [...new Set(current.map((row) => row.symbol))];
     const finalAmounts = Object.fromEntries(symbols.map((symbol) => [symbol,
@@ -1198,7 +1227,7 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
           const asset = (await db.select("SELECT id FROM assets_v2 WHERE uuid = ? AND symbol = ? ORDER BY id DESC LIMIT 1", [uuid, symbol]))[0]?.id;
           await db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [uuid, asset, assetType[symbol], displaySource(symbol === "NVDA" || symbol === "AAPL" ? "ibkr" : "binance"),
+          [uuid, asset, assetType[symbol], sourceWallet(symbol === "NVDA" || symbol === "AAPL" ? "ibkr" : "binance"),
             symbol, Math.abs(amount), Math.abs(flow / amount), type, `${month.ym}-15T09:41:00.000Z`]);
         }
         if (Math.abs(netFlow - month.dep / 100) > .02) throw new Error(`Invalid ${month.ym} deposit total`);
@@ -1207,18 +1236,18 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
     }
     if (fidelitySample === "NOVA") {
       await db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
-        VALUES ('fidelity-day-30', '2026-10-31T09:41:00.000Z', ?, 'crypto', 'NOVA', 12000, 5052, 0.421)`, [displaySource("onchain")]);
+        VALUES ('fidelity-day-30', '2026-10-31T09:41:00.000Z', ?, 'crypto', 'NOVA', 12000, 5052, 0.421)`, [sourceWallet("onchain")]);
     }
     if (fidelitySample !== "empty" && fidelitySample !== "full") {
       for (const tx of sample.transactions) {
         if (tx.sym === "NOVA" && fidelitySample !== "NOVA") continue;
         if (tx.id === "s3" && ["full", "loading"].includes(fidelitySample)) continue;
         const type = assetType[tx.sym] ?? "crypto";
-        const asset = (await db.select("SELECT id FROM assets_v2 WHERE symbol = ? AND wallet = ? ORDER BY id DESC LIMIT 1", [tx.sym, displaySource(tx.src)]))[0]?.id;
+        const asset = (await db.select("SELECT id FROM assets_v2 WHERE symbol = ? AND wallet = ? ORDER BY id DESC LIMIT 1", [tx.sym, sourceWallet(tx.src)]))[0]?.id;
         if (asset === undefined) continue;
         await db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        ["fidelity-day-30", asset, type, displaySource(tx.src), tx.sym, tx.qty, tx.edited ? 0 : tx.price ?? 0, tx.edited ? tx.imported : tx.type,
+        ["fidelity-day-30", asset, type, sourceWallet(tx.src), tx.sym, tx.qty, tx.edited ? 0 : tx.price ?? 0, tx.edited ? tx.imported : tx.type,
           `${tx.d}T${tx.time}:00.000Z`]);
         if (tx.edited && tx.imported) {
           const id = (await db.select("SELECT id FROM transactions ORDER BY id DESC LIMIT 1"))[0].id;
@@ -1227,6 +1256,6 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
         }
       }
     }
-  }, { sample, fidelitySample });
+  }, { sample, fidelitySample, walletIds });
   return result;
 }

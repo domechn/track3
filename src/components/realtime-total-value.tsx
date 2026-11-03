@@ -27,9 +27,11 @@ import { useTranslation } from "@/i18n";
 const App = ({
   currency,
   quoteColor,
+  recordsLabel = false,
 }: {
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
+  recordsLabel?: boolean;
 }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -192,9 +194,11 @@ const App = ({
     <div>
       <Popover onOpenChange={onPopoverOpenChange}>
         <PopoverTrigger asChild>
-          <button type="button" aria-label={t("realtime.design.live")} aria-description={t("realtime.open")}
+          <button type="button" aria-label={t(recordsLabel ? "realtime.open" : "realtime.design.live")}
+            aria-description={recordsLabel ? undefined : t("realtime.open")}
             className="t3-live-trigger flex min-h-9 touch:min-h-11 items-center justify-center gap-2 rounded-md text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <LightningBoltIcon aria-hidden="true" height={16} width={16} />
+            <span className="sr-only">{t("realtime.title")}</span>
             <span className="t3-live-label">{t("realtime.design.live")}</span>
             {realtimeAssetValues.length > 0 && <strong className="t3-live-label">
               {currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(realtimeTotalValue))}

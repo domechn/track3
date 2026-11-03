@@ -15,7 +15,7 @@ import { Button } from "./ui/button";
 import { ToastAction } from "./ui/toast";
 import {
   ArchiveIcon, BackpackIcon, CheckIcon, CrossCircledIcon, CubeIcon,
-  ExclamationTriangleIcon, GlobeIcon, InfoCircledIcon, ReloadIcon,
+  ExclamationTriangleIcon, GlobeIcon, InfoCircledIcon, ReloadIcon, UpdateIcon,
 } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "./index/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
@@ -42,6 +42,7 @@ import { listPortfolioSources } from "@/middlelayers/data";
 import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
 import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
 import { useRefreshQuota } from "./refresh-quota";
+import { FULL_REFRESH_REQUEST_EVENT } from "./refresh-request";
 
 let lastRetryResult: RefreshAllDataResult | undefined;
 type NearQuota = { resource: "ERC20" | "TRON"; used: number; limit: number; periodEnd: string };
@@ -50,10 +51,12 @@ const App = ({
   loading: refreshLoading,
   afterRefresh,
   overviewFlow = false,
+  fidelity = false,
 }: {
   loading: boolean;
   afterRefresh?: (success: boolean) => unknown;
   overviewFlow?: boolean;
+  fidelity?: boolean;
 }) => {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
@@ -345,6 +348,11 @@ const App = ({
     window.addEventListener(overviewRefreshRequestedEvent, onRequest);
     return () => window.removeEventListener(overviewRefreshRequestedEvent, onRequest);
   }, []);
+  useEffect(() => {
+    const listener = () => { void requestRefreshRef.current(); };
+    window.addEventListener(FULL_REFRESH_REQUEST_EVENT, listener);
+    return () => window.removeEventListener(FULL_REFRESH_REQUEST_EVENT, listener);
+  }, []);
 
   const hasFailure = sourceStatuses.some((source) => source.status === "failed" || source.status === "stale");
   const hasPartial = sourceStatuses.some((source) => source.status === "partial");
@@ -418,7 +426,9 @@ const App = ({
             : t("refresh.fidelity.refreshingSources")}
         </Button>
         : <Button variant="outline" className="t3-refresh-button" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
-          <ReloadIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />
+          {fidelity ? <svg aria-hidden="true" className={`h-[14px] w-[14px] ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3h-3" /></svg>
+            : overviewFlow ? <ReloadIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />
+              : <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />}
           <p className="hidden sm:inline-block">{t("common.refresh")}</p>
         </Button>}
       {(sourceStatuses.length > 0 || refreshLoading) && (

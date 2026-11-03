@@ -18,18 +18,26 @@ import { sourceStatusesChangedEvent } from "@/components/source-status-event";
 import { WalletStatusBanner } from "@/components/wallet-status-banner";
 import WalletSourceChanges from "@/components/wallet-source-changes";
 import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
+import { useSizeClass } from "@/mobile/components/mobile";
+import WalletFidelity from "@/mobile/components/wallet-fidelity";
+import { isIOS } from "@/utils/platform";
 
 const App = ({
   currency,
   dateRange,
   quoteColor,
+  onRefresh,
+  onRangeChange,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
+  onRefresh?: () => void | Promise<void>;
+  onRangeChange?: (selectedTimes: number, range: { from: Date; to: Date } | undefined) => void;
 }) => {
   const { t, locale } = useTranslation();
   const isMobile = useIsMobile();
+  const compact = useSizeClass().width === "compact" && isIOS();
   const LOAD_COUNT = 2;
   const [pageLoading, setPageLoading] = useState(true);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
@@ -59,6 +67,7 @@ const App = ({
     }
   }, []);
 
+  if (compact) return <WalletFidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor} onRefresh={onRefresh} onRangeChange={onRangeChange} />;
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
       <div className="d2-wallets analyze-wallets relative min-h-[400px]" aria-busy={pageLoading}>

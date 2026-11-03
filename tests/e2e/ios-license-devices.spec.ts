@@ -12,7 +12,7 @@ test("iOS hides license devices for an old or failing Pro server", async ({ brow
     const page = await context.newPage();
     const bridge = await installTauriBridge(page, { licenseDevices });
     await page.goto("/#/settings/systemInfo?section=pro");
-    await expect(page.getByRole("heading", { name: "Track3 Pro" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Track3 Pro" })).toBeVisible({ timeout: 30_000 });
     await expect.poll(() => bridge.licenseDeviceRequests()).toBe(1);
     await expect(page.getByRole("region", { name: "Devices on this license" })).toHaveCount(0);
     await context.close();

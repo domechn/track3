@@ -182,6 +182,7 @@
   ],
   "src/mobile/components/goals-alerts.tsx": [
     "await saveAlertRule(toRule());",
+    "onDelete={(rule) => void mutate(() => deleteAlertRule(rule.id))}",
     "actions={[{ label: t(\"common.delete\"), onClick: () => void mutate(() => deleteAlertRule(rule.id)) }]}"
   ],
   "src/mobile/components/historical-data.tsx": [

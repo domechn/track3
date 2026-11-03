@@ -15,19 +15,20 @@ export function Toaster() {
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, syncStatus, tone, ...props }) {
+        const styledTone = !syncStatus && !props.className ? tone : undefined
         return (
           <Toast key={id} {...props} syncStatus={syncStatus}
-            className={syncStatus ? props.className : tone ? `t3-fidelity-toast t3-fidelity-toast-${tone}` : props.className}>
-            {tone && !syncStatus && <span className="t3-fidelity-toast-icon" aria-hidden="true">{tone === "success" ? <CheckCircledIcon /> : tone === "info" ? <InfoCircledIcon /> : <ExclamationTriangleIcon />}</span>}
+            className={props.className ?? (styledTone ? `t3-fidelity-toast t3-fidelity-toast-${styledTone}` : undefined)}>
+            {styledTone && <span className="t3-fidelity-toast-icon" aria-hidden="true">{styledTone === "success" ? <CheckCircledIcon /> : styledTone === "info" ? <InfoCircledIcon /> : <ExclamationTriangleIcon />}</span>}
             <div className="grid min-w-0 gap-1 t3-fidelity-toast-text">
               {title && <ToastTitle className={syncStatus ? "text-sm font-bold" : ""}>{title}</ToastTitle>}
               {description && (
                 <ToastDescription
                   className={syncStatus ? "line-clamp-3 !text-sm leading-5 opacity-100" : ""}>{description}</ToastDescription>
               )}
-              {tone && action && <div className="t3-fidelity-toast-actions">{action}</div>}
+              {styledTone && action && <div className="t3-fidelity-toast-actions">{action}</div>}
             </div>
-            {!tone && action}
+            {!styledTone && action}
             <ToastClose />
           </Toast>
         )

@@ -36,7 +36,7 @@ for (const [size, width, height, mobile] of [
 
         await page.goto("/#/settings/sync");
         await expect(page.locator(".sync-settings-page")).toBeVisible();
-        const skip = page.getByRole("button", { name: "Skip for now" });
+        const skip = page.getByRole("button", { name: mobile ? "Continue without sync" : "Skip for now" });
         if (await skip.isVisible()) await skip.click();
         await page.locator(".sync-settings-page").getByRole("button", { name: "Use recovery file" }).click();
         await page.locator(".sync-settings-page").getByRole("button", { name: "Choose .t3key file" }).click();

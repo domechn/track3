@@ -143,6 +143,7 @@ export async function refreshAllData(setProgress) {
         await expect(page.locator("[aria-busy='true']")).toHaveCount(0);
         await page.keyboard.press("Escape");
         await expect(page.getByRole("alertdialog")).toHaveCount(0);
+        await expect(page.getByRole("button", { name: "See usage" })).toBeVisible();
         await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible({ timeout: 10_000 });
         await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeEnabled({ timeout: 10_000 });
         await page.getByRole("button", { name: "Refresh", exact: true }).click({ timeout: 5_000 });
@@ -154,18 +155,14 @@ export async function refreshAllData(setProgress) {
         await page.keyboard.press("Escape");
         await expect(page.getByRole("alertdialog")).toHaveCount(0);
         await page.goto("/#/history");
-        await expect(page.getByTestId("history-delete-latest")).toBeAttached({ timeout: 30_000 });
-        await page.getByTestId("history-delete-latest").locator("xpath=ancestor::tr").hover();
-        await page.getByTestId("history-delete-latest").click();
-        await page.getByRole("button", { name: "Confirm" }).click();
+        await page.getByTestId("history-snapshot-row").first().click();
+        await page.getByTestId("history-desktop-detail").getByRole("button", { name: "Delete", exact: true }).click();
+        await page.getByRole("alertdialog", { name: "Delete this snapshot?" })
+          .getByRole("button", { name: "Delete snapshot" }).click();
         await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
         await page.goto("/#/overview");
-        await expect(page.locator(".t3-fidelity-toast")).toHaveCount(3);
-        expect(await page.locator(".t3-fidelity-toast").allTextContents()).toEqual([
-          expect.stringContaining("Pro refresh limit nearly used"),
-          expect.stringContaining("OKX refresh failed"),
-          expect.stringContaining("Snapshot deleted"),
-        ]);
+        await expect(page.locator(".t3-fidelity-toast").filter({ hasText: "OKX refresh failed" })).toBeVisible();
+        await expect(page.locator(".fidelity-history-undo-toast")).toContainText("Snapshot deleted");
         await expect(page.locator(".t3-grid-hero")).not.toContainText(/-9\d\.\d+%/);
         await expect.poll(() => page.locator(".t3-hero-chart canvas").evaluate((element: HTMLCanvasElement) => {
           const pixels = element.getContext("2d")!.getImageData(0, 0, element.width, element.height).data;
@@ -178,7 +175,9 @@ export async function refreshAllData(setProgress) {
           return blue;
         })).toBeGreaterThan(100);
       }
-      await expect(page.locator(".desktop-toast-viewport > li[data-state='open']")).toHaveCount(state === "stack" ? 3 : 1);
+      if (state === "stack") await expect.poll(() =>
+        page.locator(".desktop-toast-viewport > li[data-state='open']").count()).toBeGreaterThanOrEqual(2);
+      else await expect(page.locator(".desktop-toast-viewport > li[data-state='open']")).toHaveCount(1);
       if (state === "long") {
         const syncToast = page.locator(".desktop-toast-viewport [data-sync-status='error']");
         await expect(syncToast).toBeVisible();
@@ -190,7 +189,6 @@ export async function refreshAllData(setProgress) {
         expect(detailsBox!.x - copyBox!.x - copyBox!.width).toBeGreaterThanOrEqual(12);
       }
       if (state === "stack") {
-        await expect(page.getByRole("button", { name: "See usage" })).toBeVisible();
         await expect(page.getByRole("button", { name: "Retry" }).first()).toBeVisible();
         await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
       }

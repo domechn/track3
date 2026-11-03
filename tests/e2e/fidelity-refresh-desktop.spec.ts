@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mkdirSync } from "node:fs";
+import md5 from "md5";
 import { installTauriBridge } from "./fidelity-scenes";
 
 const output = "/tmp/fidelity-desktop/refresh";
@@ -45,7 +46,7 @@ for (const state of states) test(`Refresh desktop captures ${state} with real so
         query: "INSERT OR REPLACE INTO configuration (id, data) VALUES (6, '31')", values: [],
       }));
       if (mode !== "ok") {
-        const missingWallet = mode === "partial" ? "OKX" : "0x4f…a91c";
+        const missingWallet = md5(mode === "partial" ? "okex-fidelity-okx-key" : "0x4f0000000000000000000000000000000000a91c");
         await page.evaluate(async ({ missingWallet, mode }) => {
           const invoke = (window as any).__e2eInvoke;
           await invoke("plugin:sql|execute", {

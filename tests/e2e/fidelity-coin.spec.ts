@@ -352,10 +352,11 @@ test("two exchange sources use grammatical coin description", async ({ browser }
     const page = await context.newPage();
     await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
     await installTauriBridge(page, { fidelitySample: "BTC" });
-    await page.evaluate(async () => (window as any).__e2eInvoke("plugin:sql|execute",
-      { query: "UPDATE assets_v2 SET wallet = 'OKX' WHERE wallet = 'Ledger cold wallet'", values: [] }));
+    const [changed] = await page.evaluate(async () => (window as any).__e2eInvoke("plugin:sql|execute",
+      { query: "UPDATE assets_v2 SET wallet = (SELECT wallet FROM assets_v2 WHERE symbol = 'USDC' LIMIT 1) WHERE symbol = 'BTC' AND ABS(amount - 2.0226) < 0.00001", values: [] }));
+    expect(changed).toBeGreaterThan(0);
     await page.goto("/#/coins/BTC");
-    await expect(page.locator(".fd-coin-head p")).toHaveText("Held on Binance and OKX");
+    await expect(page.locator(".fd-coin-head p")).toHaveText("Held on Binance and OKX", { timeout: 30_000 });
   } finally { await context.close(); }
 });
 

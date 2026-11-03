@@ -10,7 +10,7 @@ import type {
 const TOAST_REMOVE_DELAY = 1000000
 const toastLimit = () => typeof window !== "undefined" && window.innerWidth >= 761 ? 3 : 1
 
-type ToasterToast = ToastProps & {
+type ToasterToast = Omit<ToastProps, "title"> & {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode

@@ -813,6 +813,37 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(screen.getByRole("alertdialog", { name: "Source status" })).toHaveTextContent("Refreshing portfolio");
   });
 
+  it("shows done and failed icons with a pending retry in iPhone refresh progress", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    vi.mocked(getConfiguration).mockResolvedValue({} as never);
+    vi.mocked(listPortfolioSources).mockReturnValue([
+      { sourceId: "cex:0", label: "Binance" },
+      { sourceId: "cex:1", label: "OKX" },
+      { sourceId: "btc:0", label: "Ledger cold wallet" },
+    ]);
+    vi.mocked(refreshAllData).mockImplementation(() => new Promise(() => {}));
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+    const onSourceResult = vi.mocked(refreshAllData).mock.calls[0][1]?.onSourceResult;
+    if (!onSourceResult) throw new Error("refresh source callback missing");
+    act(() => {
+      onSourceResult({ sourceId: "cex:0", label: "Binance", status: "ok", coins: [],
+        startedAt: "2026-10-31T09:41:00Z", finishedAt: "2026-10-31T09:41:03.100Z" } as never);
+      onSourceResult({ sourceId: "cex:1", label: "OKX", status: "stale", category: "network", coins: [] } as never);
+    });
+    const dialog = screen.getByRole("alertdialog", { name: "Source status" });
+    const done = screen.getByRole("group", { name: "Binance" });
+    const failed = screen.getByRole("group", { name: "OKX" });
+    expect(dialog).toHaveTextContent("2 of 3 finished · 1 failed");
+    expect(done).toHaveTextContent("Done in 3.1s");
+    expect(done.querySelector("small svg")).toBeInTheDocument();
+    expect(failed).toHaveTextContent("Stale · Network or timeout");
+    expect(failed.querySelector("small svg")).toBeInTheDocument();
+    expect(failed.querySelector("small svg")).not.toHaveAttribute("class", done.querySelector("small svg")?.getAttribute("class"));
+    expect(screen.getByRole("button", { name: "Retry OKX" })).toBeDisabled();
+  });
+
   it("offers a full retry of failed sources after restarting", async () => {
     const statuses = [{ sourceId: "btc:0", label: "Private wallet", status: "failed" as const, category: "network" as const }];
     localStorage.setItem("track3-refresh-source-statuses", JSON.stringify(statuses));

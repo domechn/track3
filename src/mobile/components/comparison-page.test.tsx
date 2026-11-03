@@ -50,9 +50,22 @@ const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useRealTimers();
+  window.location.hash = "";
 });
 
 describe("Comparison page", () => {
+  it("opens a snapshot selected from History as the comparison head", async () => {
+    window.location.hash = "#/comparison?head=older";
+    vi.mocked(queryAllDataDates).mockResolvedValue([
+      { id: "latest", date: "2024-04-16", createdAt: "2024-04-16T00:00:00Z" },
+      { id: "older", date: "2024-04-15", createdAt: "2024-04-15T00:00:00Z" },
+      { id: "oldest", date: "2024-04-14", createdAt: "2024-04-14T00:00:00Z" },
+    ]);
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+    render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /head date/i })).toHaveTextContent("2024-04-15"));
+    expect(screen.getByRole("button", { name: /base date/i })).toHaveTextContent("2024-04-14");
+  });
   it("leaves quick ranges unselected when the latest two snapshots are shown on a phone", async () => {
     const previousMatchMedia = window.matchMedia;
     window.matchMedia = (query: string) => ({
@@ -183,6 +196,7 @@ describe("Comparison page", () => {
 
     const toggle = screen.getByRole("button", { name: /hide values/i });
     expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(document.querySelector(".comparison-total-base")).not.toHaveTextContent("***");
 
     await user.click(toggle);
 

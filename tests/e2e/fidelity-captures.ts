@@ -1,0 +1,1029 @@
+import { readFileSync } from "node:fs";
+import { createHash, createHmac } from "node:crypto";
+import { resolve } from "node:path";
+import type { Page } from "@playwright/test";
+import initSqlJs from "sql.js";
+import md5 from "md5";
+import { FakeS3, S3Error } from "../../src/middlelayers/sync/object-store";
+import { hourlyHistory } from "../../src/test/history-fixtures";
+
+const schemaFiles = [
+  "assets_v2", "asset_prices", "transactions", "chat_sessions",
+  "currency_rates", "configuration", "sync_manifest_cache", "sync_snapshot_state",
+];
+
+type BridgeOptions = {
+  s3?: FakeS3;
+  seedReviewContent?: boolean;
+  seedRebalanceProfile?: boolean;
+  emptyPortfolio?: boolean;
+  onboarding?: boolean;
+  seedLockedSync?: boolean;
+  richPortfolio?: boolean;
+  sparseProfitHistory?: boolean;
+  partialProfitHistory?: boolean;
+  zeroCostUSDC?: boolean;
+  slowOverview?: boolean;
+  lockedStartup?: boolean;
+  freshReviewData?: boolean;
+  slowAssistant?: boolean;
+  failDataQueries?: boolean;
+  backupFolderFixture?: boolean;
+  configuredBackupFixture?: boolean;
+  backupFolderPick?: string;
+  backupFolderFailure?: string;
+  proUsageFixture?: boolean;
+  quotaExhaustedFixture?: boolean;
+  preflightExhaustedFixture?: boolean;
+  checkoutFixture?: boolean;
+  goldenHistory?: boolean;
+  seedEditLog?: boolean;
+  seedPartialSnapshot?: boolean;
+  customPriceFixture?: boolean;
+  appVersion?: string;
+  licenseDevices?: "absent" | "present" | "error";
+  fidelityBinance?: { apiKey: string; secret: string; balances: Record<string, number>; prices: Record<string, number> };
+  fidelityUsage?: boolean;
+  fidelityPro?: boolean;
+  fidelityProExpired?: boolean;
+  fidelityLicenseInvalid?: boolean;
+  fidelityLicenseDelay?: boolean;
+  appLockEnabledFixture?: boolean;
+  fidelitySync?: boolean;
+  fidelityAiProbe?: boolean;
+  fidelityAiProbeFail?: boolean;
+};
+
+export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
+  const isIPhone = /iPhone|iPad|iPod/.test(await page.evaluate(() => navigator.userAgent));
+  const options = optionsOrS3 instanceof FakeS3
+    ? { s3: optionsOrS3, seedReviewContent: legacySeedReviewContent }
+    : { ...optionsOrS3, seedReviewContent: optionsOrS3.seedReviewContent ?? legacySeedReviewContent };
+  const {
+    s3,
+    seedReviewContent = false,
+    seedRebalanceProfile = false,
+    emptyPortfolio = false,
+    seedLockedSync = false,
+    richPortfolio = false,
+    sparseProfitHistory = false,
+    partialProfitHistory = false,
+    zeroCostUSDC = false,
+    slowOverview = false,
+    lockedStartup = false,
+    freshReviewData = false,
+    slowAssistant = false,
+    failDataQueries = false,
+    backupFolderFixture = false,
+    configuredBackupFixture = false,
+    backupFolderPick,
+    backupFolderFailure,
+    proUsageFixture = false,
+    quotaExhaustedFixture = false,
+    preflightExhaustedFixture = false,
+    checkoutFixture = false,
+    goldenHistory = false,
+    seedEditLog = false,
+    seedPartialSnapshot = false,
+    customPriceFixture = false,
+    appVersion = "0.8.2",
+    licenseDevices = "absent",
+    fidelityBinance,
+    fidelityUsage = false,
+    fidelityPro = false,
+    fidelityProExpired = false,
+    fidelityLicenseInvalid = false,
+    fidelityLicenseDelay = false,
+    appLockEnabledFixture = false,
+    fidelitySync = false,
+    fidelityAiProbe = false,
+    fidelityAiProbeFail = false,
+  } = options;
+  if (!options.onboarding) {
+    await page.addInitScript(() => localStorage.setItem("track3-onboarding-v1", "completed"));
+  }
+  const SQL = await initSqlJs({
+    locateFile: () => resolve("node_modules/sql.js/dist/sql-wasm.wasm"),
+  });
+  const db = new SQL.Database();
+  for (const name of schemaFiles) {
+    db.run(readFileSync(resolve(`src-tauri/migrations/init/${name}_up.sql`), "utf8"));
+  }
+  db.run(`
+    CREATE TABLE refresh_operations (operation_uuid TEXT, created_at TEXT);
+    INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES
+      ('snapshot-old', '2024-01-01T00:00:00.000Z', 'wallet-1', 'crypto', 'BTC', 1, 40000, 40000),
+      ('snapshot-new', '2024-01-02T00:00:00.000Z', 'wallet-1', 'crypto', 'BTC', 1, 42000, 42000);
+    INSERT INTO currency_rates (currency, alias, symbol, rate, priority, updatedAt)
+      VALUES ('USD', 'US dollar', '$', 1, 0, '2099-01-01T00:00:00.000Z');
+    INSERT INTO configuration (id, data) VALUES
+      (997, '!ent:e2e:license'),
+      (994, '!ent:e2e:ai'),
+      (998, 'e2e-client');
+  `);
+  if (goldenHistory) {
+    db.run("DELETE FROM assets_v2");
+    db.run("DELETE FROM sqlite_sequence WHERE name = 'assets_v2'");
+    db.run("UPDATE configuration SET data = 'golden-client' WHERE id = 998");
+    for (const snapshot of hourlyHistory(2, 2)) {
+      for (const asset of snapshot.assets) {
+        db.run("INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES (?, ?, 'wallet-golden', 'crypto', ?, ?, ?, ?)",
+          [snapshot.id, snapshot.createdAt, asset.symbol, asset.amount, asset.value, asset.price]);
+      }
+    }
+    db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt)
+      VALUES ('snapshot-000001', 3, 'crypto', 'wallet-golden', 'ASSET0', 1, 2, 'buy',
+      '2022-01-01T01:00:00.000Z', '2022-01-01T01:00:00.000Z', '2022-01-01T01:00:00.000Z')`);
+  }
+  if (checkoutFixture) db.run("DELETE FROM configuration WHERE id = 997");
+  db.run("INSERT INTO configuration (id, data) VALUES (12, ?)",
+    ["configs:\n  groupUSD: false\nothers:\n  - symbol: BTC\n    amount: 2\n"]);
+  db.run("INSERT INTO configuration (id, data) VALUES (11, ?)", [
+    "btc: {addresses: []}\nerc20: {addresses: []}\nsol: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n",
+  ]);
+  if (quotaExhaustedFixture) {
+    db.run("UPDATE configuration SET data = ? WHERE id = 11", [
+      "btc: {addresses: []}\nerc20: {addresses: ['0x1111111111111111111111111111111111111111']}\nsol: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n",
+    ]);
+  }
+  if (backupFolderFailure) {
+    db.run("INSERT INTO configuration (id, data) VALUES (3, '/e2e/cloud/old')");
+  }
+  if (configuredBackupFixture) {
+    db.run("INSERT INTO configuration (id, data) VALUES (3, '/e2e/cloud')");
+    db.run("UPDATE configuration SET data = 'device-a' WHERE id = 998");
+  }
+  if (seedLockedSync) {
+    db.run("INSERT INTO configuration (id, data) VALUES (991, ?)", [
+      `!ent:e2e:${JSON.stringify({ enabled: true, endpoint: "https://s3.example.test", bucket: "track3", region: "us-east-1", accessKeyId: "e2e-access", secretAccessKey: "e2e-secret" })}`,
+    ]);
+  }
+  if (emptyPortfolio) {
+    db.run("DELETE FROM assets_v2");
+    db.run("UPDATE configuration SET data = ? WHERE id = 12",
+      ["configs:\n  groupUSD: false\nothers: []\n"]);
+  }
+  if (richPortfolio && !emptyPortfolio) {
+    db.run("DELETE FROM assets_v2");
+    db.run("INSERT INTO configuration (id, data) VALUES (6, '60')");
+    const bitcoinAddress = "bc1q-demo-cold-storage";
+    const solanaAddress = "demo-solana-wallet";
+    const coinbaseIdentity = "coinbase-demo-key";
+    const ibkrIdentity = "ibkr:demo-query";
+    db.run("UPDATE configuration SET data = ? WHERE id = 11", [
+      `btc:\n  addresses:\n    - address: ${bitcoinAddress}\n      alias: Cold storage\nsol:\n  addresses:\n    - address: ${solanaAddress}\n      alias: Solana wallet\nerc20: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n`,
+    ]);
+    db.run("INSERT INTO configuration (id, data) VALUES (10, ?)", [
+      "!ent:e2e:exchanges:\n  - name: coinbase\n    alias: Main exchange\n    initParams:\n      apiKey: demo-key\n      secret: demo-secret\n",
+    ]);
+    db.run("INSERT INTO configuration (id, data) VALUES (20, ?)", [
+      "!ent:e2e:brokers:\n  - name: ibkr\n    alias: Brokerage\n    initParams:\n      token: demo-token\n      queryId: demo-query\n",
+    ]);
+    const holdings = [
+      { symbol: "BTC", type: "crypto", wallet: md5(bitcoinAddress), amount: 0.36, base: 28_000 },
+      { symbol: "ETH", type: "crypto", wallet: md5(coinbaseIdentity), amount: 3.8, base: 12_000 },
+      { symbol: "AAPL", type: "stock", wallet: md5(ibkrIdentity), amount: 43, base: 9_000 },
+      { symbol: "SOL", type: "crypto", wallet: md5(solanaAddress), amount: 42, base: 7_000 },
+      { symbol: "USDC", type: "crypto", wallet: md5(coinbaseIdentity), amount: 6_400, base: 6_400 },
+      { symbol: "AVAX", type: "crypto", wallet: md5(coinbaseIdentity), amount: 81, base: 3_000 },
+      { symbol: "LINK", type: "crypto", wallet: md5(coinbaseIdentity), amount: 90, base: 1_600 },
+    ];
+    const firstReviewDay = freshReviewData
+      ? new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() - 59))
+      : new Date(Date.UTC(2026, 7, 24));
+    for (let day = 0; day < 60; day++) {
+      const uuid = `demo-${String(day).padStart(2, "0")}`;
+      const createdAt = new Date(firstReviewDay.getTime() + day * 86400000).toISOString();
+      const dailyMove = [0.004, -0.012, 0.008, 0.015, -0.006, 0.003, -0.009, 0.011, -0.004];
+      const market = 0.86 + day * 0.004
+        + (day >= 13 ? -0.055 : 0) + (day >= 27 ? 0.045 : 0)
+        + (day >= 40 ? -0.035 : 0) + (day >= 51 ? 0.065 : 0)
+        + dailyMove[day % dailyMove.length];
+      for (const [index, holding] of holdings.entries()) {
+        const value = Math.round(holding.base * (holding.symbol === "USDC"
+          ? 1 : market * (1 + dailyMove[(day + index * 2) % dailyMove.length] * (index + 2))) * 100) / 100;
+        db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [uuid, createdAt, holding.wallet, holding.type, holding.symbol, holding.amount, value, value / holding.amount]);
+      }
+    }
+    for (const [index, holding] of holdings.entries()) {
+      const first = db.exec("SELECT id FROM assets_v2 WHERE uuid = 'demo-00' AND symbol = ?", [holding.symbol])[0]?.values[0];
+      const last = db.exec("SELECT price, value FROM assets_v2 WHERE uuid = 'demo-59' AND symbol = ?", [holding.symbol])[0]?.values[0];
+      if (!first || !last) throw new Error("Demo holding snapshot is missing");
+      const costFactor = [0.78, 1.18, 0.86, 1.24, 1, 0.82, 1.26][index];
+      db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'buy', ?)`,
+      ["demo-00", first[0], holding.type, holding.wallet, holding.symbol,
+        holding.amount, Number(last[0]) * costFactor, firstReviewDay.toISOString()]);
+    }
+    for (const [symbol, amount, saleFactor, day] of [
+      ["SOL", 5, 1.08, 20],
+      ["BTC", 0.08, 1.05, 40],
+      ["ETH", 0.8, 0.82, 44],
+    ] as const) {
+      const holding = holdings.find((item) => item.symbol === symbol)!;
+      const snapshot = `demo-${day}`;
+      const row = db.exec("SELECT id, price FROM assets_v2 WHERE uuid = ? AND symbol = ?", [snapshot, symbol])[0]?.values[0];
+      const latest = db.exec("SELECT price FROM assets_v2 WHERE uuid = 'demo-59' AND symbol = ?", [symbol])[0]?.values[0];
+      if (!row || !latest) throw new Error("Demo sale snapshot is missing");
+      const soldAt = new Date(Date.UTC(2026, 7, 24 + day)).toISOString();
+      const repurchasedAt = new Date(Date.UTC(2026, 7, 24 + 55)).toISOString();
+      db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'sell', ?)`,
+      [snapshot, row[0], holding.type, holding.wallet, symbol, amount, Number(latest[0]) * saleFactor, soldAt]);
+      db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'buy', ?)`,
+      ["demo-55", row[0], holding.type, holding.wallet, symbol, amount, Number(latest[0]) * 0.96, repurchasedAt]);
+    }
+    if (zeroCostUSDC) db.run("UPDATE transactions SET price = 0 WHERE symbol = 'USDC' AND txnType = 'buy'");
+    if (!seedReviewContent) db.run("INSERT INTO configuration (id, data) VALUES (992, ?)", [
+      `!ent:e2e:${JSON.stringify({
+        snapshotUuid: "demo-59", dismissedIds: [],
+        insights: [{ id: "new:crypto:SOL", severity: "info", messageKey: "insights.newAsset",
+          data: { symbol: "SOL", value: 7298.27 } }],
+      })}`,
+    ]);
+  }
+  if (sparseProfitHistory) {
+    db.run("DELETE FROM transactions");
+    db.run("DELETE FROM assets_v2");
+    for (const [uuid, createdAt, value] of [
+      ["sparse-dec", "2025-12-31T12:00:00.000Z", 760000],
+      ["sparse-jan", "2026-01-04T12:00:00.000Z", 758900],
+      ["sparse-apr", "2026-04-04T12:00:00.000Z", 763100],
+      ["sparse-oct", "2026-10-04T12:00:00.000Z", 681200],
+    ] as const) {
+      db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+        VALUES (?, ?, 'sparse-wallet', 'crypto', 'BTC', 1, ?, ?)`, [uuid, createdAt, value, value]);
+    }
+    const firstId = db.exec("SELECT id FROM assets_v2 WHERE uuid = 'sparse-dec'")[0].values[0][0];
+    db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+      VALUES ('sparse-dec', ?, 'crypto', 'sparse-wallet', 'BTC', 1, 760000, 'buy', '2025-12-31T12:00:00.000Z')`, [firstId]);
+  }
+  if (partialProfitHistory) {
+    db.run("DELETE FROM transactions");
+    db.run("DELETE FROM assets_v2");
+    for (let day = -1; day < 304; day += 1) {
+      const at = new Date(Date.UTC(2026, 0, day + 1, 12)).toISOString();
+      const uuid = `partial-${day}`;
+      const btcPrice = 100000 + (day + 1) * 150;
+      const ethAmount = day < 40 ? 2 : day < 160 ? 1.5 : 1;
+      db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+        VALUES (?, ?, 'partial-btc', 'crypto', 'BTC', 1, ?, ?)`, [uuid, at, btcPrice, btcPrice]);
+      db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+        VALUES (?, ?, 'partial-eth', 'crypto', 'ETH', ?, ?, 50)`, [uuid, at, ethAmount, ethAmount * 50]);
+    }
+    for (const [uuid, symbol, wallet, amount, price, txnType, at] of [
+      ["partial--1", "BTC", "partial-btc", 1, 100000, "buy", "2025-12-31T12:00:00.000Z"],
+      ["partial--1", "ETH", "partial-eth", 2, 50, "buy", "2025-12-31T12:00:00.000Z"],
+      ["partial-40", "ETH", "partial-eth", 0.5, 50, "withdraw", "2026-02-10T12:00:00.000Z"],
+      ["partial-160", "ETH", "partial-eth", 0.5, 50, "withdraw", "2026-06-10T12:00:00.000Z"],
+    ] as const) {
+      const id = db.exec("SELECT id FROM assets_v2 WHERE uuid = ? AND symbol = ?", [uuid, symbol])[0].values[0][0];
+      db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+        VALUES (?, ?, 'crypto', ?, ?, ?, ?, ?, ?)`, [uuid, id, wallet, symbol, amount, price, txnType, at]);
+    }
+  }
+  if (seedReviewContent) {
+    db.run(`INSERT INTO chat_sessions (id, title, createdAt, updatedAt, pinned, messageCount, preview)
+      VALUES ('pinned-e2e', 'Pinned portfolio review', '2026-01-01', '2026-01-02', 1, 0, ''),
+        ('recent-e2e', 'Recent portfolio review', '2026-01-01', '2026-01-03', 0, 0, '')`);
+    db.run(`INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+      VALUES ('snapshot-old', 1, 'crypto', 'wallet-1', 'BTC', 1, 40000, 'BUY', '2024-01-01T00:00:00.000Z')`);
+    db.run("INSERT INTO configuration (id, data) VALUES (992, ?)", [
+      `!ent:e2e:${JSON.stringify({
+        snapshotUuid: "snapshot-new", dismissedIds: [],
+        insights: [{ id: "new:crypto:BTC", severity: "info", messageKey: "insights.newAsset",
+          data: { symbol: "BTC", value: 42000 } }],
+      })}`,
+    ]);
+  }
+  db.run(readFileSync(resolve("src-tauri/migrations/v08t09/history_snapshots_up.sql"), "utf8"));
+  db.run(readFileSync(resolve("src-tauri/migrations/v08t09/rebalance_profiles_up.sql"), "utf8"));
+  if (seedRebalanceProfile) {
+    db.run("INSERT INTO rebalance_profiles (id, targets, tolerance_percent) VALUES (1, ?, 0)", [
+      JSON.stringify([
+        { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 },
+        { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 50 },
+      ]),
+    ]);
+  }
+  db.run(readFileSync(resolve("src-tauri/migrations/v08t09/alerts_up.sql"), "utf8"));
+  db.run(readFileSync(resolve("src-tauri/migrations/v08t09/sync_state_up.sql"), "utf8"));
+  db.run(readFileSync(resolve("src-tauri/migrations/init/snapshot_edit_log_up.sql"), "utf8"));
+  db.run(readFileSync(resolve("src-tauri/migrations/init/snapshot_partial_up.sql"), "utf8"));
+  if (seedPartialSnapshot) {
+    if (!richPortfolio) throw new Error("Partial snapshot fixture needs the rich portfolio");
+    for (const uuid of ["demo-30", "demo-59"]) {
+      const row = db.exec("SELECT createdAt, wallet FROM assets_v2 WHERE uuid = ? LIMIT 1", [uuid])[0]?.values[0];
+      if (!row) throw new Error("Partial snapshot fixture is missing");
+      const createdAt = String(row[0]);
+      db.run(`INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at)
+        VALUES (?, 5, ?, 'last_known', ?)`, [uuid, JSON.stringify([{
+        wallet: row[1], kind: "wallet", provider: "BTC", category: "network",
+        lastSuccessAt: new Date(Date.parse(createdAt) - 86400000).toISOString(),
+      }]), createdAt]);
+    }
+  }
+  if (seedEditLog) {
+    const uuid = richPortfolio ? "demo-59" : "snapshot-new";
+    db.run(`INSERT INTO snapshot_edit_log
+      (snapshot_uuid, edited_at, origin, target, action, asset_type, symbol, wallet, old_value, new_value)
+      VALUES (?, '2026-11-01T10:02:00.000Z', 'local', 'asset', 'restore', 'crypto', 'ETH', 'hashed-wallet', NULL, '{"amount":3.8,"value":12000,"price":3157.89}')`,
+    [uuid]);
+  }
+  if (customPriceFixture) {
+    db.run("UPDATE configuration SET data = ? WHERE id = 12", [
+      `configs:\n  groupUSD: false\nothers:\n  - symbol: NOVA\n    amount: 1200\n    price:\n      kind: manual\n      usd: 0.42\n      setAt: '2026-11-01T10:00:00.000Z'\n      note: OTC\n  - symbol: STBTC\n    amount: 0.5\n    price:\n      kind: follow\n      assetType: crypto\n      symbol: BTC\n      ratio: 1\n`,
+    ]);
+    db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('demo-59', '2026-10-22T00:00:00.000Z', ?, 'crypto', 'NOVA', 1200, 504, 0.42)`, [md5("others")]);
+    db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('demo-59', '2026-10-22T00:00:00.000Z', ?, 'crypto', 'STBTC', 0.5, 21000, 42000)`, [md5("others")]);
+  }
+  const config = JSON.stringify({
+    endpoint: "https://assistant.test/v1",
+    apiKey: "sk-e2e",
+    model: "test-model",
+    contextSize: 8192,
+  });
+  const files = new Map<string, string>();
+  const directories = new Set<string>();
+  if (backupFolderFixture) {
+    directories.add("/e2e/cloud/track3-backup");
+    directories.add("/e2e/cloud/track3-backup/device-a");
+    directories.add("/e2e/cloud/track3-backup/device-a/data");
+    const historicalData = [{
+      createdAt: "2024-02-01T00:00:00.000Z", total: 42,
+      assets: [{ id: 3, uuid: "folder-snapshot", createdAt: "2024-02-01T00:00:00.000Z", assetType: "crypto", symbol: "ETH", amount: 1, value: 42, price: 42, wallet: "folder-wallet" }],
+      transactions: [],
+    }];
+    const content = JSON.stringify({ historicalData });
+    const bytes = new TextEncoder().encode(content).length;
+    const sha256 = createHash("sha256").update(content).digest("hex");
+    const part = { bytes, file: `2024-02.${sha256.slice(0, 8)}.json`, month: "2024-02", records: 1, sha256 };
+    const payload = { client: "device-a", clientVersion: "0.9.0", exportAt: "2024-03-01T00:00:00.000Z", formatVersion: 2, parts: [part] };
+    const metaHash = createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+    files.set("/e2e/cloud/track3-backup/device-a/metadata.json", JSON.stringify({ ...payload, metaHash }));
+    files.set(`/e2e/cloud/track3-backup/device-a/data/${part.file}`, content);
+  }
+  directories.add("/e2e/unrelated");
+  let exportedPath: string | null = null;
+  let sharedRecoveryFile: string | null = null;
+  const requests = new Map<number, { url: string; method?: string; headers?: Record<string, string> | [string, string][]; data?: number[] }>();
+  const responses = new Map<number, { bytes: number[]; read: boolean; chunks?: number[][]; chunkIndex?: number }>();
+  let nextRid = 1;
+  let refreshes = 0;
+  let localQueries = 0;
+  let sseCalls = 0;
+  let haptics = 0;
+  let shares = 0;
+  let authentications = 0;
+  let checkoutStatus: "pending" | "completed" | "expired" = "pending";
+  let checkoutSessions = 0;
+  const openedUrls: string[] = [];
+  let publicIpMode: "loading" | "value" | "error" = "value";
+  let publicIpRequests = 0;
+  let licenseDeviceRequests = 0;
+
+  const select = (query: string, values: unknown[] = []) => {
+    localQueries++;
+    const result = db.exec(query, values as any[]);
+    return result.flatMap(({ columns, values: rows }) =>
+      rows.map((row) => Object.fromEntries(columns.map((column, i) => [column, row[i]]))),
+    );
+  };
+  const execute = (query: string, values: unknown[] = []) => {
+    db.run(query, values as any[]);
+    return [db.getRowsModified(), select("SELECT last_insert_rowid() AS id")[0]?.id ?? 0];
+  };
+  const logEdit = (
+    uuid: string, origin: string, target: string, action: string,
+    assetType: string | null, symbol: string | null, wallet: string | null,
+    oldValue: string | null, newValue: string | null,
+  ) => {
+    db.run(`INSERT INTO snapshot_edit_log
+      (snapshot_uuid, edited_at, origin, target, action, asset_type, symbol, wallet, old_value, new_value)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [uuid, new Date().toISOString(), origin, target, action, assetType, symbol, wallet, oldValue, newValue]);
+    db.run("DELETE FROM snapshot_edit_log WHERE id <= (SELECT id FROM snapshot_edit_log ORDER BY id DESC LIMIT 1 OFFSET 5000)");
+  };
+
+  let appLockEnabled = appLockEnabledFixture;
+  await page.exposeBinding("__e2eInvoke", async (_source, cmd: string, args: any, options?: any) => {
+    if (isIPhone && /^plugin:(process|updater|shell)\|/.test(cmd)) {
+      throw new Error(`Desktop-only Tauri command on iPhone: ${cmd}`);
+    }
+    if (cmd === "get_database_url") return "sqlite:e2e.db";
+    if (cmd === "ios_startup_failure") return lockedStartup ? "Protected key unavailable" : null;
+    if (cmd === "ios_retry_startup") return false;
+    if (cmd === "ios_backup_folder_status") return { path: null, failure: backupFolderFailure ?? null };
+    if (cmd === "ios_pick_backup_folder") return backupFolderPick ?? (backupFolderFixture ? "/e2e/cloud" : null);
+    if (cmd === "ios_use_import_backup_folder") return null;
+    if (cmd === "ios_prepare_backup_folder" || cmd === "ios_clear_backup_folder" || cmd === "ios_undo_clear_backup_folder") return null;
+    if (cmd === "ios_haptic") { haptics++; return null; }
+    if (cmd === "ios_lock_enabled") return appLockEnabled;
+    if (cmd === "ios_set_lock_enabled") { appLockEnabled = args.enabled === true; return null; }
+    if (cmd === "rotate_encryption_key") return null;
+    if (cmd === "ios_authenticate") { authentications++; return true; }
+    if (cmd === "ios_auto_retry_allowed") return true;
+    if (cmd === "ios_set_badge") return null;
+    if (cmd === "ios_share_file") {
+      const recovery = /^\/e2e\/cache\/[0-9a-f-]{36}\/track3-sync-[a-z0-9-]+\.t3key$/.test(args.path);
+      if ((!recovery && !/^\/e2e\/cache\/[0-9a-f-]{36}\/track3-export-data\.json$/.test(args.path)) || !files.has(args.path)) {
+        throw new Error(`invalid export file: ${args.path}`);
+      }
+      if (recovery) sharedRecoveryFile = files.get(args.path)!;
+      shares++;
+      return null;
+    }
+    if (cmd === "plugin:sql|load") return args.db;
+    if (cmd === "plugin:sql|select") {
+      if (failDataQueries && /\bassets_v2\b/i.test(args.query)) throw new Error("Demo database unavailable");
+      if (slowOverview && /assets_v2/i.test(args.query)) await new Promise((resolve) => setTimeout(resolve, 1000));
+      return select(args.query, args.values);
+    }
+    if (cmd === "plugin:sql|execute") return execute(args.query, args.values);
+    if (cmd === "save_sync_state") {
+      db.run("BEGIN");
+      try {
+        if (args.clearSnapshots) db.run("DELETE FROM sync_snapshot_state");
+        for (const id of args.deletedIds as string[]) {
+          db.run("DELETE FROM sync_snapshot_state WHERE snapshot_id = ?", [id]);
+        }
+        for (const row of args.rows as Array<Record<string, string | number | null>>) {
+          db.run(
+            `INSERT OR REPLACE INTO sync_snapshot_state
+             (snapshot_id, snapshot_hash, snapshot_edit, pending_snapshot_edit, published, known,
+              asset_rows, transaction_rows, row_events, transaction_events)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ["snapshotId", "snapshotHash", "snapshotEdit", "pendingSnapshotEdit", "published", "known",
+              "assetRows", "transactionRows", "rowEvents", "transactionEvents"].map((key) => row[key]),
+          );
+        }
+        db.run("INSERT OR REPLACE INTO sync_state (id, data) VALUES (1, ?)", [args.data]);
+        db.run("COMMIT");
+      } catch (error) {
+        db.run("ROLLBACK");
+        throw error;
+      }
+      return null;
+    }
+    if (cmd === "plugin:opener|open_url") { openedUrls.push(args.url); return null; }
+    if (cmd === "update_local_transaction_price" || cmd === "update_local_transaction_type") {
+      const row = select("SELECT uuid, asset_type, symbol, wallet, price, txnType FROM transactions WHERE id = ?", [args.id])[0];
+      if (!row) throw new Error("Transaction not found");
+      const isPrice = cmd === "update_local_transaction_price";
+      const oldValue = String(isPrice ? row.price : row.txnType);
+      const newValue = String(isPrice ? args.price : args.txnType);
+      if (oldValue === newValue) return null;
+      db.run("BEGIN");
+      try {
+        db.run(`UPDATE transactions SET ${isPrice ? "price" : "txnType"} = ?, updatedAt = ? WHERE id = ?`,
+          [isPrice ? args.price : args.txnType, new Date().toISOString(), args.id]);
+        logEdit(String(row.uuid), "local", "transaction", isPrice ? "price" : "txnType",
+          String(row.asset_type), String(row.symbol), String(row.wallet), oldValue, newValue);
+        db.run("COMMIT");
+      } catch (error) { db.run("ROLLBACK"); throw error; }
+      return null;
+    }
+    if (cmd === "delete_local_asset") {
+      const asset = select("SELECT * FROM assets_v2 WHERE id = ?", [args.id])[0];
+      if (!asset) throw new Error("Asset not found");
+      db.run("BEGIN");
+      try {
+        db.run("DELETE FROM transactions WHERE assetID = ?", [args.id]);
+        db.run("DELETE FROM assets_v2 WHERE id = ?", [args.id]);
+        logEdit(String(asset.uuid), "local", "asset", "delete", String(asset.asset_type),
+          String(asset.symbol), String(asset.wallet), JSON.stringify({ amount: asset.amount, value: asset.value, price: asset.price }), null);
+        db.run("COMMIT");
+      } catch (error) { db.run("ROLLBACK"); throw error; }
+      return null;
+    }
+    if (cmd === "restore_local_asset") {
+      const { assets, transactions } = args.backup as { assets: any[]; transactions: any[] };
+      const asset = assets[0];
+      if (!asset || assets.length !== 1) throw new Error("Invalid asset backup");
+      db.run("BEGIN");
+      try {
+        db.run("INSERT INTO assets_v2 (id, uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [asset.id, asset.uuid, asset.createdAt, asset.wallet ?? "", asset.assetType, asset.symbol, asset.amount, asset.value, asset.price]);
+        for (const txn of transactions) {
+          db.run("INSERT INTO transactions (id, uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [txn.id, txn.uuid, txn.assetID, txn.assetType, txn.wallet, txn.symbol, txn.amount, txn.price, txn.txnType, txn.txnCreatedAt, txn.createdAt, txn.updatedAt]);
+        }
+        logEdit(asset.uuid, "local", "asset", "restore", asset.assetType, asset.symbol, asset.wallet ?? "",
+          null, JSON.stringify({ amount: asset.amount, value: asset.value, price: asset.price }));
+        db.run("COMMIT");
+      } catch (error) { db.run("ROLLBACK"); throw error; }
+      return null;
+    }
+    if (cmd === "delete_sync_snapshot" || cmd === "delete_local_snapshot") {
+      // Mirrors the Rust command: remove the snapshot's rows from every snapshot-scoped table.
+      const assets = select("SELECT COUNT(*) AS n, COALESCE(SUM(value), 0) AS total FROM assets_v2 WHERE uuid = ?", [args.uuid])[0];
+      const transactions = select("SELECT COUNT(*) AS n FROM transactions WHERE uuid = ?", [args.uuid])[0];
+      db.run("BEGIN");
+      try {
+        for (const table of ["asset_prices", "transactions", "assets_v2", "history_snapshots"]) {
+          try { db.run(`DELETE FROM ${table} WHERE uuid = ?`, [args.uuid]); } catch { /* table absent in this fixture */ }
+        }
+        if (cmd === "delete_local_snapshot") logEdit(args.uuid, "local", "snapshot", "delete", null, null, null,
+          JSON.stringify({ assets: assets.n, transactions: transactions.n, total: assets.total }), null);
+        db.run("COMMIT");
+      } catch (error) { db.run("ROLLBACK"); throw error; }
+      return null;
+    }
+    if (cmd === "import_sync_snapshot" || cmd === "replace_import_snapshot" || cmd === "restore_local_snapshot") {
+      const snapshot = args.snapshot as { uuid: string; assets: any[]; prices: any[]; transactions: any[] };
+      const existing = select("SELECT COUNT(*) AS n FROM assets_v2 WHERE uuid = ?", [snapshot.uuid])[0]?.n ?? 0;
+      if (cmd !== "replace_import_snapshot" && Number(existing) > 0) return false;
+      if (cmd === "replace_import_snapshot" && Number(existing) === 0) throw new Error("Cannot edit missing sync snapshot");
+      if (cmd === "replace_import_snapshot" && snapshot.prices.length) throw new Error("Import file cannot replace local cost prices");
+      db.run("BEGIN");
+      try {
+        const localPrices = cmd === "replace_import_snapshot"
+          ? select("SELECT a.asset_type, a.wallet, a.symbol, p.symbol AS priceSymbol, p.price, p.assetCreatedAt, p.updatedAt FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID AND a.uuid = p.uuid WHERE p.uuid = ?", [snapshot.uuid])
+          : [];
+        if (cmd === "replace_import_snapshot" &&
+          Number(select("SELECT COUNT(*) AS n FROM asset_prices WHERE uuid = ?", [snapshot.uuid])[0]?.n) !== localPrices.length) {
+          throw new Error("Cannot replace snapshot without losing local cost prices");
+        }
+        for (const price of localPrices) {
+          if (!snapshot.assets.some((asset) => (asset.asset_type ?? asset.assetType) === price.asset_type &&
+            (asset.wallet ?? "") === price.wallet && asset.symbol === price.symbol)) {
+            throw new Error("Cannot replace snapshot without losing local cost prices");
+          }
+        }
+        if (cmd === "replace_import_snapshot") {
+          for (const table of ["asset_prices", "transactions", "assets_v2"]) db.run(`DELETE FROM ${table} WHERE uuid = ?`, [snapshot.uuid]);
+        }
+        const idMap = new Map<number, number>();
+        for (const asset of snapshot.assets) {
+          db.run("INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [snapshot.uuid, asset.createdAt, asset.wallet ?? "", asset.asset_type ?? asset.assetType, asset.symbol, asset.amount, asset.value, asset.price]);
+          idMap.set(asset.id, Number(select("SELECT last_insert_rowid() AS id")[0].id));
+        }
+        for (const txn of snapshot.transactions) {
+          const assetID = idMap.get(txn.assetID);
+          if (!assetID) throw new Error("Invalid sync transaction asset");
+          db.run("INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [snapshot.uuid, assetID, txn.asset_type ?? txn.assetType, txn.wallet, txn.symbol, txn.amount, txn.price, txn.txnType, txn.txnCreatedAt, txn.createdAt, txn.updatedAt]);
+        }
+        if (cmd === "import_sync_snapshot") {
+          for (const price of snapshot.prices) {
+            const assetID = idMap.get(price.assetID);
+            if (!assetID) continue;
+            db.run("INSERT INTO asset_prices (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
+              [price.uuid, assetID, price.symbol, price.price, price.assetCreatedAt, price.updatedAt]);
+          }
+        }
+        for (const price of localPrices) {
+          const asset = snapshot.assets.find((row) => (row.asset_type ?? row.assetType) === price.asset_type &&
+            (row.wallet ?? "") === price.wallet && row.symbol === price.symbol)!;
+          db.run("INSERT INTO asset_prices (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
+            [snapshot.uuid, idMap.get(asset.id)!, price.priceSymbol, price.price, price.assetCreatedAt, price.updatedAt]);
+        }
+        if (cmd === "restore_local_snapshot") for (const txn of args.orphanTransactions as any[]) {
+          db.run("INSERT INTO transactions (id, uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [txn.id, txn.uuid, txn.assetID, txn.asset_type ?? txn.assetType, txn.wallet, txn.symbol, txn.amount, txn.price, txn.txnType, txn.txnCreatedAt, txn.createdAt, txn.updatedAt]);
+        }
+        if (cmd === "restore_local_snapshot") logEdit(snapshot.uuid, "local", "snapshot", "restore", null, null, null,
+          null, JSON.stringify({ assets: snapshot.assets.length, transactions: snapshot.transactions.length + (args.orphanTransactions?.length ?? 0),
+            total: snapshot.assets.reduce((sum, asset) => sum + asset.value, 0) }));
+        if (cmd === "replace_import_snapshot") logEdit(snapshot.uuid, "import", "snapshot", "replace", null, null, null,
+          null, JSON.stringify({ assets: snapshot.assets.length, transactions: snapshot.transactions.length,
+            total: snapshot.assets.reduce((sum, asset) => sum + asset.value, 0) }));
+        db.run("COMMIT");
+      } catch (error) {
+        db.run("ROLLBACK");
+        throw error;
+      }
+      return cmd === "import_sync_snapshot" ? true : null;
+    }
+    if (cmd === "plugin:path|resolve_directory") {
+      if (args.directory === 16) return "/e2e/cache";
+      if (args.directory === 6) return "/e2e/documents";
+      return "/e2e/app";
+    }
+    if (cmd === "plugin:dialog|save") {
+      exportedPath = `/e2e/documents/${args.options.defaultPath}`;
+      files.set(exportedPath, "");
+      return exportedPath;
+    }
+    if (cmd === "plugin:dialog|open") return exportedPath;
+    if (cmd === "plugin:app|version") return appVersion;
+    if (cmd === "plugin:app|tauri_version") return "2.11.1";
+    if (cmd === "plugin:updater|check") return null;
+    if (cmd === "plugin:event|listen") return nextRid++;
+    if (cmd === "plugin:event|unlisten") return null;
+    if (cmd === "download_coins_logos") return null;
+    if (cmd === "encrypt") return `!ent:e2e:${args.data}`;
+    if (cmd === "decrypt") {
+      if (args.data === "!ent:e2e:license") return "e2e-license";
+      if (args.data === "!ent:e2e:ai") return config;
+      return String(args.data).replace(/^!ent:e2e:/, "");
+    }
+    if (cmd === "persist_refresh") {
+      refreshes++;
+      if (!args.operationUuid || !args.createdAt) throw new Error("invalid refresh payload");
+      for (const asset of args.assets as Array<{
+        wallet: string; assetType: string; symbol: string; amount: number; value: number; price: number;
+      }>) {
+        execute(`INSERT INTO assets_v2
+          (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [
+          args.operationUuid, args.createdAt, asset.wallet, asset.assetType,
+          asset.symbol, asset.amount, asset.value, asset.price,
+        ]);
+      }
+      execute("INSERT INTO refresh_operations (operation_uuid, created_at) VALUES (?, ?)",
+        [args.operationUuid, args.createdAt]);
+      if (args.partial) {
+        const partial = args.partial as {
+          sourcesTotal: number; missing: unknown[]; fill: string; createdAt: string;
+        };
+        execute(`INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at)
+          VALUES (?, ?, ?, ?, ?)`, [
+          args.operationUuid, partial.sourcesTotal, JSON.stringify(partial.missing),
+          partial.fill, partial.createdAt,
+        ]);
+      }
+      return null;
+    }
+    if (cmd === "plugin:fs|exists") return files.has(args.path) || directories.has(args.path) ||
+      (richPortfolio && /\/assets\/coins\/(btc|eth|sol|usdc|avax|link)\.png$/.test(args.path));
+    if (cmd === "plugin:fs|read_dir") {
+      const prefix = `${args.path}/`;
+      return [...directories, ...files.keys()].filter((path) => path.startsWith(prefix) && !path.slice(prefix.length).includes("/"))
+        .map((path) => ({ name: path.slice(prefix.length), isDirectory: directories.has(path), isFile: files.has(path), isSymlink: false }));
+    }
+    if (cmd === "plugin:fs|mkdir") return null;
+    if (cmd === "plugin:fs|copy_file") {
+      const text = files.get(args.fromPath);
+      if (text === undefined) throw new Error(`file missing: ${args.fromPath}`);
+      files.set(args.toPath, text);
+      return null;
+    }
+    if (cmd === "plugin:fs|stat") {
+      const text = files.get(args.path);
+      if (text === undefined) throw new Error(`file missing: ${args.path}`);
+      return { size: new TextEncoder().encode(text).length, isFile: true, isDirectory: false, isSymlink: false, mtime: null, atime: null, birthtime: null, readonly: false };
+    }
+    if (cmd === "plugin:fs|remove") {
+      files.delete(args.path);
+      return null;
+    }
+    if (cmd === "plugin:fs|read_text_file") {
+      const text = files.get(args.path);
+      if (text === undefined) throw new Error(`file missing: ${args.path}`);
+      return Array.from(new TextEncoder().encode(text));
+    }
+    if (cmd === "plugin:fs|write_text_file") {
+      const path = decodeURIComponent(options.headers.path);
+      files.set(path, new TextDecoder().decode(Uint8Array.from(Object.values(args))));
+      return null;
+    }
+    if (cmd === "plugin:http|fetch") {
+      const rid = nextRid++;
+      requests.set(rid, args.clientConfig);
+      return rid;
+    }
+    if (cmd === "plugin:http|fetch_send") {
+      const request = requests.get(args.rid);
+      if (!request) throw new Error("HTTP request missing");
+      if (s3 && (new URL(request.url).hostname === "s3.example.test" ||
+        (fidelitySync && new URL(request.url).hostname === "3f9a1c7e2b4d.r2.cloudflarestorage.com"))) {
+        const url = new URL(request.url);
+        const key = decodeURIComponent(url.pathname.replace(/^\/(?:track3-sync|track3)\/?/, ""));
+        const method = request.method ?? "GET";
+        const headers = Array.isArray(request.headers) ? Object.fromEntries(request.headers) : request.headers ?? {};
+        let status = 200;
+        let bytes = new Uint8Array();
+        let responseHeaders: Record<string, string> = {};
+        try {
+          if (url.searchParams.get("list-type") === "2") {
+            const page = await s3.listObjectsV2({
+              prefix: url.searchParams.get("prefix") ?? undefined,
+              delimiter: url.searchParams.get("delimiter") ?? undefined,
+              continuationToken: url.searchParams.get("continuation-token") ?? undefined,
+            });
+            const xml = `<ListBucketResult><EncodingType>url</EncodingType><IsTruncated>${!!page.nextContinuationToken}</IsTruncated>${page.objects.map((object) =>
+              `<Contents><Key>${encodeURIComponent(object.key)}</Key><ETag>${object.etag.replaceAll("&", "&amp;").replaceAll('"', "&quot;")}</ETag><Size>${object.size}</Size><LastModified>${object.lastModified}</LastModified></Contents>`).join("")}${(page.commonPrefixes ?? []).map((prefix) =>
+              `<CommonPrefixes><Prefix>${encodeURIComponent(prefix)}</Prefix></CommonPrefixes>`).join("")}${page.nextContinuationToken ? `<NextContinuationToken>${page.nextContinuationToken}</NextContinuationToken>` : ""}</ListBucketResult>`;
+            bytes = new TextEncoder().encode(xml);
+            responseHeaders = { "content-type": "application/xml" };
+          } else if (method === "PUT") {
+            const result = await s3.putObject(key, Uint8Array.from(request.data ?? []), {
+              ...(headers["if-match"] ? { ifMatch: headers["if-match"] } : {}),
+              ...(headers["if-none-match"] === "*" ? { ifNoneMatch: "*" } : {}),
+            });
+            responseHeaders = { etag: result.etag };
+          } else if (method === "GET") {
+            const result = headers["if-none-match"]
+              ? await s3.getObject(key, undefined, headers["if-none-match"])
+              : await s3.getObject(key);
+            if (!result) status = 404;
+            else {
+              if ("notModified" in result) status = 304;
+              else bytes = result.body;
+              responseHeaders = { etag: result.etag, ...(result.lastModified ? { "last-modified": result.lastModified } : {}) };
+            }
+          } else if (method === "HEAD") {
+            const result = await s3.headObject(key);
+            if (!result) status = 404;
+            else responseHeaders = { etag: result.etag, "content-length": String(result.size) };
+          } else if (method === "DELETE") {
+            await s3.deleteObject(key);
+            status = 204;
+          } else {
+            status = 400;
+          }
+        } catch (error) {
+          if (error instanceof S3Error) status = error.status;
+          else throw error;
+        }
+        const rid = nextRid++;
+        responses.set(rid, { bytes: Array.from(bytes), read: false });
+        return { status, statusText: status < 300 ? "OK" : "Error", url: request.url, headers: responseHeaders, rid };
+      }
+      let contentType = "application/json";
+      let body = "{}";
+      let status = 200;
+      const usage = {
+        erc20: { limit: fidelityUsage ? 30 : 300,
+          used: preflightExhaustedFixture ? 300 : fidelityPro ? 143 : fidelityUsage ? 8 : 12,
+          remaining: preflightExhaustedFixture ? 0 : fidelityPro ? 157 : fidelityUsage ? 22 : 288,
+          periodStart: fidelityPro ? "2026-10-01T00:00:00.000Z" : "2026-10-03T00:00:00.000Z",
+          periodEnd: fidelityPro ? "2026-11-01T00:00:00.000Z" : "2026-11-03T00:00:00.000Z" },
+        tron: { limit: fidelityUsage ? 30 : 300,
+          used: fidelityPro ? 41 : fidelityUsage ? 6 : 8,
+          remaining: fidelityPro ? 259 : fidelityUsage ? 24 : 292,
+          periodStart: fidelityPro ? "2026-10-01T00:00:00.000Z" : "2026-10-03T00:00:00.000Z",
+          periodEnd: fidelityPro ? "2026-11-01T00:00:00.000Z" : "2026-11-03T00:00:00.000Z" },
+      };
+      const requestUrl = new URL(request.url);
+      const requestPath = requestUrl.pathname;
+      const proApi = requestUrl.origin === "https://api.track3.dev";
+      const currencyApi = requestUrl.origin === "https://currency-rate-api.track3.dev";
+      if (requestUrl.origin === "https://api.ipify.org" || requestUrl.origin === "https://1.1.1.1") {
+        publicIpRequests++;
+        const mode = publicIpMode;
+        if (mode === "loading") await new Promise<never>(() => {});
+        if (mode === "error") {
+          status = 503;
+          body = "unavailable";
+        } else if (requestUrl.origin === "https://api.ipify.org") {
+          body = '{"ip":"8.8.8.8"}';
+        } else {
+          contentType = "text/plain";
+          body = "fl=1\nip=8.8.8.8\n";
+        }
+      } else if (requestUrl.hostname === "api.binance.com" || requestUrl.hostname === "fapi.binance.com") {
+        if (requestPath !== "/api/v3/ticker/price" && requestPath !== "/api/v3/time") {
+          const headers = Array.isArray(request.headers) ? Object.fromEntries(request.headers) : request.headers ?? {};
+          const signature = requestUrl.searchParams.get("signature");
+          const payload = requestUrl.search.slice(1).replace(/&signature=[^&]*$/, "");
+          const expected = createHmac("sha256", fidelityBinance?.secret ?? "e2e-api-secret").update(payload).digest("hex");
+          if (headers["x-mbx-apikey"] !== (fidelityBinance?.apiKey ?? "e2e-api-key") ||
+            !signature || signature !== expected ||
+            !requestUrl.search.endsWith(`&signature=${signature}`) ||
+            !requestUrl.searchParams.has("timestamp")) {
+            throw new Error("unexpected Binance signed request");
+          }
+        }
+        if (requestUrl.hostname === "api.binance.com" && requestPath === "/api/v3/account" && request.method === "GET") {
+          body = JSON.stringify({ balances: Object.entries(fidelityBinance?.balances ?? {}).map(([asset, amount]) =>
+            ({ asset, free: String(amount), locked: "0" })) });
+        }
+        else if (requestUrl.hostname === "api.binance.com" && requestPath === "/sapi/v1/asset/get-funding-asset" && request.method === "POST") body = "[]";
+        else if (requestUrl.hostname === "api.binance.com" && (requestPath === "/sapi/v1/simple-earn/locked/position" || requestPath === "/sapi/v1/simple-earn/flexible/position")) body = '{"rows":[],"total":0}';
+        else if (requestUrl.hostname === "api.binance.com" && requestPath === "/sapi/v1/margin/account") body = '{"userAssets":[]}';
+        else if (requestUrl.hostname === "fapi.binance.com" && requestPath === "/fapi/v2/balance") body = "[]";
+        else if (requestUrl.hostname === "api.binance.com" && requestPath === "/api/v3/ticker/price") {
+          body = JSON.stringify(Object.entries(fidelityBinance?.prices ?? {}).map(([symbol, price]) => ({
+            symbol: `${symbol}USDT`, price: String(price),
+          })));
+        }
+        else if (requestUrl.hostname === "api.binance.com" && requestPath === "/api/v3/time") body = JSON.stringify({ serverTime: Date.now() });
+        else throw new Error("unexpected Binance endpoint");
+      } else if (proApi && proUsageFixture && requestPath === "/api/stripe") {
+        const input = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? [])));
+        if (input.action !== "customer-portal") throw new Error("unexpected Stripe portal request");
+        body = '{"url":"https://billing.stripe.test/portal"}';
+      } else if (proApi && checkoutFixture && requestPath === "/api/stripe") {
+        const url = new URL(request.url);
+        if (url.searchParams.get("action") === "checkout-status") {
+          body = JSON.stringify(checkoutStatus === "completed"
+            ? { status: "completed", license: "e2e-stripe-license", planType: "yearly", periodEnd: "2026-12-01T00:00:00.000Z" }
+            : { status: checkoutStatus });
+        } else {
+          const input = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? [])));
+          if (input.action !== "create-checkout-session" || !["monthly", "yearly"].includes(input.planType)) {
+            throw new Error("unexpected Stripe checkout request");
+          }
+          checkoutSessions++;
+          body = JSON.stringify({ sessionId: "cs_e2e_123", url: "https://checkout.stripe.test/session" });
+        }
+      } else if (proApi && checkoutFixture && requestPath === "/api/license/validate") {
+        if (fidelityLicenseDelay) await new Promise((resolve) => setTimeout(resolve, 5000));
+        body = fidelityLicenseInvalid ? '{"isValid":false}' : '{"isValid":true}';
+      } else if (proApi && checkoutFixture && requestPath === "/api/license/active") {
+        body = '{"success":true}';
+      } else if (proApi && requestPath === "/api/license/isPro") {
+        body = '{"isPro":true}';
+      } else if (proApi && requestPath === "/api/license") {
+        const action = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? []))).action;
+        if (action === "devices") {
+          licenseDeviceRequests++;
+          const headers = Array.isArray(request.headers) ? Object.fromEntries(request.headers) : request.headers ?? {};
+          if (headers["x-track3-platform"] || headers["x-track3-app-version"]) throw new Error("unexpected device metadata headers");
+          if (licenseDevices === "present") {
+            body = JSON.stringify({ limit: 3, devices: [
+              { id: "0123456789abcdef", current: true, platform: "ios", appVersion: fidelityPro ? "0.9.4" : "0.9.5",
+                activatedAt: fidelityPro ? "2026-03-14T10:00:00.000Z" : "2026-10-01T10:00:00.000Z",
+                lastSeenAt: fidelityPro ? "2026-10-31T09:41:00.000Z" : "2026-11-01T10:00:00.000Z" },
+              { id: "abcdef0123456789", current: false, platform: null, appVersion: null,
+                activatedAt: fidelityPro ? "2026-04-02T10:00:00.000Z" : "2026-09-01T10:00:00.000Z",
+                lastSeenAt: fidelityPro ? "2026-10-28T21:14:00.000Z" : null },
+            ] });
+          } else {
+            status = licenseDevices === "absent" ? 400 : 500;
+            body = JSON.stringify({ error: licenseDevices === "absent" ? "Unknown license action" : "Server error" });
+          }
+        } else body = action === "subscription-plans"
+          ? '{"plans":[{"planType":"monthly","currency":"usd","unitAmountCents":1299,"interval":"month"},{"planType":"yearly","currency":"usd","unitAmountCents":9999,"interval":"year"}]}'
+          : action === "usage"
+            ? JSON.stringify({ enforced: true, usage })
+            : JSON.stringify({ planType: "yearly", status: fidelityProExpired ? "canceled" : "active",
+              currentPeriodEnd: fidelityProExpired ? "2026-10-14T00:00:00.000Z"
+                : fidelityPro ? "2027-03-14T00:00:00.000Z" : "2026-12-01T00:00:00.000Z",
+              cancelAtPeriodEnd: false, isLegacy: false, ...(proUsageFixture ? { usage } : {}) });
+      } else if (proApi && quotaExhaustedFixture && requestPath === "/api/erc20/assetsBalances") {
+        status = 429;
+        body = JSON.stringify({ error: "Monthly ERC20 wallet refresh limit reached", code: "USAGE_LIMIT_EXCEEDED",
+          resource: "erc20", usage: { ...usage.erc20, used: 300, remaining: 0 } });
+      } else if (proApi && requestPath === "/api/coins/price") {
+        body = '{"data":{"BTC":42000,"USDT":1}}';
+      } else if (proApi && requestPath === "/api/coins/listStableCoins") {
+        body = '{"data":[{"symbol":"USDT"},{"symbol":"USDC"}]}';
+      } else if (currencyApi && requestPath.startsWith("/api/currency-rate/")) {
+        body = '{"success":true,"base":"USD","rates":{"USD":1,"EUR":0.9}}';
+      } else if (fidelityAiProbe && requestUrl.hostname === "openrouter.ai" &&
+        requestPath === "/api/v1/chat/completions") {
+        if (fidelityAiProbeFail) {
+          status = 401;
+          body = '{"error":{"message":"Unauthorized"}}';
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, 380));
+          contentType = "text/event-stream";
+          body = 'data: {"choices":[{"delta":{"content":"pong"}}]}\n\ndata: [DONE]\n\n';
+        }
+      } else if (request.url.endsWith("/chat/completions")) {
+        const input = JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? [])));
+        if (input.stream === true) {
+          const setupQuestion = JSON.stringify(input.messages).includes("Set BTC 40%, ETH 30%, USDT 30%");
+          const portfolioQuestion = richPortfolio && JSON.stringify(input.messages).includes("How is my portfolio doing?");
+          const afterProposal = input.messages.some((message: { role: string }) => message.role === "tool");
+          if (request.url !== "https://assistant.test/v1/chat/completions"
+            || input.model !== "test-model"
+            || (!JSON.stringify(input.messages).includes("Say hello") && !setupQuestion && !portfolioQuestion)) {
+            throw new Error("unexpected assistant request");
+          }
+          sseCalls++;
+          contentType = "text/event-stream";
+          body = setupQuestion ? [
+            afterProposal
+              ? `data: ${JSON.stringify({ choices: [{ delta: { content: "Review the target change above." } }] })}`
+              : `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{
+                index: 0, id: "setup-targets", type: "function",
+                function: { name: "propose_action", arguments: JSON.stringify({
+                  action: "save_rebalance_targets",
+                  args: { targets: [
+                    { kind: "asset", assetType: "crypto", symbol: "BTC", percent: 40 },
+                    { kind: "asset", assetType: "crypto", symbol: "ETH", percent: 30 },
+                    { kind: "asset", assetType: "crypto", symbol: "USDT", percent: 30 },
+                  ], tolerancePercent: 0 },
+                }) },
+              }] } }] })}`,
+            'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+            "data: [DONE]",
+            "",
+          ].join("\n\n") : [
+            ...portfolioQuestion ? [] : ['data: {"choices":[{"delta":{"reasoning_content":"Let me think"}}]}'],
+            `data: ${JSON.stringify({ choices: [{ delta: { content: portfolioQuestion
+              ? "**Portfolio check**\n\nYour seven holdings have climbed over the past two months, with a few pullbacks along the way.\n\n- **Largest position:** Bitcoin remains the anchor.\n- **Positive contributor:** AAPL is above its cost basis.\n- **Watch closely:** ETH is below its cost basis.\n\nOpen Analytics for the full return breakdown."
+              : "Hello from SSE" } }] })}`,
+            'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
+            "data: [DONE]",
+            "",
+          ].join("\n\n");
+        } else {
+          const isToolActivityPlan = slowAssistant
+            && input.messages.some((message: { content?: string }) => message.content?.includes("portfolio-analysis planner"))
+            && input.messages.some((message: { content?: string }) => message.content?.includes("Show my tool activity"));
+          if (slowAssistant && !isToolActivityPlan
+            && input.messages.some((message: { content?: string }) => message.content?.includes("Show my tool activity"))) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+          body = JSON.stringify({
+            choices: [{ message: { content: isToolActivityPlan ? JSON.stringify({
+              complexity: "multi",
+              reasoning: "Read holdings and portfolio value",
+              tasks: [
+                { id: "t1", skillName: "asset_snapshot", args: {}, description: "Read holdings", dependsOn: [] },
+                { id: "t2", skillName: "portfolio_value", args: {}, description: "Check total value", dependsOn: [] },
+              ],
+              requiresRefinement: false,
+              maxOptimizerRounds: 0,
+            }) : "Your portfolio is ready to explore." } }],
+          });
+        }
+      }
+      const rid = nextRid++;
+      const response = { bytes: Array.from(new TextEncoder().encode(body)), read: false, chunks: undefined as number[][] | undefined, chunkIndex: 0 };
+      if (slowAssistant && contentType === "text/event-stream" && (body.includes("Hello from SSE") || body.includes("Portfolio check"))) {
+        const split = body.indexOf('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}');
+        response.chunks = [
+          Array.from(new TextEncoder().encode(body.slice(0, split))),
+          Array.from(new TextEncoder().encode(body.slice(split))),
+        ];
+      }
+      responses.set(rid, response);
+      return {
+        status, statusText: status === 200 ? "OK" : "Error", url: request.url,
+        headers: { "content-type": contentType, ...(status === 429 ? { "Retry-After": "3600" } : {}) }, rid,
+      };
+    }
+    if (cmd === "plugin:http|fetch_read_body") {
+      const response = responses.get(args.rid);
+      if (!response || response.read) return [1];
+      if (response.chunks) {
+        const chunkIndex = response.chunkIndex ?? 0;
+        if (chunkIndex >= response.chunks.length) {
+          response.read = true;
+          return [1];
+        }
+        if (chunkIndex === 1) await new Promise((resolve) => setTimeout(resolve, 1000));
+        response.chunkIndex = chunkIndex + 1;
+        return [...response.chunks[chunkIndex], 0];
+      }
+      response.read = true;
+      return [...response.bytes, 0];
+    }
+    if (cmd === "plugin:http|fetch_cancel_body" || cmd === "plugin:http|fetch_cancel") return null;
+    throw new Error(`Unhandled Tauri command: ${cmd}`);
+  });
+  await page.addInitScript((withLogos: boolean) => {
+    let callbackId = 0;
+    const callbacks = new Map<number, Function>();
+    (window as any).isTauri = true;
+    (window as any).__TAURI_INTERNALS__ = {
+      invoke: (cmd: string, args: unknown, options: unknown) =>
+        (window as any).__e2eInvoke(cmd, args, options),
+      transformCallback: (callback: Function) => {
+        const id = ++callbackId;
+        callbacks.set(id, callback);
+        (window as any)[`_${id}`] = callback;
+        return id;
+      },
+      unregisterCallback: (id: number) => {
+        callbacks.delete(id);
+        delete (window as any)[`_${id}`];
+      },
+      convertFileSrc: (path: string) => {
+        if (!withLogos) return path;
+        const symbol = path.match(/\/assets\/coins\/([a-z]+)\.png$/)?.[1];
+        if (!symbol) return path;
+        const colors: Record<string, string> = {
+          btc: "#f7931a", eth: "#62688f", sol: "#0f827b",
+          usdc: "#2775ca", avax: "#e84142", link: "#315cbe",
+        };
+        const glyphs: Record<string, string> = { btc: "₿", eth: "Ξ", sol: "S", usdc: "$", avax: "A", link: "L" };
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="20" fill="${colors[symbol] ?? "#315cbe"}"/>
+          <text x="20" y="27" text-anchor="middle" fill="white" font-family="-apple-system,system-ui" font-size="22" font-weight="700">${glyphs[symbol] ?? symbol[0].toUpperCase()}</text>
+        </svg>`;
+        return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      },
+      metadata: { currentWindow: { label: "main" }, currentWebview: { label: "main" } },
+    };
+  }, richPortfolio);
+  return { persistedRefreshes: () => refreshes, localQueries: () => localQueries, httpRequests: () => requests.size, sseRequests: () => sseCalls, haptics: () => haptics, shares: () => shares,
+    historyIds: () => select("SELECT DISTINCT uuid FROM assets_v2 ORDER BY uuid").map((row) => row.uuid),
+    transactionUuids: () => select("SELECT uuid FROM transactions ORDER BY id").map((row) => row.uuid),
+    seedTransactionIdCollision: () => db.run("INSERT INTO transactions (id, uuid, assetID, wallet, symbol, amount, price, txnType, txnCreatedAt) VALUES (1, 'snapshot-old', 1, 'wallet-1', 'BTC', 1, 40000, 'buy', '2024-01-01T00:00:00.000Z')"),
+    seedCostPrice: () => db.run("INSERT INTO asset_prices (uuid, assetID, symbol, price, assetCreatedAt, updatedAt) SELECT uuid, id, symbol, 123, createdAt, createdAt FROM assets_v2 WHERE uuid = 'snapshot-old'"),
+    costPrice: () => select("SELECT p.price FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID WHERE p.uuid = 'snapshot-old'")[0]?.price,
+    snapshotPrices: (uuid: string) => select("SELECT p.price FROM asset_prices p JOIN assets_v2 a ON a.id = p.assetID AND a.uuid = p.uuid WHERE p.uuid = ?", [uuid]).map((row) => row.price),
+    snapshotValue: () => select("SELECT value FROM assets_v2 WHERE uuid = 'snapshot-old'")[0]?.value,
+    exportedFile: () => sharedRecoveryFile ?? (exportedPath === null ? null : files.get(exportedPath) ?? null),
+    setImportFile: (text: string, filename = "track3-import-golden.json") => {
+      exportedPath = `/e2e/documents/${filename}`;
+      files.set(exportedPath, text);
+    },
+    authentications: () => authentications,
+    openedUrls: () => openedUrls, checkoutSessions: () => checkoutSessions, licenseDeviceRequests: () => licenseDeviceRequests, setCheckoutStatus: (status: "pending" | "completed" | "expired") => { checkoutStatus = status; },
+    setPublicIpMode: (mode: "loading" | "value" | "error") => { publicIpMode = mode; }, publicIpRequests: () => publicIpRequests };
+}
