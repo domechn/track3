@@ -5,7 +5,6 @@ import type { RebalanceProfile } from "@/middlelayers/rebalance";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { alertDraftFromRule, alertRuleFromDraft, needsAsset, needsWindow, type AlertDraft } from "@/middlelayers/ui-state/alert-draft";
 import { useTranslation } from "@/i18n";
-import { useDarkTheme } from "./common/theme";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import FidelityRail from "./fidelity-rail";
 import FidelityIcon from "./fidelity-icon";
@@ -344,13 +343,12 @@ const kindCards = [
 ] as const;
 export function GoalsKinds({ currency, isProUser }: { currency?: CurrencyRateDetail; isProUser?: boolean }) {
   const { t } = useTranslation();
-  const darkTheme = useDarkTheme();
   const unit = (kind: typeof kindCards[number]["unit"]) =>
     (kind === "usd" || kind === "usdPerUnit") && currency && currency.currency !== "USD"
       ? t(`goals.fidelity.kindUnit.${kind === "usd" ? "currency" : "currencyPerUnit"}`).replace("{currency}", currency.currency)
       : t(`goals.fidelity.kindUnit.${kind}`);
   return <div className="t3-fidelity-page t3-fidelity-kinds">
-    {darkTheme && <FidelityRail isProUser={isProUser} />}
+    <FidelityRail isProUser={isProUser} />
     <header className="t3-fidelity-head"><div><a href="#/goals">{t("goals.fidelity.title")}</a><h1>{t("goals.fidelity.ruleKinds")}</h1><p>{t("goals.fidelity.kindsSubtitle")}</p></div></header>
     <div className="t3-fidelity-info"><FidelityIcon name="info" /><div><b>{t("goals.fidelity.howRulesRun")}</b><span>{t("goals.fidelity.kindsInfo")}</span></div></div>
     <div className="t3-fidelity-grid">{kindCards.map((card) => <section key={card.kind} className={`t3-fidelity-card t3-fidelity-kind-card ${kindCards.indexOf(card) < 4 ? "top" : "bottom"}`}>

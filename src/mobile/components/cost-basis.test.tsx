@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import CostBasisPage from "@/mobile/components/cost-basis";
 import { getCostBasisMethod, saveCostBasisMethod } from "@/middlelayers/configuration";
 import { exportCostBasisReport, loadCostBasisReport } from "@/middlelayers/cost-basis-data";
+import { queryTransactionsBySymbolAndDateRange } from "@/middlelayers/charts-profit";
 import type { CostBasisReport } from "@/middlelayers/cost-basis-report";
 import { COST_BASIS_SETTINGS_KEY } from "@/middlelayers/ai/actions/page-settings";
 import axe from "axe-core";
@@ -13,6 +14,9 @@ vi.mock("@/middlelayers/configuration", () => ({
 }));
 vi.mock("@/middlelayers/cost-basis-data", () => ({
   loadCostBasisReport: vi.fn(), exportCostBasisReport: vi.fn(),
+}));
+vi.mock("@/middlelayers/charts-profit", () => ({
+  queryTransactionsBySymbolAndDateRange: vi.fn(),
 }));
 vi.mock("react-chartjs-2", () => ({
   Bar: (props: { "aria-label": string }) => <div role="img" aria-label={props["aria-label"]} />,
@@ -35,8 +39,12 @@ beforeEach(() => {
   vi.mocked(getCostBasisMethod).mockResolvedValue("FIFO");
   vi.mocked(loadCostBasisReport).mockResolvedValue(report as never);
   vi.mocked(exportCostBasisReport).mockResolvedValue(true);
+  vi.mocked(queryTransactionsBySymbolAndDateRange).mockResolvedValue([]);
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+});
 
 it("shows realized totals and data gaps from the loaded report", async () => {
   render(<CostBasisPage />);
@@ -50,6 +58,7 @@ it("shows realized totals and data gaps from the loaded report", async () => {
 });
 
 it("shows an empty row for each phone cost basis section without records", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
@@ -57,31 +66,68 @@ it("shows an empty row for each phone cost basis section without records", async
     ...report, assets: [], disposals: [], unrealized: [],
   } as never);
   render(<CostBasisPage />);
-  await waitFor(() => expect(document.querySelector(".cost-dashboard-secondary")?.children[0]).toHaveTextContent("Proceeds$200.00"));
-  expect(document.querySelector(".cost-dashboard-secondary")!.children[0]).not.toHaveTextContent("USD");
-  fireEvent.click(await screen.findByText("Details"));
-  const lists = document.querySelectorAll(".d2-cost .mobile-record-list");
-  expect(lists).toHaveLength(3);
-  lists.forEach((list) => expect(list).toHaveTextContent("No Data"));
+  expect(await screen.findByText("No sales in 2026")).toBeInTheDocument();
+  expect(screen.getByText("No sales in this range, so there is nothing to chart.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Show open lots" })).toBeInTheDocument();
 });
 
-it("expands phone cost lots inline with their signed gain", async () => {
+it("shows phone cost lots inline with their signed gain", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
   render(<CostBasisPage />);
-  fireEvent.click(await screen.findByText("Details"));
-  const realized = screen.getByRole("heading", { name: "Realized disposals" }).closest("section")!;
-  fireEvent.click(within(realized).getByRole("button", { name: /BTC/ }));
-  expect(within(realized).getByRole("button", { name: /BTC/ })).toHaveAttribute("aria-expanded", "true");
-  expect(within(realized).getByText("Acquired")).toBeVisible();
-  expect(within(realized).getByText("Jan 1, 2024")).toBeVisible();
-  expect(within(realized).getByText("$200.00")).toBeVisible();
-  expect(within(realized).getAllByText("+$100.00")).toHaveLength(2);
+  await screen.findByRole("button", { name: "Dispositions 1" }, { timeout: 15_000 });
+  const realized = document.querySelector(".fidelity-cost-lots")!;
+  expect(realized).toHaveTextContent("BTC");
+  expect(realized).toHaveTextContent("Acquired 1 Jan 2024");
+  expect(realized).toHaveTextContent("Cost $100.00 · Proceeds $200.00");
+  expect(realized).toHaveTextContent("+$100.00");
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
-it("uses the same signed two-decimal gain in phone asset rows", async () => {
+it("keeps stock and crypto lots with the same symbol in separate groups", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  vi.mocked(loadCostBasisReport).mockResolvedValue({
+    ...report,
+    disposals: [
+      { ...report.disposals[0], eventId: "stock-aapl", assetType: "stock", symbol: "AAPL", gainLoss: 20 },
+      { ...report.disposals[0], eventId: "crypto-aapl", assetType: "crypto", symbol: "AAPL", gainLoss: 30 },
+    ],
+  } as never);
+  render(<CostBasisPage />);
+  await screen.findByRole("button", { name: "Dispositions 2" });
+  const groups = document.querySelectorAll(".fidelity-lot-group");
+  expect(groups).toHaveLength(2);
+  expect(groups[0]).toHaveTextContent("AAPL");
+  expect(groups[0]).toHaveTextContent("Stock");
+  expect(groups[0]).toHaveTextContent("+$20.00");
+  expect(groups[1]).toHaveTextContent("Crypto");
+  expect(groups[1]).toHaveTextContent("+$30.00");
+});
+
+it("shows a crypto data gap when a stock with the same symbol has a known gain", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  vi.mocked(loadCostBasisReport).mockResolvedValue({
+    ...report,
+    assets: [{ ...report.assets[0], assetType: "stock", symbol: "AAPL" }],
+    warnings: [{ code: "unknown-disposal", eventId: "crypto-aapl", assetType: "crypto",
+      symbol: "AAPL", amount: 2, date: "2026-10-18" }],
+  } as never);
+  render(<CostBasisPage />);
+  const chart = (await screen.findByRole("heading", { name: "Realized P&L by asset" })).closest("section")!;
+  expect(chart.querySelectorAll(".fidelity-asset-bar")).toHaveLength(2);
+  expect(chart.querySelector(".fidelity-asset-bar:last-child")).toHaveTextContent("–");
+});
+
+it("rounds phone chart gains to whole dollars as in the design", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
@@ -89,9 +135,8 @@ it("uses the same signed two-decimal gain in phone asset rows", async () => {
     ...report, assets: [{ ...report.assets[0], gainLoss: 1891.2 }],
   } as never);
   render(<CostBasisPage />);
-  fireEvent.click(await screen.findByText("Details"));
-  const assets = screen.getByRole("heading", { name: "By asset" }).closest("section")!;
-  expect(within(assets).getByText("+$1,891.20")).toBeInTheDocument();
+  const assets = (await screen.findByRole("heading", { name: "Realized P&L by asset" })).closest("section")!;
+  expect(within(assets).getByText("+$1,891")).toBeInTheDocument();
 });
 it("keeps manual setup open after a filter reload", async () => {
   render(<CostBasisPage />);
@@ -114,6 +159,18 @@ it("shows loading while a changed filter reloads an existing report", async () =
   expect(await screen.findByRole("status")).toHaveTextContent("Loading");
   await act(async () => { finishReload(report as never); });
   await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+});
+
+it("marks old phone report busy as soon as the visible filter changes", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  render(<CostBasisPage />);
+  await screen.findByRole("button", { name: "Dispositions 1" }, { timeout: 15_000 });
+  await waitFor(() => expect(document.querySelector(".fidelity-cost")).toHaveAttribute("aria-busy", "false"));
+  fireEvent.change(screen.getByLabelText("Tax year"), { target: { value: "2024" } });
+  expect(document.querySelector(".fidelity-cost")).toHaveAttribute("aria-busy", "true");
 });
 
 it("leads with AI setup and keeps report details in a collapsible section", async () => {
@@ -221,4 +278,144 @@ it("shows the actual amount of a tiny missing-lots warning", async () => {
   } as never);
   render(<CostBasisPage />);
   expect(await screen.findByText(/5e-11 ETH/)).toBeInTheDocument();
+});
+
+it("shows dated gap columns and folds sub-1e-8 residue into one dust row on phones", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  vi.mocked(loadCostBasisReport).mockResolvedValue({
+    ...report,
+    unrealized: [{ assetType: "crypto", symbol: "ETH", amount: 1, marketValue: 100, costBasis: 90, gainLoss: 10 }],
+    warnings: [
+      { ...report.warnings[0], date: "2026-10-18T12:00:00Z", amount: 1234.12345678 },
+      { ...report.warnings[0], eventId: "residue-a", date: "2026-10-18T12:00:00Z", amount: 5e-11 },
+      { ...report.warnings[0], eventId: "residue-b", date: "2026-10-18T12:00:00Z", amount: 3e-12 },
+      { ...report.warnings[0], eventId: "fiat-dust", date: "2026-10-18T12:00:00Z", amount: 0.00009 },
+    ],
+  } as never);
+  render(<CostBasisPage />);
+  const gaps = await screen.findByRole("table", { name: "Data gaps to review" });
+  expect(within(gaps).getByRole("columnheader", { name: "Date" })).toBeInTheDocument();
+  expect(within(gaps).getByRole("columnheader", { name: "Coin" })).toBeInTheDocument();
+  expect(within(gaps).getByRole("columnheader", { name: "Amount" })).toBeInTheDocument();
+  expect(within(gaps).getByRole("columnheader", { name: "Reason" })).toBeInTheDocument();
+  expect(within(gaps).getByText("1,234.12345678")).toBeInTheDocument();
+  expect(within(gaps).getByText("Dust (3)")).toBeInTheDocument();
+  expect(gaps).not.toHaveTextContent("5e-11");
+});
+
+it("filters phone gaps by reason and pages fifty real warnings", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  vi.mocked(loadCostBasisReport).mockResolvedValue({
+    ...report,
+    warnings: [
+      ...Array.from({ length: 51 }, (_, index) => ({
+        ...report.warnings[0], eventId: `gap-${index}`, symbol: `GAP-${index}`,
+        date: "2026-10-18", amount: 1234.123456789,
+      })),
+      { ...report.warnings[0], eventId: "other", code: "unknown-disposal", date: "2026-10-18", symbol: "SOL", amount: 35 },
+      { ...report.warnings[0], eventId: "dust", date: "2026-10-18", amount: 1e-9 },
+    ],
+  } as never);
+  render(<CostBasisPage />);
+  const table = await screen.findByRole("table", { name: "Data gaps to review" });
+  expect(within(table).getAllByRole("row")).toHaveLength(51);
+  expect(table).toHaveTextContent("1,234.12345679");
+  expect(table).not.toHaveTextContent("GAP-50");
+  fireEvent.click(screen.getByRole("button", { name: "Next page of Data gaps to review" }));
+  expect(table).toHaveTextContent("GAP-50");
+  fireEvent.change(screen.getByRole("combobox", { name: "Reason" }), { target: { value: "unknown-disposal" } });
+  expect(within(table).getAllByRole("row")).toHaveLength(2);
+  expect(table).toHaveTextContent("SOL");
+  expect(table).not.toHaveTextContent("GAP-50");
+});
+
+it("keeps dated phone gaps visible when the range has no end date", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  vi.mocked(loadCostBasisReport).mockResolvedValue({
+    ...report, warnings: [{ ...report.warnings[0], date: "2026-10-18", amount: 2 }],
+  } as never);
+  render(<CostBasisPage />);
+  fireEvent.click(await screen.findByRole("button", { name: "Custom range" }));
+  fireEvent.change(screen.getByLabelText("To"), { target: { value: "" } });
+  const table = await screen.findByRole("table", { name: "Data gaps to review" });
+  expect(within(table).getByText("18 Oct 2026")).toBeInTheDocument();
+});
+
+it("uses the report's local-day warning selection on phones", async () => {
+  const previousTimeZone = process.env.TZ;
+  process.env.TZ = "Asia/Shanghai";
+  try {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  vi.mocked(loadCostBasisReport).mockResolvedValue({
+    ...report, warnings: [{ ...report.warnings[0], date: "2025-12-31T18:00:00Z", symbol: "SOL" }],
+  } as never);
+  render(<CostBasisPage />);
+  const table = await screen.findByRole("table", { name: "Data gaps to review" });
+  expect(within(table).getByText("SOL")).toBeInTheDocument();
+  expect(within(table).getByText("1 Jan 2026")).toBeInTheDocument();
+  } finally {
+    if (previousTimeZone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimeZone;
+  }
+});
+
+it("uses priced open positions consistently in phone KPIs and lot totals", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  vi.mocked(loadCostBasisReport).mockResolvedValue({
+    ...report,
+    openLots: [
+      { assetType: "crypto", symbol: "BTC", amount: 1, costBasis: 100 },
+      { assetType: "crypto", symbol: "SOL", amount: 1, costBasis: 50 },
+    ],
+    unrealized: [{ assetType: "crypto", symbol: "BTC", amount: 1, costBasis: 100, marketValue: 120, gainLoss: 20, acquiredAt: "2025-01-01" }],
+  } as never);
+  render(<CostBasisPage />);
+  await screen.findByText("Open lots value");
+  const kpis = document.querySelector(".fidelity-cost-kpis")!;
+  expect(kpis).toHaveTextContent("1 open lots");
+  expect(kpis).toHaveTextContent("Cost $100.00");
+  fireEvent.click(screen.getByRole("button", { name: "Open lots 1" }));
+  expect(document.querySelector(".fidelity-lot-total")).toHaveTextContent("Cost $100.00 · Value $120.00");
+});
+
+it("keeps assistant setup available on phones", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  render(<CostBasisPage />);
+  expect(await screen.findByText("Let the assistant set this up")).toBeVisible();
+});
+
+it("formats phone average quantities to four places and emphasizes the custom period", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  vi.mocked(queryTransactionsBySymbolAndDateRange).mockResolvedValue([
+    { txnType: "buy", amount: 1, price: 100 },
+    { txnType: "sell", amount: 1, price: 200 },
+  ] as never);
+  render(<CostBasisPage />);
+  await screen.findByText("Avg. buy/sell price (selected range)");
+  await waitFor(() => expect(document.querySelector(".fidelity-cost-prices"))
+    .toHaveTextContent("Bought 1.0000 · sold 1.0000"));
+  fireEvent.click(screen.getByRole("button", { name: "Custom range" }));
+  expect(document.querySelector(".fidelity-cost-head strong")).toHaveTextContent("custom range");
+  expect(screen.getByText("Recorded stablecoin trades are included in cost basis.")).toBeInTheDocument();
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import {
   deleteHistoricalDataByUUID,
@@ -10,7 +10,8 @@ import {
   restoreHistoricalData,
 } from "@/middlelayers/charts";
 import type { HistoricalLatest, HistoricalPageRow, SnapshotEdit } from "@/middlelayers/charts-history";
-import { addToBlacklist } from "@/middlelayers/configuration";
+import { displayEditValue } from "@/middlelayers/charts-history";
+import { addToBlacklist, getConfiguration } from "@/middlelayers/configuration";
 import {
   CurrencyRateDetail,
   HistoricalData,
@@ -71,6 +72,7 @@ import { BottomSheet, SplitView, SwipeableRow, useIsMobile, useSizeClass } from 
 import { groupHistoryMonths } from "@/mobile/components/history-months";
 import HistoryEditLog from "@/components/history-edit-log";
 import { HistoryPartialDetails, HistoryPartialPill } from "@/components/history-partial";
+import { hasActiveSource } from "@/mobile/components/common/active-source";
 
 function DesktopDetailPassthrough({ children }: React.ComponentProps<typeof BottomSheet>) {
   return <>{children}</>;
@@ -88,6 +90,21 @@ type RankData = {
 };
 
 const DETAIL_PAGE_SIZE = 100;
+
+function HistoryPhoneIcon({ kind }: { kind: "clock" | "filter" | "chevron" | "info" | "trash" | "edit" | "compare" | "refresh" }) {
+  const paths = {
+    clock: <><circle cx="9" cy="9" r="6.5" /><path d="M9 5v4l2.5 1.5" /></>,
+    filter: <path d="M2.5 4h13l-5 6v4.5l-3-1.5V10z" />,
+    chevron: <path d="m4 7 5 5 5-5" />,
+    info: <><circle cx="9" cy="9" r="6.5" /><path d="M9 8v4M9 5.8v.2" /></>,
+    trash: <path d="M3.5 5h11M7 5V3.5h4V5M5 5l.7 9.5h6.6L13 5" />,
+    edit: <path d="m3 15 .8-3.5L12.5 3l2.5 2.5-8.7 8.7z" />,
+    compare: <path d="M6 3v12M12 3v12M3 6l3-3 3 3M9 12l3 3 3-3" />,
+    refresh: <><path d="M14.5 8a5.5 5.5 0 1 0 .2 2" /><path d="M14.5 3.5V8H10" /></>,
+  };
+  return <svg viewBox="0 0 18 18" width="18" height="18" fill="none" stroke="currentColor"
+    strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[kind]}</svg>;
+}
 
 const App = ({
   afterDataChanged,
@@ -110,7 +127,9 @@ const App = ({
     { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" },
   ), [locale]);
   const isMobile = useIsMobile();
-  const isWide = useSizeClass().width === "wide";
+  const widthClass = useSizeClass().width;
+  const isWide = widthClass === "wide";
+  const isPhone = isMobile && widthClass === "compact";
 
   const [data, setData] = useState<HistoricalPageRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -119,9 +138,20 @@ const App = ({
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [selectedDataId, setSelectedDataId] = useState<string | null>(null);
+  const [phoneOpenedRow, setPhoneOpenedRow] = useState<HistoricalPageRow | null>(null);
   const [editLog, setEditLog] = useState<SnapshotEdit[] | null>(null);
   const [editLogError, setEditLogError] = useState(false);
+  const [phonePreviousDate, setPhonePreviousDate] = useState<string | null>(null);
   const [historyFilter, setHistoryFilter] = useState<"all" | "edited" | "complete" | "partial">("all");
+  const [phoneFilterOpen, setPhoneFilterOpen] = useState(false);
+  const [phoneRange, setPhoneRange] = useState<"all" | "7" | "30" | "90">("all");
+  const [pendingPhoneRange, setPendingPhoneRange] = useState<"all" | "7" | "30" | "90">("all");
+  const [pendingPhoneStatus, setPendingPhoneStatus] = useState<"all" | "edited" | "complete" | "partial">("all");
+  const [phoneFrom, setPhoneFrom] = useState("");
+  const [phoneTo, setPhoneTo] = useState("");
+  const [pendingPhoneFrom, setPendingPhoneFrom] = useState("");
+  const [pendingPhoneTo, setPendingPhoneTo] = useState("");
+  const [phoneCounts, setPhoneCounts] = useState<{ all: number; partial: number; edited: number } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [detailLimit, setDetailLimit] = useState(DETAIL_PAGE_SIZE);
   const [detailSearch, setDetailSearch] = useState("");
@@ -131,6 +161,13 @@ const App = ({
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [deleteCandidate, setDeleteCandidate] = useState<string | null>(null);
   const [deleteAssetCandidate, setDeleteAssetCandidate] = useState<{ id: number; symbol: string } | null>(null);
+  const phoneBackRef = useRef<HTMLButtonElement>(null);
+  const phoneOpenerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!isPhone) return;
+    if (isModalOpen) phoneBackRef.current?.focus();
+    else if (phoneOpenerRef.current?.isConnected) phoneOpenerRef.current.focus();
+  }, [isPhone, isModalOpen]);
 
   const { run: runDelete, isDeleting: deleting } = useOptimisticDelete(setData);
   const { run: runDetailDelete, isDeleting: deletingDetail } = useOptimisticDelete(setSelectedData);
@@ -139,7 +176,11 @@ const App = ({
   const dataPageRef = useRef(dataPage);
   dataPageRef.current = dataPage;
   const [pageInput, setPageInput] = useState("1");
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(isPhone ? 50 : 20);
+  useEffect(() => {
+    setPageSize(isPhone ? 50 : 20);
+    setDataPage(0);
+  }, [isPhone]);
 
   const loadGenRef = useRef(0);
   const detailRegionRef = useRef<HTMLDivElement>(null);
@@ -148,11 +189,41 @@ const App = ({
   // overlay. Keep the current list visible while `loadPage` refreshes it.
   const skipNextLoadingRef = useRef(false);
   const localMutationRef = useRef(false);
-  const rangeKey = useMemo(
-    () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
-    [dateRange.start, dateRange.end],
-  );
+  const queryRange = useMemo(() => {
+    if (!isPhone) return dateRange;
+    if (phoneRange === "all" && !phoneFrom && !phoneTo) return dateRange;
+    const end = new Date(Math.min(dateRange.end.getTime(),
+      phoneTo ? new Date(`${phoneTo}T23:59:59.999`).getTime() : dateRange.end.getTime()));
+    const days = phoneRange === "all" ? null : Number(phoneRange);
+    const daysStart = new Date(end);
+    if (days) daysStart.setDate(daysStart.getDate() - days);
+    const start = new Date(Math.max(dateRange.start.getTime(), phoneFrom
+      ? new Date(`${phoneFrom}T00:00:00.000`).getTime() : days ? daysStart.getTime() : dateRange.start.getTime()));
+    return { start, end };
+  }, [isPhone, dateRange.start, dateRange.end, phoneRange, phoneFrom, phoneTo]);
+  const rangeKey = `${queryRange.start.getTime()}-${queryRange.end.getTime()}`;
   const dataChangedVersion = useDataChangedVersion();
+
+  useEffect(() => {
+    if (!isPhone || !phoneFilterOpen) return;
+    let active = true;
+    setPhoneCounts(null);
+    const end = new Date(Math.min(dateRange.end.getTime(), pendingPhoneTo
+      ? new Date(`${pendingPhoneTo}T23:59:59.999`).getTime() : dateRange.end.getTime()));
+    const days = pendingPhoneRange === "all" ? null : Number(pendingPhoneRange);
+    const daysStart = new Date(end);
+    if (days) daysStart.setDate(daysStart.getDate() - days);
+    const start = new Date(Math.max(dateRange.start.getTime(), pendingPhoneFrom
+      ? new Date(`${pendingPhoneFrom}T00:00:00.000`).getTime() : days ? daysStart.getTime() : dateRange.start.getTime()));
+    Promise.all((["all", "partial", "edited"] as const)
+      .map((filter) => queryHistoricalPage({ start, end }, 1, 0, filter)))
+      .then(([all, partial, edited]) => {
+        if (active) setPhoneCounts({ all: all.totalCount, partial: partial.totalCount, edited: edited.totalCount });
+      })
+      .catch(() => { if (active) setPhoneCounts(null); });
+    return () => { active = false; };
+  }, [isPhone, phoneFilterOpen, pendingPhoneRange, pendingPhoneFrom, pendingPhoneTo,
+    dateRange.start, dateRange.end, dataChangedVersion]);
 
   useEffect(() => {
     if (skipNextLoadingRef.current) {
@@ -228,7 +299,7 @@ const App = ({
     const currentGen = ++loadGenRef.current;
 
     try {
-      const result = await queryHistoricalPage(dateRange, pageSize, dataPage, historyFilter);
+      const result = await queryHistoricalPage(queryRange, pageSize, dataPage, historyFilter);
       if (currentGen !== loadGenRef.current) {
         return;
       }
@@ -246,7 +317,11 @@ const App = ({
         setPageLoading(false);
       }
     }
-  }, [rangeKey, dateRange, dataChangedVersion, dataPage, pageSize, historyFilter]);
+  }, [rangeKey, queryRange, dataChangedVersion, dataPage, pageSize, historyFilter, isPhone]);
+
+  useEffect(() => {
+    if (isPhone) setDataPage(0);
+  }, [dataChangedVersion, isPhone]);
 
   useEffect(() => {
     loadPage();
@@ -294,7 +369,7 @@ const App = ({
     setSelectedDataId(null);
     setSelectedData(null);
     setIsModalOpen(false);
-  }, [rangeKey]);
+  }, [dateRange.start.getTime(), dateRange.end.getTime(), phoneRange, phoneFrom, phoneTo]);
 
   const maxDataPage = useMemo(() => {
     const pageCount = Math.ceil(totalCount / pageSize);
@@ -443,14 +518,21 @@ const App = ({
             afterDataChanged("undoDeletion", uuid, undefined);
           }
         },
-        successMessage: t("history.deleted"),
+        successTitle: isPhone ? t("fidelity.history.deletedTitle") : undefined,
+        successMessage: isPhone
+          ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
+            day: "numeric", month: "short", year: "numeric",
+          }).format(new Date(removed.createdAt)).replace("Sept", "Sep") + `, ${new Intl.DateTimeFormat("en-GB", {
+            hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+          }).format(new Date(removed.createdAt))}`
+          : t("history.deleted"),
         undoLabel: t("common.undo"),
         undoAltText: t("history.undoDelete"),
         undoWindowMs: 5000,
         syncSnapshotUuid: uuid,
       });
     },
-    [afterDataChanged, data, dataPage, latestRow, runDelete, t],
+    [afterDataChanged, data, dataPage, latestRow, runDelete, t, isPhone, locale],
   );
 
   const onHistoricalDataDetailDeleteClick = useCallback(
@@ -565,17 +647,30 @@ const App = ({
     [onHistoricalDataDetailDeleteClick],
   );
 
-  const onRowClick = useCallback((id: string) => {
+  const onRowClick = useCallback((id: string, opener?: HTMLElement) => {
+    if (opener) phoneOpenerRef.current = opener;
+    setPhoneOpenedRow(data.find((row) => row.id === id) ?? null);
     setSelectedData(null);
     setDetailLoading(true);
     setDetailError(false);
     setSelectedDataId(id);
+    setPhonePreviousDate(null);
     setDetailLimit(DETAIL_PAGE_SIZE);
     setDetailSearch("");
     setDetailScrollTop(0);
     setMeasuredDetailHeights(new Map());
     setIsModalOpen(true);
-  }, []);
+  }, [data]);
+
+  useEffect(() => {
+    if (!isPhone || !selectedData?.createdAt) return;
+    let active = true;
+    const end = new Date(Date.parse(selectedData.createdAt) - 1);
+    void queryHistoricalPage({ start: new Date(0), end }, 1, 0).then((page) => {
+      if (active) setPhonePreviousDate(page.rows[0]?.createdAt ?? null);
+    }).catch(() => { if (active) setPhonePreviousDate(null); });
+    return () => { active = false; };
+  }, [isPhone, selectedData?.createdAt]);
 
   const emptyState = !pageLoading && totalCount === 0;
   const loadedRangeStart = totalCount ? dataPage * pageSize + 1 : 0;
@@ -586,11 +681,190 @@ const App = ({
   const DetailWrapper = isMobile ? BottomSheet : DesktopDetailPassthrough;
   const closeDetail = (open: boolean) => {
     setIsModalOpen(open);
-    if (!open) {
-      setSelectedDataId(null);
-      setSelectedData(null);
-    }
   };
+  const refreshEmptyHistory = async () => {
+    const config = await getConfiguration().catch(() => null);
+    if (hasActiveSource(config)) window.dispatchEvent(new Event("track3:full-refresh"));
+    else window.location.hash = "#/settings/configuration";
+  };
+
+  const phoneDate = (value: string, year = false) => new Intl.DateTimeFormat(
+    locale === "zh" ? "zh-CN" : "en-GB",
+    { day: "numeric", month: "short", ...(year ? { year: "numeric" } : {}) },
+  ).format(new Date(value)).replace("Sept", "Sep");
+  const phoneTime = (value: string) => new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date(value));
+  const phoneMoney = (value: number) => `${currency.symbol}${currencyWrapper(currency)(value)
+    .toLocaleString(locale === "zh" ? "zh-CN" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const phoneChange = (value: number | null, total: number) => {
+    if (value === null) return "–";
+    const previous = total - value;
+    const percent = previous === 0 ? 0 : value / previous * 100;
+    return <><span>{`${value > 0 ? "+" : value < 0 ? "−" : ""}${phoneMoney(Math.abs(value))}`}</span>
+      <span>{`${percent > 0 ? "+" : percent < 0 ? "−" : ""}${Math.abs(percent).toFixed(2)}%`}</span></>;
+  };
+  const phoneQuantity = (value: number, assetType?: AssetType, symbol?: string) => new Intl.NumberFormat(
+    locale === "zh" ? "zh-CN" : "en-US",
+    { minimumFractionDigits: assetType === "stock" ? 0 : ["USDT", "USDC", "DAI", "FDUSD", "TUSD", "USDD",
+      "PYUSD", "USDP", "FRAX", "LUSD", "GUSD", "BUSD"].includes(symbol ?? "") ? 2 : Number.isInteger(value) || value < 1 ? 4 : 2,
+      maximumFractionDigits: 8 },
+  ).format(value);
+  const phonePrice = (value: number) => {
+    const converted = currencyWrapper(currency)(value);
+    return `${currency.symbol}${Math.abs(converted) < 0.001
+      ? new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US", {
+        minimumFractionDigits: 2, maximumFractionDigits: 20,
+      }).format(converted)
+      : Math.abs(converted - Math.round(converted * 100) / 100) > 1e-8
+        ? new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US", {
+          minimumFractionDigits: 4, maximumFractionDigits: 8,
+        }).format(converted)
+      : prettyPriceNumberToLocaleString(converted)}`;
+  };
+  const phoneSelectedRow = data.find((row) => row.id === selectedDataId) ??
+    (phoneOpenedRow?.id === selectedDataId ? phoneOpenedRow : null);
+  const phonePreviousTotal = selectedData && phoneSelectedRow?.change != null
+    ? selectedData.total - phoneSelectedRow.change : 0;
+  const phoneChangePercent = phoneSelectedRow?.change == null || phonePreviousTotal === 0
+    ? 0 : phoneSelectedRow.change / phonePreviousTotal * 100;
+  const phoneEditCount = editLog?.length ?? 0;
+  const phoneDetailContent = (
+    <section role="dialog" aria-label={t("history.snapshotDetails")} className="fidelity-history-detail"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          closeDetail(false);
+        }
+      }}>
+      <div className="fidelity-history-detail-head">
+        <button ref={phoneBackRef} type="button" className="fidelity-history-back" aria-label={t("common.back")}
+          onClick={() => closeDetail(false)}><ChevronLeftIcon aria-hidden="true" /></button>
+        <h2>{selectedData ? `${phoneDate(selectedData.createdAt, true)}, ${phoneTime(selectedData.createdAt)}` : t("history.snapshotDetails")}</h2>
+        {phoneSelectedRow?.edited && <span className="fidelity-history-edited">{t("history.editLog.edited")}</span>}
+      </div>
+      {detailLoading && <p role="status">{t("common.loading")}</p>}
+      {detailError && <p role="alert">{t("history.detailLoadFailed")}</p>}
+      {selectedData && <>
+        <div className="fidelity-history-detail-kpis">
+          <div className="fidelity-history-detail-total">
+            <span>{t("fidelity.history.detail.totalValue")}</span>
+            <strong className="ios-money">{phoneMoney(selectedData.total)}</strong>
+            <small>{phoneEditCount
+              ? t("fidelity.history.detail.includesEdits").replace("{count}", String(phoneEditCount))
+              : t("fidelity.history.detail.asOf")}</small>
+          </div>
+          <div className="fidelity-history-detail-subkpis">
+            <div>
+              <span>{t("history.change")}</span>
+              <strong className="ios-money" data-tone={phoneSelectedRow?.change == null ? "neutral" :
+                positiveNegativeTone(phoneSelectedRow.change, quoteColor) === "green" ? "gain" : "loss"}>
+                {phoneSelectedRow?.change == null ? "–" : `${phoneSelectedRow.change < 0 ? "−" : "+"}${phoneMoney(Math.abs(phoneSelectedRow.change))}`}
+              </strong>
+              <small>{phoneSelectedRow?.change == null ? t("fidelity.history.detail.noPrevious") : <>
+                <span data-tone={positiveNegativeTone(phoneSelectedRow.change, quoteColor) === "green" ? "gain" : "loss"}>{`${phoneChangePercent > 0 ? "+" : phoneChangePercent < 0 ? "−" : ""}${Math.abs(phoneChangePercent).toFixed(2)}%`}</span>
+                {` ${t("fidelity.history.detail.vsDate").replace("{date}", phonePreviousDate ? phoneDate(phonePreviousDate) : "–")}`}
+              </>}</small>
+            </div>
+            <div>
+              <span>{t("history.assets")}</span>
+              <strong>{rankData.length}</strong>
+              <small>{selectedData.partial
+                ? t("fidelity.history.sources").replace("{ready}", String(selectedData.partial.sourcesTotal - selectedData.partial.missing.length))
+                  .replace("{total}", String(selectedData.partial.sourcesTotal))
+                : ""}</small>
+            </div>
+          </div>
+        </div>
+        <div className="fidelity-history-detail-actions">
+          <a href={`#/comparison?head=${encodeURIComponent(selectedData.id)}`}><HistoryPhoneIcon kind="compare" />{t("fidelity.history.detail.compare")}</a>
+          <button type="button" onClick={() => document.getElementById("fidelity-history-detail-assets")?.scrollIntoView({ behavior: "smooth" })}>
+            <HistoryPhoneIcon kind="chevron" />{t("fidelity.history.detail.viewAssets")}</button>
+          <button type="button" className="danger" onClick={() => { setIsModalOpen(false); setDeleteCandidate(selectedData.id); }}>
+            <HistoryPhoneIcon kind="trash" />{t("fidelity.history.detail.delete")}</button>
+        </div>
+        <div id="fidelity-history-detail-assets" className="fidelity-history-detail-section">
+          <div className="fidelity-history-section-head"><h3>{t("fidelity.history.detail.assetsAt")}</h3>
+            <span>{t("history.assetCount").replace("{n}", String(rankData.length))}</span></div>
+          {visibleRankData.map((item) => <SwipeableRow key={item.assetId} className="fidelity-history-detail-asset" allowImmediateAction
+            actions={[{ label: t("common.delete"), destructive: true, disabled: deletingDetail,
+              onClick: () => setDeleteAssetCandidate({ id: item.assetId, symbol: item.symbol }) }]}>
+            <div className="fidelity-history-detail-asset-body">
+              <div><strong>{item.symbol}</strong><b className="ios-money">{phoneMoney(item.value)}</b></div>
+              <small className="ios-money">
+                <span>{phoneQuantity(item.amount, item.assetType, item.symbol)}</span>
+                {" × "}
+                <span>{phonePrice(item.price)}</span>
+                {" · "}{(item.value / selectedData.total * 100).toFixed(1)}%
+              </small>
+            </div>
+          </SwipeableRow>)}
+          {rankData.length > visibleRankData.length && <button type="button" onClick={() => setDetailLimit((count) => count + DETAIL_PAGE_SIZE)}>
+            {t("fidelity.history.detail.loadMore")}</button>}
+          <div className="fidelity-history-detail-sum"><strong>{t("history.total")}</strong><b className="ios-money">{phoneMoney(selectedData.total)}</b></div>
+        </div>
+        {phoneEditCount > 0 && <div role="region" aria-label={t("history.editLog.title")}
+          className="fidelity-history-detail-section fidelity-history-detail-edits">
+          <div className="fidelity-history-section-head"><h3>{t("fidelity.history.detail.editsTitle")}</h3><span>
+            {t("fidelity.history.detail.editsCount").replace("{count}", String(phoneEditCount))}</span></div>
+          <ol className="fidelity-history-phone-edits">{editLog?.slice().sort((a, b) =>
+            a.edited_at.localeCompare(b.edited_at)).map((edit) => {
+            const labels = { assets: t("history.editLog.assets"), amount: t("common.amountLabel"), value: t("common.valueLabel") };
+            const formatValue = (value: string | null) => {
+              if (value === null) return "";
+              if (edit.target === "transaction" && edit.action === "price" && Number.isFinite(Number(value)))
+                return phoneMoney(Number(value));
+              const formatted = displayEditValue(value, locale === "zh" ? "zh-CN" : "en-US", labels);
+              if (edit.target === "snapshot" && edit.action === "replace") {
+                const marker = `${labels.value} `;
+                const position = formatted.lastIndexOf(marker);
+                if (position >= 0) {
+                  const total = Number(formatted.slice(position + marker.length).replaceAll(",", ""));
+                  if (Number.isFinite(total))
+                    return `${formatted.slice(0, position + marker.length)}${phoneMoney(total)}`;
+                }
+              }
+              return formatted;
+            };
+            const before = formatValue(edit.old_value);
+            const after = formatValue(edit.new_value);
+            const priceEdit = edit.target === "transaction" && edit.action === "price" && edit.symbol;
+            return <li key={edit.id} className="fidelity-history-edit-row">
+              <span><strong>{priceEdit ? t("fidelity.history.detail.priceEdit").replace("{symbol}", edit.symbol ?? "")
+                : `${t(`history.editLog.${edit.target}.${edit.action}`)}${edit.symbol ? ` ${edit.symbol}` : ""}`}</strong>
+                <small>{priceEdit ? t("fidelity.history.detail.editedAt")
+                  .replace("{date}", phoneDate(edit.edited_at, true)).replace("{time}", phoneTime(edit.edited_at))
+                  : `${t(`history.editLog.origin.${edit.origin}`)} · ${phoneDate(edit.edited_at, true)}, ${phoneTime(edit.edited_at)}`}</small></span>
+              <span>{before && after ? `${before} → ${after}` : before || after}</span>
+            </li>;
+          })}</ol>
+        </div>}
+        {selectedData.partial && <div className="fidelity-history-detail-section">
+          <div className="fidelity-history-section-head"><h3>{t("fidelity.history.detail.sources")}</h3>
+            <span>{selectedData.partial.missing.length ? t("fidelity.history.issues") :
+              t("fidelity.history.detail.allRefreshed").replace("{count}", String(selectedData.partial.sourcesTotal))}</span></div>
+          <HistoryPartialDetails partial={selectedData.partial} t={t} locale={locale} />
+        </div>}
+      </>}
+      <ConfirmDeleteDialog
+        open={deleteAssetCandidate !== null}
+        onOpenChange={(open) => { if (!open) setDeleteAssetCandidate(null); }}
+        title={t("history.deleteDialogTitle")}
+        description={t("history.deleteDialogDesc")}
+        cancelLabel={t("common.cancel")}
+        actions={[
+          { label: t("history.deleteBlacklist"), onClick: () => {
+            if (deleteAssetCandidate) onHistoricalDataDetailDeleteAndBlacklistClick(deleteAssetCandidate.id, deleteAssetCandidate.symbol);
+            setDeleteAssetCandidate(null);
+          } },
+          { label: t("common.delete"), onClick: () => {
+            if (deleteAssetCandidate) onHistoricalDataDetailDeleteClick(deleteAssetCandidate.id);
+            setDeleteAssetCandidate(null);
+          } },
+        ]}
+      />
+    </section>
+  );
 
   const detailContent = (
         <Dialog
@@ -854,6 +1128,86 @@ const App = ({
         </Dialog>
   );
 
+  const phoneListContent = <div className="fidelity-history">
+    <h1 className="ios-large-title">{t("fidelity.history.title")}</h1>
+    <p className="fidelity-history-subtitle">{pageLoading && totalCount === 0 ? t("common.loading") :
+      emptyState ? t("fidelity.history.emptySubtitle") :
+      t("fidelity.history.subtitle").replace("{date}", latestRow
+        ? `${phoneDate(latestRow.createdAt)}, ${phoneTime(latestRow.createdAt)}` : "–")
+        .split("{count}").map((part, index) => <Fragment key={index}>
+          {index > 0 && <strong>{totalCount.toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}</strong>}{part}
+        </Fragment>)}</p>
+    <div className="fidelity-history-chips">
+      <button type="button" className="selected" disabled={emptyState} onClick={() => {
+        setPendingPhoneRange(phoneRange); setPendingPhoneStatus(historyFilter);
+        setPendingPhoneFrom(phoneFrom); setPendingPhoneTo(phoneTo); setPhoneFilterOpen(true);
+      }}><HistoryPhoneIcon kind="clock" />{phoneRange === "all" ? t("fidelity.history.allTime") :
+        t(`fidelity.history.days${phoneRange}`)}<HistoryPhoneIcon kind="chevron" /></button>
+      <button type="button" disabled={emptyState} onClick={() => {
+        setPendingPhoneRange(phoneRange); setPendingPhoneStatus(historyFilter);
+        setPendingPhoneFrom(phoneFrom); setPendingPhoneTo(phoneTo); setPhoneFilterOpen(true);
+      }}><HistoryPhoneIcon kind="filter" />{historyFilter === "all" ? t("fidelity.history.statusAll") :
+        historyFilter === "edited" ? t("history.editLog.edited") : historyFilter === "partial" ?
+          t("fidelity.history.issues") : t("history.partial.complete")}<HistoryPhoneIcon kind="chevron" /></button>
+      <button type="button" disabled={emptyState} aria-pressed={historyFilter === "edited"}
+        onClick={() => { setHistoryFilter(historyFilter === "edited" ? "all" : "edited"); setDataPage(0); }}>
+        {t("history.editLog.edited")}</button>
+    </div>
+    <section className="fidelity-history-card t3-history-records history-records-card">
+      <div className="fidelity-history-card-head"><h2>{t("fidelity.history.snapshots")}</h2>
+        {!emptyState && <span>{pageLoading ? t("common.loading") : t("fidelity.history.newest")}</span>}</div>
+      {pageLoading && data.length === 0 ? <div className="fidelity-history-skeletons">{Array.from({ length: 8 }, (_, index) =>
+        <div className="fidelity-history-skeleton" key={index}><i /><i /><i /><i /></div>)}</div> :
+        emptyState ? <div className="fidelity-history-empty">
+          <div><strong>{t("fidelity.history.noSnapshots")}</strong>
+            <p>{t("fidelity.history.emptyBody")}</p>
+            <button type="button" onClick={() => { void refreshEmptyHistory(); }}>
+              <HistoryPhoneIcon kind="refresh" />{t("fidelity.history.refresh")}</button>
+          </div>
+        </div> :
+        <div className="history-mobile-list fidelity-history-list">
+          {data.map((row) => <SwipeableRow key={row.id} className="history-mobile-snapshot"
+            actions={[{ label: t("common.delete"), icon: <HistoryPhoneIcon kind="trash" />, destructive: true, disabled: deleting,
+              onClick: () => setDeleteCandidate(row.id) }]}>
+            <button type="button" data-testid="history-mobile-row" className="history-mobile-snapshot-button"
+              aria-current={isWide && isModalOpen && selectedDataId === row.id ? "true" : undefined}
+              onClick={(event) => onRowClick(row.id, event.currentTarget)}>
+              <span className="sr-only">{t("history.viewSnapshot").replace("{date}", phoneDate(row.createdAt, true))}</span>
+              <span className="history-mobile-snapshot-date"><strong>{phoneDate(row.createdAt)}</strong>
+                <span>{phoneTime(row.createdAt)}</span>
+                {row.edited && <span className="fidelity-history-edited">{t("history.editLog.edited")}</span>}
+              </span>
+              <span className="history-mobile-snapshot-total ios-money">{phoneMoney(row.total)}</span>
+              <span className="fidelity-history-sources">
+                {t("history.assetCount").replace("{n}", String(row.assetCount))}
+                {row.sourcesTotal !== undefined && <> · <span className="fidelity-history-source-count">{t("fidelity.history.sources")
+                  .replace("{ready}", String(row.sourcesTotal - (row.missingCount ?? 0)))
+                  .replace("{total}", String(row.sourcesTotal))}</span></>}
+                <span className="fidelity-history-hidden-logos"><ImageStack imageSrcs={row.topAssets.slice(0, 3).map((asset) =>
+                  resolveAssetLogoSrc(asset, logoMap[asset.symbol]))} imageWidth={18} imageHeight={18} /></span>
+              </span>
+              <span className="history-mobile-snapshot-delta ios-money" data-tone={row.change === null ? "neutral" :
+                positiveNegativeTone(row.change, quoteColor) === "green" ? "gain" : "loss"}>
+                {phoneChange(row.change, row.total)}
+              </span>
+            </button>
+          </SwipeableRow>)}
+        </div>}
+      {pageLoading && <div className="fidelity-history-skeleton-pager"><i /></div>}
+      {!emptyState && !pageLoading && <div className="fidelity-history-pager">
+        <span>{t("fidelity.history.rangeCount").replace("{start}", String(dataPage * pageSize + 1))
+          .replace("{end}", String(dataPage * pageSize + data.length))
+          .replace("{count}", totalCount.toLocaleString(locale === "zh" ? "zh-CN" : "en-US"))}</span>
+        {dataPage > 0 && <button type="button" onClick={() => setDataPage(dataPage - 1)}>
+          {t("fidelity.history.previous50")}</button>}
+        <button type="button" disabled={dataPage >= maxDataPage}
+          onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}>{t("fidelity.history.next50")}</button>
+      </div>}
+      {!pageLoading && <div className="fidelity-history-hint"><HistoryPhoneIcon kind="info" />
+        <span>{t(emptyState ? "fidelity.history.localNoteActual" : "fidelity.history.hintActual")}</span></div>}
+    </section>
+  </div>;
+
   const listContent = (
         <FadeUp>
           <Card className={isMobile ? "t3-history-records history-records-card" : "t3-history-records"}>
@@ -995,7 +1349,7 @@ const App = ({
                         onClick: () => setDeleteCandidate(row.id) }] : []}>
                       <button type="button" data-testid="history-mobile-row"
                         className="history-mobile-snapshot-button" aria-current={isWide && isModalOpen && selectedDataId === row.id ? "true" : undefined}
-                        onClick={() => onRowClick(row.id)}>
+                        onClick={(event) => onRowClick(row.id, event.currentTarget)}>
                         <span className="sr-only">{t("history.viewSnapshot").replace("{date}", timeToDateStr(new Date(row.createdAt).getTime(), true))}</span>
                         <span className="history-mobile-snapshot-primary">
                           <span className="history-mobile-snapshot-date">{new Intl.DateTimeFormat(
@@ -1169,14 +1523,62 @@ const App = ({
         {isMobile && <ConfirmDeleteDialog
           open={deleteCandidate !== null}
           onOpenChange={(open) => { if (!open) setDeleteCandidate(null); }}
-          title={t("history.deleteLatestTitle")}
-          description={t("history.deleteLatestDesc")}
+          title={isPhone ? t("fidelity.history.deleteTitle") : t("history.deleteLatestTitle")}
+          description={isPhone ? <>{deleteCandidate && data.find((row) => row.id === deleteCandidate) && <span className="fidelity-history-delete-meta">
+            {phoneDate(data.find((row) => row.id === deleteCandidate)!.createdAt, true)},{" "}
+            {phoneTime(data.find((row) => row.id === deleteCandidate)!.createdAt)} ·{" "}
+            {phoneMoney(data.find((row) => row.id === deleteCandidate)!.total)} ·{" "}
+            {t("history.assetCount").replace("{n}", String(data.find((row) => row.id === deleteCandidate)!.assetCount))}
+          </span>}{t("fidelity.history.deleteDesc")}</> : t("history.deleteLatestDesc")}
           cancelLabel={t("common.cancel")}
-          actions={[{ label: t("common.confirm"), onClick: () => {
+          actions={[{ label: isPhone ? t("history.deleteSnapshot") : t("common.confirm"),
+            icon: isPhone ? <HistoryPhoneIcon kind="trash" /> : undefined, onClick: () => {
             if (deleteCandidate) onHistoricalDataDeleteClick(deleteCandidate);
             setDeleteCandidate(null);
           } }]}
+          contentClassName={isPhone ? "fidelity-history-delete-dialog" : undefined}
         />}
+        {isPhone && <BottomSheet open={phoneFilterOpen} onOpenChange={setPhoneFilterOpen}
+          title={t("fidelity.history.filterTitle")} className="fidelity-history-filter-sheet" detents={["medium"]}>
+          <div className="fidelity-history-filter">
+            <p>{(phoneCounts?.all ?? totalCount).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")} {t("fidelity.history.snapshots").toLowerCase()}</p>
+            <label>{t("fidelity.history.range")}</label>
+            <div className="fidelity-history-segments" role="group" aria-label={t("fidelity.history.range")}>
+              {(["7", "30", "90", "all"] as const).map((value) => <button type="button" key={value}
+                className={pendingPhoneRange === value ? "selected" : ""} aria-pressed={pendingPhoneRange === value}
+                onClick={() => setPendingPhoneRange(value)}>{value === "all" ? t("fidelity.history.all") :
+                  t(`fidelity.history.days${value}`)}</button>)}
+            </div>
+            <label>{t("cost.from")}<span className="fidelity-history-date-input" data-empty={!pendingPhoneFrom}>
+              <input type="date" aria-label={t("cost.from")} value={pendingPhoneFrom}
+                onChange={(event) => setPendingPhoneFrom(event.target.value)} />
+              {!pendingPhoneFrom && <span aria-hidden="true">{t("fidelity.history.anyDate")}</span>}
+            </span></label>
+            <label className="fidelity-history-to">{t("cost.to")}<span className="fidelity-history-date-input" data-empty={!pendingPhoneTo}>
+              <input type="date" aria-label={t("cost.to")} value={pendingPhoneTo}
+                onChange={(event) => setPendingPhoneTo(event.target.value)} />
+              {!pendingPhoneTo && <span aria-hidden="true">{t("fidelity.history.anyDate")}</span>}
+            </span></label>
+            <label>{t("fidelity.history.show")}</label>
+            <div className="fidelity-history-segments" role="group" aria-label={t("fidelity.history.show")}>
+              {(["all", "partial", "edited"] as const).map((value) => <button type="button" key={value}
+                className={pendingPhoneStatus === value ? "selected" : ""} aria-pressed={pendingPhoneStatus === value}
+                onClick={() => setPendingPhoneStatus(value)}>{value === "all" ? t("fidelity.history.all") :
+                  `${value === "edited" ? t("history.editLog.edited") : t("fidelity.history.issues")}${phoneCounts ? ` ${phoneCounts[value]}` : ""}`}</button>)}
+            </div>
+            <button type="button" className="fidelity-history-apply" onClick={() => {
+              setPhoneRange(pendingPhoneRange); setPhoneFrom(pendingPhoneFrom); setPhoneTo(pendingPhoneTo);
+              setHistoryFilter(pendingPhoneStatus); setDataPage(0); setPhoneFilterOpen(false);
+            }}>{t("fidelity.history.showCount").replace("{count}",
+              (phoneCounts?.[pendingPhoneStatus as keyof typeof phoneCounts] ?? totalCount)
+                .toLocaleString(locale === "zh" ? "zh-CN" : "en-US"))}</button>
+            <button type="button" className="fidelity-history-reset" onClick={() => {
+              setPendingPhoneRange("all"); setPendingPhoneStatus("all"); setPendingPhoneFrom(""); setPendingPhoneTo("");
+              setPhoneRange("all"); setHistoryFilter("all"); setPhoneFrom(""); setPhoneTo("");
+              setDataPage(0); setPhoneFilterOpen(false);
+            }}>{t("fidelity.history.reset")}</button>
+          </div>
+        </BottomSheet>}
         {!isMobile && detailContent}
 
         {!isMobile && <FadeUp>
@@ -1233,10 +1635,10 @@ const App = ({
           </div>
         </FadeUp>}
 
-        {isMobile ? <SplitView selected={false} master={listContent}
+        {isMobile ? <SplitView selected={isPhone && isModalOpen} master={isPhone ? phoneListContent : listContent}
           detail={isWide && !isModalOpen
             ? <p className="analytics-empty">{t("history.selectDetail")}</p>
-            : detailContent}
+            : isPhone ? phoneDetailContent : detailContent}
           className="history-split" masterLabel={t("history.recordsCardTitle")}
           detailLabel={t("history.detailTitle")} /> : listContent}
       </StaggerContainer>

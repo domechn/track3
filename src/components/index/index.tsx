@@ -30,7 +30,7 @@ import SyncStatusIndicator from "../sync-status-indicator";
 import { SummaryLoadingContext } from "../summary-loading-context";
 import { SummaryFidelityRangeContext } from "../summary-fidelity-range-context";
 import "./index.css";
-import { Route, Routes, HashRouter, Outlet, Navigate, useLocation } from "react-router-dom";
+import { Route, Routes, HashRouter, Outlet, Navigate, useLocation, Link } from "react-router-dom";
 
 import { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -121,6 +121,7 @@ function TopBar({
   onRefreshSuccess,
   fidelityPage,
   fidelityBusy,
+  recordsToolsOpen,
 }: {
   isProUser: boolean;
   railFidelityPage: boolean;
@@ -136,8 +137,11 @@ function TopBar({
   onRefreshSuccess: () => void;
   fidelityPage?: "summary" | "coin";
   fidelityBusy?: boolean;
+  recordsToolsOpen: boolean;
 }) {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
+  const recordsPage = pathname === "/history" || pathname === "/cost-basis";
   const { range: fidelityRange, setRange: setSummaryRange } = React.useContext(SummaryFidelityRangeContext);
   const [selectedFidelityRange, setSelectedFidelityRange] = useState("All");
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
@@ -149,8 +153,10 @@ function TopBar({
   const liveTotal = isProUser && <RealTimeTotalValue quoteColor={quoteColor} currency={currentCurrency} />;
 
   return (
-    <div className={railFidelityPage ? "t3-fidelity-rail-refresh-container" : fidelityPage ? `t3-fidelity-topbar t3-fidelity-topbar-${fidelityPage}` : "sticky top-0 z-10 glass-subtle border-b relative"}>
-      <div className={railFidelityPage ? "t3-fidelity-rail-refresh-inner" : "flex h-12 items-center px-4"}>
+    <div className={recordsPage ? "t3-records-toolbar" : railFidelityPage ? "t3-fidelity-rail-refresh-container" : fidelityPage ? `t3-fidelity-topbar t3-fidelity-topbar-${fidelityPage}` : "sticky top-0 z-10 glass-subtle border-b relative"}
+      data-open={recordsToolsOpen}>
+      <div id={recordsPage ? "t3-records-toolbar-panel" : undefined}
+        className={recordsPage ? "t3-records-toolbar-panel flex h-12 items-center px-4" : railFidelityPage ? "t3-fidelity-rail-refresh-inner" : "flex h-12 items-center px-4"}>
         {!fidelityPage && liveTotal && <div className={railFidelityPage ? "t3-fidelity-rail-live" : "mr-4"}>{liveTotal}</div>}
         <div className={fidelityPage ? "t3-fidelity-topbar-controls ml-auto flex items-center" : "ml-auto flex items-center space-x-3"}>
           {fidelityPage && liveTotal && <div className="t3-fidelity-live-control">{liveTotal}</div>}
@@ -172,7 +178,7 @@ function TopBar({
                 }}>{label}</button>;
             })}
           </div>}
-          {!fidelityPage && availableDates.length > 0 && <div className="t3-topbar-ranges" role="group" aria-label={t("datePicker.predefined")}>
+          {!fidelityPage && !railFidelityPage && !recordsPage && availableDates.length > 0 && <div className="t3-topbar-ranges" role="group" aria-label={t("datePicker.predefined")}>
             {([10, 30, 50, 100, -1] as const).map((count) => {
               const selected = count < 0 ? availableDates : availableDates.slice(-count);
               return <button key={count} type="button"
@@ -183,9 +189,9 @@ function TopBar({
               </button>;
             })}
           </div>}
-          {!railFidelityPage && <SyncStatusIndicator />}
+          {!railFidelityPage && !recordsPage && <SyncStatusIndicator />}
           {fidelityPage && (fidelityBusy || lastRefreshAt) && <span className="t3-fidelity-stamp"><i className={fidelityBusy ? "off" : ""} />{fidelityBusy ? t("summary.fidelity.loadingLabel") : `${t("summary.fidelity.updated")} ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(lastRefreshAt ?? 0))}`}</span>}
-          {!railFidelityPage && <div className={fidelityPage ? "t3-fidelity-date-control" : undefined}><DatePicker
+          {!railFidelityPage && !recordsPage && <div className={fidelityPage ? "t3-fidelity-date-control" : undefined}><DatePicker
             availableDates={availableDates}
             value={fidelityPage ? fidelityDateRange : dateRange}
             onDateChange={(count, next) => {
@@ -230,10 +236,11 @@ function TopBar({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider></fieldset>
+          {recordsPage && <Link to="/settings" className="t3-records-settings-link">{t("nav.settings")}</Link>}
         </div>
       </div>
       {refreshProgress > 0 && refreshButtonLoading && (
-        <div className={railFidelityPage ? "t3-fidelity-refresh-progress" : "absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none"}>
+        <div className={recordsPage ? "t3-records-refresh-progress absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none" : railFidelityPage ? "t3-fidelity-refresh-progress" : "absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none"}>
           <Progress value={refreshProgress} className={railFidelityPage ? "h-1.5 w-full" : "w-[80%]"} />
         </div>
       )}
@@ -295,10 +302,22 @@ function Layout({
     return () => window.removeEventListener("resize", onResize);
   }, []);
   const railFidelityPage = wideViewport && darkTheme && (location.pathname === "/rebalance" || location.pathname === "/goals" || location.pathname === "/goals/kinds");
+  const recordsPage = location.pathname === "/history" || location.pathname === "/cost-basis";
   const sidebarWidth = sidebarCollapsed ? 56 : 216;
   const fidelityPage = location.pathname === "/summary" ? "summary" : location.pathname.startsWith("/coins/") ? "coin" : undefined;
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryRange, setSummaryRange] = useState<TDateRange>();
+  const [recordsToolsOpen, setRecordsToolsOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setRecordsToolsOpen(true);
+    const toggle = () => setRecordsToolsOpen((value) => !value);
+    window.addEventListener("records-controls-open", open);
+    window.addEventListener("records-controls-toggle", toggle);
+    return () => {
+      window.removeEventListener("records-controls-open", open);
+      window.removeEventListener("records-controls-toggle", toggle);
+    };
+  }, []);
 
   return (
     <div className={fidelityPage ? `min-h-screen t3-fidelity-shell t3-fidelity-${fidelityPage}-shell` : "min-h-screen"}>
@@ -307,11 +326,12 @@ function Layout({
         onToggle={onSidebarToggle}
         isProUser={isProUser}
         fidelity={!!fidelityPage}
+        recordsToolsOpen={recordsToolsOpen}
       />
 
       <div
-        style={{ marginLeft: railFidelityPage || fidelityPage ? 56 : sidebarWidth }}
-        className="transition-[margin-left] duration-300 ease-in-out"
+        style={{ marginLeft: railFidelityPage || fidelityPage || recordsPage ? 56 : sidebarWidth }}
+        className={`transition-[margin-left] duration-300 ease-in-out ${recordsPage ? "t3-records-fidelity-shell" : ""}`}
       >
         <SummaryFidelityRangeContext.Provider value={{ range: summaryRange, setRange: setSummaryRange }}>
         <SummaryLoadingContext.Provider value={setSummaryLoading}>
@@ -327,6 +347,7 @@ function Layout({
           onRefreshSuccess={onRefreshSuccess}
           fidelityPage={fidelityPage}
           fidelityBusy={fidelityPage === "summary" && summaryLoading}
+          recordsToolsOpen={recordsToolsOpen}
         />
 
         {/* Main content */}
@@ -366,8 +387,6 @@ type AppRoutesProps = {
   tDateRange: { start: Date; end: Date };
   maxDateRange: { start: Date; end: Date };
   hasData: boolean;
-  retainHistory: boolean;
-  setRetainHistory: React.Dispatch<React.SetStateAction<boolean>>;
   onDatePickerValueChange: (
     selectedTimes: number,
     nextDateRange: DateRange | undefined,
@@ -391,21 +410,11 @@ function AppRoutes({
   tDateRange,
   maxDateRange,
   hasData,
-  retainHistory,
-  setRetainHistory,
   onDatePickerValueChange,
   lastRefreshAt,
   onDataChanged,
   handleConfigurationSave,
 }: AppRoutesProps) {
-  const location = useLocation();
-
-  useEffect(() => {
-    if (location.pathname !== "/history") {
-      setRetainHistory(false);
-    }
-  }, [location.pathname, setRetainHistory]);
-
   return (
     <Routes>
       <Route
@@ -499,28 +508,17 @@ function AppRoutes({
         <Route
           path="history"
           element={
-            <AnimatedPage>
-              <PageWrapper
-                dateRange={tDateRange}
-                hasData={hasData || retainHistory}
-              >
-                <HistoricalData
-                  currency={currentCurrency}
-                  dateRange={tDateRange}
-                  quoteColor={quoteColor}
-                  afterDataChanged={onDataChanged}
-                />
-              </PageWrapper>
-            </AnimatedPage>
+            <HistoricalData
+              currency={currentCurrency}
+              dateRange={tDateRange}
+              quoteColor={quoteColor}
+              afterDataChanged={onDataChanged}
+            />
           }
         />
         <Route
           path="cost-basis"
-          element={
-            <AnimatedPage>
-              <CostBasis quoteColor={quoteColor} />
-            </AnimatedPage>
-          }
+          element={<CostBasis quoteColor={quoteColor} />}
         />
         <Route
           path="assistant"
@@ -617,7 +615,6 @@ const App = () => {
 
   const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
   const [hasData, setHasData] = useState(true);
-  const [retainHistory, setRetainHistory] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [dataChangedVersion, setDataChangedVersion] = useState(0);
   const [autoBackupStatus, setAutoBackupStatus] = useState<
@@ -817,7 +814,6 @@ const App = () => {
   function onDataChanged(action?: "delete" | "undoDeletion") {
     const currentHash = window.location.hash || "";
     const isSettingsRoute = currentHash.startsWith("#/settings");
-    setRetainHistory(action === "delete" || action === "undoDeletion");
     // Bump the data-changed version first so any consumer that subscribes
     // through DataChangedContext sees a new value during this same tick,
     // even when the settings route skips loadAllData() below.
@@ -976,8 +972,6 @@ const App = () => {
           tDateRange={tDateRange}
           maxDateRange={maxDateRange}
           hasData={hasData}
-          retainHistory={retainHistory}
-          setRetainHistory={setRetainHistory}
           onDatePickerValueChange={onDatePickerValueChange}
           lastRefreshAt={lastRefreshAt}
           onDataChanged={onDataChanged}

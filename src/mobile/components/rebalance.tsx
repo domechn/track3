@@ -15,6 +15,7 @@ import {
   validateProfile,
   type RebalanceHolding,
   type RebalanceOptions,
+  type RebalanceProfile,
   type RebalanceResult,
   type RebalanceTarget,
 } from "@/middlelayers/rebalance";
@@ -40,6 +41,8 @@ import {
 } from "@/mobile/components/ui/alert-dialog";
 import { useIsMobile } from "@/mobile/components/mobile";
 import { formatPhoneMoney } from "@/mobile/currency";
+import RebalanceFidelity from "@/mobile/components/rebalance-fidelity";
+import { usePhoneWidth } from "@/mobile/components/mobile/size-class";
 
 type TargetDraft = RebalanceTarget & { id: number; previousAsset?: { assetType: AssetType; symbol: string } };
 
@@ -50,6 +53,10 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   const { t } = useTranslation();
   const [stablecoinsAsCash, setStablecoinsAsCash] = useState(() => readRebalanceOptions().stablecoinsAsCash !== false);
   const mobile = useIsMobile();
+  const phoneWidth = usePhoneWidth();
+  const defaultTolerance = 0;
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const fidelityPhone = mobile && phoneWidth && !advancedOpen;
   const labelFor = (target: RebalanceTarget) =>
     target.kind === "asset" ? target.symbol || t("rebalance.targetAsset") :
     target.kind === "type" ? t(`rebalance.${target.assetType}`) : t(stablecoinsAsCash ? "rebalance.targetCash" : "rebalance.targetCashOnly");
@@ -58,8 +65,9 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   const [partialSnapshot, setPartialSnapshot] = useState(false);
   const [stablecoinSymbols, setStablecoinSymbols] = useState<string[]>([]);
   const [targets, setTargets] = useState<TargetDraft[]>([]);
-  const [tolerance, setTolerance] = useState(0);
+  const [tolerance, setTolerance] = useState(defaultTolerance);
   const [saved, setSaved] = useState(false);
+  const [savedProfile, setSavedProfile] = useState<RebalanceProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profileLoadError, setProfileLoadError] = useState(false);
@@ -114,8 +122,9 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
         if (!active) return;
         if (!profileLoaded.current) {
           setTargets(withIds(profile?.targets ?? []));
-          setTolerance(profile?.tolerancePercent ?? 0);
+          setTolerance(profile?.tolerancePercent ?? defaultTolerance);
           setSaved(!!profile || failed);
+          setSavedProfile(profile ?? null);
           if (!manualInitialized.current) {
             setManualOpen(!profile?.targets.length);
             manualInitialized.current = true;
@@ -191,6 +200,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
       await saveRebalanceProfile(profile);
       setTargets(profile.targets.map((target, index) => ({ ...target, id: targets[index].id })));
       setSaved(true);
+      setSavedProfile(profile);
       setProfileLoadError(false);
       setStatus(t("rebalance.saved"));
     } catch {
@@ -202,8 +212,9 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
     try {
       await deleteRebalanceProfile();
       setTargets([]);
-      setTolerance(0);
+      setTolerance(defaultTolerance);
       setSaved(false);
+      setSavedProfile(null);
       setProfileLoadError(false);
       setStatus(t("rebalance.deleted"));
     } catch {
@@ -222,6 +233,14 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   }
 
   const total = targets.reduce((sum, target) => sum + (Number.isFinite(target.percent) ? target.percent : 0), 0);
+  const savedUnchanged = !!savedProfile && tolerance === savedProfile.tolerancePercent
+    && targets.length === savedProfile.targets.length
+    && targets.every((target, index) => {
+      const original = savedProfile.targets[index];
+      return target.kind === original.kind && target.percent === original.percent
+        && ("assetType" in target ? "assetType" in original && target.assetType === original.assetType : true)
+        && ("symbol" in target ? "symbol" in original && target.symbol === original.symbol : true);
+    });
   const numberField = (
     id: string, label: string, value: number, setter: (next: number) => void,
   ) => (
@@ -233,8 +252,39 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
     </label>
   );
 
+  if (fidelityPhone) return <RebalanceFidelity
+    currency={currency} holdings={holdings} targets={targets} result={result}
+    tolerance={tolerance} minimumTradeValue={minimumTradeValue} ignoreBelowValue={ignoreBelowValue}
+    mode={mode} injectedCash={injectedCash}
+    stablecoinsAsCash={stablecoinsAsCash} loading={loading} loadError={loadError}
+    profileLoadError={profileLoadError} partialSnapshot={partialSnapshot} status={status}
+    saved={saved} savedUnchanged={savedUnchanged} canSave={targets.length > 0 && !validation}
+    onSave={() => void save()} onDelete={() => void removeSaved()} onAdvanced={() => { setManualOpen(true); setAdvancedOpen(true); }}
+    onTarget={(holding, percent) => {
+      setTargets((previous) => {
+        const match = previous.findIndex((target) => target.kind === "asset" &&
+          target.assetType === holding.assetType && target.symbol === holding.symbol);
+        if (percent === null) return previous.filter((_, index) => index !== match);
+        if (match < 0) return [...previous, { id: nextTargetId.current++, kind: "asset",
+          assetType: holding.assetType, symbol: holding.symbol, percent }];
+        return previous.map((target, index) => index === match ? { ...target, percent } : target);
+      });
+      setStatus("");
+    }}
+    onPreset={applyPreset}
+    onNormalize={() => {
+      try {
+        setTargets(normalizeTargets(targets).map((target, index) => ({ ...targets[index], percent: target.percent })));
+        setNormalizeError(false);
+      } catch { setNormalizeError(true); }
+    }}
+    onTolerance={setTolerance}
+    onMinimum={setMinimumTradeValue} onIgnore={setIgnoreBelowValue}
+    onStablecoins={setStablecoinsAsCash} onExport={() => void exportCsv()} />;
+
   return (
     <div className="t3-manage-rebalance ios-d3-rebalance mx-auto flex max-w-6xl flex-col gap-4">
+      {mobile && phoneWidth && advancedOpen && <Button variant="outline" onClick={() => setAdvancedOpen(false)}>{t("fidelity.rebalance.backToPlan")}</Button>}
       {mobile && document.getElementById("app-top-bar") && createPortal(
         <span className="ios-d3-pushed-title">{t("rebalance.title")}</span>, document.getElementById("app-top-bar")!)}
       <header>

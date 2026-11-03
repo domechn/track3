@@ -229,15 +229,25 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
 
           await page.locator("#sync-passphrase").fill("correct horse battery staple");
           await page.locator("#sync-confirm").fill("correct horse battery staple");
+          // Hold the scheduler's startup debounce until the explicit Sync now run begins.
+          await page.clock.pauseAt(new Date());
           await page.getByRole("button", { name: locale === "en" ? "Enable sync" : "启用同步" }).click();
           const now = page.getByRole("button", { name: locale === "en" ? "Sync now" : "立即同步" });
           await expect(now).toBeEnabled({ timeout: 15000 });
           await expect(page.getByRole("button", { name: locale === "en" ? "Sync idle" : "同步空闲" })).toBeVisible({ timeout: 15000 });
+          await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
+          await expect(page.getByRole("button", { name: locale === "en" ? "Sync idle" : "同步空闲" })).toBeVisible({ timeout: 15000 });
+          await page.evaluate(() => (window as any).__e2eInvoke("plugin:sql|execute", {
+            query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+              VALUES ('manual-sync-snapshot', '2024-01-03T00:00:00.000Z', 'wallet-1', 'crypto', 'BTC', 1, 43000, 43000)`,
+            values: [],
+          }));
 
           const nowWidth = (await now.boundingBox())!.width;
           const nowBackground = await now.evaluate((node) => getComputedStyle(node).backgroundColor);
           store.hold();
           await now.click();
+          await page.clock.resume();
           const syncingButton = page.locator(".sync-settings-page button[aria-busy=true]");
           await expect(syncingButton).toHaveCount(1);
           await expect.poll(() => syncingButton.evaluate((node) => getComputedStyle(node).backgroundColor))
@@ -248,7 +258,7 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           store.release();
           await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Sync complete" : "同步完成");
           await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Pushed 5" : "已推送 5 项");
+          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Pushed 1" : "已推送 1 项");
           await shot(page, `${prefix}-now-success`);
 
           store.failList = true;
