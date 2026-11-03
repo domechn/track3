@@ -5,7 +5,8 @@ import { TDateRange } from "@/middlelayers/types";
 import { parseISO } from "date-fns";
 import { Card, CardContent } from "@/mobile/components/ui/card";
 import { useTranslation } from "@/mobile/i18n";
-import { EmptyState, useIsMobile } from "@/mobile/components/mobile";
+import { EmptyState, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
+import { isIOS } from "@/utils/platform";
 
 const emptyDate = parseISO("1970-01-01");
 
@@ -13,16 +14,21 @@ const App = ({
   hasData,
   children,
   dateRange,
+  fidelityFirstRun = false,
 }: {
   hasData: boolean;
   children: React.ReactNode;
   dateRange: TDateRange;
+  fidelityFirstRun?: boolean;
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
+  const sizeClass = useSizeClass();
+  const useFidelityFirstRun = fidelityFirstRun && isIOS() && sizeClass.width === "compact";
 
   if (!hasData) {
+    if (useFidelityFirstRun) return <>{children}</>;
     if (isMobile) return <EmptyState title={t("overview.emptyTitle")} description={t("overview.emptyDescription")}
       illustrationLabel={t("overview.emptyIllustration")}
       action={t("overview.addFirstSource")} onAction={() => navigate("/settings/configuration")} />;
@@ -46,7 +52,7 @@ const App = ({
     );
   }
 
-  if (dateRange.start.getTime() === emptyDate.getTime() || dateRange.end.getTime() === emptyDate.getTime()) {
+  if (!useFidelityFirstRun && (dateRange.start.getTime() === emptyDate.getTime() || dateRange.end.getTime() === emptyDate.getTime())) {
     return <div className="min-h-[400px]" />;
   }
 

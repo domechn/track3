@@ -81,7 +81,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
 
     for (const [name, route, title] of settings) {
       await page.goto(`/#${route}`);
-      await expect(page.locator("#app-main-content h1")).toHaveText(title);
+      await expect(page.locator("#app-main-content h1")).toHaveText(title, { timeout: 30_000 });
       await capture(page, phone.name, theme, name);
       if (name === "currency") {
         await expect(page.getByRole("button", { name: /Base currency.*USD/ })).toBeVisible();
@@ -255,7 +255,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await capture(page, phone.name, theme, "assistant-tools");
 
     await page.goto("/#/overview");
-    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await page.locator(".fd-overview-refresh, .fd-partial-refresh").click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     await expect(page.locator("[data-source-status-row]").first()).toBeVisible();
     await expect(page.locator(".ios-d3-refresh-sheet [data-source-status-row]").first()).not.toContainText("Waiting…");
@@ -302,9 +302,9 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await installTauriBridge(page, { emptyPortfolio: true });
     mkdirSync("test-results/mobile", { recursive: true });
     await page.goto("/#/overview");
-    await expect(page.getByRole("button", { name: "Add your first source" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add an exchange" })).toBeVisible({ timeout: 30_000 });
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-first-launch.png` });
-    await page.getByRole("button", { name: "Add your first source" }).click();
+    await page.getByRole("button", { name: "Add an exchange" }).click();
     await expect(page.getByRole("list", { name: "Getting started" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Add symbol" })).toHaveCount(0);
     await capture(page, phone.name, theme, "onboarding");

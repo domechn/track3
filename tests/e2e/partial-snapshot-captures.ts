@@ -20,22 +20,34 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
     path: `test-results/p7b/${shell}-${width}-${theme}-${screen}.png`,
     animations: "disabled" as const,
   });
+  const phoneLayout = shell === "ios" && width <= 430;
 
   await page.goto("/#/overview");
-  await expect(page.locator(".t3-hero-card").getByText("Partial", { exact: true })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Dotted gap: partial refreshes are omitted from this chart.")).toBeVisible();
-  await capture("overview");
-  await page.getByRole("combobox", { name: "Total value view" }).click();
-  await page.getByRole("option", { name: "Total value, excluding BTC" }).click();
-  await expect(page.locator(".t3-hero-value")).not.toContainText("$75,048.19");
-  await capture("overview-excluding");
-  await page.getByRole("combobox", { name: "Total value view" }).click();
-  await page.getByRole("option", { name: "Including last known values" }).click();
-
-  await page.getByRole("button", { name: "Source status" }).click();
-  await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
-  await capture("refresh");
-  await page.getByRole("button", { name: "Close" }).click();
+  if (phoneLayout) {
+    await expect(page.locator(".fd-partial-pill")).toHaveText("Partial", { timeout: 30_000 });
+    await expect(page.locator(".fd-partial-chart")).toBeVisible();
+    await capture("overview");
+    await expect(page.locator(".fd-partial-total")).toHaveText("$49,898.45");
+    await capture("overview-excluding");
+    await page.locator(".fd-partial-summary").click();
+    await expect(page.locator(".fd-partial-status")).toBeVisible();
+    await capture("refresh");
+    await page.locator(".fd-partial-status").getByRole("button", { name: "Close" }).click();
+  } else {
+    await expect(page.locator(".t3-hero-card").getByText("Partial", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Dotted gap: partial refreshes are omitted from this chart.")).toBeVisible();
+    await capture("overview");
+    await page.getByRole("combobox", { name: "Total value view" }).click();
+    await page.getByRole("option", { name: "Total value, excluding BTC" }).click();
+    await expect(page.locator(".t3-hero-value")).not.toContainText("$75,048.19");
+    await capture("overview-excluding");
+    await page.getByRole("combobox", { name: "Total value view" }).click();
+    await page.getByRole("option", { name: "Including last known values" }).click();
+    await page.getByRole("button", { name: "Source status" }).click();
+    await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
+    await capture("refresh");
+    await page.getByRole("button", { name: "Close" }).click();
+  }
 
   await page.goto("/#/history");
   await expect(page.locator("[data-testid=history-content][aria-busy=true]")).toHaveCount(0);
@@ -56,12 +68,17 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 
   await page.goto("/#/overview");
-  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await (phoneLayout ? page.locator(".fd-partial-refresh") : page.getByRole("button", { name: "Refresh", exact: true })).click();
   const status = page.getByRole("alertdialog", { name: "Source status" });
   await expect(status.getByRole("button", { name: "Use last known values" })).toBeVisible();
-  await expect(page.locator(".overview-loading")).toBeHidden();
-  await expect(page.locator(".t3-hero-value")).not.toContainText("$75,048.19");
-  await expect(page.locator(".t3-hero-value")).toContainText("Partial");
+  if (phoneLayout) {
+    await expect(page.locator(".fd-partial-total")).not.toHaveText("$75,048.19");
+    await expect(page.locator(".fd-partial-pill")).toHaveText("Partial");
+  } else {
+    await expect(page.locator(".overview-loading")).toBeHidden();
+    await expect(page.locator(".t3-hero-value")).not.toContainText("$75,048.19");
+    await expect(page.locator(".t3-hero-value")).toContainText("Partial");
+  }
   if (shell === "desktop") await expect(page.locator(".desktop-toast-viewport > li[data-state='open']")).toBeHidden({ timeout: 15_000 });
   await capture("refresh-offer");
   await status.getByRole("button", { name: "Use last known values" }).click();

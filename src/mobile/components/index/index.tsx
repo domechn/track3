@@ -55,7 +55,7 @@ import { invalidateCacheGroups } from "@/middlelayers/datafetch/utils/cache";
 import { CACHE_GROUP_KEYS } from "@/middlelayers/consts";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { ASSISTANT_APP_ACTION_EVENT, validateActionArgs } from "@/middlelayers/ai/actions";
-import { setCurrentDateRange, readAssistantDateRange, clearAssistantDateRange } from "@/middlelayers/ui-state/page-prefs";
+import { setCurrentDateRange, clearCurrentDateRange, readAssistantDateRange, clearAssistantDateRange } from "@/middlelayers/ui-state/page-prefs";
 import { useTranslation } from "@/mobile/i18n";
 import { DataChangedContext } from "@/contexts/data-changed";
 import { processAlerts } from "@/middlelayers/alerts";
@@ -73,7 +73,7 @@ import { ANALYTICS_DESTINATIONS_EVENT, MobileNavigation, MobileSidebar, routeTit
 import { MobileIcon, type MobileIconName } from "@/mobile/components/mobile/icons";
 import { useAlertBadge } from "@/mobile/components/use-alert-badge";
 import { MobileHeaderTotal } from "@/mobile/components/mobile/header-total";
-import { ChevronLeftIcon } from "@radix-ui/react-icons";
+import { BellIcon, ChevronLeftIcon } from "@radix-ui/react-icons";
 
 const Setting = React.lazy(() => import("@/mobile/components/settings"));
 const HistoricalData = React.lazy(() => import("@/mobile/components/historical-data"));
@@ -130,6 +130,7 @@ function TopBar({
   refreshAction,
   onBack,
   overview,
+  unread,
 }: {
   mobile: boolean;
   isProUser: boolean;
@@ -147,13 +148,17 @@ function TopBar({
   refreshAction: React.MutableRefObject<(() => Promise<void>) | null>;
   onBack?: () => void;
   overview: boolean;
+  unread: number;
 }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const topBarSizeClass = useSizeClass();
+  const fidelityOverview = mobile && overview && topBarSizeClass.width === "compact";
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const [configuredSource, setConfiguredSource] = useState(false);
   useEffect(() => {
-    if (!mobile || !overview || availableDates.length > 0) return;
+    if (!mobile || topBarSizeClass.width === "compact" || !overview || availableDates.length > 0) return;
     let active = true;
     void getConfiguration().then((config) => {
       if (!active) return;
@@ -166,19 +171,20 @@ function TopBar({
       ));
     }).catch(() => { if (active) setConfiguredSource(false); });
     return () => { active = false; };
-  }, [mobile, overview, availableDates.length]);
-  const showActions = !mobile || (overview && (availableDates.length > 0 || configuredSource));
+  }, [mobile, topBarSizeClass.width, overview, availableDates.length]);
+  const showActions = !mobile || (overview && (availableDates.length > 0 ||
+    topBarSizeClass.width !== "compact" && configuredSource));
 
   return (
-    <div id="app-top-bar" className={`sticky top-0 z-10 glass-subtle border-b relative${mobile ? ` mobile-topbar ${onBack ? " mobile-topbar-back" : " mobile-topbar-root"}${compactTitle && !onBack ? " mobile-topbar-collapsed" : ""}` : ""}`}>
+    <div id="app-top-bar" className={`sticky top-0 z-10 glass-subtle border-b relative${mobile ? ` mobile-topbar ${onBack ? " mobile-topbar-back" : " mobile-topbar-root"}${compactTitle && !onBack ? " mobile-topbar-collapsed" : ""}${fidelityOverview ? " fidelity-overview-topbar" : ""}` : ""}`}>
       <div className="flex h-12 items-center px-4">
         {mobile && onBack && <button type="button" className="mobile-back mobile-header-back"
           onClick={onBack} aria-label={t("common.back", "Back")}>
           <ChevronLeftIcon aria-hidden="true" />{t("common.back", "Back")}
         </button>}
         {compactTitle && <span className={`mobile-compact-title${overview ? " mobile-overview-compact-title" : ""}`}>{compactTitle}</span>}
-        {(!mobile || compactTitle) && !(mobile && onBack && compactTitle) &&
-          <MobileHeaderTotal currency={currentCurrency} live={isProUser}
+        {(!mobile || compactTitle || fidelityOverview && availableDates.length > 0) && !(mobile && onBack && compactTitle) &&
+          <MobileHeaderTotal currency={currentCurrency} live={isProUser} fidelity={fidelityOverview}
             range={overview && dateRange?.from && dateRange.to ? { start: dateRange.from, end: dateRange.to } : undefined} />}
         {isProUser && !mobile && (
           <div className="mr-4">
@@ -190,6 +196,10 @@ function TopBar({
         )}
         <div className="ml-auto flex items-center space-x-3">
           <SyncStatusIndicator />
+          {fidelityOverview && availableDates.length > 0 && <button type="button" className="fd-header-alerts"
+            aria-label={unread > 0 ? `${t("nav.goals")} ${t("goals.unread").replace("{count}", String(unread))}` : t("nav.goals")}
+            onClick={() => navigate("/goals")}><BellIcon aria-hidden="true" />
+            {unread > 0 && <span aria-hidden="true">{unread > 99 ? "99+" : unread}</span>}</button>}
           {(!mobile || (overview && availableDates.length > 0)) && <DatePicker
             availableDates={availableDates}
             value={dateRange}
@@ -269,6 +279,7 @@ type LayoutProps = {
   lastRefreshAt?: string;
   onRefreshSuccess: () => void;
   onLocalRefresh: () => Promise<void>;
+  refreshAction: React.MutableRefObject<(() => Promise<void>) | null>;
   onRootTap: (tab: MobileTab) => void;
 };
 
@@ -285,6 +296,7 @@ function Layout({
   lastRefreshAt,
   onRefreshSuccess,
   onLocalRefresh,
+  refreshAction,
   onRootTap,
 }: LayoutProps) {
   const { t } = useTranslation();
@@ -331,7 +343,6 @@ function Layout({
   };
   const swipeStart = useRef<{ id: number; x: number; y: number } | null>(null);
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
-  const refreshAction = useRef<(() => Promise<void>) | null>(null);
   useLayoutEffect(() => {
     const previous = previousRoute.current;
     if (previous.tab === currentTab && previous.path === routePath) return;
@@ -386,7 +397,7 @@ function Layout({
   };
 
   return (
-    <div className="app-layout min-h-screen" data-width-class={sizeClass.width}
+    <div className="app-layout min-h-screen" data-width-class={sizeClass.width} data-route={location.pathname}
       data-height-class={sizeClass.height} data-sidebar-collapsed={sidebarCollapsed}
       data-header-collapsed={headerCollapsed}>
       <MobileSidebar unread={unread} collapsed={sidebarCollapsed} onCollapse={() => setSidebarCollapsed((value) => !value)}
@@ -405,6 +416,7 @@ function Layout({
           lastRefreshAt={lastRefreshAt}
           compactTitle={mobile && headerCollapsed ? routeTitle(location.pathname, t) : undefined}
           overview={location.pathname === "/overview"}
+          unread={unread}
           onBack={showBack ? () => { rememberScroll(); navigate(backPath); } : undefined}
           onRefreshSuccess={onRefreshSuccess}
           refreshAction={refreshAction}
@@ -439,7 +451,10 @@ function Layout({
             }
           }}
           onPointerCancel={() => { swipeStart.current = null; }}>
-          <PullToRefresh disabled={/^\/assistant(\/|$)/.test(location.pathname)} onRefresh={onLocalRefresh}>
+          <PullToRefresh disabled={/^\/assistant(\/|$)/.test(location.pathname)}
+            sourceProgress={location.pathname === "/overview"}
+            lastRefreshAt={lastRefreshAt}
+            onRefresh={onLocalRefresh}>
           {!/^\/(settings|goals|rebalance)(\/|$)/.test(location.pathname) && <div className="mobile-route-heading">
             <MobilePage title={routeTitle(location.pathname, t)} />
           </div>}
@@ -626,6 +641,7 @@ function AppRoutes({
 }: AppRoutesProps) {
   const location = useLocation();
   const [overviewExpanded, setOverviewExpanded] = useState(false);
+  const refreshAction = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (location.pathname !== "/history") {
@@ -654,6 +670,7 @@ function AppRoutes({
               syncRuntime.trigger("refresh");
             }}
             onLocalRefresh={onLocalRefresh}
+            refreshAction={refreshAction}
             onRootTap={(tab) => {
               if (tab === "overview") setOverviewExpanded(false);
             }}
@@ -666,7 +683,7 @@ function AppRoutes({
           path="overview"
           element={
             <AnimatedPage>
-              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+              <PageWrapper dateRange={tDateRange} hasData={hasData} fidelityFirstRun={!initializing}>
                 <Overview
                   currency={currentCurrency}
                   dateRange={tDateRange}
@@ -674,6 +691,8 @@ function AppRoutes({
                   allTimeRange={maxDateRange}
                   expanded={overviewExpanded}
                   onExpandedChange={setOverviewExpanded}
+                  onRangeChange={onDatePickerValueChange}
+                  onRefresh={() => refreshAction.current?.() ?? onLocalRefresh()}
                 />
               </PageWrapper>
             </AnimatedPage>
@@ -703,6 +722,8 @@ function AppRoutes({
                   currency={currentCurrency}
                   dateRange={tDateRange}
                   quoteColor={quoteColor}
+                  onRefresh={() => refreshAction.current?.() ?? onLocalRefresh()}
+                  onRangeChange={onDatePickerValueChange}
                 />
               </PageWrapper>
             </AnimatedPage>
@@ -1118,6 +1139,7 @@ const App = () => {
     nextDateRange: DateRange | undefined,
   ) {
     clearAssistantDateRange();
+    if (!nextDateRange?.from || !nextDateRange.to) clearCurrentDateRange();
     setDateRange((prev) => {
       const prevFrom = prev?.from?.getTime() ?? 0;
       const prevTo = prev?.to?.getTime() ?? 0;

@@ -7,8 +7,8 @@ import { useTranslation } from "@/mobile/i18n";
 import { useIsMobile } from "@/mobile/components/mobile";
 import type { TDateRange } from "@/middlelayers/types";
 
-export function MobileHeaderTotal({ currency, live, range }: {
-  currency: CurrencyRateDetail; live: boolean; range?: TDateRange;
+export function MobileHeaderTotal({ currency, live, range, fidelity = false }: {
+  currency: CurrencyRateDetail; live: boolean; range?: TDateRange; fidelity?: boolean;
 }) {
   const { t } = useTranslation();
   const mobile = useIsMobile();
@@ -22,11 +22,11 @@ export function MobileHeaderTotal({ currency, live, range }: {
     let failures = 0;
     const load = () => {
       if (document.visibilityState === "hidden") return;
-      const query = range
-        ? queryTotalValue(range).then((result) => result.totalValue)
+      const query = (range
+        ? Promise.resolve().then(() => queryTotalValue(range).then((result) => result.totalValue))
         : (live ? queryRealTimeAssetsValue() : queryLatestAssets())
           .catch(() => queryLatestAssets())
-          .then((assets) => assets.reduce((sum, asset) => sum + asset.value, 0));
+          .then((assets) => assets.reduce((sum, asset) => sum + asset.value, 0)));
       void query.then((value) => {
         if (active) {
           failures = 0;
@@ -52,9 +52,10 @@ export function MobileHeaderTotal({ currency, live, range }: {
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };
   }, [mobile, version, live, range?.start.getTime(), range?.end.getTime()]);
-  return <div className="mobile-header-total" aria-label={t("history.total")}>
-    <span className="mobile-header-total-label">{t("history.total")}</span>
+  return <div className="mobile-header-total" aria-label={t(fidelity ? "fidelity.overview.liveTotal" : "history.total")}>
+    <span className="mobile-header-total-label">{t(fidelity ? "fidelity.overview.liveTotal" : "history.total")}</span>
     <span className="mobile-header-total-value">{total === undefined ? "—" :
       `${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(total))}`}</span>
+    {fidelity && <span className="mobile-header-live-dot" aria-hidden="true" />}
   </div>;
 }

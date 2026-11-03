@@ -615,6 +615,11 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .coin-chart-modes button { min-height: 30px; border-radius: var(--radius-pill); padding: 4px 11px; color: hsl(var(--muted-foreground)); font-size: 12px; }
 .coin-chart-modes button[aria-pressed="true"] { background: hsl(var(--raised)); color: hsl(var(--foreground)); }
 .coin-chart-modes button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+@media (max-width: 699px) and (pointer: coarse) {
+  .coin-chart-modes button { min-height: 44px; }
+  .analyze-source-picker button { min-height: 44px; }
+  .data-export-configuration-label { min-height: 44px; }
+}
 @media (max-width: 1100px) {
   .analyze-summary-hero { grid-template-columns: minmax(0, 1fr); }
   .analyze-profit-summary .analyze-period-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

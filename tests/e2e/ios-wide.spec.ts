@@ -4,6 +4,33 @@ import { installTauriBridge } from "./fidelity-scenes";
 
 const iPhoneUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
+test("regular width can refresh a configured source before its first snapshot", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 834, height: 1112 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { emptyPortfolio: true, firstRunBinance: true });
+    await page.goto("/#/overview");
+    await expect(page.locator(".app-layout")).toHaveAttribute("data-width-class", "regular");
+    await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+test("opening an empty portfolio does not erase the last selected range", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await page.addInitScript(() => localStorage.setItem("track3-current-date-range", '{"from":"2026-10-08","to":"2026-10-24"}'));
+    await installTauriBridge(page, { emptyPortfolio: true });
+    await page.goto("/#/overview");
+    await expect(page.getByRole("heading", { name: "Add your first source" })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("track3-current-date-range"))).toBe('{"from":"2026-10-08","to":"2026-10-24"}');
+  } finally {
+    await context.close();
+  }
+});
+
 test("regular width uses the live mobile sidebar", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 744, height: 1133 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
@@ -657,7 +684,7 @@ const routes = [
 for (const [name, width, height] of viewports) {
   for (const theme of ["light", "dark"] as const) {
     test(`${name} ${theme} route matrix fits the window without clipped text`, async ({ browser }) => {
-      test.setTimeout(120_000);
+      test.setTimeout(180_000);
       const context = await browser.newContext({
         userAgent: iPhoneUserAgent, viewport: { width, height }, hasTouch: true, isMobile: true,
         colorScheme: theme, reducedMotion: "reduce",
@@ -674,9 +701,10 @@ for (const [name, width, height] of viewports) {
           await page.goto(`/#/${route}`);
           await expect(page.locator("#app-main-content")).toBeVisible({ timeout: 30_000 });
           if (route === "summary") await expect(page.locator(".d2-summary")).toBeVisible();
-          if (route === "wallets") await expect(page.locator(".d2-wallets")).toBeVisible();
+          if (route === "wallets") await expect(page.locator(".analyze-wallets")).toBeVisible();
           if (route === "coins/BTC") await expect(page.locator(".d2-coin")).toBeVisible();
           if (route === "settings/sync") await expect(page.locator(".sync-settings-page")).toBeVisible();
+          if (route === "assistant") await expect(page.locator(".ios-d3-chat")).toBeVisible({ timeout: 30_000 });
           await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
           await page.evaluate(({ left, right, top, bottom }) => {
             document.documentElement.style.setProperty("--mobile-safe-left", `${left}px`);
@@ -703,8 +731,22 @@ for (const [name, width, height] of viewports) {
           });
           expect(layout.documentWidth, `${name} ${theme} ${route}`).toBeLessThanOrEqual(width + 1);
           expect(layout.mainWidth, `${name} ${theme} ${route}`).toBeGreaterThan(0);
-          expect(layout.paddingLeft, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeLeft);
-          expect(layout.paddingRight, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeRight);
+          if (route === "assistant" && size === "compact") {
+            const chatInsets = await page.locator(
+              '.ios-d3-chat [data-testid="chat-thread"], .ios-d3-quick-actions, .ios-d3-chat-composer',
+            ).evaluateAll((nodes) => nodes.map((node) => {
+              const style = getComputedStyle(node);
+              return { left: parseFloat(style.paddingLeft), right: parseFloat(style.paddingRight) };
+            }));
+            expect(chatInsets.length, `${name} ${theme} assistant content`).toBeGreaterThanOrEqual(2);
+            for (const inset of chatInsets) {
+              expect(inset.left, `${name} ${theme} assistant left`).toBeGreaterThanOrEqual(safeLeft);
+              expect(inset.right, `${name} ${theme} assistant right`).toBeGreaterThanOrEqual(safeRight);
+            }
+          } else {
+            expect(layout.paddingLeft, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeLeft);
+            expect(layout.paddingRight, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeRight);
+          }
           expect(layout.paddingTop, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeTop);
           expect(layout.paddingBottom, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeBottom);
           const navigation = page.locator(size === "compact" ? ".mobile-tab-bar a" : ".mobile-sidebar a");

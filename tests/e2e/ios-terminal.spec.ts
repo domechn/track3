@@ -58,8 +58,8 @@ test("phone and iPad keep the Overview inset, flat History, and bordered analysi
   for (const width of [390, 834]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/#/overview");
-    const hero = page.locator(".mobile-hero-card");
-    const label = hero.locator(".mobile-hero-header h3");
+    const hero = page.locator(width === 390 ? ".fd-overview-hero" : ".mobile-hero-card");
+    const label = hero.locator(width === 390 ? "> .fd-overview-hero-head .fd-label" : ".mobile-hero-header h3");
     await expect(label).toBeVisible();
     const cardBox = await hero.boundingBox();
     const labelBox = await label.boundingBox();
@@ -90,7 +90,7 @@ test("phone loading skeleton animates until reduced motion is requested", async 
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { richPortfolio: true, slowOverview: true });
   await page.goto("/#/overview");
-  const skeleton = page.locator(".overview-skeleton .mobile-skeleton").first();
+  const skeleton = page.locator(".fd-overview-loading-page .fd-loading-skeleton").first();
   await expect(skeleton).toBeVisible();
   await expect(skeleton).toHaveCSS("animation-name", "mobile-shimmer");
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -102,7 +102,7 @@ test("phone light gain text uses the readable positive token", async ({ page }) 
   await installTauriBridge(page, { richPortfolio: true });
   await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "light"));
   await page.goto("/#/wallets");
-  const gain = page.locator(".wallet-change-mobile-list .text-emerald-500").first();
+  const gain = page.locator(".fd-wallet-matrix-row strong[data-tone='gain']").first();
   await expect(gain).toBeVisible();
   await expect(gain).toHaveCSS("color", "rgb(31, 122, 89)");
 });
