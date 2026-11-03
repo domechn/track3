@@ -27,10 +27,14 @@ import { AnimatedPage } from "../motion";
 import PageLoadingOverlay from "../page-loading-overlay";
 import AutoBackupIndicator from "../auto-backup-indicator";
 import SyncStatusIndicator from "../sync-status-indicator";
+import DesktopOverviewSkeleton from "../desktop-overview-skeleton";
+import DesktopErrorBoundary from "../desktop-error-boundary";
 import { SummaryLoadingContext } from "../summary-loading-context";
 import { SummaryFidelityRangeContext } from "../summary-fidelity-range-context";
 import "./index.css";
 import { Route, Routes, HashRouter, Outlet, Navigate, useLocation, Link } from "react-router-dom";
+import { BellIcon } from "@radix-ui/react-icons";
+import { useAlertBadge } from "../use-alert-badge";
 
 import { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -112,6 +116,7 @@ export const RefreshButtonLoadingContext = React.createContext<{
 function TopBar({
   isProUser,
   railFidelityPage,
+  pageOwnsSync,
   quoteColor,
   currentCurrency,
   availableDates,
@@ -125,6 +130,7 @@ function TopBar({
 }: {
   isProUser: boolean;
   railFidelityPage: boolean;
+  pageOwnsSync: boolean;
   quoteColor: QuoteColor;
   currentCurrency: CurrencyRateDetail;
   availableDates: Date[];
@@ -140,7 +146,9 @@ function TopBar({
   recordsToolsOpen: boolean;
 }) {
   const { t } = useTranslation();
+  const unreadAlerts = useAlertBadge();
   const { pathname } = useLocation();
+  const isOverview = pathname === "/overview";
   const recordsPage = pathname === "/history" || pathname === "/cost-basis";
   const { range: fidelityRange, setRange: setSummaryRange } = React.useContext(SummaryFidelityRangeContext);
   const [selectedFidelityRange, setSelectedFidelityRange] = useState("All");
@@ -150,7 +158,15 @@ function TopBar({
   const fidelityDateRange = fidelityRange
     ? { from: fidelityRange.start, to: fidelityRange.end }
     : { from: availableDates[0], to: availableDates.at(-1) };
-  const liveTotal = isProUser && <RealTimeTotalValue quoteColor={quoteColor} currency={currentCurrency} />;
+  const liveTotal = isProUser && <RealTimeTotalValue quoteColor={quoteColor} currency={currentCurrency} recordsLabel={recordsPage} />;
+  const overviewPresets = [
+    { label: "1D", days: 1 }, { label: "7D", days: 7 }, { label: "30D", days: 30 },
+    { label: "90D", days: 90 }, { label: "1Y", days: 365 }, { label: "All", days: -1 },
+  ] as const;
+  const rangeSpan = dateRange?.from && dateRange.to
+    ? Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / 86400000) : -1;
+  const activeOverviewPreset = overviewPresets.find((preset) => preset.days === rangeSpan)?.label ??
+    (selectedSnapshots === availableDates.length ? "All" : "");
 
   return (
     <div className={recordsPage ? "t3-records-toolbar" : railFidelityPage ? "t3-fidelity-rail-refresh-container" : fidelityPage ? `t3-fidelity-topbar t3-fidelity-topbar-${fidelityPage}` : "sticky top-0 z-10 glass-subtle border-b relative"}
@@ -158,7 +174,7 @@ function TopBar({
       <div id={recordsPage ? "t3-records-toolbar-panel" : undefined}
         className={recordsPage ? "t3-records-toolbar-panel flex h-12 items-center px-4" : railFidelityPage ? "t3-fidelity-rail-refresh-inner" : "flex h-12 items-center px-4"}>
         {!fidelityPage && liveTotal && <div className={railFidelityPage ? "t3-fidelity-rail-live" : "mr-4"}>{liveTotal}</div>}
-        <div className={fidelityPage ? "t3-fidelity-topbar-controls ml-auto flex items-center" : "ml-auto flex items-center space-x-3"}>
+        <div className={fidelityPage ? "t3-fidelity-topbar-controls ml-auto flex items-center" : "t3-topbar-controls ml-auto flex items-center gap-3"}>
           {fidelityPage && liveTotal && <div className="t3-fidelity-live-control">{liveTotal}</div>}
           {fidelityPage === "summary" && <div className="t3-fidelity-ranges" role="group" aria-label={t("datePicker.predefined")}>
             {(["1D", "7D", "30D", "90D", "1Y", "All"] as const).map((label) => {
@@ -189,11 +205,26 @@ function TopBar({
               </button>;
             })}
           </div>}
-          {!railFidelityPage && !recordsPage && <SyncStatusIndicator />}
+          {!railFidelityPage && !recordsPage && !pageOwnsSync && <SyncStatusIndicator overviewFidelity={isOverview} />}
+          {!railFidelityPage && !fidelityPage && !recordsPage && <Link to="/goals" aria-label={t("overview.fidelity.alerts")} className="t3-topbar-bell">
+            <BellIcon aria-hidden="true" />
+            {unreadAlerts > 0 && <span aria-hidden="true">{unreadAlerts > 99 ? "99+" : unreadAlerts}</span>}
+          </Link>}
+          {isOverview && availableDates.length > 0 && <div className="t3-fidelity-ranges" role="group" aria-label={t("overview.fidelity.period")}>
+            {overviewPresets.map(({ label, days }) => <button key={label} type="button"
+              aria-pressed={activeOverviewPreset === label}
+              onClick={() => {
+                const latest = availableDates.at(-1);
+                const selected = days < 0 || !latest ? availableDates
+                  : availableDates.filter((date) => date.getTime() >= latest.getTime() - days * 86400000);
+                onDatePickerValueChange(selected.length, { from: selected[0], to: selected.at(-1) });
+              }}>{label}</button>)}
+          </div>}
           {fidelityPage && (fidelityBusy || lastRefreshAt) && <span className="t3-fidelity-stamp"><i className={fidelityBusy ? "off" : ""} />{fidelityBusy ? t("summary.fidelity.loadingLabel") : `${t("summary.fidelity.updated")} ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(lastRefreshAt ?? 0))}`}</span>}
           {!railFidelityPage && !recordsPage && <div className={fidelityPage ? "t3-fidelity-date-control" : undefined}><DatePicker
             availableDates={availableDates}
             value={fidelityPage ? fidelityDateRange : dateRange}
+            currency={currentCurrency}
             onDateChange={(count, next) => {
               if (fidelityPage) {
                 const all = next?.from?.getTime() === availableDates[0]?.getTime() && next?.to?.getTime() === availableDates.at(-1)?.getTime();
@@ -202,6 +233,7 @@ function TopBar({
               }
               onDatePickerValueChange(count, next);
             }}
+            overviewFidelity={isOverview}
           /></div>}
           <fieldset disabled={fidelityBusy} className={`t3-fidelity-refresh-control${fidelityBusy ? " t3-fidelity-refresh-disabled" : ""}`}><TooltipProvider>
             <Tooltip>
@@ -218,6 +250,7 @@ function TopBar({
                     <RefreshData
                       loading={refreshButtonLoading}
                       fidelity={!!fidelityPage}
+                      overviewFlow={isOverview}
                       afterRefresh={(success) => {
                         if (success) {
                           onRefreshSuccess();
@@ -263,6 +296,7 @@ function RouteLoadingFallback({ hidden }: { hidden: boolean }) {
 }
 
 type LayoutProps = {
+  hasData: boolean;
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
   initializing: boolean;
@@ -280,6 +314,7 @@ type LayoutProps = {
 };
 
 function Layout({
+  hasData,
   sidebarCollapsed,
   onSidebarToggle,
   initializing,
@@ -295,14 +330,16 @@ function Layout({
   const { t } = useTranslation();
   const darkTheme = useDarkTheme();
   const location = useLocation();
-  const [wideViewport, setWideViewport] = useState(() => window.innerWidth >= 1500);
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  const wideViewport = viewportWidth >= 1500;
   useEffect(() => {
-    const onResize = () => setWideViewport(window.innerWidth >= 1500);
+    const onResize = () => setViewportWidth(window.innerWidth);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
   const railFidelityPage = wideViewport && darkTheme && (location.pathname === "/rebalance" || location.pathname === "/goals" || location.pathname === "/goals/kinds");
   const recordsPage = location.pathname === "/history" || location.pathname === "/cost-basis";
+  const pageOwnsSync = viewportWidth >= 1400 && (location.pathname === "/comparison" || location.pathname === "/wallets");
   const sidebarWidth = sidebarCollapsed ? 56 : 216;
   const fidelityPage = location.pathname === "/summary" ? "summary" : location.pathname.startsWith("/coins/") ? "coin" : undefined;
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -320,7 +357,10 @@ function Layout({
   }, []);
 
   return (
-    <div className={fidelityPage ? `min-h-screen t3-fidelity-shell t3-fidelity-${fidelityPage}-shell` : "min-h-screen"}>
+    <div className={["min-h-screen", fidelityPage && `t3-fidelity-shell t3-fidelity-${fidelityPage}-shell`,
+      location.pathname === "/comparison" && "t3-route-comparison", location.pathname === "/wallets" && "t3-route-wallets",
+      location.pathname === "/overview" && !hasData && "t3-route-first-run",
+      location.pathname === "/overview" && initializing && "t3-route-overview-loading"].filter(Boolean).join(" ")}>
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={onSidebarToggle}
@@ -338,6 +378,7 @@ function Layout({
         <TopBar
           isProUser={isProUser}
           railFidelityPage={railFidelityPage}
+          pageOwnsSync={pageOwnsSync}
           quoteColor={quoteColor}
           currentCurrency={currentCurrency}
           availableDates={availableDates}
@@ -353,6 +394,7 @@ function Layout({
         {/* Main content */}
         <main id="app-main-content" tabIndex={-1} className="mx-auto w-full max-w-[1560px] px-7 py-5">
           <div className="relative min-h-[400px]" aria-busy={initializing}>
+            <div className="t3-desktop-loading-legacy">
             <React.Suspense
               fallback={<RouteLoadingFallback hidden={initializing} />}
             >
@@ -364,6 +406,8 @@ function Layout({
                 description={t("loading.portfolioDesc")}
               />
             )}
+            </div>
+            {location.pathname === "/overview" && initializing && viewportWidth >= 1400 && <DesktopOverviewSkeleton />}
           </div>
         </main>
         </SummaryLoadingContext.Provider>
@@ -421,6 +465,7 @@ function AppRoutes({
         path="/"
         element={
           <Layout
+            hasData={hasData}
             sidebarCollapsed={sidebarCollapsed}
             onSidebarToggle={onSidebarToggle}
             initializing={initializing}
@@ -443,7 +488,7 @@ function AppRoutes({
           path="overview"
           element={
             <AnimatedPage>
-              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+              <PageWrapper dateRange={tDateRange} hasData={hasData} firstRunOverview>
                 <Overview
                   currency={currentCurrency}
                   dateRange={tDateRange}
@@ -477,6 +522,8 @@ function AppRoutes({
                   currency={currentCurrency}
                   dateRange={tDateRange}
                   quoteColor={quoteColor}
+                  availableDates={availableDates}
+                  onDatePickerValueChange={onDatePickerValueChange}
                 />
               </PageWrapper>
             </AnimatedPage>
@@ -958,7 +1005,7 @@ const App = () => {
       <DataChangedContext.Provider value={dataChangedVersion}>
         <HashRouter>
           <FirstRunOnboarding variant="desktop" ready={!initializing} />
-          <AppRoutes
+          <DesktopErrorBoundary><AppRoutes
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={handleSidebarToggle}
           initializing={initializing}
@@ -976,7 +1023,7 @@ const App = () => {
           lastRefreshAt={lastRefreshAt}
           onDataChanged={onDataChanged}
           handleConfigurationSave={handleConfigurationSave}
-        />
+        /></DesktopErrorBoundary>
         </HashRouter>
       </DataChangedContext.Provider>
     </div>

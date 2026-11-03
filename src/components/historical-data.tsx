@@ -434,7 +434,14 @@ const App = ({
             afterDataChanged("undoDeletion", uuid, undefined);
           }
         },
-        successMessage: t("history.deleted"),
+        successTitle: t("history.fidelity.snapshotDeleted"),
+        successMessage: t("history.fidelity.snapshotRemoved").replace("{date}", (() => {
+          const date = new Date(removed.createdAt);
+          const tag = locale === "zh" ? "zh-CN" : "en-GB";
+          return `${date.toLocaleDateString(tag, { day: "numeric", month: "short" })} ${date.toLocaleTimeString(tag, {
+            hour: "2-digit", minute: "2-digit", hour12: false,
+          })}`;
+        })()),
         undoLabel: t("common.undo"),
         undoAltText: t("history.undoDelete"),
         undoWindowMs: 5000,

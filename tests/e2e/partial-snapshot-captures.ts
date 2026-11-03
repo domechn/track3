@@ -23,7 +23,29 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   const phoneLayout = shell === "ios" && width <= 430;
 
   await page.goto("/#/overview");
-  if (phoneLayout) {
+  if (shell === "desktop") {
+    await expect(page.locator(".t3-hero-value").getByText("Partial", { exact: true })).toBeVisible({ timeout: 30_000 });
+    const label = await page.locator(".t3-hero-header .text-sm").boundingBox();
+    const amount = await page.locator(".t3-hero-value").boundingBox();
+    expect(label && amount && label.y + label.height + 4 <= amount.y).toBe(true);
+    await expect(page.getByText("Insights", { exact: true })).toBeVisible();
+    await expect(page.getByText("Daily change", { exact: true })).toBeVisible();
+    await expect(page.getByText("Top coins", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Show More" })).toBeVisible();
+    await capture("overview");
+    await page.getByRole("combobox", { name: "Total value view" }).click();
+    await page.getByRole("option", { name: "Total value, excluding BTC" }).click();
+    await expect(page.locator(".t3-hero-value")).not.toContainText("$75,048.19");
+    await capture("overview-excluding");
+    await page.getByRole("combobox", { name: "Total value view" }).click();
+    await page.getByRole("option", { name: "Including last known values" }).click();
+    await page.getByRole("button", { name: "Source status" }).click();
+    const initialStatus = page.getByRole("alertdialog", { name: "Refresh finished" });
+    await expect(initialStatus).toBeVisible();
+    await capture("refresh");
+    await page.keyboard.press("Escape");
+    await expect(initialStatus).toHaveCount(0);
+  } else if (phoneLayout) {
     await expect(page.locator(".fd-partial-pill")).toHaveText("Partial", { timeout: 30_000 });
     await expect(page.locator(".fd-partial-chart")).toBeVisible();
     await capture("overview");
@@ -77,7 +99,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
 
   await page.goto("/#/overview");
   await (phoneLayout ? page.locator(".fd-partial-refresh") : page.getByRole("button", { name: "Refresh", exact: true })).click();
-  const status = page.getByRole("alertdialog", { name: "Source status" });
+  const status = page.getByRole("alertdialog", { name: shell === "desktop" ? "Refresh finished" : "Source status" });
   await expect(status.getByRole("button", { name: "Use last known values" })).toBeVisible();
   if (phoneLayout) {
     await expect(page.locator(".fd-partial-total")).not.toHaveText("$75,048.19");
@@ -87,9 +109,20 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
     await expect(page.locator(".t3-hero-value")).not.toContainText("$75,048.19");
     await expect(page.locator(".t3-hero-value")).toContainText("Partial");
   }
-  if (shell === "desktop") await expect(page.locator(".desktop-toast-viewport > li[data-state='open']")).toBeHidden({ timeout: 15_000 });
+  if (shell === "desktop") await expect(page.locator(".desktop-toast-viewport > li[data-state='open']")).toHaveCount(0, { timeout: 15_000 });
   await capture("refresh-offer");
   await status.getByRole("button", { name: "Use last known values" }).click();
-  await page.getByRole("button", { name: "Source status" }).click();
-  await expect(status.getByRole("button", { name: "Use last known values" })).toHaveCount(0);
+  if (shell === "desktop") await expect(status).toHaveCount(0);
+  else if (!phoneLayout) {
+    await expect(status).toHaveCount(0);
+    await page.getByRole("button", { name: "Source status" }).click();
+    await expect(status.getByRole("button", { name: "Use last known values" })).toHaveCount(0);
+    await status.getByRole("button", { name: "Close" }).click();
+  }
+  if (!phoneLayout) {
+    await expect(page.locator(".t3-hero-value")).toContainText("$142,648.20");
+    await page.getByRole("combobox", { name: "Total value view" }).click();
+    await page.getByRole("option", { name: "Total value, excluding BTC" }).click();
+    await expect(page.locator(".t3-hero-value")).toContainText("$127,528.20");
+  }
 }

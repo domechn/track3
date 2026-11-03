@@ -82,8 +82,8 @@ test("portfolio, refresh, history undo, and assistant SSE work in a browser", as
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await expect(page.getByText("$42,000.00").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Refresh" }).click();
-  await expect(page.getByText("Refresh successfully!", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(page.locator(".desktop-toast-viewport")).toContainText("1 of 1 sources refreshed at");
   expect(bridge.persistedRefreshes()).toBe(1);
   await expect(page.getByText("$84,000.00").first()).toBeVisible();
 

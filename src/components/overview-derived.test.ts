@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveOverviewSeries, deriveContributions, selectContributionSnapshots, unavailableSources } from "./overview-derived";
+import { deriveOverviewSeries, deriveContributions, selectBestDayContributionSnapshots, selectContributionSnapshots, unavailableSources } from "./overview-derived";
 
 describe("overview render data", () => {
   it("uses the newest seven snapshots even though the database returns dates descending", () => {
@@ -70,6 +70,19 @@ describe("overview render data", () => {
       { symbol: "SOL", assetType: "crypto", value: -25 },
       { symbol: "BTC", assetType: "crypto", value: 15 },
     ]);
+  });
+
+  it("selects the best day's closing snapshot and the preceding close for attribution", () => {
+    const dates = [
+      { id: "late", createdAt: "2026-10-29T21:00:00Z" },
+      { id: "early", createdAt: "2026-10-29T08:00:00Z" },
+      { id: "prior", createdAt: "2026-10-28T21:00:00Z" },
+      { id: "before-range", createdAt: "2026-10-27T21:00:00Z" },
+    ];
+    expect(selectBestDayContributionSnapshots(dates, Date.parse("2026-10-29T21:00:00Z"), new Date("2026-10-28")))
+      .toEqual({ fromId: "prior", toId: "late" });
+    expect(selectBestDayContributionSnapshots(dates, Date.parse("2026-10-28T21:00:00Z"), new Date("2026-10-28")))
+      .toBeUndefined();
   });
 
   it("shows only failed or stale local source statuses with the last good time", () => {

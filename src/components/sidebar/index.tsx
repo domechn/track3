@@ -37,14 +37,14 @@ const recordsIcons: Record<string, ReactNode> = {
 
 function NavItem({ item, collapsed, unread, fidelity }: { item: NavEntry; collapsed: boolean; unread?: number; fidelity?: boolean }) {
   const { t } = useTranslation();
-  const label = t(item.labelKey);
+  const label = item.to === "/goals" ? t("overview.fidelity.alerts") : t(item.labelKey);
   const resolved = useResolvedPath(item.to);
   const match = useMatch({ path: resolved.pathname, end: false });
   const { pathname } = useLocation();
   const current = !!match || (fidelity && item.to === "/overview" && pathname.startsWith("/coins/"));
   const unreadText = unread ? t("goals.unread").replace("{count}", String(unread)) : "";
   const link = <Link to={item.to}
-    aria-label={collapsed ? `${label}${unreadText ? ` ${unreadText}` : ""}` : undefined}
+    aria-label={unreadText ? `${label} ${unreadText}` : collapsed ? label : undefined}
     aria-current={current ? "page" : undefined}
     className={cn(
       "group relative flex h-9 touch:min-h-11 items-center gap-3 rounded-md px-[9px] text-[13px] font-medium whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -84,6 +84,13 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
   const { pathname } = useLocation();
   const records = pathname === "/history" || pathname === "/cost-basis";
   return <aside style={{ width: collapsed ? "var(--sidebar-collapsed-width)" : "var(--sidebar-width)" }}
+    aria-keyshortcuts="Alt+ArrowRight Alt+ArrowLeft"
+    onKeyDown={(event) => {
+      if (event.altKey && ((event.key === "ArrowRight" && collapsed) || (event.key === "ArrowLeft" && !collapsed))) {
+        event.preventDefault();
+        onToggle();
+      }
+    }}
     className={cn("fixed inset-y-0 left-0 z-20 flex flex-col overflow-hidden border-r bg-background transition-[width] duration-300 ease-in-out",
       !fidelity && "fidelity-records-rail", !fidelity && collapsed && "fidelity-records-rail-collapsed", fidelity && "t3-fidelity-sidebar")}>
     <div className="flex h-14 shrink-0 items-center gap-2 px-[10px]">

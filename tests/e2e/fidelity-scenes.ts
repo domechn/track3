@@ -986,9 +986,86 @@ const sample = {
   }
 } as Sample;
 
-export async function installTauriBridge(page: Page, options: BaseOptions & { fidelitySample?: SampleMode; slowBackup?: boolean; fidelitySlowSummary?: boolean; fidelitySlowCoin?: boolean; slowRefreshPersist?: boolean; firstRunBinance?: boolean; keyRecoveryNeeded?: boolean } = {}) {
-  const { fidelitySample, slowBackup = false, fidelitySlowSummary = false, fidelitySlowCoin = false, slowRefreshPersist = false, firstRunBinance = false, keyRecoveryNeeded = false, ...baseOptions } = options;
+export async function seedDesktopSourceStatuses(page: Page) {
+  await page.addInitScript((sources) => localStorage.setItem("track3-refresh-source-statuses", JSON.stringify(
+    sources.map((source, index) => ({
+      sourceId: `sample:${source.id}`,
+      label: source.name,
+      kind: source.kind.toLowerCase(),
+      provider: source.id,
+      status: "ok",
+      startedAt: [
+        "2026-10-31T09:40:56.900Z", "2026-10-31T09:40:53.200Z",
+        "2026-10-31T09:39:55.800Z", "2026-10-31T09:39:55.000Z",
+        "2026-10-31T09:40:56.500Z",
+      ][index],
+      finishedAt: index === 2 || index === 3
+        ? "2026-10-31T09:40:00.000Z" : "2026-10-31T09:41:00.000Z",
+      lastSuccessAt: `2026-10-31T09:41:00.000Z`,
+    })),
+  )), sample.sources);
+}
+
+export async function seedDesktopAiSummary(page: Page) {
+  await page.evaluate(async () => (window as any).__e2eInvoke("plugin:sql|execute", {
+    query: "INSERT OR REPLACE INTO configuration (id, data) VALUES (992, ?)",
+    values: [`!ent:e2e:${JSON.stringify({
+      snapshotUuid: "fidelity-day-30", dismissedIds: [],
+      insights: [{ id: "week:btc", severity: "info", messageKey: "insights.newAsset",
+        data: { symbol: "BTC", value: 205737.58 } }],
+      summary: "BTC drove the week — it added $12,286.29 of the $26,010.84 gain: 47% of it.\nStablecoins are 29.1% of the portfolio — USDT and USDC total $222,446.74.\nAAPL is the one position down — it is −3.8% over 7 days while the total is +3.5%.",
+      summaryLocale: "en", summarySnapshotUuid: "fidelity-day-30",
+    })}`],
+  }));
+}
+
+export async function installTauriBridge(page: Page, options: BaseOptions & { fidelitySample?: SampleMode; slowBackup?: boolean; fidelitySlowSummary?: boolean; fidelitySlowCoin?: boolean; slowRefreshPersist?: boolean; firstRunBinance?: boolean; keyRecoveryNeeded?: boolean; quotaUsageFixture?: "near" | "exhausted"; routeDemoR2ToFakeS3?: boolean } = {}) {
+  const { fidelitySample, slowBackup = false, fidelitySlowSummary = false, fidelitySlowCoin = false, slowRefreshPersist = false, firstRunBinance = false, keyRecoveryNeeded = false, quotaUsageFixture, routeDemoR2ToFakeS3 = false, ...baseOptions } = options;
   const result = await installBaseBridge(page, baseOptions);
+  if (routeDemoR2ToFakeS3) await page.addInitScript(() => {
+    const original = (window as any).__e2eInvoke;
+    (window as any).__e2eInvoke = (cmd: string, args: any, ...rest: any[]) => {
+      if (cmd === "plugin:http|fetch" && args.clientConfig?.url) {
+        const url = new URL(args.clientConfig.url);
+        if (url.hostname === "demo.r2.cloudflarestorage.com") {
+          url.hostname = "s3.example.test";
+          args = { ...args, clientConfig: { ...args.clientConfig, url: url.href } };
+        }
+      }
+      return original(cmd, args, ...rest);
+    };
+  });
+  if (quotaUsageFixture) await page.addInitScript((quotaUsageFixture) => {
+    const original = (window as any).__e2eInvoke;
+    const usageRequests = new Set<number>();
+    const usageResponses = new Set<number>();
+    (window as any).__e2eInvoke = async (cmd: string, args: any, ...rest: any[]) => {
+      if (cmd === "plugin:http|fetch") {
+        const rid = await original(cmd, args, ...rest);
+        const request = args.clientConfig;
+        if (new URL(request.url).pathname === "/api/license" &&
+          JSON.parse(new TextDecoder().decode(Uint8Array.from(request.data ?? []))).action === "usage") {
+          usageRequests.add(rid);
+        }
+        return rid;
+      }
+      if (cmd === "plugin:http|fetch_send") {
+        const response = await original(cmd, args, ...rest);
+        if (usageRequests.has(args.rid)) usageResponses.add(response.rid);
+        return response;
+      }
+      if (cmd === "plugin:http|fetch_read_body" && usageResponses.has(args.rid)) {
+        const bytes = await original(cmd, args, ...rest);
+        if (bytes.at(-1) !== 0) return bytes;
+        const response = JSON.parse(new TextDecoder().decode(Uint8Array.from(bytes.slice(0, -1))));
+        response.usage.erc20 = { limit: 50, used: quotaUsageFixture === "near" ? 47 : 50,
+          remaining: quotaUsageFixture === "near" ? 3 : 0,
+          periodStart: "2026-10-03T00:00:00.000Z", periodEnd: "2026-11-01T00:00:00.000Z" };
+        return [...new TextEncoder().encode(JSON.stringify(response)), 0];
+      }
+      return original(cmd, args, ...rest);
+    };
+  }, quotaUsageFixture);
   if (firstRunBinance) await page.evaluate(async () => {
     await (window as any).__e2eInvoke("plugin:sql|execute", {
       query: "INSERT INTO configuration (id, data) VALUES (10, ?)",

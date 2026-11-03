@@ -56,8 +56,9 @@ const currency: CurrencyRateDetail = {
 describe("RealtimeTotalValue", () => {
   it("labels the on-demand live total control without implying a value has already loaded", () => {
     render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />);
-    expect(screen.getByRole("button", { name: "Show real-time portfolio value" })).toHaveTextContent("Live total");
-    expect(screen.getByRole("button", { name: "Show real-time portfolio value" })).not.toHaveTextContent("$");
+    expect(screen.getByRole("button", { name: "Live total" })).toHaveAttribute(
+      "aria-description", "Show real-time portfolio value");
+    expect(screen.getByRole("button", { name: "Live total" })).not.toHaveTextContent("$");
   });
   it("initializes the vertical carousel with a compatible autoplay plugin", () => {
     render(

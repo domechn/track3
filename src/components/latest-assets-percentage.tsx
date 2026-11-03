@@ -23,10 +23,13 @@ import bluebird from "bluebird";
 import { Link } from "react-router-dom";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import {
+  queryAllDataDates,
+  queryAssetsByUUIDs,
   queryLatestAssetsPercentage,
   resizeChart,
   resizeChartWithDelay,
 } from "@/middlelayers/charts";
+import { displayWeekPercent, holdingsWeekPriceChanges } from "./overview-holdings";
 import { ChartResizeContext } from "@/App";
 import { offsetHoveredItemWrapper } from "@/utils/legend";
 import { ChartJSOrUndefined } from "react-chartjs-2/dist/types";
@@ -60,6 +63,7 @@ const App = ({
   const [dataPage, setDataPage] = useState<number>(0);
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
     useState<LatestAssetsPercentageData>([]);
+  const [weekChanges, setWeekChanges] = useState<Record<string, number>>({});
   const chartRef =
     useRef<ChartJSOrUndefined<"doughnut", number[], unknown>>(null);
   const pageSize = 5;
@@ -96,6 +100,29 @@ const App = ({
   }, [rangeKey, dataChangedVersion]);
 
   useEffect(() => resizeChart(chartName), [needResize]);
+
+  useEffect(() => {
+    if (!holdings) return;
+    let active = true;
+    void (async () => {
+      try {
+        const dates = (await queryAllDataDates())
+          .filter((row) => {
+            const time = new Date(row.createdAt).getTime();
+            return time >= dateRange.start.getTime() && time <= dateRange.end.getTime();
+          })
+          .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+        const latest = dates.at(-1);
+        const target = latest && new Date(latest.createdAt).getTime() - 7 * 24 * 60 * 60 * 1000;
+        const week = target === undefined ? undefined : dates.find((row) => Math.abs(new Date(row.createdAt).getTime() - target) < 12 * 60 * 60 * 1000);
+        const changes = week && latest
+          ? holdingsWeekPriceChanges(await queryAssetsByUUIDs([week.id, latest.id]), week.id, latest.id)
+          : {};
+        if (active) setWeekChanges(changes);
+      } catch { if (active) setWeekChanges({}); }
+    })();
+    return () => { active = false; };
+  }, [holdings, rangeKey, dataChangedVersion]);
 
   useEffect(() => {
     if (holdings) return;
@@ -347,14 +374,16 @@ const App = ({
         <h2>{t("overview.design.holdings")}</h2>
         <span>{t("overview.design.assetCount").replace("{count}", String(latestAssetsPercentageData.length))}</span>
       </header>
-      <div className="t3-holdings-head"><span>{t("overview.design.asset")}</span><span>{t("overview.design.amount")}</span><span>{t("overview.design.value")}</span></div>
+      <div className="t3-holdings-head"><span>{t("overview.design.asset")}</span><span>{t("overview.design.value")}</span><span>{t("overview.fidelity.sevenDays")}</span></div>
       <div className="t3-holdings-body">
         {latestAssetsPercentageData.map((asset) => <Link key={getAssetLogoKey({ symbol: asset.coin, assetType: asset.assetType })}
           to={buildAssetDetailsPath({ symbol: asset.coin, assetType: asset.assetType })}
           className="t3-holdings-row">
           <span><span className="sr-only">{t("common.openAssetDetails").replace("{asset}", formatAssetLabel({ symbol: asset.coin, assetType: asset.assetType }))} </span><strong>{asset.coin}</strong><small>{asset.percentage.toFixed(1)}%</small></span>
-          <span>{asset.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
           <span>{currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(asset.value))}</span>
+          <span className={weekChanges[`${asset.assetType}:${asset.coin}`] >= 0.05 ? "text-gain" : weekChanges[`${asset.assetType}:${asset.coin}`] <= -0.05 ? "text-loss" : "text-muted-foreground"}>
+            {displayWeekPercent(weekChanges[`${asset.assetType}:${asset.coin}`])}
+          </span>
         </Link>)}
       </div>
     </Card>

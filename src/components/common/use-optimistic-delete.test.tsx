@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "@/components/ui/use-toast";
 import { useOptimisticDelete } from "./use-optimistic-delete";
 
 function Fixture({ commit, restore, successDetail }: {
@@ -45,7 +46,12 @@ function ConcurrentFixture({ commit }: { commit: (item: string) => Promise<void>
   </>;
 }
 
-beforeEach(() => vi.useRealTimers());
+beforeEach(() => {
+  vi.useRealTimers();
+  const { result, unmount } = renderHook(() => useToast());
+  act(() => result.current.dismiss());
+  unmount();
+});
 
 describe("useOptimisticDelete", () => {
   it("shows a dated confirmation under the undo toast title", async () => {

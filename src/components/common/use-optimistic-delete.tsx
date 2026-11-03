@@ -14,6 +14,7 @@ type DeleteOptions<T, Result> = {
   onDeleted?: (result: Result) => void;
   onUndone?: () => void;
   successMessage: string;
+  successTitle?: string;
   successDetail?: string;
   undoLabel: string;
   undoAltText: string;
@@ -34,6 +35,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
     onDeleted,
     onUndone,
     successMessage,
+    successTitle,
     successDetail,
     undoLabel,
     undoAltText,
@@ -59,7 +61,7 @@ export function useOptimisticDelete<T>(setItems: Dispatch<SetStateAction<T>>) {
       onDeleted?.(result);
       toast({
         className: successDetail ? "fidelity-history-undo-toast" : undefined,
-        title: successDetail ? <span className="fidelity-undo-title"><CheckIcon aria-hidden="true" />{successMessage}</span> : undefined,
+        title: successTitle ?? (successDetail ? <span className="fidelity-undo-title"><CheckIcon aria-hidden="true" />{successMessage}</span> : undefined),
         description: successDetail ?? successMessage,
         duration: undoWindowMs,
         action: (

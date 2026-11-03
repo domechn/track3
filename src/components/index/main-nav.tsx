@@ -43,7 +43,7 @@ export function MainNav({
       <div role="group" aria-label={t("nav.manage")} className="flex flex-wrap items-center gap-4">
         <CustomLink to="/history">{t("nav.history")}</CustomLink>
         <CustomLink to="/rebalance">{t("nav.rebalance")}</CustomLink>
-        <CustomLink to="/goals">{t("nav.goals")}{unread > 0 && <><span aria-hidden="true" className="ml-1 rounded-full bg-negative px-1.5 text-xs text-background">{unread}</span>{" "}<span className="sr-only">{t("goals.unread").replace("{count}", String(unread))}</span></>}</CustomLink>
+        <CustomLink to="/goals">{t("overview.fidelity.alerts")}{unread > 0 && <><span aria-hidden="true" className="ml-1 rounded-full bg-negative px-1.5 text-xs text-background">{unread}</span>{" "}<span className="sr-only">{t("goals.unread").replace("{count}", String(unread))}</span></>}</CustomLink>
         <CustomLink to="/assistant">{t("nav.assistant")}</CustomLink>
       </div>
       <CustomLink to="/settings">{t("nav.settings")}</CustomLink>

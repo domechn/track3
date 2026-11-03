@@ -38,7 +38,7 @@ test("shared controls use Terminal geometry in both themes", async ({ page }) =>
     await page.reload();
     await expect(page.locator("html")).toHaveClass(new RegExp(theme));
     await expect(page.locator("[data-ui-card]").first()).toHaveCSS("border-radius", "6px");
-    await expect(page.getByRole("button", { name: "Refresh" })).toHaveCSS("border-radius", "999px");
+    await expect(page.getByRole("button", { name: "Refresh", exact: true })).toHaveCSS("border-radius", "999px");
     expect(await page.locator("body").evaluate((node) => getComputedStyle(node).fontFamily)).toContain("Public Sans");
   }
 });
@@ -53,13 +53,13 @@ test("desktop source status keeps long rows separate inside its scroll area afte
   )));
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
-  await page.getByRole("button", { name: "Refresh" }).click();
-  const dialog = page.getByRole("alertdialog", { name: "Source status" });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  const dialog = page.getByRole("alertdialog", { name: "Refresh finished" });
   await expect(dialog).toBeVisible();
-  const rows = dialog.locator("[data-source-status-row]");
+  const rows = dialog.locator(".t3-refresh-flow-row");
   await expect(rows).toHaveCount(5);
   const content = await rows.evaluateAll((nodes) => nodes.map((node) => {
-    const box = node.firstElementChild!.getBoundingClientRect();
+    const box = node.getBoundingClientRect();
     return { top: box.top, bottom: box.bottom };
   }));
   for (let index = 1; index < content.length; index++) {

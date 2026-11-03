@@ -7,10 +7,16 @@ import { getAccessibleMotionProps } from "@/components/motion"
 import { Button } from "@/components/ui/button"
 import { useHaptics } from "@/utils/use-haptics"
 import { Illustration } from "./illustrations"
+import guideArt1 from "./guide-art-1.svg?raw"
+import guideArt2 from "./guide-art-2.svg?raw"
+import guideArt3 from "./guide-art-3.svg?raw"
+import guideArt4 from "./guide-art-4.svg?raw"
+import guideArt5 from "./guide-art-5.svg?raw"
 import PhoneFidelityArt from "./phone-fidelity-art"
 import "./onboarding.css"
 
 const steps = ["welcome", "sources", "history", "deeper", "backup"] as const
+const guideArt = [guideArt1, guideArt2, guideArt3, guideArt4, guideArt5]
 const ease = [0.2, 0.8, 0.2, 1] as const
 type Variant = "desktop" | "ios"
 type CloseReason = "completed" | "skipped"
@@ -42,8 +48,16 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose, 
   const id = steps[step]
   const last = step === steps.length - 1
   const [fullScreenSheet, setFullScreenSheet] = useState(() => variant === "ios" && (window.innerWidth < 700 || window.innerHeight < 500))
+  const [fidelityDesktop, setFidelityDesktop] = useState(() => variant === "desktop" && window.innerWidth >= 1400)
   const phoneFidelity = variant === "ios" && fullScreenSheet && window.innerWidth >= 380 && window.innerHeight >= 700
   const count = t(phoneFidelity ? "fidelity.guide.stepCount" : "onboarding.stepCount").replace("{current}", String(step + 1)).replace("{total}", String(steps.length))
+
+  useEffect(() => {
+    if (variant !== "desktop") return
+    const update = () => setFidelityDesktop(window.innerWidth >= 1400)
+    window.addEventListener("resize", update)
+    return () => window.removeEventListener("resize", update)
+  }, [variant])
 
   useEffect(() => {
     if (variant !== "ios") return
@@ -114,6 +128,46 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose, 
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
+  if (fidelityDesktop) {
+    return <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) skip() }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="ob-fidelity-overlay" />
+        <Dialog.Content asChild onOpenAutoFocus={(event) => { event.preventDefault(); contentRef.current?.focus() }} onEscapeKeyDown={(event) => { event.preventDefault(); skip() }} onPointerDownOutside={(event) => event.preventDefault()} onInteractOutside={(event) => event.preventDefault()}>
+          <div ref={contentRef} tabIndex={-1} data-testid="onboarding-dialog" data-step={id} data-variant={variant} data-closing={closing} className="ob-fidelity-desktop" onKeyDown={(event) => {
+            if (event.key === "ArrowRight") { event.preventDefault(); go(1) }
+            if (event.key === "ArrowLeft") { event.preventDefault(); go(-1) }
+            if (event.key === "Enter" && event.target === event.currentTarget) {
+              event.preventDefault()
+              if (last) nextRef.current?.focus()
+              else go(1)
+            }
+          }}>
+            <header className="ob-fidelity-top">
+              <div className="ob-fidelity-brand"><svg viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#4a8ad6"/><path d="M8 20v-6M14 20V8M20 20v-4.5" stroke="#0d0d0e" strokeWidth="2.4" strokeLinecap="round"/></svg>Track3</div>
+              <span className="ob-fidelity-count">{step + 1} of {steps.length}</span>
+              <button type="button" data-testid="onboarding-skip" className="ob-fidelity-skip" onClick={skip}>{last ? t("onboarding.fidelity.close") : t("onboarding.skip")}</button>
+            </header>
+            <div className="ob-fidelity-mid">
+              <div className="ob-fidelity-grid">
+                <div className="ob-fidelity-body" role="region" aria-labelledby={titleId} tabIndex={0} data-testid={`onboarding-step-${id}`}>
+                  <div className="ob-fidelity-eyebrow">{t(`onboarding.fidelity.${id}.eyebrow`)}</div>
+                  <Dialog.Title id={titleId} className="ob-fidelity-title">{t(`onboarding.fidelity.${id}.title`)}</Dialog.Title>
+                  <Dialog.Description className="ob-fidelity-description">{t(`onboarding.fidelity.${id}.body`)}</Dialog.Description>
+                  <div className="ob-fidelity-dots" role="tablist" aria-label={count} data-testid="onboarding-progress">{steps.map((item, index) => <span key={item} className={index === step ? "active" : index < step ? "done" : ""} />)}</div>
+                  <div className="ob-fidelity-actions">
+                    <button type="button" data-testid="onboarding-back" disabled={step === 0} onClick={() => go(-1)}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m9.5 3-5 5 5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>{t("onboarding.back")}</button>
+                    <button type="button" ref={nextRef} data-testid={last ? "onboarding-cta-add-source" : "onboarding-next"} className="primary" onClick={last ? complete : () => go(1)}>{primary}{!last && <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6.5 3 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}</button>
+                  </div>
+                </div>
+                <div className="ob-fidelity-art"><div className="ob-fidelity-design-art" aria-hidden="true" dangerouslySetInnerHTML={{ __html: guideArt[step] }} /><span className="ob-fidelity-old-art"><Illustration id={id} variant={variant} reduced={reduced} /></span></div>
+              </div>
+            </div>
+            <div aria-live="polite" className="sr-only" data-testid="onboarding-live">{announcement}</div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  }
 
   return <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) skip() }}>
     <Dialog.Portal>

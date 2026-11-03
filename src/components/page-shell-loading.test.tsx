@@ -75,7 +75,7 @@ const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 
 beforeEach(() => {
   vi.useRealTimers();
-  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1400 });
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
   Object.keys(reportCounts).forEach((key) => {
     reportCounts[key as keyof typeof reportCounts] = 0;
   });

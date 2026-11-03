@@ -23,13 +23,15 @@ const App = ({
   dateRange,
   quoteColor,
   compact = false,
+  overviewFidelity = false,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
   compact?: boolean;
+  overviewFidelity?: boolean;
 }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { needResize } = useContext(ChartResizeContext);
   const { reportLoaded } = useContext(OverviewLoadingContext);
 
@@ -97,12 +99,16 @@ const App = ({
     return ts ? timeToDateStr(ts) : "";
   }
 
+  function comparisonDate(ts?: number) {
+    return ts ? new Date(ts).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short" }) : "";
+  }
+
   function getPNLTextColor(val?: number): string {
     return positiveNegativeTextClass(val ?? 0, quoteColor, 600);
   }
 
   return (
-    <div className={compact ? "t3-pnl-compact" : "h-full"}>
+    <div className={compact ? `t3-pnl-compact${overviewFidelity ? " t3-pnl-fidelity" : ""}` : "h-full"}>
       <Card className={compact ? "t3-pnl-compact-card" : "flex h-full flex-col"}>
         {!compact && <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -115,7 +121,7 @@ const App = ({
               className="flex min-h-[88px] flex-col items-center justify-center border-b border-border/50 pb-3 sm:min-h-0 sm:border-b-0 sm:border-r sm:pb-0"
               title={formatTimestampData(pnlTableData.todayPNL?.timestamp)}
             >
-              <div className="text-xs text-muted-foreground">{t("pnl.last")}</div>
+              <div className="text-xs text-muted-foreground">{t(overviewFidelity ? "overview.fidelity.latest" : "pnl.last")}</div>
               <div
                 className={`text-xl font-semibold font-mono tracking-tight tabular-nums ${getPNLTextColor(
                   pnlTableData.todayPNL?.value,
@@ -128,14 +134,14 @@ const App = ({
                   pnlTableData.todayPNL?.value,
                 )}`}
               >
-                {formatPNLValue(pnlTableData.todayPNL?.value)}
+                {formatPNLValue(pnlTableData.todayPNL?.value)}{overviewFidelity && comparisonDate(pnlTableData.todayPNL?.timestamp) && <span> {t("overview.fidelity.versus").replace("{date}", comparisonDate(pnlTableData.todayPNL?.timestamp))}</span>}
               </p>
             </div>
             <div
               className="flex min-h-[88px] flex-col items-center justify-center border-b border-border/50 pb-3 sm:min-h-0 sm:border-b-0 sm:border-r sm:pb-0"
               title={formatTimestampData(pnlTableData.sevenTPnl?.timestamp)}
             >
-              <div className="text-xs text-muted-foreground">{t("pnl.7T")}</div>
+              <div className="text-xs text-muted-foreground">{t(overviewFidelity ? "overview.fidelity.sevenDaysLong" : "pnl.7T")}</div>
               <div
                 className={`text-xl font-semibold font-mono tracking-tight tabular-nums ${getPNLTextColor(
                   pnlTableData.sevenTPnl?.value,
@@ -148,14 +154,14 @@ const App = ({
                   pnlTableData.sevenTPnl?.value,
                 )}`}
               >
-                {formatPNLValue(pnlTableData.sevenTPnl?.value)}
+                {formatPNLValue(pnlTableData.sevenTPnl?.value)}{overviewFidelity && comparisonDate(pnlTableData.sevenTPnl?.timestamp) && <span> {t("overview.fidelity.versus").replace("{date}", comparisonDate(pnlTableData.sevenTPnl?.timestamp))}</span>}
               </p>
             </div>
             <div
               className="flex min-h-[88px] flex-col items-center justify-center"
               title={formatTimestampData(pnlTableData.thirtyPNL?.timestamp)}
             >
-              <div className="text-xs text-muted-foreground">{t("pnl.30T")}</div>
+              <div className="text-xs text-muted-foreground">{t(overviewFidelity ? "overview.fidelity.thirtyDays" : "pnl.30T")}</div>
               <div
                 className={`text-xl font-semibold font-mono tracking-tight tabular-nums ${getPNLTextColor(
                   pnlTableData.thirtyPNL?.value,
@@ -168,7 +174,7 @@ const App = ({
                   pnlTableData.thirtyPNL?.value,
                 )}`}
               >
-                {formatPNLValue(pnlTableData.thirtyPNL?.value)}
+                {formatPNLValue(pnlTableData.thirtyPNL?.value)}{overviewFidelity && comparisonDate(pnlTableData.thirtyPNL?.timestamp) && <span> {t("overview.fidelity.versus").replace("{date}", comparisonDate(pnlTableData.thirtyPNL?.timestamp))}</span>}
               </p>
             </div>
           </div>

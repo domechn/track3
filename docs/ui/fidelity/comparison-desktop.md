@@ -1,0 +1,29 @@
+# Comparison desktop fidelity specification
+
+Approved images: `analyze/comparison-desktop.jpg` and `comparison-picker-desktop.jpg` (1600 px wide). Authoritative source: `source/ds/pages/analyze-comparison*.html`, `analyze-comparison.js`, `analyze-data.js`, `ds.css`, `ds.js`, and `ds/BRIEF.md`. Geometry and computed type below were measured in headless Chromium at 1600 px in dark mode.
+
+## Shell and grid
+
+The 56 px collapsed rail has Comparison active. Main area begins at x=56 with 28 px horizontal, 20 px top, and 40 px bottom padding. Heading `Comparison` is `(84,20)`, Public Sans 26 px/32 px weight 600; subtitle is `(84,54)`, 13 px/18 px regular, muted, and reads `What changed between two snapshots? +$34,641.48 (+4.75%) from 1 Oct to 31 Oct; BTC and ETH made 68% of it.` Right actions are green-dot `Synced 09:41` and a 34 px `Copy as text` pill. Grid starts at `(84,88)`, width 1488 px, with 16 px gaps and a 12-column split. Cards are `--surface #131217` with `--border #222224` 1 px, 6 px radius, 20 px padding. Titles are 15 px/20 px weight 600; body 13 px/18 px, labels 12 px, all values tabular. Blue `--accent #4a8ad6` marks selected snapshots and top movers; green `--positive #5fc39c` and red `--negative #ee6a82` mark signed changes.
+
+1. **Snapshots**, `(84,88)`, 1488 × 249 px. Header says `31 snapshots in October · compare any two`. The selector row has Snapshot A input `1 Oct 2026`, right detail `09:41 · $729,168`; a 36 px circular Swap button; Snapshot B `31 Oct 2026`, `09:41 · $763,809`; Quick range ending at B with `Yesterday`, `7 days`, selected `30 days`, `Start of month` pills. Below a divider, four KPI cells: Value at A · 1 Oct `$729,167.79`, `Snapshot 09:41`; Value at B · 31 Oct `$763,809.27`, `30 days later`; Change `+$34,641.48`, `absolute`; Change % `+4.75%`, `vs 1 Oct`.
+2. **Per asset**, `(84,353)`, 1488 × 584 px. Header note `1 Oct → 31 Oct, sorted by absolute change`. Full-width grouped table has Asset, Amount A/B, Price A/B, Value A/B, Change Absolute/Relative. Eight rows in absolute change order BTC, ETH, SOL, BNB, NVDA, AAPL, USDT, USDC. BTC and ETH have a blue edge, raised background, and `Top mover` chip. BTC is 3.2226 both dates, `$59,485.37` → `$63,842.11`, `$191,697.55` → `$205,737.58`, `+$14,040.03`, +7.32%; ETH is 59.8508, `$2,367.06` → `$2,527.14`, `+$9,580.92`; AAPL is −$231.00; stablecoins are −$18.24 and −$4.00. Total has values `$729,167.79` and `$763,809.27`, change `+$34,641.48` (+4.75%). A 1446 × 62 px blue info banner at y=854 reads `Amounts are the same on both dates` and `Nothing was bought, sold or moved, so the whole +$34,641.48 is price movement.`
+3. **Biggest movers by value**, `(84,953)`, 736 × 459 px. Eight diverging bar rows BTC `+$14,040`, ETH `+$9,581`, SOL `+$7,450`, BNB `+$2,618`, NVDA `+$1,206`, USDC `−$4`, USDT `−$18`, AAPL `−$231`; footer says BTC and ETH made 68% of the total change.
+4. **Biggest movers by percentage**, `(836,953)`, 736 × 459 px. Eight diverging bar rows SOL +12.09%, BTC +7.32%, ETH +6.76%, BNB +5.55%, NVDA +4.04%, USDT −0.01%, USDC −0.01%, AAPL −0.67%; right column also shows absolute change. Footer says SOL rose most in relative terms and stablecoins stayed within ±0.01%.
+
+## Snapshot A picker open
+
+The first selector has a blue focus ring. A 340 px wide popover is anchored 6 px below it at approximately `(105,220)` and overlays the KPI/table without moving them. It has a dark raised surface, border, 10 px radius, shadow, October 2026 header with previous/next circular icons, a seven-column Monday-first calendar, muted Sep 28–30 and Nov 1, blue dots on days with snapshots, selected day 1 in blue, comparison day 31 outlined. A key reads `Has a snapshot` and `Grey: none yet`. The bottom selected-snapshot row reads `1 Oct 2026, 09:41` and `$729,167.79`. Clicking a dated snapshot updates A; Swap exchanges A and B; quick-range pills compute A from B. The picker closes with Escape/outside click and is keyboard reachable.
+
+## Other states and constraints
+
+With fewer than two stored snapshots, the page shows an empty explanation and no invented comparison. Loading preserves the selector/card regions. Query failure uses the existing error and retry treatment. A missing asset on one date shows unknown or absent fields rather than inventing amount/price. Unknown profit and sparse-month snapshots retain the established #760/#788 display. The blue price-movement banner appears only if stored amounts really are equal; saved transactions are not inferred from equal balances. Copy as text uses the current selection. Hide-values masks every monetary cell, and quote-colour settings control signed values. All selection changes use UI state and existing snapshot records.
+
+## Remaining differences
+
+The current 1600 px full-page source and app captures both measure 1600 × 1452 px. The review gate's RGB-difference sum greater than 60 marks **2.40%** changed pixels for the default state and **2.50%** for the picker state. These figures compare the source HTML render with the real app in the overlapping rectangle.
+
+- Both states: the shared rail icon paths, selected rail glyph shape, small shadow and text raster details remain visible. The app uses its existing icon and font rendering system; the measured card bounds, columns, sections, order, values, dates, chips, and dominant colours match.
+- Both states: the visible sync stamp opens the existing sync status popover, which the static design does not represent. The duplicate hidden top-bar stamp was removed.
+- Picker: the first calendar selector has a slightly different focus ring and the calendar's text baseline and day-dot placement differ by about 1–2 px. The calendar uses the product's actual available snapshot dates and keyboard selection.
+- The Per asset caption now reserves space for the hide-values eye button; the button no longer covers `sorted by absolute change`.

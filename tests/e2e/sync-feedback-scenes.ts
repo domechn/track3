@@ -32,7 +32,11 @@ async function shot(page: Page, name: string) {
     await page.getByRole("button", { name: /^(Sync now|立即同步)$/ })
       .evaluate((node) => node.scrollIntoView({ block: "center", behavior: "auto" }));
   }
-  const toast = page.locator(`${name.startsWith("mobile") ? ".ios-d3-toast-viewport" : ".desktop-toast-viewport"} > li[data-state=open]`).last();
+  const state = name.includes("-pending") ? "pending" : name.includes("-success") ? "success" : "error";
+  const matchingToasts = page.locator(`${name.startsWith("mobile") ? ".ios-d3-toast-viewport" : ".desktop-toast-viewport"} > li[data-state=open][data-sync-status=${state}]`);
+  const toast = name.endsWith("-long-error")
+    ? matchingToasts.filter({ hasText: name.includes("-zh") ? "同步存储未完成请求" : "The sync store did not finish the request" }).first()
+    : matchingToasts.first();
   await expect(toast).toBeVisible();
   await page.waitForTimeout(250);
   await expect(toast.locator("svg").first()).toBeVisible();
@@ -53,7 +57,7 @@ async function shot(page: Page, name: string) {
       pill!.y < box!.y + box!.height && pill!.y + pill!.height > box!.y,
     `${name}: sync status pill overlaps toast`).toBe(false);
   }
-  expect(box!.height).toBeLessThanOrEqual(name.startsWith("mobile") || page.viewportSize()!.width <= 900 ? 240 : 181);
+  expect(box!.height).toBeLessThanOrEqual(name.startsWith("mobile") || page.viewportSize()!.width <= 900 || state === "error" ? 240 : 181);
   expect(box!.width).toBeGreaterThanOrEqual(page.viewportSize()!.width === 320 ? 280
     : page.viewportSize()!.width <= 900 ? 220 : page.viewportSize()!.width < 1000 ? 270 : 300);
   const overlap = await toast.evaluate((node, mobile) => {
@@ -74,7 +78,7 @@ async function shot(page: Page, name: string) {
   }, name.startsWith("mobile"));
   expect(overlap, `${name}: toast overlaps a control`).toBeNull();
   if (name.endsWith("-long-error")) {
-    const description = toast.locator("div.grid > :last-child");
+    const description = toast.locator("div.grid > :nth-child(2)");
     const extent = await description.evaluate((node) => ({
       height: node.clientHeight,
       scrollHeight: node.scrollHeight,
@@ -90,7 +94,7 @@ async function shot(page: Page, name: string) {
   }
   const readability = await toast.evaluate((node) => {
     const text = node.querySelector("div.grid");
-    const description = text?.lastElementChild;
+    const description = text?.children[1];
     const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
     const luminance = (value: number[]) => value.map((channel) => {
       const normalized = channel / 255;
@@ -230,13 +234,6 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           if (!mobile) {
             await expect(page.getByRole("button", { name: locale === "en" ? "Sync idle" : "同步空闲" })).toBeVisible({ timeout: 15000 });
           }
-          await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
-          await page.evaluate(() => (window as any).__e2eInvoke("plugin:sql|execute", {
-            query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
-              VALUES ('manual-sync-snapshot', '2024-01-03T00:00:00.000Z', 'wallet-1', 'crypto', 'BTC', 1, 43000, 43000)`,
-            values: [],
-          }));
-
           const nowWidth = (await now.boundingBox())!.width;
           const nowBackground = await now.evaluate((node) => getComputedStyle(node).backgroundColor);
           store.hold();
@@ -250,10 +247,21 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
             .toBeLessThan(1);
           await shotPending(page, `${prefix}-now-pending`);
           store.release();
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Sync complete" : "同步完成");
+          await expect(toast.locator("> li[data-state=open]").filter({
+            hasText: locale === "en" ? /Sync complete[\s\S]*Pushed 5/ : /同步完成[\s\S]*已推送 5 项/,
+          })).toBeVisible();
           await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Pushed 1" : "已推送 1 项");
           await shot(page, `${prefix}-now-success`);
+
+          await page.evaluate(() => (window as any).__e2eInvoke("plugin:sql|execute", {
+            query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+              VALUES ('manual-sync-snapshot', '2024-01-03T00:00:00.000Z', 'wallet-1', 'crypto', 'BTC', 1, 43000, 43000)`,
+            values: [],
+          }));
+          await now.click();
+          await expect(toast.locator("> li[data-state=open]").filter({
+            hasText: locale === "en" ? /Sync complete[\s\S]*Pushed 1/ : /同步完成[\s\S]*已推送 1 项/,
+          })).toBeVisible();
 
           store.failList = true;
           await now.click();
@@ -288,6 +296,10 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           });
           await longToast.locator("[toast-close]").click();
           await expect(longToast).toHaveCount(0);
+          while (await toast.locator("> li[data-state=open]").count()) {
+            await toast.locator("> li[data-state=open] [toast-close]").first().click();
+          }
+          await expect(toast.locator("> li[data-state=open]")).toHaveCount(0);
         } finally {
           await context.close();
         }

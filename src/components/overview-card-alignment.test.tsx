@@ -124,6 +124,7 @@ describe("Overview card alignment", () => {
     });
     renderOverview();
     const view = await screen.findByRole("combobox", { name: "Total value view" });
+    expect(screen.getByText("$1,000.00")).toBeInTheDocument();
     fireEvent.keyDown(view, { key: "ArrowDown" });
     fireEvent.keyDown(await screen.findByRole("option", { name: "Total value, excluding OKX" }), { key: "Enter" });
     expect(screen.getByText("$1,000.00")).toBeInTheDocument();
@@ -139,7 +140,7 @@ describe("Overview card alignment", () => {
     const totalValueCard = screen
       .getByText("Total value")
       .closest<HTMLElement>("[data-ui-card]");
-    const pnlCard = screen.getByText("Last PNL").closest<HTMLElement>("[data-ui-card]");
+    const pnlCard = document.querySelector<HTMLElement>(".t3-pnl-compact-card");
 
     expect(totalValueCard).not.toBeNull();
     expect(pnlCard).not.toBeNull();

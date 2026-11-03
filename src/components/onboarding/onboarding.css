@@ -215,3 +215,43 @@
   .ob-desktop .ob-body { grid-column: 1; grid-row: 2; }
   .ob-desktop .ob-text { flex: 1; padding-block: 12px; }
 }
+
+@media (min-width: 1400px) {
+  .ob-fidelity-overlay { position: fixed; inset: 0; z-index: 80; background: #0d0d0e; }
+  .ob-fidelity-desktop {
+    position: fixed; inset: 0; z-index: 81; display: flex; flex-direction: column;
+    background: #0d0d0e; color: #fff; font-family: "Public Sans Variable", sans-serif;
+    font-size: 13px; line-height: 18px; outline: none;
+  }
+  .ob-fidelity-desktop[data-closing="true"] { opacity: 0; transition: opacity 150ms linear; }
+  .ob-fidelity-top { height: 60px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 28px; }
+  .ob-fidelity-brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; }
+  .ob-fidelity-brand svg { width: 28px; height: 28px; }
+  .ob-fidelity-count { margin-left: auto; margin-right: 12px; color: #9b9da3; font-size: 12px; }
+  .ob-fidelity-skip { height: 34px; padding: 0 14px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: #b4b6bc; font-weight: 500; }
+  .ob-fidelity-skip:hover { background: #1b1a20; }
+  .ob-fidelity-mid { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 28px 28px; }
+  .ob-fidelity-grid { width: 100%; max-width: 1160px; display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 640px); gap: 80px; align-items: center; margin-top: -30px; }
+  .ob-fidelity-body { min-height: 300px; display: flex; flex-direction: column; outline-offset: 4px; }
+  .ob-fidelity-eyebrow { margin-bottom: 10px; color: #b4b6bc; }
+  .ob-fidelity-title { margin: 0; font-size: 34px; line-height: 40px; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; }
+  .ob-fidelity-description { margin: 14px 0 0; color: #b4b6bc; font-size: 15px; line-height: 23px; text-wrap: pretty; }
+  .ob-fidelity-dots { display: flex; gap: 8px; align-items: center; margin-top: 40px; }
+  .ob-fidelity-dots span { width: 8px; height: 8px; border-radius: 50%; background: #3f4047; }
+  .ob-fidelity-dots span.active { width: 22px; border-radius: 4px; background: #4a8ad6; }
+  .ob-fidelity-dots span.done { background: #6a6b72; }
+  .ob-fidelity-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .ob-fidelity-actions button { height: 40px; display: inline-flex; align-items: center; gap: 8px; padding: 0 18px; border: 1px solid #3a3a3e; border-radius: 999px; background: transparent; color: #fff; font-size: 13px; font-weight: 500; }
+  .ob-fidelity-actions button:hover:not(:disabled) { background: #1b1a20; }
+  .ob-fidelity-actions button:disabled { opacity: .45; }
+  .ob-fidelity-actions button.primary { border-color: #fff; background: #fff; color: #0d0d0e; }
+  .ob-fidelity-actions button.primary:hover { background: #e9e9ea; }
+  .ob-fidelity-actions svg { width: 14px; height: 14px; }
+  .ob-fidelity-art { position: relative; padding: 28px; border: 1px solid #222224; border-radius: 6px; background: #131217; box-shadow: 0 12px 28px rgba(0,0,0,.2); }
+  .ob-fidelity-design-art svg { width: 100%; height: auto; display: block; }
+  .ob-fidelity-design-art text { font-family: "Public Sans Variable"; }
+  .ob-fidelity-old-art { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+}
+@media (min-width: 1400px) and (max-width: 1499px) {
+  .ob-fidelity-desktop { inset: 16px; }
+}
