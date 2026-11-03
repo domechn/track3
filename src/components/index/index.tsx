@@ -59,6 +59,7 @@ import { ASSISTANT_APP_ACTION_EVENT, validateActionArgs } from "@/middlelayers/a
 import { setCurrentDateRange, readAssistantDateRange, clearAssistantDateRange } from "@/middlelayers/ui-state/page-prefs";
 import { ChartResizeContext } from "@/App";
 import { useTranslation } from "@/i18n";
+import { useDarkTheme } from "@/components/common/theme";
 import { DataChangedContext } from "@/contexts/data-changed";
 import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
@@ -71,6 +72,7 @@ const Overview = React.lazy(() => import("../overview"));
 const Comparison = React.lazy(() => import("../comparison"));
 const Rebalance = React.lazy(() => import("../rebalance"));
 const GoalsAlerts = React.lazy(() => import("../goals-alerts"));
+const GoalsKinds = React.lazy(() => import("../goals-desktop").then((module) => ({ default: module.GoalsKinds })));
 const WalletAnalysis = React.lazy(() => import("../wallet-analytics"));
 const CoinAnalysis = React.lazy(() => import("../coin-analytics"));
 const Configuration = React.lazy(() => import("@/components/configuration"));
@@ -107,6 +109,7 @@ export const RefreshButtonLoadingContext = React.createContext<{
 
 function TopBar({
   isProUser,
+  fidelityPage,
   quoteColor,
   currentCurrency,
   availableDates,
@@ -116,6 +119,7 @@ function TopBar({
   onRefreshSuccess,
 }: {
   isProUser: boolean;
+  fidelityPage: boolean;
   quoteColor: QuoteColor;
   currentCurrency: CurrencyRateDetail;
   availableDates: Date[];
@@ -133,10 +137,10 @@ function TopBar({
   const selectedSnapshots = availableDates.filter((date) => dateRange?.from && dateRange.to && date >= dateRange.from && date <= dateRange.to).length;
 
   return (
-    <div className="sticky top-0 z-10 glass-subtle border-b relative">
-      <div className="flex h-12 items-center px-4">
+    <div className={fidelityPage ? "t3-fidelity-rail-refresh-container" : "sticky top-0 z-10 glass-subtle border-b relative"}>
+      <div className={fidelityPage ? "t3-fidelity-rail-refresh-inner" : "flex h-12 items-center px-4"}>
         {isProUser && (
-          <div className="mr-4">
+          <div className={fidelityPage ? "t3-fidelity-rail-live" : "mr-4"}>
             <RealTimeTotalValue
               quoteColor={quoteColor}
               currency={currentCurrency}
@@ -144,7 +148,7 @@ function TopBar({
           </div>
         )}
         <div className="ml-auto flex items-center space-x-3">
-          {availableDates.length > 0 && <div className="t3-topbar-ranges" role="group" aria-label={t("datePicker.predefined")}>
+          {!fidelityPage && availableDates.length > 0 && <div className="t3-topbar-ranges" role="group" aria-label={t("datePicker.predefined")}>
             {([10, 30, 50, 100, -1] as const).map((count) => {
               const selected = count < 0 ? availableDates : availableDates.slice(-count);
               return <button key={count} type="button"
@@ -155,12 +159,12 @@ function TopBar({
               </button>;
             })}
           </div>}
-          <SyncStatusIndicator />
-          <DatePicker
+          {!fidelityPage && <SyncStatusIndicator />}
+          {!fidelityPage && <DatePicker
             availableDates={availableDates}
             value={dateRange}
             onDateChange={onDatePickerValueChange}
-          />
+          />}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -196,8 +200,8 @@ function TopBar({
         </div>
       </div>
       {refreshProgress > 0 && refreshButtonLoading && (
-        <div className="absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none">
-          <Progress value={refreshProgress} className="w-[80%]" />
+        <div className={fidelityPage ? "t3-fidelity-refresh-progress" : "absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none"}>
+          <Progress value={refreshProgress} className={fidelityPage ? "h-1.5 w-full" : "w-[80%]"} />
         </div>
       )}
     </div>
@@ -249,6 +253,15 @@ function Layout({
   onRefreshSuccess,
 }: LayoutProps) {
   const { t } = useTranslation();
+  const darkTheme = useDarkTheme();
+  const { pathname } = useLocation();
+  const [wideViewport, setWideViewport] = useState(() => window.innerWidth >= 1500);
+  useEffect(() => {
+    const onResize = () => setWideViewport(window.innerWidth >= 1500);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const fidelityPage = wideViewport && darkTheme && (pathname === "/rebalance" || pathname === "/goals" || pathname === "/goals/kinds");
   const sidebarWidth = sidebarCollapsed ? 56 : 216;
 
   return (
@@ -260,11 +273,12 @@ function Layout({
       />
 
       <div
-        style={{ marginLeft: sidebarWidth }}
+        style={{ marginLeft: fidelityPage ? 56 : sidebarWidth }}
         className="transition-[margin-left] duration-300 ease-in-out"
       >
         <TopBar
           isProUser={isProUser}
+          fidelityPage={fidelityPage}
           quoteColor={quoteColor}
           currentCurrency={currentCurrency}
           availableDates={availableDates}
@@ -433,11 +447,12 @@ function AppRoutes({
           path="rebalance"
           element={
             <AnimatedPage>
-              <Rebalance currency={currentCurrency} quoteColor={quoteColor} />
+              <Rebalance currency={currentCurrency} quoteColor={quoteColor} lastRefreshAt={lastRefreshAt} isProUser={isProUser} />
             </AnimatedPage>
           }
         />
-        <Route path="goals" element={<AnimatedPage><GoalsAlerts /></AnimatedPage>} />
+        <Route path="goals" element={<AnimatedPage><GoalsAlerts currency={currentCurrency} isProUser={isProUser} /></AnimatedPage>} />
+        <Route path="goals/kinds" element={<AnimatedPage><GoalsKinds currency={currentCurrency} isProUser={isProUser} /></AnimatedPage>} />
         <Route
           path="history"
           element={

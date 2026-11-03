@@ -3,6 +3,7 @@ import { save as saveFile } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
+import { useDarkTheme } from "./common/theme";
 import {
   calculateRebalance,
   deleteRebalanceProfile,
@@ -14,6 +15,7 @@ import {
   validateProfile,
   type RebalanceHolding,
   type RebalanceOptions,
+  type RebalanceProfile,
   type RebalanceResult,
   type RebalanceTarget,
 } from "@/middlelayers/rebalance";
@@ -28,6 +30,8 @@ import { rebalanceCsvDialogOptions } from "@/middlelayers/ui-state/rebalance-exp
 import { FinanceChartSkeleton, RebalanceCharts } from "./finance-charts";
 import { rebalanceVisuals } from "./finance-visuals";
 import { RebalanceSummary } from "./rebalance-summary";
+import RebalanceDesktop from "./rebalance-desktop";
+import FidelityRail from "./fidelity-rail";
 import type { QuoteColor } from "@/middlelayers/types";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
@@ -41,8 +45,25 @@ import {
 type TargetDraft = RebalanceTarget & { id: number; previousAsset?: { assetType: AssetType; symbol: string } };
 
 const numberOrZero = (raw: string) => raw === "" ? Number.NaN : Number(raw);
-export default function Rebalance({ currency, quoteColor = "green-up-red-down" }: { currency: CurrencyRateDetail; quoteColor?: QuoteColor }) {
+function profilesMatch(draft: RebalanceProfile, stored: RebalanceProfile | null) {
+  return !!stored && draft.tolerancePercent === stored.tolerancePercent &&
+    draft.targets.length === stored.targets.length && draft.targets.every((target, index) => {
+      const savedTarget = stored.targets[index];
+      if (target.kind !== savedTarget.kind || target.percent !== savedTarget.percent) return false;
+      if (target.kind === "cash") return true;
+      if (savedTarget.kind === "cash" || target.assetType !== savedTarget.assetType) return false;
+      return target.kind === "type" || (savedTarget.kind === "asset" && target.symbol === savedTarget.symbol);
+    });
+}
+export default function Rebalance({ currency, quoteColor = "green-up-red-down", lastRefreshAt, isProUser }: { currency: CurrencyRateDetail; quoteColor?: QuoteColor; lastRefreshAt?: string; isProUser?: boolean }) {
   const { t } = useTranslation();
+  const darkTheme = useDarkTheme();
+  const [wideDesktop, setWideDesktop] = useState(() => window.innerWidth >= 1500);
+  useEffect(() => {
+    const onResize = () => setWideDesktop(window.innerWidth >= 1500);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const [stablecoinsAsCash, setStablecoinsAsCash] = useState(() => readRebalanceOptions().stablecoinsAsCash !== false);
   const labelFor = (target: RebalanceTarget) =>
     target.kind === "asset" ? target.symbol || t("rebalance.targetAsset") :
@@ -54,6 +75,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   const [targets, setTargets] = useState<TargetDraft[]>([]);
   const [tolerance, setTolerance] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [savedProfile, setSavedProfile] = useState<RebalanceProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [profileLoadError, setProfileLoadError] = useState(false);
@@ -110,6 +132,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
           setTargets(withIds(profile?.targets ?? []));
           setTolerance(profile?.tolerancePercent ?? 0);
           setSaved(!!profile || failed);
+          setSavedProfile(profile ?? null);
           if (!manualInitialized.current) {
             setManualOpen(!profile?.targets.length);
             manualInitialized.current = true;
@@ -185,6 +208,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
       await saveRebalanceProfile(profile);
       setTargets(profile.targets.map((target, index) => ({ ...target, id: targets[index].id })));
       setSaved(true);
+      setSavedProfile(profile);
       setProfileLoadError(false);
       setStatus(t("rebalance.saved"));
     } catch {
@@ -198,6 +222,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
       setTargets([]);
       setTolerance(0);
       setSaved(false);
+      setSavedProfile(null);
       setProfileLoadError(false);
       setStatus(t("rebalance.deleted"));
     } catch {
@@ -216,6 +241,8 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
   }
 
   const total = targets.reduce((sum, target) => sum + (Number.isFinite(target.percent) ? target.percent : 0), 0);
+  const dirty = targets.length > 0 && !profilesMatch(profileFromTargets(targets, tolerance), savedProfile);
+  const legacyWide = wideDesktop && darkTheme && targets.some((target) => target.kind !== "asset");
   const numberField = (
     id: string, label: string, value: number, setter: (next: number) => void,
   ) => (
@@ -227,8 +254,33 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
     </label>
   );
 
+  if (wideDesktop && darkTheme && !legacyWide) return <RebalanceDesktop
+    holdings={holdings} targets={targets} tolerance={tolerance} result={result} currency={currency}
+    lastRefreshAt={lastRefreshAt}
+    minimumTradeValue={minimumTradeValue} ignoreBelowValue={ignoreBelowValue} stablecoinsAsCash={stablecoinsAsCash}
+    mode={mode} injectedCash={injectedCash} validation={validation} normalizeError={normalizeError}
+    loading={loading} loadError={loadError} profileLoadError={profileLoadError} partialSnapshot={partialSnapshot}
+    saved={saved} dirty={dirty} status={status} isProUser={isProUser}
+    onTarget={updateTarget}
+    onPreset={applyPreset}
+    onNormalize={() => {
+      try {
+        setTargets(normalizeTargets(targets).map((target, index) => ({ ...targets[index], percent: target.percent })));
+        setNormalizeError(false);
+      } catch { setNormalizeError(true); }
+    }}
+    onTolerance={setTolerance} onMinimumTrade={setMinimumTradeValue} onIgnoreBelow={setIgnoreBelowValue}
+    onMode={setMode} onInjectedCash={setInjectedCash}
+    onStablecoinsAsCash={setStablecoinsAsCash}
+    onAddTarget={(holding) => setTargets((previous) => [
+      ...previous, { id: nextTargetId.current++, kind: "asset", assetType: holding?.assetType ?? "crypto", symbol: holding?.symbol ?? "", percent: 0 },
+    ])}
+    onRemoveTarget={(index) => setTargets((previous) => previous.filter((_, i) => i !== index))}
+    onSave={() => void save()} onDelete={() => void removeSaved()} onExport={() => void exportCsv()} />;
+
   return (
-    <div className="t3-manage-rebalance mx-auto flex max-w-6xl flex-col gap-4">
+    <div className={`t3-manage-rebalance mx-auto flex max-w-6xl flex-col gap-4${legacyWide ? " t3-fidelity-page" : ""}`}>
+      {legacyWide && <FidelityRail isProUser={isProUser} />}
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">{t("rebalance.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("rebalance.description")}</p>
