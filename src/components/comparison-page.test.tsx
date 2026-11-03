@@ -156,6 +156,7 @@ describe("Comparison page", () => {
 
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(toggle).toHaveAccessibleName(/show values/i);
+    expect(screen.getByRole("table", { name: "Per asset" })).toHaveTextContent("***");
     const cells = screen.getByRole("table", { name: "Per asset" }).querySelectorAll("tbody td");
     for (const index of [1, 2, 5, 6, 7]) expect(cells[index]).toHaveTextContent("***");
     expect(cells[3]).toHaveTextContent("1,125.00");
@@ -163,6 +164,7 @@ describe("Comparison page", () => {
     expect(toggle).toHaveAttribute("aria-pressed", "false");
     expect(cells[1]).toHaveTextContent("0.8");
     expect(cells[1]).not.toHaveTextContent("***");
+    expect(screen.getByRole("table", { name: "Per asset" })).not.toHaveTextContent("***");
   });
 
   it("renders the value visibility icon with theme-aware current color", async () => {

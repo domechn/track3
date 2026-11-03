@@ -71,4 +71,3 @@ it("keeps All time inside the app date range", async () => {
   await screen.findByText("1–1 of 1");
   expect(queryHistoricalPage).toHaveBeenCalledWith(props.dateRange, 50, 0, "all");
 });
-

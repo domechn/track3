@@ -35,19 +35,21 @@ const recordsIcons: Record<string, ReactNode> = {
   "/settings": <><circle cx="9" cy="9" r="2.5" /><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4" /></>,
 };
 
-function NavItem({ item, collapsed, unread }: { item: NavEntry; collapsed: boolean; unread?: number }) {
+function NavItem({ item, collapsed, unread, fidelity }: { item: NavEntry; collapsed: boolean; unread?: number; fidelity?: boolean }) {
   const { t } = useTranslation();
   const label = t(item.labelKey);
   const resolved = useResolvedPath(item.to);
   const match = useMatch({ path: resolved.pathname, end: false });
+  const { pathname } = useLocation();
+  const current = !!match || (fidelity && item.to === "/overview" && pathname.startsWith("/coins/"));
   const unreadText = unread ? t("goals.unread").replace("{count}", String(unread)) : "";
   const link = <Link to={item.to}
     aria-label={collapsed ? `${label}${unreadText ? ` ${unreadText}` : ""}` : undefined}
-    aria-current={match ? "page" : undefined}
+    aria-current={current ? "page" : undefined}
     className={cn(
       "group relative flex h-9 touch:min-h-11 items-center gap-3 rounded-md px-[9px] text-[13px] font-medium whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
       "hover:bg-raised hover:text-foreground",
-      match ? "bg-raised text-foreground before:absolute before:-left-[10px] before:top-2 before:bottom-2 before:w-[2px] before:bg-accent-data" : "text-muted-foreground",
+      current ? "bg-raised text-foreground before:absolute before:-left-[10px] before:top-2 before:bottom-2 before:w-[2px] before:bg-accent-data" : "text-muted-foreground",
       collapsed && "justify-center px-0",
     )}>
     <svg aria-hidden="true" className="h-[18px] w-[18px] shrink-0" viewBox="0 0 18 18"
@@ -64,18 +66,18 @@ function NavItem({ item, collapsed, unread }: { item: NavEntry; collapsed: boole
     <TooltipContent side="right" sideOffset={10}>{label}</TooltipContent></Tooltip> : link;
 }
 
-function NavGroup({ label, items, collapsed, unread }: {
-  label: string; items: NavEntry[]; collapsed: boolean; unread: number;
+function NavGroup({ label, items, collapsed, unread, fidelity }: {
+  label: string; items: NavEntry[]; collapsed: boolean; unread: number; fidelity?: boolean;
 }) {
-  return <div className="mt-2 border-t border-border pt-2 fidelity-records-rail-group">
+  return <div className={cn("mt-2 border-t border-border pt-2 fidelity-records-rail-group", fidelity && "t3-fidelity-nav-group")}>
     {!collapsed && <div className="px-[9px] pb-1 text-xs text-muted-foreground">{label}</div>}
-    {items.map((item) => <NavItem key={item.to} item={item} collapsed={collapsed}
+    {items.map((item) => <NavItem key={item.to} item={item} collapsed={collapsed} fidelity={fidelity}
       unread={item.to === "/goals" ? unread : undefined} />)}
   </div>;
 }
 
-export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOpen = false }: {
-  collapsed: boolean; onToggle: () => void; isProUser: boolean; recordsToolsOpen?: boolean;
+export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOpen = false, fidelity = false }: {
+  collapsed: boolean; onToggle: () => void; isProUser: boolean; recordsToolsOpen?: boolean; fidelity?: boolean;
 }) {
   const { t } = useTranslation();
   const unread = useAlertBadge();
@@ -83,10 +85,10 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
   const records = pathname === "/history" || pathname === "/cost-basis";
   return <aside style={{ width: collapsed ? "var(--sidebar-collapsed-width)" : "var(--sidebar-width)" }}
     className={cn("fixed inset-y-0 left-0 z-20 flex flex-col overflow-hidden border-r bg-background transition-[width] duration-300 ease-in-out",
-      "fidelity-records-rail", collapsed && "fidelity-records-rail-collapsed")}>
+      !fidelity && "fidelity-records-rail", !fidelity && collapsed && "fidelity-records-rail-collapsed", fidelity && "t3-fidelity-sidebar")}>
     <div className="flex h-14 shrink-0 items-center gap-2 px-[10px]">
       <button type="button" aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")}
-        aria-expanded={!collapsed} onClick={onToggle} className="flex h-11 w-11 shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        aria-expanded={!collapsed} onClick={onToggle} className={cn("flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", fidelity ? "h-7 w-7" : "h-11 w-11")}>
         <svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 28 28">
           <rect width="28" height="28" rx="7" fill="#4a8ad6" />
           <path d="M8 20v-6M14 20V8M20 20v-4.5" stroke="#0d0d0e" strokeWidth="2.4" strokeLinecap="round" />
@@ -96,9 +98,9 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
       {isProUser && !collapsed && <span className="rounded-pill bg-accent-data/15 px-2 text-xs text-foreground dark:text-accent-data">{t("app.proBadge")}</span>}
     </div>
     <TooltipProvider delayDuration={220}><nav aria-label={t("nav.main", "Main navigation")} className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-[10px] touch:px-[5px] pb-2">
-      <NavItem item={overview} collapsed={collapsed} />
-      <NavGroup label={t("nav.analyze", "Analyze")} items={analyze} collapsed={collapsed} unread={unread} />
-      <NavGroup label={t("nav.manage", "Manage")} items={isProUser ? manage : manage.slice(0, -1)} collapsed={collapsed} unread={unread} />
+      <NavItem item={overview} collapsed={collapsed} fidelity={fidelity} />
+      <NavGroup label={t("nav.analyze", "Analyze")} items={analyze} collapsed={collapsed} unread={unread} fidelity={fidelity} />
+      <NavGroup label={t("nav.manage", "Manage")} items={isProUser ? manage : manage.slice(0, -1)} collapsed={collapsed} unread={unread} fidelity={fidelity} />
       <div className="mt-auto border-t border-border pt-2">{records
         ? <button type="button" aria-label={t("records.controls")} aria-haspopup="true"
           aria-expanded={recordsToolsOpen} aria-controls="t3-records-toolbar-panel"
@@ -110,7 +112,7 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
             {recordsIcons["/settings"]}
           </svg>
           {!collapsed && <span>{t("records.controls")}</span>}
-        </button> : <NavItem item={settings} collapsed={collapsed} />}</div>
+        </button> : <NavItem item={settings} collapsed={collapsed} fidelity={fidelity} />}</div>
     </nav></TooltipProvider>
   </aside>;
 }

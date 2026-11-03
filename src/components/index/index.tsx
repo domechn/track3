@@ -27,10 +27,12 @@ import { AnimatedPage } from "../motion";
 import PageLoadingOverlay from "../page-loading-overlay";
 import AutoBackupIndicator from "../auto-backup-indicator";
 import SyncStatusIndicator from "../sync-status-indicator";
+import { SummaryLoadingContext } from "../summary-loading-context";
+import { SummaryFidelityRangeContext } from "../summary-fidelity-range-context";
 import "./index.css";
 import { Route, Routes, HashRouter, Outlet, Navigate, useLocation, Link } from "react-router-dom";
 
-import { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
+import { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getAvailableDates,
@@ -109,7 +111,7 @@ export const RefreshButtonLoadingContext = React.createContext<{
 
 function TopBar({
   isProUser,
-  fidelityPage,
+  railFidelityPage,
   quoteColor,
   currentCurrency,
   availableDates,
@@ -117,10 +119,12 @@ function TopBar({
   onDatePickerValueChange,
   lastRefreshAt,
   onRefreshSuccess,
+  fidelityPage,
+  fidelityBusy,
   recordsToolsOpen,
 }: {
   isProUser: boolean;
-  fidelityPage: boolean;
+  railFidelityPage: boolean;
   quoteColor: QuoteColor;
   currentCurrency: CurrencyRateDetail;
   availableDates: Date[];
@@ -131,30 +135,50 @@ function TopBar({
   ) => void;
   lastRefreshAt?: string;
   onRefreshSuccess: () => void;
+  fidelityPage?: "summary" | "coin";
+  fidelityBusy?: boolean;
   recordsToolsOpen: boolean;
 }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const recordsPage = pathname === "/history" || pathname === "/cost-basis";
+  const { range: fidelityRange, setRange: setSummaryRange } = React.useContext(SummaryFidelityRangeContext);
+  const [selectedFidelityRange, setSelectedFidelityRange] = useState("All");
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const selectedSnapshots = availableDates.filter((date) => dateRange?.from && dateRange.to && date >= dateRange.from && date <= dateRange.to).length;
+  const fidelityDateRange = fidelityRange
+    ? { from: fidelityRange.start, to: fidelityRange.end }
+    : { from: availableDates[0], to: availableDates.at(-1) };
+  const liveTotal = isProUser && <RealTimeTotalValue quoteColor={quoteColor} currency={currentCurrency} />;
 
   return (
-    <div className={recordsPage ? "t3-records-toolbar" : fidelityPage ? "t3-fidelity-rail-refresh-container" : "sticky top-0 z-10 glass-subtle border-b relative"}
+    <div className={recordsPage ? "t3-records-toolbar" : railFidelityPage ? "t3-fidelity-rail-refresh-container" : fidelityPage ? `t3-fidelity-topbar t3-fidelity-topbar-${fidelityPage}` : "sticky top-0 z-10 glass-subtle border-b relative"}
       data-open={recordsToolsOpen}>
       <div id={recordsPage ? "t3-records-toolbar-panel" : undefined}
-        className={recordsPage ? "t3-records-toolbar-panel flex h-12 items-center px-4" : fidelityPage ? "t3-fidelity-rail-refresh-inner" : "flex h-12 items-center px-4"}>
-        {isProUser && (
-          <div className={fidelityPage ? "t3-fidelity-rail-live" : "mr-4"}>
-            <RealTimeTotalValue
-              quoteColor={quoteColor}
-              currency={currentCurrency}
-            />
-          </div>
-        )}
-        <div className="ml-auto flex items-center space-x-3">
-          {!fidelityPage && !recordsPage && availableDates.length > 0 && <div className="t3-topbar-ranges" role="group" aria-label={t("datePicker.predefined")} >
+        className={recordsPage ? "t3-records-toolbar-panel flex h-12 items-center px-4" : railFidelityPage ? "t3-fidelity-rail-refresh-inner" : "flex h-12 items-center px-4"}>
+        {!fidelityPage && liveTotal && <div className={railFidelityPage ? "t3-fidelity-rail-live" : "mr-4"}>{liveTotal}</div>}
+        <div className={fidelityPage ? "t3-fidelity-topbar-controls ml-auto flex items-center" : "ml-auto flex items-center space-x-3"}>
+          {fidelityPage && liveTotal && <div className="t3-fidelity-live-control">{liveTotal}</div>}
+          {fidelityPage === "summary" && <div className="t3-fidelity-ranges" role="group" aria-label={t("datePicker.predefined")}>
+            {(["1D", "7D", "30D", "90D", "1Y", "All"] as const).map((label) => {
+              const latest = availableDates.at(-1);
+              const days = label === "1D" ? 1 : label === "7D" ? 7 : label === "30D" ? 30 : label === "90D" ? 90 : 365;
+              const start = latest ? new Date(latest.getTime() - days * 86400000) : undefined;
+              const selected = label === "All" ? availableDates : availableDates.filter((value) => start && value >= start);
+              const chosen = selected.length ? selected : latest ? [latest] : [];
+              const isSelected = fidelityBusy ? label === "All"
+                : availableDates.length < 2 ? label === "1D"
+                : label === selectedFidelityRange;
+              return <button key={label} type="button" aria-pressed={!!isSelected} disabled={!latest || availableDates.length < 2 || fidelityBusy}
+                onClick={() => {
+                  setSelectedFidelityRange(label);
+                  setSummaryRange(label === "All" ? undefined : { start: chosen[0], end: chosen.at(-1)! });
+                  onDatePickerValueChange(chosen.length, { from: chosen[0], to: chosen.at(-1) });
+                }}>{label}</button>;
+            })}
+          </div>}
+          {!fidelityPage && !railFidelityPage && !recordsPage && availableDates.length > 0 && <div className="t3-topbar-ranges" role="group" aria-label={t("datePicker.predefined")}>
             {([10, 30, 50, 100, -1] as const).map((count) => {
               const selected = count < 0 ? availableDates : availableDates.slice(-count);
               return <button key={count} type="button"
@@ -165,13 +189,21 @@ function TopBar({
               </button>;
             })}
           </div>}
-          {!fidelityPage && !recordsPage && <SyncStatusIndicator />}
-          {!fidelityPage && !recordsPage && <DatePicker
+          {!railFidelityPage && !recordsPage && <SyncStatusIndicator />}
+          {fidelityPage && (fidelityBusy || lastRefreshAt) && <span className="t3-fidelity-stamp"><i className={fidelityBusy ? "off" : ""} />{fidelityBusy ? t("summary.fidelity.loadingLabel") : `${t("summary.fidelity.updated")} ${new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(lastRefreshAt ?? 0))}`}</span>}
+          {!railFidelityPage && !recordsPage && <div className={fidelityPage ? "t3-fidelity-date-control" : undefined}><DatePicker
             availableDates={availableDates}
-            value={dateRange}
-            onDateChange={onDatePickerValueChange}
-          />}
-          <TooltipProvider>
+            value={fidelityPage ? fidelityDateRange : dateRange}
+            onDateChange={(count, next) => {
+              if (fidelityPage) {
+                const all = next?.from?.getTime() === availableDates[0]?.getTime() && next?.to?.getTime() === availableDates.at(-1)?.getTime();
+                setSummaryRange(all || !next?.from || !next.to ? undefined : { start: next.from, end: next.to });
+                setSelectedFidelityRange(all ? "All" : "custom");
+              }
+              onDatePickerValueChange(count, next);
+            }}
+          /></div>}
+          <fieldset disabled={fidelityBusy} className={`t3-fidelity-refresh-control${fidelityBusy ? " t3-fidelity-refresh-disabled" : ""}`}><TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div>
@@ -185,6 +217,7 @@ function TopBar({
                   >
                     <RefreshData
                       loading={refreshButtonLoading}
+                      fidelity={!!fidelityPage}
                       afterRefresh={(success) => {
                         if (success) {
                           onRefreshSuccess();
@@ -202,13 +235,13 @@ function TopBar({
                 </p>
               </TooltipContent>
             </Tooltip>
-          </TooltipProvider>
+          </TooltipProvider></fieldset>
           {recordsPage && <Link to="/settings" className="t3-records-settings-link">{t("nav.settings")}</Link>}
         </div>
       </div>
       {refreshProgress > 0 && refreshButtonLoading && (
-        <div className={recordsPage ? "t3-records-refresh-progress absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none" : fidelityPage ? "t3-fidelity-refresh-progress" : "absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none"}>
-          <Progress value={refreshProgress} className={fidelityPage ? "h-1.5 w-full" : "w-[80%]"} />
+        <div className={recordsPage ? "t3-records-refresh-progress absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none" : railFidelityPage ? "t3-fidelity-refresh-progress" : "absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none"}>
+          <Progress value={refreshProgress} className={railFidelityPage ? "h-1.5 w-full" : "w-[80%]"} />
         </div>
       )}
     </div>
@@ -261,16 +294,19 @@ function Layout({
 }: LayoutProps) {
   const { t } = useTranslation();
   const darkTheme = useDarkTheme();
-  const { pathname } = useLocation();
+  const location = useLocation();
   const [wideViewport, setWideViewport] = useState(() => window.innerWidth >= 1500);
   useEffect(() => {
     const onResize = () => setWideViewport(window.innerWidth >= 1500);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-  const fidelityPage = wideViewport && darkTheme && (pathname === "/rebalance" || pathname === "/goals" || pathname === "/goals/kinds");
-  const recordsPage = pathname === "/history" || pathname === "/cost-basis";
+  const railFidelityPage = wideViewport && darkTheme && (location.pathname === "/rebalance" || location.pathname === "/goals" || location.pathname === "/goals/kinds");
+  const recordsPage = location.pathname === "/history" || location.pathname === "/cost-basis";
   const sidebarWidth = sidebarCollapsed ? 56 : 216;
+  const fidelityPage = location.pathname === "/summary" ? "summary" : location.pathname.startsWith("/coins/") ? "coin" : undefined;
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryRange, setSummaryRange] = useState<TDateRange>();
   const [recordsToolsOpen, setRecordsToolsOpen] = useState(false);
   useEffect(() => {
     const open = () => setRecordsToolsOpen(true);
@@ -284,21 +320,24 @@ function Layout({
   }, []);
 
   return (
-    <div className="min-h-screen">
+    <div className={fidelityPage ? `min-h-screen t3-fidelity-shell t3-fidelity-${fidelityPage}-shell` : "min-h-screen"}>
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={onSidebarToggle}
         isProUser={isProUser}
+        fidelity={!!fidelityPage}
         recordsToolsOpen={recordsToolsOpen}
       />
 
       <div
-        style={{ marginLeft: fidelityPage ? 56 : sidebarWidth }}
+        style={{ marginLeft: railFidelityPage || fidelityPage || recordsPage ? 56 : sidebarWidth }}
         className={`transition-[margin-left] duration-300 ease-in-out ${recordsPage ? "t3-records-fidelity-shell" : ""}`}
       >
+        <SummaryFidelityRangeContext.Provider value={{ range: summaryRange, setRange: setSummaryRange }}>
+        <SummaryLoadingContext.Provider value={setSummaryLoading}>
         <TopBar
           isProUser={isProUser}
-          fidelityPage={fidelityPage}
+          railFidelityPage={railFidelityPage}
           quoteColor={quoteColor}
           currentCurrency={currentCurrency}
           availableDates={availableDates}
@@ -306,6 +345,8 @@ function Layout({
           onDatePickerValueChange={onDatePickerValueChange}
           lastRefreshAt={lastRefreshAt}
           onRefreshSuccess={onRefreshSuccess}
+          fidelityPage={fidelityPage}
+          fidelityBusy={fidelityPage === "summary" && summaryLoading}
           recordsToolsOpen={recordsToolsOpen}
         />
 
@@ -325,6 +366,8 @@ function Layout({
             )}
           </div>
         </main>
+        </SummaryLoadingContext.Provider>
+        </SummaryFidelityRangeContext.Provider>
       </div>
     </div>
   );
@@ -536,8 +579,10 @@ function AppRoutes({
             <AnimatedPage>
               <CoinAnalysis
                 currency={currentCurrency}
-                dateRange={tDateRange}
+                dateRange={maxDateRange}
+                quoteColor={quoteColor}
                 onDataChanged={onDataChanged}
+                fidelity
               />
             </AnimatedPage>
           }
