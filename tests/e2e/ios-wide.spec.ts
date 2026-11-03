@@ -677,6 +677,7 @@ for (const [name, width, height] of viewports) {
           if (route === "wallets") await expect(page.locator(".d2-wallets")).toBeVisible();
           if (route === "coins/BTC") await expect(page.locator(".d2-coin")).toBeVisible();
           if (route === "settings/sync") await expect(page.locator(".sync-settings-page")).toBeVisible();
+          if (route === "assistant") await expect(page.locator(".ios-d3-chat")).toBeVisible();
           await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
           await page.evaluate(({ left, right, top, bottom }) => {
             document.documentElement.style.setProperty("--mobile-safe-left", `${left}px`);
@@ -703,8 +704,13 @@ for (const [name, width, height] of viewports) {
           });
           expect(layout.documentWidth, `${name} ${theme} ${route}`).toBeLessThanOrEqual(width + 1);
           expect(layout.mainWidth, `${name} ${theme} ${route}`).toBeGreaterThan(0);
-          expect(layout.paddingLeft, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeLeft);
-          expect(layout.paddingRight, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeRight);
+          if (route === "assistant" && size === "compact") {
+            expect(layout.paddingLeft, `${name} ${theme} ${route}`).toBe(0);
+            expect(layout.paddingRight, `${name} ${theme} ${route}`).toBe(0);
+          } else {
+            expect(layout.paddingLeft, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeLeft);
+            expect(layout.paddingRight, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeRight);
+          }
           expect(layout.paddingTop, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeTop);
           expect(layout.paddingBottom, `${name} ${theme} ${route}`).toBeGreaterThanOrEqual(safeBottom);
           const navigation = page.locator(size === "compact" ? ".mobile-tab-bar a" : ".mobile-sidebar a");
