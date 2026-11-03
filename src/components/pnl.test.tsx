@@ -53,6 +53,14 @@ it("renders metrics without a second chart inside the overview hero", async () =
   expect(screen.queryByTestId("pnl-chart")).not.toBeInTheDocument();
 });
 
+it("announces only the visible Overview metric labels", () => {
+  vi.mocked(queryPNLTableValue).mockResolvedValue({ latestTotalValue: 100 });
+  render(<ChartResizeContext.Provider value={resize}><PNL currency={currency} dateRange={dateRange}
+    quoteColor="green-up-red-down" compact overviewFidelity /></ChartResizeContext.Provider>);
+  expect(screen.getByText("Latest").textContent).toBe("Latest");
+  expect(screen.getByText("7 days").textContent).toBe("7 days");
+});
+
 it.each([
   ["en", "7 refreshes", "30 refreshes"],
   ["zh", "7 次刷新", "30 次刷新"],

@@ -10,7 +10,7 @@ import {
   QuoteColor,
   TDateRange,
 } from "../middlelayers/types";
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import {
   Collapsible,
@@ -23,8 +23,12 @@ import AssetsPercentageChange from "./assets-percentage-change";
 import { StaggerContainer, FadeUp } from "./motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
+import { currencyWrapper } from "@/utils/currency";
 import InsightsCard from "./insights-card";
 import { DailyChangeCard, SourceStatusCard, TopCoinsCard, WhatMovedCard, useOverviewPanelsData } from "./overview-panels";
+import { syncRuntime } from "@/middlelayers/sync/runtime";
+import PartialOverview, { usePartialOverview } from "./partial-overview";
+import { overviewRefreshActivityEvent } from "./source-status-event";
 
 const MAIN_COMPONENT_COUNT = 3;
 
@@ -40,15 +44,44 @@ const App = ({
   allTimeRange?: TDateRange;
 }) => {
   const { t } = useTranslation();
+  const syncStatus = useSyncExternalStore(syncRuntime.subscribe, syncRuntime.status);
+  const syncDestination = syncStatus.mode === "ready" && syncRuntime.getSettings().endpoint.includes("r2.cloudflarestorage.com")
+    ? "Cloudflare R2" : "S3";
+  const deviceCount = syncStatus.sync.report?.devices?.length;
+  const syncSummary = syncStatus.mode === "ready" && syncStatus.sync.lastSync !== undefined
+    ? t(deviceCount === 1 ? "overview.fidelity.footerSyncedOne" : "overview.fidelity.footerSynced")
+      .replace("{destination}", syncDestination)
+      .replace("{devices}", deviceCount === undefined ? "—" : String(deviceCount))
+      .replace("{conflicts}", String(syncStatus.sync.report?.conflicts.length ?? 0))
+    : t("overview.fidelity.footerLocal");
   const [isShowMore, setIsShowMore] = useState<boolean>(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [refreshRunning, setRefreshRunning] = useState(false);
+  useEffect(() => {
+    const onActivity = (event: Event) => setRefreshRunning((event as CustomEvent<boolean>).detail);
+    window.addEventListener(overviewRefreshActivityEvent, onActivity);
+    return () => window.removeEventListener(overviewRefreshActivityEvent, onActivity);
+  }, []);
   const loadedCountRef = useRef(0);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
   );
   const dataChangedVersion = useDataChangedVersion();
-  const { series, contributions, contributionCount, coins, statuses } = useOverviewPanelsData(dateRange, allTimeRange ?? dateRange);
+  const { series, bestDayContribution, contributions, contributionCount, weekBased, coins, statuses, sources } = useOverviewPanelsData(dateRange, allTimeRange ?? dateRange);
+  const partialView = usePartialOverview(dateRange);
+  const positive = contributions.filter((row) => row.value > 0).sort((a, b) => b.value - a.value);
+  const negative = contributions.filter((row) => row.value < 0);
+  const weekTotal = contributions.reduce((total, row) => total + row.value, 0);
+  const weekValue = `${currency.symbol}${currencyWrapper(currency)(weekTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const summary = weekBased && weekTotal > 0 && positive.length >= 2 && negative.length === 1
+    ? t("overview.fidelity.weekSummary")
+      .replace("{value}", weekValue)
+      .replace("{first}", positive[0].symbol)
+      .replace("{second}", positive[1].symbol)
+      .replace("{down}", negative[0].symbol)
+    : t("overview.design.summary");
+  const weekValueAt = summary.indexOf(weekValue);
   useLayoutEffect(() => {
     setPageLoading(true);
     loadedCountRef.current = 0;
@@ -68,9 +101,12 @@ const App = ({
       <div className="relative min-h-[400px]" aria-busy={pageLoading}>
         <div className="t3-overview-heading">
           <h1>{t("overview.h1")}</h1>
-          <p>{t("overview.design.summary")}</p>
+          <p>{refreshRunning ? t("refresh.fidelity.progressHeading").replace("{total}", String(statuses.length))
+            : weekBased && weekValueAt >= 0 && weekTotal > 0 ? <>
+            {summary.slice(0, weekValueAt)}<b>{weekValue}</b>{summary.slice(weekValueAt + weekValue.length)}
+          </> : summary}</p>
         </div>
-        <SourceStatusCard statuses={statuses} />
+        {partialView && <PartialOverview view={partialView} statuses={statuses} currency={currency} bannerOnly />}
         <Collapsible open={isShowMore} onOpenChange={setIsShowMore}>
           <StaggerContainer className="t3-overview-grid">
               <FadeUp className="t3-grid-hero">
@@ -78,27 +114,28 @@ const App = ({
                   currency={currency}
                   dateRange={dateRange}
                   quoteColor={quoteColor}
-                  metrics={<PNL currency={currency} dateRange={dateRange} quoteColor={quoteColor} compact />}
+                  metrics={<PNL currency={currency} dateRange={dateRange} quoteColor={quoteColor} compact overviewFidelity />}
                   ath={series.ath && { ...series.ath, distanceFromAth: series.distanceFromAth }}
                   bestDay={series.bestDay}
+                  bestDayContribution={bestDayContribution}
                 />
               </FadeUp>
               <FadeUp className="t3-grid-holdings"><LatestAssetsPercentage currency={currency} dateRange={dateRange} holdings /></FadeUp>
-              <FadeUp className="t3-grid-insights"><InsightsCard currency={currency} /></FadeUp>
-              <FadeUp className="t3-grid-daily"><DailyChangeCard currency={currency} daily={series.daily} bestDay={series.bestDay} /></FadeUp>
-              <FadeUp className="t3-grid-moved"><WhatMovedCard currency={currency} rows={contributions} count={contributionCount} /></FadeUp>
-              <FadeUp className="t3-grid-coins"><TopCoinsCard currency={currency} rows={coins} /></FadeUp>
-              <FadeUp className="t3-grid-sources"><SourceStatusCard statuses={statuses} variant="card" /></FadeUp>
+              <FadeUp className="t3-grid-insights"><InsightsCard currency={currency} overviewFidelity /></FadeUp>
+              <FadeUp className="t3-grid-daily"><DailyChangeCard currency={currency} daily={series.daily} bestDay={series.bestDay} desktopFidelity /></FadeUp>
+              <FadeUp className="t3-grid-moved"><WhatMovedCard currency={currency} rows={contributions} count={contributionCount} weekBased={weekBased} desktopFidelity /></FadeUp>
+              <FadeUp className="t3-grid-coins"><TopCoinsCard currency={currency} rows={coins} overviewFidelity /></FadeUp>
+              <FadeUp className="t3-grid-sources"><SourceStatusCard statuses={statuses} sources={sources} currency={currency} variant="card" desktopFidelity /></FadeUp>
           </StaggerContainer>
-          <CollapsibleTrigger asChild className="my-3 w-full">
-            <Button
-              variant="ghost"
-              className="text-muted-foreground hover:text-foreground border-t border-border/40 rounded-none hover:bg-muted/50"
-            >
-              {isShowMore ? t("common.showLess") : t("common.showMore")}
-              <CaretSortIcon className="ml-1 h-4 w-4" />
-            </Button>
-          </CollapsibleTrigger>
+          <div className="t3-overview-footer">
+            <span><i aria-hidden="true" />{syncSummary}</span>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="t3-overview-more">
+                {isShowMore ? t("common.showLess") : t("common.showMore")}
+                <CaretSortIcon className="ml-1 h-4 w-4" />
+              </Button>
+            </CollapsibleTrigger>
+          </div>
           <CollapsibleContent>
             <StaggerContainer className="space-y-3">
               <FadeUp><Profit currency={currency} dateRange={dateRange} quoteColor={quoteColor} /></FadeUp>

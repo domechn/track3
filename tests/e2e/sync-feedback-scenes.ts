@@ -32,7 +32,11 @@ async function shot(page: Page, name: string) {
     await page.getByRole("button", { name: /^(Sync now|立即同步)$/ })
       .evaluate((node) => node.scrollIntoView({ block: "center", behavior: "auto" }));
   }
-  const toast = page.locator(`${name.startsWith("mobile") ? ".ios-d3-toast-viewport" : ".desktop-toast-viewport"} > li[data-state=open]`).last();
+  const state = name.includes("-pending") ? "pending" : name.includes("-success") ? "success" : "error";
+  const matchingToasts = page.locator(`${name.startsWith("mobile") ? ".ios-d3-toast-viewport" : ".desktop-toast-viewport"} > li[data-state=open][data-sync-status=${state}]`);
+  const toast = name.endsWith("-long-error")
+    ? matchingToasts.filter({ hasText: name.includes("-zh") ? "同步存储未完成请求" : "The sync store did not finish the request" }).first()
+    : matchingToasts.first();
   await expect(toast).toBeVisible();
   await page.waitForTimeout(250);
   await expect(toast.locator("svg").first()).toBeVisible();
@@ -76,23 +80,42 @@ async function shot(page: Page, name: string) {
   }, name.startsWith("mobile"));
   expect(overlap, `${name}: toast overlaps a control`).toBeNull();
   if (name.endsWith("-long-error")) {
-    const description = toast.locator("div.grid > :last-child");
+    const description = toast.locator("div.grid > :nth-child(2)");
     const extent = await description.evaluate((node) => ({
       height: node.clientHeight,
       scrollHeight: node.scrollHeight,
       overflow: getComputedStyle(node).overflowY,
       lineClamp: getComputedStyle(node).webkitLineClamp,
+      fullHeight: (() => {
+        const copy = node.cloneNode(true) as HTMLElement;
+        copy.style.display = "block";
+        copy.style.webkitLineClamp = "unset";
+        copy.style.position = "absolute";
+        copy.style.visibility = "hidden";
+        copy.style.width = `${node.getBoundingClientRect().width}px`;
+        node.parentElement!.appendChild(copy);
+        const height = copy.getBoundingClientRect().height;
+        copy.remove();
+        return height;
+      })(),
     }));
     expect(extent.height).toBeLessThanOrEqual(61);
-    expect(extent.overflow).toBe("hidden");
-    expect(extent.lineClamp).toBe("3");
-    if (name.includes("-en-") || name.endsWith("-en-long-error")) {
+    const shortChineseMessageFits = name.includes("-zh") &&
+      (page.viewportSize()!.width >= 1280 ||
+        (name.startsWith("mobile") && page.viewportSize()!.width === 390));
+    if (shortChineseMessageFits) {
+      // The shorter Chinese message fits three lines at these measured widths.
+      expect(extent.fullHeight).toBeLessThanOrEqual(extent.height);
+      expect(extent.scrollHeight).toBeLessThanOrEqual(extent.height);
+    } else {
       expect(extent.scrollHeight).toBeGreaterThan(extent.height);
     }
+    expect(extent.overflow).toBe("hidden");
+    expect(extent.lineClamp).toBe("3");
   }
   const readability = await toast.evaluate((node) => {
     const text = node.querySelector("div.grid");
-    const description = text?.lastElementChild;
+    const description = text?.children[1];
     const rgb = (value: string) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
     const luminance = (value: number[]) => value.map((channel) => {
       const normalized = channel / 255;
@@ -214,16 +237,16 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
             .toBeLessThan(1);
           if (platform === "desktop" && theme === "light" && locale === "en") {
             await page.waitForTimeout(4200);
-            await expect(toast.locator("> li[data-state=open]")).toContainText("Testing…");
+            await expect(toast.locator("> li[data-state=open]").filter({ hasText: "Testing…" })).toBeVisible();
           }
           await shotPending(page, `${prefix}-test-pending`);
           store.release();
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Connection OK" : "连接正常");
+          await expect(toast.locator("> li[data-state=open]").filter({ hasText: locale === "en" ? "Connection OK" : "连接正常" })).toBeVisible();
           await shot(page, `${prefix}-test-success`);
 
           store.ignoreConditions = true;
           await testButton.click();
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "conditional writes" : "条件写入");
+          await expect(toast.locator("> li[data-state=open]").filter({ hasText: locale === "en" ? "conditional writes" : "条件写入" })).toBeVisible();
           await shot(page, `${prefix}-test-error`);
           store.ignoreConditions = false;
 
@@ -246,14 +269,15 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
             .toBeLessThan(1);
           await shotPending(page, `${prefix}-now-pending`);
           store.release();
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Sync complete" : "同步完成");
-          await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Pushed 5" : "已推送 5 项");
+          await expect(toast.locator("> li[data-state=open]").filter({
+            hasText: locale === "en" ? /Sync complete[\s\S]*Pushed 5/ : /同步完成[\s\S]*已推送 5 项/,
+          })).toBeVisible();
           await shot(page, `${prefix}-now-success`);
+          await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
 
           store.failList = true;
           await now.click();
-          await expect(toast.locator("> li[data-state=open]")).toContainText(locale === "en" ? "Bucket not found." : "存储桶");
+          await expect(toast.locator("> li[data-state=open]").filter({ hasText: locale === "en" ? "Bucket not found." : "存储桶" })).toBeVisible();
           await shot(page, `${prefix}-now-error`);
 
           await page.evaluate(async ({ mobile, locale }) => {
@@ -267,6 +291,8 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
             toast({ title: locale === "en" ? "Sync failed" : "同步失败", description: long,
               variant: "destructive", syncStatus: "error", duration: 8000 });
           }, { mobile, locale });
+          await expect(toast.locator("> li[data-state=open]").filter({ hasText: locale === "en"
+            ? "The sync store did not finish the request" : "同步存储未完成请求" })).toBeVisible();
           await shot(page, `${prefix}-long-error`);
           if (!mobile) {
             const expand = page.getByRole("button", { name: /Expand sidebar|展开侧边栏/ });
@@ -279,7 +305,9 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
             await page.waitForTimeout(350);
             await shot(page, `${prefix}-collapsed-long-error`);
           }
-          await toast.locator("> li[data-state=open] [toast-close]").click();
+          while (await toast.locator("> li[data-state=open]").count()) {
+            await toast.locator("> li[data-state=open] [toast-close]").first().click();
+          }
           await expect(toast.locator("> li[data-state=open]")).toHaveCount(0);
         } finally {
           await context.close();
@@ -303,7 +331,7 @@ async function shotPending(page: Page, name: string) {
     const mainBox = await page.locator("#app-main-content").boundingBox();
     expect(buttonBox!.y + buttonBox!.height).toBeLessThanOrEqual(mainBox!.y + mainBox!.height);
   }
-  const toast = page.locator(`${name.startsWith("mobile") ? ".ios-d3-toast-viewport" : ".desktop-toast-viewport"} > li[data-state=open]`);
+  const toast = page.locator(`${name.startsWith("mobile") ? ".ios-d3-toast-viewport" : ".desktop-toast-viewport"} > li[data-state=open][data-sync-status=pending]`);
   await expect(toast).toHaveCount(1);
   await expect(toast).toHaveAttribute("data-sync-status", "pending");
   if (name.includes("-now-")) {

@@ -7,8 +7,8 @@ import type {
   ToastProps,
 } from "@/components/ui/toast"
 
-const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
+const toastLimit = () => typeof window !== "undefined" && window.innerWidth >= 761 ? 3 : 1
 
 type ToasterToast = ToastProps & {
   id: string
@@ -78,7 +78,7 @@ export const reducer = (state: State, action: Action): State => {
     case "ADD_TOAST":
       return {
         ...state,
-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+        toasts: [...state.toasts, action.toast].slice(-toastLimit()),
       }
 
     case "UPDATE_TOAST":
@@ -145,6 +145,8 @@ function toast({ ...props }: Toast) {
   const id = genId()
   const clean = (value: Toast) => ({
     ...value,
+    tone: value.tone ?? (value.variant === "destructive" || value.syncStatus === "error"
+      ? "error" : value.syncStatus === "success" ? "success" : "info"),
     title: typeof value.title === "string" ? redactSecrets(value.title) : value.title,
     description: typeof value.description === "string" ? redactSecrets(value.description) : value.description,
   })

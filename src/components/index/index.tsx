@@ -25,10 +25,14 @@ import RealTimeTotalValue from "../realtime-total-value";
 import Sidebar from "../sidebar";
 import { AnimatedPage } from "../motion";
 import PageLoadingOverlay from "../page-loading-overlay";
+import DesktopOverviewSkeleton from "../desktop-overview-skeleton";
 import AutoBackupIndicator from "../auto-backup-indicator";
 import SyncStatusIndicator from "../sync-status-indicator";
+import DesktopErrorBoundary from "../desktop-error-boundary";
 import "./index.css";
-import { Route, Routes, HashRouter, Outlet, Navigate, useLocation } from "react-router-dom";
+import { Route, Routes, HashRouter, Outlet, Navigate, Link, useLocation } from "react-router-dom";
+import { BellIcon } from "@radix-ui/react-icons";
+import { useAlertBadge } from "../use-alert-badge";
 
 import { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -110,6 +114,7 @@ export const RefreshButtonLoadingContext = React.createContext<{
 function TopBar({
   isProUser,
   fidelityPage,
+  pageOwnsSync,
   quoteColor,
   currentCurrency,
   availableDates,
@@ -120,6 +125,7 @@ function TopBar({
 }: {
   isProUser: boolean;
   fidelityPage: boolean;
+  pageOwnsSync: boolean;
   quoteColor: QuoteColor;
   currentCurrency: CurrencyRateDetail;
   availableDates: Date[];
@@ -132,9 +138,19 @@ function TopBar({
   onRefreshSuccess: () => void;
 }) {
   const { t } = useTranslation();
+  const unreadAlerts = useAlertBadge();
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
+  const isOverview = useLocation().pathname === "/overview";
   const selectedSnapshots = availableDates.filter((date) => dateRange?.from && dateRange.to && date >= dateRange.from && date <= dateRange.to).length;
+  const fidelityPresets = [
+    { label: "1D", days: 1 }, { label: "7D", days: 7 }, { label: "30D", days: 30 },
+    { label: "90D", days: 90 }, { label: "1Y", days: 365 }, { label: "All", days: -1 },
+  ] as const;
+  const rangeSpan = dateRange?.from && dateRange.to
+    ? Math.round((dateRange.to.getTime() - dateRange.from.getTime()) / 86400000) : -1;
+  const activePreset = fidelityPresets.find((preset) => preset.days === rangeSpan)?.label ??
+    (selectedSnapshots === availableDates.length ? "All" : "");
 
   return (
     <div className={fidelityPage ? "t3-fidelity-rail-refresh-container" : "sticky top-0 z-10 glass-subtle border-b relative"}>
@@ -147,8 +163,24 @@ function TopBar({
             />
           </div>
         )}
-        <div className="ml-auto flex items-center space-x-3">
-          {!fidelityPage && availableDates.length > 0 && <div className="t3-topbar-ranges" role="group" aria-label={t("datePicker.predefined")}>
+        <div className="ml-auto flex items-center gap-3">
+          {!fidelityPage && !pageOwnsSync && <SyncStatusIndicator overviewFidelity={isOverview} />}
+          {!fidelityPage && <Link to="/goals" aria-label={t("overview.fidelity.alerts")} className="t3-topbar-bell">
+            <BellIcon aria-hidden="true" />
+            {unreadAlerts > 0 && <span aria-hidden="true">{unreadAlerts > 99 ? "99+" : unreadAlerts}</span>}
+          </Link>}
+          <div className="t3-topbar-controls flex items-center gap-3">
+            {isOverview && availableDates.length > 0 && <div className="t3-fidelity-ranges" role="group" aria-label={t("overview.fidelity.period")}>
+              {fidelityPresets.map(({ label, days }) => <button key={label} type="button"
+                aria-pressed={activePreset === label}
+                onClick={() => {
+                  const latest = availableDates.at(-1);
+                  const selected = days < 0 || !latest ? availableDates
+                    : availableDates.filter((date) => date.getTime() >= latest.getTime() - days * 86400000);
+                  onDatePickerValueChange(selected.length, { from: selected[0], to: selected.at(-1) });
+                }}>{label}</button>)}
+            </div>}
+            {!fidelityPage && availableDates.length > 0 && <div className="t3-topbar-ranges" role="group" aria-label={t("datePicker.predefined")}>
             {([10, 30, 50, 100, -1] as const).map((count) => {
               const selected = count < 0 ? availableDates : availableDates.slice(-count);
               return <button key={count} type="button"
@@ -158,45 +190,48 @@ function TopBar({
                 {count < 0 ? t("datePicker.all") : count}
               </button>;
             })}
-          </div>}
-          {!fidelityPage && <SyncStatusIndicator />}
-          {!fidelityPage && <DatePicker
-            availableDates={availableDates}
-            value={dateRange}
-            onDateChange={onDatePickerValueChange}
-          />}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <RefreshButtonLoadingContext.Provider
-                    value={{
-                      buttonLoading: refreshButtonLoading,
-                      setButtonLoading: setRefreshButtonLoading,
-                      progress: refreshProgress,
-                      setProgress: setRefreshProgress,
-                    }}
-                  >
-                    <RefreshData
-                      loading={refreshButtonLoading}
-                      afterRefresh={(success) => {
-                        if (success) {
-                          onRefreshSuccess();
-                        }
+            </div>}
+            {!fidelityPage && <DatePicker
+              availableDates={availableDates}
+              value={dateRange}
+              onDateChange={onDatePickerValueChange}
+              overviewFidelity={isOverview}
+              currency={currentCurrency}
+            />}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <RefreshButtonLoadingContext.Provider
+                      value={{
+                        buttonLoading: refreshButtonLoading,
+                        setButtonLoading: setRefreshButtonLoading,
+                        progress: refreshProgress,
+                        setProgress: setRefreshProgress,
                       }}
-                    />
-                  </RefreshButtonLoadingContext.Provider>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>
-                  {lastRefreshAt
-                    ? t("topbar.lastRefreshAt") + lastRefreshAt
-                    : t("topbar.neverRefreshBefore")}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+                    >
+                      <RefreshData
+                        loading={refreshButtonLoading}
+                        overviewFlow={isOverview}
+                        afterRefresh={(success) => {
+                          if (success) {
+                            onRefreshSuccess();
+                          }
+                        }}
+                      />
+                    </RefreshButtonLoadingContext.Provider>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>
+                    {lastRefreshAt
+                      ? t("topbar.lastRefreshAt") + lastRefreshAt
+                      : t("topbar.neverRefreshBefore")}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
       </div>
       {refreshProgress > 0 && refreshButtonLoading && (
@@ -223,6 +258,7 @@ function RouteLoadingFallback({ hidden }: { hidden: boolean }) {
 }
 
 type LayoutProps = {
+  hasData: boolean;
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
   initializing: boolean;
@@ -240,6 +276,7 @@ type LayoutProps = {
 };
 
 function Layout({
+  hasData,
   sidebarCollapsed,
   onSidebarToggle,
   initializing,
@@ -254,18 +291,20 @@ function Layout({
 }: LayoutProps) {
   const { t } = useTranslation();
   const darkTheme = useDarkTheme();
-  const { pathname } = useLocation();
-  const [wideViewport, setWideViewport] = useState(() => window.innerWidth >= 1500);
+  const pathname = useLocation().pathname;
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   useEffect(() => {
-    const onResize = () => setWideViewport(window.innerWidth >= 1500);
+    const onResize = () => setViewportWidth(window.innerWidth);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-  const fidelityPage = wideViewport && darkTheme && (pathname === "/rebalance" || pathname === "/goals" || pathname === "/goals/kinds");
+  const fidelityPage = viewportWidth >= 1500 && darkTheme &&
+    (pathname === "/rebalance" || pathname === "/goals" || pathname === "/goals/kinds");
+  const pageOwnsSync = viewportWidth >= 1400 && (pathname === "/comparison" || pathname === "/wallets");
   const sidebarWidth = sidebarCollapsed ? 56 : 216;
 
   return (
-    <div className="min-h-screen">
+    <div className={`min-h-screen ${pathname === "/comparison" ? "t3-route-comparison" : pathname === "/wallets" ? "t3-route-wallets" : pathname === "/overview" && !hasData ? "t3-route-first-run" : ""} ${pathname === "/overview" && initializing ? "t3-route-overview-loading" : ""}`}>
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={onSidebarToggle}
@@ -279,6 +318,7 @@ function Layout({
         <TopBar
           isProUser={isProUser}
           fidelityPage={fidelityPage}
+          pageOwnsSync={pageOwnsSync}
           quoteColor={quoteColor}
           currentCurrency={currentCurrency}
           availableDates={availableDates}
@@ -291,6 +331,7 @@ function Layout({
         {/* Main content */}
         <main id="app-main-content" tabIndex={-1} className="mx-auto w-full max-w-[1560px] px-7 py-5">
           <div className="relative min-h-[400px]" aria-busy={initializing}>
+            <div className="t3-desktop-loading-legacy">
             <React.Suspense
               fallback={<RouteLoadingFallback hidden={initializing} />}
             >
@@ -302,6 +343,8 @@ function Layout({
                 description={t("loading.portfolioDesc")}
               />
             )}
+            </div>
+            {pathname === "/overview" && initializing && viewportWidth >= 1400 && <DesktopOverviewSkeleton />}
           </div>
         </main>
       </div>
@@ -369,6 +412,7 @@ function AppRoutes({
         path="/"
         element={
           <Layout
+            hasData={hasData}
             sidebarCollapsed={sidebarCollapsed}
             onSidebarToggle={onSidebarToggle}
             initializing={initializing}
@@ -391,7 +435,7 @@ function AppRoutes({
           path="overview"
           element={
             <AnimatedPage>
-              <PageWrapper dateRange={tDateRange} hasData={hasData}>
+              <PageWrapper dateRange={tDateRange} hasData={hasData} firstRunOverview>
                 <Overview
                   currency={currentCurrency}
                   dateRange={tDateRange}
@@ -425,6 +469,8 @@ function AppRoutes({
                   currency={currentCurrency}
                   dateRange={tDateRange}
                   quoteColor={quoteColor}
+                  availableDates={availableDates}
+                  onDatePickerValueChange={onDatePickerValueChange}
                 />
               </PageWrapper>
             </AnimatedPage>
@@ -917,7 +963,7 @@ const App = () => {
       <DataChangedContext.Provider value={dataChangedVersion}>
         <HashRouter>
           <FirstRunOnboarding variant="desktop" ready={!initializing} />
-          <AppRoutes
+          <DesktopErrorBoundary><AppRoutes
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={handleSidebarToggle}
           initializing={initializing}
@@ -937,7 +983,7 @@ const App = () => {
           lastRefreshAt={lastRefreshAt}
           onDataChanged={onDataChanged}
           handleConfigurationSave={handleConfigurationSave}
-        />
+        /></DesktopErrorBoundary>
         </HashRouter>
       </DataChangedContext.Provider>
     </div>

@@ -17,6 +17,18 @@ describe("overview panels", () => {
     expect(screen.getByLabelText(/daily change chart/i)).toHaveTextContent("−$30");
   });
 
+  it("labels the daily chart's vertical direction outside its date axis", () => {
+    const daily = Array.from({ length: 30 }, (_, index) => ({
+      timestamp: Date.parse("2026-10-01") + index * 86400000,
+      value: index % 2 ? -100 : 100,
+    }));
+    render(<DailyChangeCard currency={usd} daily={daily} desktopFidelity />);
+    expect(screen.getByText("▲ Up")).toBeInTheDocument();
+    expect(screen.getByText("▼ Down")).toBeInTheDocument();
+    expect(document.querySelector(".t3-daily-x-axis")).not.toHaveTextContent("Up");
+    expect((document.querySelector(".t3-daily-up") as HTMLElement).style.height).toBe("48%");
+  });
+
   it("lists signed asset contributions", () => {
     render(<MemoryRouter><WhatMovedCard currency={usd} count={3} rows={[
       { symbol: "ETH", assetType: "crypto", value: 40 },
@@ -26,6 +38,52 @@ describe("overview panels", () => {
     expect(screen.getByText("Last 3 snapshots")).toBeInTheDocument();
     expect(screen.getByText("+$40.00")).toBeInTheDocument();
     expect(screen.getByText("−$25.00")).toBeInTheDocument();
+  });
+  it("keeps nonzero contribution bars visible at their original scale outside desktop fidelity", () => {
+    const { rerender } = render(<MemoryRouter><WhatMovedCard currency={usd} count={2} rows={[
+      { symbol: "ETH", assetType: "crypto", value: -40 },
+      { symbol: "SOL", assetType: "crypto", value: -25 },
+    ]} /></MemoryRouter>);
+    expect([...document.querySelectorAll<HTMLElement>(".t3-moved-track > span")].map((bar) => bar.style.width))
+      .toEqual(["100%", "62.5%"]);
+    rerender(<MemoryRouter><WhatMovedCard currency={usd} count={2} rows={[
+      { symbol: "ETH", assetType: "crypto", value: 1000 },
+      { symbol: "SOL", assetType: "crypto", value: -500 },
+      { symbol: "BTC", assetType: "crypto", value: 1 },
+    ]} /></MemoryRouter>);
+    expect([...document.querySelectorAll<HTMLElement>(".t3-moved-track > span")].map((bar) => bar.style.width))
+      .toEqual(["100%", "50%", "2%"]);
+    expect(document.querySelector(".t3-moved-diverging")).toBeNull();
+  });
+  it("keeps desktop gains and losses visible on opposite sides of the zero line", () => {
+    const { rerender } = render(<MemoryRouter><WhatMovedCard currency={usd} count={2} desktopFidelity rows={[
+      { symbol: "ETH", assetType: "crypto", value: -40 },
+      { symbol: "SOL", assetType: "crypto", value: -25 },
+    ]} /></MemoryRouter>);
+    expect(document.querySelector(".t3-moved-diverging")).toBeInTheDocument();
+    expect([...document.querySelectorAll<HTMLElement>(".t3-moved-track > span")].map((bar) => Number.parseFloat(bar.style.width)))
+      .toEqual([92, 57.5]);
+    rerender(<MemoryRouter><WhatMovedCard currency={usd} count={2} desktopFidelity rows={[
+      { symbol: "ETH", assetType: "crypto", value: 1000 },
+      { symbol: "SOL", assetType: "crypto", value: -500 },
+    ]} /></MemoryRouter>);
+    const bars = [...document.querySelectorAll<HTMLElement>(".t3-moved-track > span")];
+    expect(Number.parseFloat(bars[0].style.width)).toBeGreaterThan(60);
+    expect(Number.parseFloat(bars[1].style.width)).toBeGreaterThan(30);
+    expect(bars[0].style.left).not.toBe("");
+    expect(bars[1].style.right).not.toBe("");
+  });
+  it("uses the selected currency for daily chart ticks", () => {
+    render(<DailyChangeCard currency={eur} daily={[
+      { timestamp: Date.parse("2026-10-30"), value: 300 },
+    ]} desktopFidelity />);
+    expect(document.querySelector(".t3-daily-y-axis")).toHaveTextContent("+1K");
+  });
+  it("keeps the phone daily bar scale unchanged for small converted values", () => {
+    render(<DailyChangeCard currency={eur} daily={[
+      { timestamp: Date.parse("2026-10-30"), value: 0.8 },
+    ]} />);
+    expect((document.querySelector(".t3-daily-up") as HTMLElement).style.height).toBe("38.400000000000006%");
   });
   it("labels the coin percentage as a change rather than a price", () => {
     render(<MemoryRouter><TopCoinsCard currency={usd} rows={[

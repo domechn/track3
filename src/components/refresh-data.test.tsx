@@ -1,5 +1,5 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RefreshData from "@/components/refresh-data";
@@ -78,6 +78,7 @@ beforeEach(() => {
   vi.mocked(getConfiguration).mockResolvedValue(undefined);
   vi.mocked(isProVersion).mockResolvedValue({ isPro: false });
   vi.mocked(listPortfolioSources).mockReturnValue([]);
+  mockGetUsage.mockResolvedValue(undefined);
   vi.mocked(refreshAllData).mockResolvedValue({
     failedSources: [],
     requiresDataSourceAction: false,
@@ -92,6 +93,105 @@ beforeEach(() => {
 });
 
 describe("RefreshData — currency rates refresh ordering", () => {
+  it("dismisses a finished Overview panel when navigation changes the route", async () => {
+    render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("alertdialog", { name: "Refresh finished" })).toBeVisible();
+    act(() => window.dispatchEvent(new HashChangeEvent("hashchange")));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  });
+  it("opens the source progress panel for a manual refresh at 1440 px", async () => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+    vi.mocked(refreshAllData).mockReturnValueOnce(new Promise(() => {}));
+    try {
+      render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+      expect(await screen.findByRole("alertdialog", { name: "Refreshing sources" })).toBeVisible();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
+  it("chooses the Overview progress flow from its route even before the grid mounts", async () => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+    vi.mocked(refreshAllData).mockReturnValueOnce(new Promise(() => {}));
+    try {
+      render(<RefreshData loading={false} overviewFlow />);
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+      expect(await screen.findByRole("alertdialog", { name: "Refreshing sources" })).toBeVisible();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
+  it("does not offer a retry for a quota-limited Overview source", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult, sourceStatuses: [{ sourceId: "erc20:0", label: "Wallet", status: "failed", category: "quota" }],
+    } as never);
+    render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("alertdialog", { name: "Refresh finished" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Retry failed" })).not.toBeInTheDocument();
+  });
+  it("shows the real quota usage and a plan action for a quota-limited source", async () => {
+    mockGetUsage.mockResolvedValue({
+      enforced: true,
+      usage: {
+        erc20: { limit: 50, used: 50, remaining: 0, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+        tron: { limit: 300, used: 8, remaining: 292, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+      },
+    });
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult, sourceStatuses: [
+        { sourceId: "btc:0", label: "Cold wallet", status: "ok" },
+        { sourceId: "erc20:0", label: "0x4f…a91c", status: "failed", category: "quota" },
+      ],
+    } as never);
+    render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Refresh finished" });
+    expect(dialog).toHaveTextContent("1 of 2 refreshed · 1 needs a plan change");
+    expect(await within(dialog).findByText("Pro limit reached: 50 of 50 ERC20 refreshes used, resets 1 Nov")).toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Manage plan" }));
+    expect(window.location.hash).toBe("#/settings/systemInfo");
+    window.location.hash = "";
+  });
+  it("counts partial and stale sources in the finished Overview summary", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult, sourceStatuses: [
+        { sourceId: "btc:0", label: "BTC", status: "ok" },
+        { sourceId: "cex:0", label: "OKX", status: "failed", category: "network" },
+        { sourceId: "cex:1", label: "Binance", status: "stale", category: "network" },
+        { sourceId: "erc20:0", label: "Wallet", status: "partial" },
+      ],
+    } as never);
+    render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("alertdialog", { name: "Refresh finished" }))
+      .toHaveTextContent("1 of 4 refreshed · 3 failed");
+  });
+  it("offers an explicit Close action after every source refreshes", async () => {
+    render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Refresh finished" });
+    expect(within(dialog).getByRole("button", { name: "Close" })).toBeVisible();
+  });
+  it("retries the failed Overview source from the finished panel", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
+    render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Retry failed" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(refreshAllData).mock.calls[1][1]).toMatchObject({ retrySourceId: "btc:0" });
+  });
+  it("posts a styled success notice from a completed refresh", async () => {
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Refresh complete",
+      tone: "success",
+    })));
+  });
   it("asks before consuming more Pro ERC20 refreshes than remain", async () => {
     vi.mocked(getConfiguration).mockResolvedValue({} as never);
     vi.mocked(isProVersion).mockResolvedValue({ isPro: true, license: "pro" });
@@ -160,6 +260,32 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(dialog).toHaveTextContent("Monthly refresh limit reached");
     expect(screen.queryByRole("button", { name: "Retry Wallet" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry all failed" })).not.toBeInTheDocument();
+    const quotaToast = mockToast.mock.lastCall?.[0];
+    expect(quotaToast.title).toBe("Pro refresh limit reached");
+    expect(quotaToast.description).toContain("Wallet");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    render(<div>{quotaToast.action}</div>);
+    fireEvent.click(screen.getByRole("button", { name: "See usage" }));
+    expect(window.location.hash).toBe("#/settings/systemInfo");
+    window.location.hash = "";
+  });
+  it("offers Retry and Details on a failed source toast", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "BTC wallet 1 refresh failed",
+    })));
+    const failedToast = mockToast.mock.lastCall?.[0];
+    const notice = within(render(<div>{failedToast.action}</div>).container);
+    expect(notice.getByRole("button", { name: "Retry" })).toBeVisible();
+    expect(notice.getByRole("button", { name: /^Details$/ })).toBeVisible();
+    fireEvent.click(notice.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(refreshAllData).mock.calls[1][1]).toMatchObject({
+      retrySourceId: "btc:0",
+      previousSourceStatuses: [{ sourceId: "btc:0", status: "stale" }],
+    });
   });
   it("announces an active refresh to assistive technology", () => {
     render(<RefreshData loading={true} />);

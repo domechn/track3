@@ -53,6 +53,22 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
+  it("starts from the same 30-day comparison at narrow desktop widths", async () => {
+    const width = window.innerWidth;
+    window.innerWidth = 1024;
+    try {
+      vi.mocked(queryAllDataDates).mockResolvedValue(Array.from({ length: 31 }, (_, index) => ({
+        id: String(31 - index),
+        date: `2026-10-${String(31 - index).padStart(2, "0")}`,
+      })) as never);
+      vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+      render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+      await waitFor(() => expect(screen.getByRole("button", { name: /base date/i })).toHaveTextContent("2026-10-01"));
+    } finally {
+      window.innerWidth = width;
+    }
+  });
+
   it("consumes an assistant comparison date selection after applying it", async () => {
     localStorage.setItem(COMPARISON_DATES_KEY, JSON.stringify({ base: "2024-04-15", head: "2024-04-16" }));
     vi.mocked(queryAllDataDates).mockResolvedValue([

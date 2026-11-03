@@ -261,7 +261,7 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     window.location.hash = "#/goals/kinds";
     try {
       const view = renderApp();
-      expect(await view.findByRole("button", { name: "Show real-time portfolio value" })).toBeInTheDocument();
+      expect(await view.findByRole("button", { name: "Live total" })).toBeInTheDocument();
     } finally {
       vi.unstubAllGlobals();
     }

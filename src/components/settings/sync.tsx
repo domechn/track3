@@ -20,7 +20,7 @@ import {
 export default function SyncSettingsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const { busy, statusMessage, clearStatus, error, success, result, run } = useSyncFeedback(t, toast);
+  const { busy, statusMessage, clearStatus, error, success, result, run } = useSyncFeedback(t, toast, true);
   const status = useSyncExternalStore(syncRuntime.subscribe, syncRuntime.status);
   const [form, setForm] = useState<SyncSettings>(() => syncRuntime.getSettings());
   const awaitingSettings = useRef(status.mode === "loading");

@@ -242,7 +242,8 @@ test("expanded Overview content passes axe with its percentage rows visible", as
   await installTauriBridge(page, undefined, true);
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Show More" }).click();
-  await expect(page.locator("[data-testid='tcpc-row']").first()).toBeVisible();
+  // Show More loads the percentage rows asynchronously before the axe scan.
+  await expect(page.locator("[data-testid='tcpc-row']").first()).toBeVisible({ timeout: 15000 });
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(results.violations.map(({ id, nodes }) => `${id}: ${nodes.map((node) => `${node.target.join(" ")} ${node.failureSummary}`).join(", ")}`)).toEqual([]);
 });
@@ -568,10 +569,10 @@ test("refresh status dialog fits and has no axe violations", async ({ page }) =>
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installTauriBridge(page);
   await page.goto("/#/overview");
-  await page.getByRole("button", { name: "Refresh" }).click();
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
   const trigger = page.getByRole("button", { name: "Source status" });
   await expect(trigger).toBeVisible();
-  await expect(page.getByRole("button", { name: "Refresh" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeEnabled();
   await trigger.click();
   const dialog = page.getByRole("alertdialog", { name: "Source status" });
   await expect(dialog).toBeVisible();

@@ -1,9 +1,10 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Overview from "@/components/overview";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { loadInsightCard } from "@/middlelayers/insights-service";
+import { overviewRefreshActivityEvent } from "./source-status-event";
 
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 
@@ -93,6 +94,14 @@ beforeEach(() => {
 });
 
 describe("Overview loading state", () => {
+  it("keeps detailed panels and Show More mounted during refresh", () => {
+    render(<Overview currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" />);
+    act(() => window.dispatchEvent(new CustomEvent(overviewRefreshActivityEvent, { detail: true })));
+    expect(screen.getByRole("button", { name: "Show More" })).toBeInTheDocument();
+    expect(screen.getByText("Daily change")).toBeInTheDocument();
+  });
   it("announces loading and keeps it visible until overview sections finish loading", () => {
     vi.useFakeTimers();
 

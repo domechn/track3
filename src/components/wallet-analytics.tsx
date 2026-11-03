@@ -17,17 +17,25 @@ import { sourceStatusesChangedEvent } from "./source-status-event";
 import { WalletStatusBanner } from "./wallet-status-banner";
 import WalletSourceChanges from "./wallet-source-changes";
 import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
+import WalletsFidelity from "./wallets-fidelity";
+import { useWindowSize } from "@/utils/hook";
 
 const App = ({
   currency,
   dateRange,
   quoteColor,
+  availableDates,
+  onDatePickerValueChange,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
+  availableDates?: Date[];
+  onDatePickerValueChange?: (selectedTimes: number, nextDateRange: { from: Date; to: Date }) => void;
 }) => {
   const { t, locale } = useTranslation();
+  const windowSize = useWindowSize();
+  const wide = (windowSize.width ?? window.innerWidth) >= 1400;
   const LOAD_COUNT = 2;
   const [pageLoading, setPageLoading] = useState(true);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
@@ -56,10 +64,16 @@ const App = ({
       setPageLoading(false);
     }
   }, []);
+  const onFidelityLoaded = useCallback(() => setPageLoading(false), []);
 
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
       <div className="analyze-wallets relative min-h-[400px]" aria-busy={pageLoading}>
+        {wide && <WalletsFidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor}
+          selectedSource={selectedSource} onSelectSource={setSelectedSource} statuses={statuses}
+          nextBySource={retrySchedule.nextBySource} availableDates={availableDates}
+          onDatePickerValueChange={onDatePickerValueChange} onLoaded={onFidelityLoaded} />}
+        {!wide && <div className="t3-wallet-legacy">
         <h1 className="analyze-page-title">{t("wallets.h1")}</h1>
         <WalletStatusBanner statuses={statuses} locale={locale} t={t}
           nextBySource={retrySchedule.nextBySource} stopped={retrySchedule.stopped} />
@@ -81,6 +95,7 @@ const App = ({
               quoteColor={quoteColor} selectedSource={selectedSource} />
           </FadeUp>
         </StaggerContainer>
+        </div>}
         {pageLoading && (
           <PageLoadingOverlay
             title={t("loading.wallets")}

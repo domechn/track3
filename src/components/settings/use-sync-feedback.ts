@@ -1,10 +1,13 @@
-import { useRef, useState } from "react";
+import { createElement, useRef, useState, type ReactElement } from "react";
 import { classifySyncError, type SyncConnectionResult } from "@/middlelayers/sync/settings";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
+import { serializeSyncDiagnostics } from "@/middlelayers/sync/diagnostics";
+import { ToastAction, type ToastActionElement } from "@/components/ui/toast";
 
 type ShowToast = (options: {
   title?: string; description: string; variant?: "destructive";
   duration?: number; syncStatus?: "success" | "pending" | "error";
+  action?: ToastActionElement;
 }) => {
   dismiss: () => void;
 };
@@ -23,7 +26,7 @@ export function waitForSyncResult(): Promise<void> {
   });
 }
 
-export function useSyncFeedback(t: (key: string) => string, toast: ShowToast) {
+export function useSyncFeedback(t: (key: string) => string, toast: ShowToast, desktopActions = false) {
   const [busy, setBusy] = useState<string>();
   const [statusMessage, setStatusMessage] = useState<string>();
   const running = useRef(false);
@@ -41,6 +44,15 @@ export function useSyncFeedback(t: (key: string) => string, toast: ShowToast) {
     clearPending();
     if (lastError.current?.message === message) lastError.current.dismiss();
     const action = currentAction.current;
+    const diagnostics = syncRuntime.status().sync.diagnostics;
+    const details = diagnostics ? `${message}\n${serializeSyncDiagnostics(diagnostics)}` : message;
+    const actions: ReactElement = createElement("div", { className: "t3-sync-toast-actions" },
+      createElement(ToastAction, { altText: t("startup.fidelity.copyDetails"), onClick: () => {
+        void navigator.clipboard?.writeText(details);
+      } }, t("startup.fidelity.copyDetails")),
+      createElement(ToastAction, { altText: t("refresh.details"), onClick: () => {
+        window.location.hash = "#/settings/sync";
+      } }, t("refresh.details")));
     const shown = toast({
       title: t(titleKey ?? (action === "test" || action === "unlock" ? "sync.toast.connectionFailed"
         : action === "save" ? "sync.toast.settingsFailed"
@@ -50,6 +62,7 @@ export function useSyncFeedback(t: (key: string) => string, toast: ShowToast) {
         : action === "forget" ? "sync.toast.forgetFailed" : "sync.toast.failed")),
       description: message, variant: "destructive",
       syncStatus: "error", duration: 8000,
+      action: desktopActions ? actions : undefined,
     });
     lastError.current = { message, dismiss: shown.dismiss };
   }

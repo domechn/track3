@@ -192,7 +192,7 @@ const App = ({
     <div>
       <Popover onOpenChange={onPopoverOpenChange}>
         <PopoverTrigger asChild>
-          <button type="button" aria-label={t("realtime.open")}
+          <button type="button" aria-label={t("realtime.design.live")} aria-description={t("realtime.open")}
             className="t3-live-trigger flex min-h-9 touch:min-h-11 items-center justify-center gap-2 rounded-md text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <LightningBoltIcon aria-hidden="true" height={16} width={16} />
             <span className="t3-live-label">{t("realtime.design.live")}</span>

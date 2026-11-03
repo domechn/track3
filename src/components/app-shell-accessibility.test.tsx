@@ -25,6 +25,7 @@ vi.mock("@/components/common/theme", () => ({
 
 vi.mock("@/utils/hook", () => ({
   renderRightClickMenu: vi.fn(),
+  useWindowSize: () => ({ width: 1440, height: 900 }),
 }));
 
 vi.mock("@/components/total-value-and-change", () => ({

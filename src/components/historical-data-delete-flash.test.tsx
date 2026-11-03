@@ -266,6 +266,10 @@ describe("Historical-data — delete does not flash loading overlay", () => {
     await waitFor(() => expect(deleteHistoricalDataByUUID).toHaveBeenCalledWith("snapshot-1"));
     const latest = screen.getByText("Latest Snapshot").closest("[class*='rounded']") ?? screen.getByText("Latest Snapshot").parentElement?.parentElement;
     expect(latest).toHaveTextContent("$800");
+    expect(toastMock.mock.lastCall?.[0]).toMatchObject({
+      title: "Snapshot deleted",
+      description: "16 Apr 12:00 removed from History.",
+    });
   });
 
   it("closes the detail dialog when an external refresh removes its snapshot", async () => {

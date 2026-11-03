@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Line } from "react-chartjs-2";
+import { Tooltip as ChartTooltip, type Chart as ChartJS, type Plugin } from "chart.js";
 import {
   queryAssetChange,
   queryTotalValue,
@@ -36,6 +37,8 @@ import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { downsampleIndices } from "@/middlelayers/chart-downsample";
 import { hasPartialGap } from "@/middlelayers/chart-gap";
+import { chartBounds, shouldShowOverviewDateTick } from "./overview-chart-scale";
+import { overviewUseLastKnownEvent } from "./source-status-event";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -49,6 +52,27 @@ interface TotalValueShower {
 
 const chartName = "Trend of Asset";
 const btcSymbol = "₿";
+Object.assign(ChartTooltip.positioners, {
+  overviewTop(this: { chart: { chartArea: { top: number } } }, elements: { element: { x: number } }[]) {
+    return elements.length ? { x: elements[0].element.x, y: this.chart.chartArea.top } : false;
+  },
+});
+const overviewCrosshair: Plugin<"line"> = {
+  id: "overview-crosshair",
+  afterDatasetsDraw(chart) {
+    const point = chart.getActiveElements().find((item) => item.datasetIndex === 0);
+    if (!point) return;
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.strokeStyle = chartThemeColor("control");
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(point.element.x, chartArea.top);
+    ctx.lineTo(point.element.x, chartArea.bottom);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
 
 class FiatTotalValue implements TotalValueShower {
   private currency: CurrencyRateDetail;
@@ -175,6 +199,7 @@ const App = ({
   metrics,
   ath,
   bestDay,
+  bestDayContribution,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
@@ -182,9 +207,11 @@ const App = ({
   metrics?: ReactNode;
   ath?: { timestamp: number; value: number; distanceFromAth?: number };
   bestDay?: { timestamp: number; value: number };
+  bestDayContribution?: { symbol: string; value: number };
 }) => {
   const lineColor = chartColors[0].main;
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === "zh" ? "zh-CN" : "en-GB";
   const { needResize } = useContext(ChartResizeContext);
   const { reportLoaded } = useContext(OverviewLoadingContext);
 
@@ -221,6 +248,7 @@ const App = ({
     () => timeToDateStr(assetChangeData.timestamps[0] ?? 0),
     [assetChangeData],
   );
+  const latestSnapshot = assetChangeData.timestamps.at(-1);
 
   const totalValueShower = useMemo(
     () =>
@@ -267,6 +295,12 @@ const App = ({
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
+  useEffect(() => {
+    const includeLastKnown = () => setExcludedProvider("");
+    window.addEventListener(overviewUseLastKnownEvent, includeLastKnown);
+    return () => window.removeEventListener(overviewUseLastKnownEvent, includeLastKnown);
+  }, []);
+
   async function loadData(dr: TDateRange, gen: number) {
     return bluebird.all([loadTotalValue(dr, gen), loadChartData(dr, gen)]);
   }
@@ -277,6 +311,7 @@ const App = ({
       return;
     }
     setTotalValueData(tv);
+    setExcludedProvider(tv.partial ? tv.excludedSources?.[0]?.provider ?? "" : "");
   }
 
   async function loadChartData(dr: TDateRange, gen: number) {
@@ -348,6 +383,16 @@ const App = ({
       .map((d) => currencyWrapper(currency)(d.usdValue))
       .map((d) => (showPercentageInChart ? (d / baseDataValue) * 100 - 100 : d));
   }, [assetChangeData, btcAsBase, currency, showPercentageInChart]);
+  const valueBounds = useMemo(() => chartBounds(lineValues.map((totalValue) => ({ totalValue }))), [lineValues]);
+  const chartEnd = lineValues.at(-1);
+  const chartRef = useRef<ChartJS<"line"> | null>(null);
+  useEffect(() => {
+    const chart = chartRef.current;
+    const endLabel = chart?.canvas.parentElement?.querySelector<HTMLSpanElement>(".t3-chart-end-value");
+    if (chart?.scales.y && endLabel && chartEnd !== undefined) {
+      endLabel.style.top = `${chart.scales.y.getPixelForValue(chartEnd) + chart.canvas.offsetTop}px`;
+    }
+  });
   const plottedIndices = useMemo(
     () => downsampleIndices([lineValues], Math.max(40, Math.floor(chartWidth / 2))),
     [lineValues, chartWidth],
@@ -356,6 +401,44 @@ const App = ({
     () => plottedIndices.map((index) => assetChangeData.timestamps[index]),
     [plottedIndices, assetChangeData.timestamps],
   );
+  const overviewBestDayMarker = useMemo<Plugin<"line">>(() => ({
+    id: "overview-best-day-marker",
+    afterDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      ctx.save();
+      ctx.strokeStyle = chartThemeColor("border");
+      ctx.lineWidth = 1;
+      for (const tick of scales.y.ticks) {
+        const y = Math.round(scales.y.getPixelForValue(tick.value)) + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(chartArea.right, y);
+        ctx.lineTo(chart.canvas.clientWidth - 1, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    },
+    afterDatasetsDraw(chart) {
+      const endLabel = chart.canvas.parentElement?.querySelector<HTMLSpanElement>(".t3-chart-end-value");
+      if (endLabel && chartEnd !== undefined) {
+        endLabel.style.top = `${chart.scales.y.getPixelForValue(chartEnd) + chart.canvas.offsetTop}px`;
+        endLabel.style.left = `${chart.scales.x.getPixelForValue(plottedTimestamps.length - 1) + chart.canvas.offsetLeft + 6}px`;
+      }
+      if (!bestDay) return;
+      const index = plottedTimestamps.findIndex((timestamp) =>
+        new Date(timestamp).toDateString() === new Date(bestDay.timestamp).toDateString());
+      if (index < 0) return;
+      const { ctx, chartArea } = chart;
+      const x = chart.scales.x.getPixelForValue(index);
+      ctx.save();
+      ctx.strokeStyle = chartThemeColor("control");
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.stroke();
+      ctx.restore();
+    },
+  }), [bestDay, chartEnd, plottedTimestamps]);
 
   function changePercentageColorClass(
     ts: TotalValueShower,
@@ -370,6 +453,7 @@ const App = ({
     () => ({
       maintainAspectRatio: false,
       responsive: true,
+      ...(metrics ? { layout: { padding: { top: 13, right: 68, bottom: 12 } } } : {}),
       animation: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? false : { duration: 350 },
       onResize: (_chart: unknown, size: { width: number }) => setChartWidth(size.width),
       hover: {
@@ -394,10 +478,13 @@ const App = ({
         },
         tooltip: {
           ...glassTooltip,
+          ...(metrics ? { position: "overviewTop", yAlign: "top", titleFont: { size: 12, weight: "normal" },
+            bodyFont: { size: 12, weight: "bold" } } : {}),
+          displayColors: false,
           filter: (item: { datasetIndex: number }) => item.datasetIndex === 0,
           callbacks: {
             label: (context: { parsed: { y: number } }) => {
-              const v = context.parsed.y.toLocaleString();
+              const v = metrics ? Math.round(context.parsed.y).toLocaleString() : context.parsed.y.toLocaleString();
               if (showPercentageInChart) {
                 return `${v}%`;
               }
@@ -427,6 +514,9 @@ const App = ({
               const start = 0;
               const end = size - 1;
 
+              if (metrics && shouldShowOverviewDateTick(index, size)) {
+                return new Date(data[index]).toLocaleDateString(dateLocale, { day: "numeric", month: "short" });
+              }
               // only show start and end date
               if (index === start) {
                 return timeToDateStr(data[index]);
@@ -448,15 +538,17 @@ const App = ({
             display: false,
             text: currency.currency,
           },
-          offset: true,
+          offset: !metrics,
+          ...(metrics && !btcAsBase && !showPercentageInChart && lineValues.length
+            ? { min: valueBounds.low, max: valueBounds.high } : {}),
           ticks: {
             ...glassScaleOptions.ticks,
             precision: 2,
-            maxTicksLimit: 4,
+            maxTicksLimit: metrics ? 5 : 4,
             callback: (value: any) => {
               return showPercentageInChart
                 ? `${value.toLocaleString()}%`
-                : simplifyNumber(value);
+                : metrics ? simplifyNumber(value).replace("k", "K") : simplifyNumber(value);
             },
           },
           grid: {
@@ -471,16 +563,21 @@ const App = ({
       currency.symbol,
       currency.currency,
       plottedTimestamps,
+      lineValues,
+      valueBounds,
+      dateLocale,
+      metrics,
     ],
   );
 
   const lineDataMemo = useMemo(() => {
-    const high = !ath || btcAsBase || !plottedTimestamps.length ? undefined
+    const high = !ath || btcAsBase || !plottedTimestamps.length || metrics && ath.distanceFromAth === 0 ? undefined
       : showPercentageInChart
         ? firstTotalValue ? ath.value / firstTotalValue * 100 - 100 : undefined
         : currencyWrapper(currency)(ath.value);
     return {
-      labels: plottedTimestamps.map((x) => timeToDateStr(x)),
+      labels: plottedTimestamps.map((x) => metrics
+        ? new Date(x).toLocaleDateString(dateLocale, { day: "numeric", month: "short" }) : timeToDateStr(x)),
       datasets: [
         {
           label: "Value",
@@ -490,6 +587,10 @@ const App = ({
           borderWidth: 2,
           tension: 0,
           pointRadius: 0,
+          pointHoverRadius: metrics ? 4 : 0,
+          pointHoverBorderWidth: 2,
+          pointHoverBackgroundColor: chartThemeColor("card"),
+          pointHoverBorderColor: lineColor,
           pointStyle: "rotRect",
           segment: {
             borderDash: (segment: { p0DataIndex: number; p1DataIndex: number }) =>
@@ -509,7 +610,7 @@ const App = ({
         }]),
       ],
     };
-  }, [plottedTimestamps, plottedIndices, lineValues, lineColor, ath, btcAsBase, showPercentageInChart, firstTotalValue, currency, t, assetChangeData.gaps]);
+  }, [plottedTimestamps, plottedIndices, lineValues, lineColor, ath, btcAsBase, showPercentageInChart, firstTotalValue, currency, t, assetChangeData.gaps, metrics, dateLocale]);
 
   return (
     <div className={metrics ? "h-full t3-total-overview" : "h-full"}>
@@ -596,7 +697,10 @@ const App = ({
             </SelectContent>
           </Select>}
           <p className="text-xs text-muted-foreground mb-2 t3-hero-change">
-            <span
+            {metrics && latestSnapshot && !excludedSource ? t("overview.fidelity.lastSnapshot")
+              .replace("{date}", new Date(latestSnapshot).toLocaleDateString(dateLocale, { day: "numeric", month: "short" }))
+              .replace("{time}", new Date(latestSnapshot).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit", hour12: false }))
+              : <><span
               className={`tabular-nums ${changePercentageColorClass(
                 totalValueShower,
                 shownTotalValue,
@@ -605,18 +709,26 @@ const App = ({
             >
               {changedValueOrPercentage}
             </span>{" "}
-            {t("totalValue.from").replace("{date}", firstDate)}
+            {t("totalValue.from").replace("{date}", firstDate)}</>}
           </p>
           {metrics}
           <div className="min-h-[120px] flex-1 t3-hero-chart">
-            {bestDay && <div className="t3-chart-best-day">{t("overview.design.bestDay")
-              .replace("{day}", new Date(bestDay.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" }))
-              .replace("{amount}", `${bestDay.value >= 0 ? "+" : "−"}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(bestDay.value)))}`)}</div>}
-            <Line role="img" aria-label={t("totalValue.chartSummary")
+            {bestDay && <div className="t3-chart-best-day">{t(bestDayContribution
+              ? "overview.fidelity.bestDayWithAsset" : "overview.design.bestDay")
+              .replace("{day}", new Date(bestDay.timestamp).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", day: "numeric" }))
+              .replace("{amount}", `${bestDay.value >= 0 ? "+" : "−"}${currency.symbol}${Math.round(currencyWrapper(currency)(Math.abs(bestDay.value))).toLocaleString()}`)
+              .replace("{asset}", bestDayContribution?.symbol ?? "")
+              .replace("{contribution}", bestDayContribution
+                ? `${currency.symbol}${Math.round(currencyWrapper(currency)(bestDayContribution.value)).toLocaleString()}` : "")}</div>}
+            {metrics && !btcAsBase && !showPercentageInChart && chartEnd !== undefined &&
+              <span className="t3-chart-end-value">
+                {currency.symbol}{Math.round(chartEnd).toLocaleString()}
+              </span>}
+            <Line ref={chartRef} key={bestDay?.timestamp ?? "no-best-day"} role="img" aria-label={t("totalValue.chartSummary")
               .replace("{value}", totalValueShower.formatTotalValue())
               .replace("{change}", changedValueOrPercentage)
               .replace("{date}", firstDate)}
-              options={options as any} data={lineDataMemo} />
+              options={options as any} data={lineDataMemo} plugins={metrics ? [overviewBestDayMarker, overviewCrosshair] : []} />
           </div>
           {!!assetChangeData.gaps?.length && <p className="mt-1 border-t border-dotted border-muted-foreground/50 pt-1 text-xs text-muted-foreground">
             {t("totalValue.partialGap")}
@@ -624,9 +736,13 @@ const App = ({
           {ath && <div className="t3-ath-note">
             <span>{t("overview.design.ath")}</span>
             <strong>{currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(ath.value))}</strong>
-            <span>{new Date(ath.timestamp).toLocaleDateString()}</span>
-            <span>{ath.distanceFromAth === undefined ? "—" : t("overview.design.belowAth")
-              .replace("{percent}", Math.abs(ath.distanceFromAth).toFixed(2))}</span>
+            <span>{metrics
+              ? t(ath.timestamp === latestSnapshot ? "overview.fidelity.athLatest" : "overview.fidelity.athReached")
+                .replace("{date}", new Date(ath.timestamp).toLocaleDateString(dateLocale, { day: "numeric", month: "short" }))
+              : new Date(ath.timestamp).toLocaleDateString()}</span>
+            <span>{ath.distanceFromAth === undefined ? "—" : metrics
+              ? t("overview.fidelity.athDistance").replace("{percent}", Math.abs(ath.distanceFromAth).toFixed(2))
+              : t("overview.design.belowAth").replace("{percent}", Math.abs(ath.distanceFromAth).toFixed(2))}</span>
           </div>}
         </CardContent>
       </Card>

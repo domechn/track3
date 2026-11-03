@@ -38,11 +38,12 @@ export default function FidelityRail({ isProUser = false }: { isProUser?: boolea
   const { pathname } = useLocation();
   const { t } = useTranslation();
   const unread = useAlertBadge();
+  const goalsLabel = t("overview.fidelity.alerts");
   return <nav className="t3-fidelity-rail" aria-label={t("nav.main")}>
     <Link to="/overview" className="t3-fidelity-brand" aria-label="Track3"><svg viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#4a8ad6" /><path d="M8 20v-6M14 20V8M20 20v-4.5" stroke="#0d0d0e" strokeWidth="2.4" strokeLinecap="round" /></svg></Link>
     {entries.map((entry, index) => "sep" in entry ? <div className="t3-fidelity-rail-sep" key={`sep-${index}`} /> :
       entry.to === "/assistant" && !isProUser ? null :
-      <Link key={entry.to} to={entry.to} title={t(entry.labelKey)} aria-label={`${t(entry.labelKey)}${entry.to === "/goals" && unread > 0 ? ` ${t("goals.unread").replace("{count}", String(unread))}` : ""}`}
+      <Link key={entry.to} to={entry.to} title={entry.to === "/goals" ? goalsLabel : t(entry.labelKey)} aria-label={`${entry.to === "/goals" ? goalsLabel : t(entry.labelKey)}${entry.to === "/goals" && unread > 0 ? ` ${t("goals.unread").replace("{count}", String(unread))}` : ""}`}
         aria-current={pathname.startsWith(entry.to) ? "page" : undefined}
         className={`t3-fidelity-rail-item ${pathname.startsWith(entry.to) ? "selected" : ""}`}>
         <RailIcon name={entry.icon} />{entry.to === "/goals" && unread > 0 && <i className="t3-fidelity-rail-badge" aria-hidden="true" />}
