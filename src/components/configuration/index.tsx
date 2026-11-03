@@ -49,12 +49,15 @@ import { configurationFromForm, configurationToForm, initialConfiguration } from
 import { AutoRetrySetting } from "@/components/configuration/auto-retry-setting";
 import { SummaryCards } from "./summary-cards";
 import { GeneralSettings } from "./general-settings";
+import { CurrencyDesign } from "./currency-design";
 import { ExchangeSection } from "./exchange-section";
 import { StockBrokerSection } from "./stock-broker-section";
 import { WalletSection } from "./wallet-section";
 import { OthersSection } from "./others-section";
 import { QuickLookDialog } from "./quick-look-dialog";
 import { AttachModal } from "./attach-modal";
+import { SourceDesign } from "./source-design";
+import { validateCustomPrice } from "@/middlelayers/custom-price";
 
 import type {
   ExchangeRow,
@@ -121,6 +124,7 @@ const App = ({
   const [hideInactive, setHideInactive] = useState(false);
   const [querySize, setQuerySize] = useState(0);
   const [formChanged, setFormChanged] = useState(false);
+  const [configurationLoading, setConfigurationLoading] = useState(true);
   const [preferCurrency, setPreferCurrency] = useState(
     warmStartPreferCurrency || defaultBaseCurrency,
   );
@@ -143,6 +147,7 @@ const App = ({
     useState(false);
   const [saveWalletConfigLoading, setSaveWalletConfigLoading] = useState(false);
   const [refreshCurrencyLoading, setRefreshCurrencyLoading] = useState(false);
+  const [currencyRateError, setCurrencyRateError] = useState(false);
 
   const [isPro, setIsPro] = useState(false);
   const [proLicense, setProLicense] = useState("");
@@ -375,8 +380,10 @@ const App = ({
         setStockBrokers(form.stockBrokers);
         setWallets(form.wallets);
         setOthers(form.others);
+        setConfigurationLoading(false);
       })
       .catch((e) => {
+        setConfigurationLoading(false);
         toast({
           description: t("config.getConfigFailed") + safeError(e),
           variant: "destructive",
@@ -640,13 +647,17 @@ const App = ({
   }
 
   function onUpdateCurrencyRatesClick() {
+    setCurrencyRateError(false);
     updateCurrencyRates()
       .then(() => notifyConfigurationSaved())
       .catch((e) => {
-        toast({
-          description: safeError(e),
-          variant: "destructive",
-        });
+        setCurrencyRateError(true);
+        if (section !== "currency" || window.innerWidth < 1440) {
+          toast({
+            description: safeError(e),
+            variant: "destructive",
+          });
+        }
       });
   }
 
@@ -958,14 +969,58 @@ const App = ({
   }
 
   // ---- Others handlers ----
-  function handleAddOther(val: {
-    symbol: string;
-    amount: number;
-    alias?: string;
-  }) {
+  function handleAddOther(val: OtherRow) {
     setOthers([...others, { ...val, amount: val.amount || 0 }]);
     setOtherAmountDraftMap({});
     markFormChanged();
+  }
+
+  async function addExchangeFromDesign(draft: ExchangeDraft): Promise<boolean> {
+    setSaveCexConfigLoading(true);
+    try {
+      if (!await validateExchangeConfig(draft)) return false;
+      handleExchangeChange(draft);
+      return true;
+    } catch (error) {
+      toast({ description: safeError(error), variant: "destructive" });
+      return false;
+    } finally {
+      setSaveCexConfigLoading(false);
+    }
+  }
+
+  async function addWalletFromDesign(draft: WalletDraft): Promise<boolean> {
+    setSaveWalletConfigLoading(true);
+    try {
+      if (!await validateWalletAddress(draft)) return false;
+      handleAddWallet(draft);
+      return true;
+    } catch (error) {
+      toast({ description: safeError(error), variant: "destructive" });
+      return false;
+    } finally {
+      setSaveWalletConfigLoading(false);
+    }
+  }
+
+  async function addBrokerFromDesign(draft: StockBrokerDraft): Promise<boolean> {
+    setSaveStockBrokerConfigLoading(true);
+    try {
+      if (!await validateStockBrokerConfig(draft)) return false;
+      handleAddStockBroker(draft);
+      return true;
+    } catch (error) {
+      toast({ description: safeError(error), variant: "destructive" });
+      return false;
+    } finally {
+      setSaveStockBrokerConfigLoading(false);
+    }
+  }
+
+  function addCustomFromDesign(row: OtherRow): boolean {
+    if (!row.price || !validateCustomPrice(row.price, others.map((item) => item.symbol), row.symbol)) return false;
+    handleAddOther(row);
+    return true;
   }
 
   function handleRemoveOther(idx: number) {
@@ -1083,7 +1138,7 @@ const App = ({
         preferCurrencyLoading={preferCurrencyLoading}
       />}
 
-      {showCurrency && <GeneralSettings
+      {showCurrency && <div className="t3-settings-legacy-currency"><GeneralSettings
         groupUSD={groupUSD}
         onGroupUSDChange={onGroupUSDSelectChange}
         hideInactive={hideInactive}
@@ -1097,6 +1152,23 @@ const App = ({
         onPreferCurrencyChange={onPreferCurrencyChanged}
         refreshCurrencyLoading={refreshCurrencyLoading}
         onUpdateCurrencyRatesClick={onUpdateCurrencyRatesClick}
+      /></div>}
+      {section === "currency" && <CurrencyDesign
+        groupUSD={groupUSD}
+        onGroupUSDChange={onGroupUSDSelectChange}
+        hideInactive={hideInactive}
+        onHideInactiveChange={onHideInactiveSelectChange}
+        querySize={querySize}
+        onQuerySizeChange={onQuerySizeChanged}
+        preferCurrency={preferCurrency}
+        preferCurrencyLoading={preferCurrencyLoading}
+        preferCurrencyOptions={preferCurrencyOptions}
+        preferredCurrencyDetail={preferredCurrencyDetail}
+        onPreferCurrencyChange={onPreferCurrencyChanged}
+        refreshCurrencyLoading={refreshCurrencyLoading}
+        onUpdateCurrencyRatesClick={onUpdateCurrencyRatesClick}
+        currencies={currencies}
+        rateError={currencyRateError}
       />}
 
       {section === "sources" && <AutoRetrySetting t={t} />}
@@ -1190,6 +1262,30 @@ const App = ({
           setAttachModalOpen(true);
         }}
         getAttachDisplayLabel={getAttachDisplayLabel}
+      />}
+      {section === "sources" && <SourceDesign
+        loading={configurationLoading}
+        tab={sourceTab}
+        setTab={setSourceTab}
+        exchanges={exchanges}
+        wallets={wallets}
+        brokers={stockBrokers}
+        others={others}
+        onExchangeToggle={handleActiveExchange}
+        onWalletToggle={handleActiveWallet}
+        onBrokerToggle={handleActiveStockBroker}
+        onExchangeRemove={handleRemoveExchange}
+        onWalletRemove={handleRemoveWallet}
+        onBrokerRemove={handleRemoveStockBroker}
+        onOtherRemove={handleRemoveOther}
+        onOtherAttach={(index, attachment) => handleOthersChange(index, "attachTo", attachment ? encodedAttachTo(attachment) : "")}
+        onExchangeQuickLook={handleQuickLookExchange}
+        onWalletQuickLook={handleQuickLookWallet}
+        onBrokerQuickLook={handleQuickLookStockBroker}
+        onSaveExchange={addExchangeFromDesign}
+        onSaveWallet={addWalletFromDesign}
+        onSaveBroker={addBrokerFromDesign}
+        onSaveCustom={addCustomFromDesign}
       />}
     </div>
   );

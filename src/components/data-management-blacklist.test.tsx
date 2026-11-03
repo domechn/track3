@@ -154,7 +154,8 @@ describe("Data Management", () => {
     expect(screen.queryByText("BTC")).not.toBeInTheDocument();
     expect(screen.getByText("No blacklisted tokens")).toBeInTheDocument();
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
-      description: '"BTC" removed from blacklist',
+      title: "Removed BTC from the blacklist",
+      description: "It will show up again after the next refresh.",
       duration: 5000,
     }));
     const toastView = render(<ToastProvider><Toast defaultOpen duration={Infinity}>

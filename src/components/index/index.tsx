@@ -124,6 +124,7 @@ function TopBar({
   onDatePickerValueChange,
   lastRefreshAt,
   onRefreshSuccess,
+  hideWide = false,
   fidelityPage,
   fidelityBusy,
   recordsToolsOpen,
@@ -141,6 +142,7 @@ function TopBar({
   ) => void;
   lastRefreshAt?: string;
   onRefreshSuccess: () => void;
+  hideWide?: boolean;
   fidelityPage?: "summary" | "coin";
   fidelityBusy?: boolean;
   recordsToolsOpen: boolean;
@@ -169,7 +171,7 @@ function TopBar({
     (selectedSnapshots === availableDates.length ? "All" : "");
 
   return (
-    <div className={recordsPage ? "t3-records-toolbar" : railFidelityPage ? "t3-fidelity-rail-refresh-container" : fidelityPage ? `t3-fidelity-topbar t3-fidelity-topbar-${fidelityPage}` : "sticky top-0 z-10 glass-subtle border-b relative"}
+    <div className={recordsPage ? "t3-records-toolbar" : railFidelityPage ? "t3-fidelity-rail-refresh-container" : fidelityPage ? `t3-fidelity-topbar t3-fidelity-topbar-${fidelityPage}` : `sticky top-0 z-10 glass-subtle border-b relative${hideWide ? " t3-fidelity-settings-topbar" : ""}`}
       data-open={recordsToolsOpen}>
       <div id={recordsPage ? "t3-records-toolbar-panel" : undefined}
         className={recordsPage ? "t3-records-toolbar-panel flex h-12 items-center px-4" : railFidelityPage ? "t3-fidelity-rail-refresh-inner" : "flex h-12 items-center px-4"}>
@@ -330,6 +332,8 @@ function Layout({
   const { t } = useTranslation();
   const darkTheme = useDarkTheme();
   const location = useLocation();
+  const assistantPage = location.pathname === "/assistant" || location.pathname.startsWith("/assistant/");
+  const settingsPage = location.pathname.startsWith("/settings");
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
   const wideViewport = viewportWidth >= 1500;
   useEffect(() => {
@@ -375,7 +379,7 @@ function Layout({
       >
         <SummaryFidelityRangeContext.Provider value={{ range: summaryRange, setRange: setSummaryRange }}>
         <SummaryLoadingContext.Provider value={setSummaryLoading}>
-        <TopBar
+        {!assistantPage && <TopBar
           isProUser={isProUser}
           railFidelityPage={railFidelityPage}
           pageOwnsSync={pageOwnsSync}
@@ -389,7 +393,8 @@ function Layout({
           fidelityPage={fidelityPage}
           fidelityBusy={fidelityPage === "summary" && summaryLoading}
           recordsToolsOpen={recordsToolsOpen}
-        />
+          hideWide={settingsPage}
+        />}
 
         {/* Main content */}
         <main id="app-main-content" tabIndex={-1} className="mx-auto w-full max-w-[1560px] px-7 py-5">

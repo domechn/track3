@@ -250,6 +250,11 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
           await expect(toast.locator("> li[data-state=open]").filter({
             hasText: locale === "en" ? /Sync complete[\s\S]*Pushed 5/ : /同步完成[\s\S]*已推送 5 项/,
           })).toBeVisible();
+          await expect.poll(() => page.evaluate(async () => {
+            const runtimeModule = "/src/middlelayers/sync/runtime.ts";
+            const { syncRuntime } = await import(runtimeModule);
+            return syncRuntime.status().sync.report?.pushed;
+          })).toBe(5);
           await expect.poll(async () => (await store.listObjectsV2({ prefix: "devices/" })).objects.length).toBeGreaterThan(0);
           await shot(page, `${prefix}-now-success`);
 

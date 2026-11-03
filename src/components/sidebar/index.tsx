@@ -91,7 +91,7 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
         onToggle();
       }
     }}
-    className={cn("fixed inset-y-0 left-0 z-20 flex flex-col overflow-hidden border-r bg-background transition-[width] duration-300 ease-in-out",
+    className={cn("t3-desktop-rail fixed inset-y-0 left-0 z-20 flex flex-col overflow-hidden border-r bg-background transition-[width] duration-300 ease-in-out",
       !fidelity && "fidelity-records-rail", !fidelity && collapsed && "fidelity-records-rail-collapsed", fidelity && "t3-fidelity-sidebar")}>
     <div className="flex h-14 shrink-0 items-center gap-2 px-[10px]">
       <button type="button" aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")}

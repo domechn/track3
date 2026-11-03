@@ -94,7 +94,9 @@ export default function BackupRestoreList({ directory, prepare, onPreview, t, lo
               <div className="min-w-0 flex-1">
                 <p className="font-medium" title={client}>{t("data.restore.device").replace("{client}", client.slice(0, 8))}</p>
                 <p className="text-xs text-muted-foreground">{t("data.restore.copyDetail")
-                  .replace("{time}", new Date(exportAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US"))
+                  .replace("{time}", new Date(exportAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-GB", {
+                    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+                  }))
                   .replace("{months}", String(months))
                   .replace("{snapshots}", String(snapshots))}</p>
               </div>

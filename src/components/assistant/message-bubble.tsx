@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ChatBubbleIcon,
   ChevronDownIcon,
+  ExclamationTriangleIcon,
   PersonIcon,
+  ReloadIcon,
 } from "@radix-ui/react-icons";
+import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/i18n";
 import MarkdownRenderer from "./markdown-renderer";
 import type { AssistantBlock, ChatMessage } from "./use-chat";
 import UsageLabel from "./usage-label";
 import ActionCard from "./action-card";
+import type { CurrencyRateDetail } from "@/middlelayers/types";
 
 function stripThinkTags(s: string): string {
   return s.replace(/<\/?think\s*>/gi, "").trim();
@@ -129,12 +132,14 @@ function mergeBlocks(blocks: AssistantBlock[]): AssistantBlock[] {
 }
 
 function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: boolean, hasResponseStarted?: boolean,
-  onDecideAction?: (id: string, decision: "approve" | "reject") => void, canDecideAction?: boolean) {
+  onDecideAction?: (id: string, decision: "approve" | "reject") => void, canDecideAction?: boolean,
+  onRetry?: () => void, currency?: CurrencyRateDetail) {
   if (block.kind === "think") {
     return <ThinkBlock key={idx} text={block.text} isStreaming={isStreaming} hasResponseStarted={hasResponseStarted} />;
   }
   if (block.kind === "text") {
     if (!block.text) return null;
+    if (/^\[error\]/i.test(block.text)) return <AssistantRequestError key={idx} detail={block.text.replace(/^\[error\]\s*/i, "")} onRetry={onRetry} />;
     return (
       <div key={idx} className="markdown-content">
         <MarkdownRenderer content={stripThinkTags(block.text)} />
@@ -163,26 +168,51 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
     );
   }
   if (block.kind === "pending_action") {
-    return <ActionCard key={block.id} action={block} onDecide={onDecideAction} canDecide={canDecideAction} />;
+    return <ActionCard key={block.id} action={block} onDecide={onDecideAction} canDecide={canDecideAction} currency={currency} />;
   }
+}
+
+function AssistantRequestError({ detail, onRetry }: { detail: string; onRetry?: () => void }) {
+  const { t } = useTranslation();
+  const status = detail.match(/\bHTTP\s+(\d{3})\b/i)?.[1];
+  return <div className="t3-assistant-request-error" role="alert">
+    <ExclamationTriangleIcon aria-hidden="true" />
+    <div>
+      <b>{t("fidelity.assistant.requestFailed")}</b>
+      <p>{t(status === "429" ? "fidelity.assistant.rateLimitError" : "fidelity.assistant.genericRequestError")}</p>
+      <div className="t3-assistant-request-error-actions">
+        <button type="button" onClick={onRetry} disabled={!onRetry}><ReloadIcon aria-hidden="true" />{t("fidelity.assistant.retry")}</button>
+        <Link to="/settings/assistant">{t("fidelity.assistant.settings")}</Link>
+        <span>{t("fidelity.assistant.errorDetails").replace("{detail}", detail)}</span>
+      </div>
+    </div>
+  </div>;
 }
 
 export default function MessageBubble({
   message,
+  model,
+  timestamp,
+  onRetry,
   isStreaming,
   pricePerMillionTokens,
   inputPricePerMillionTokens,
   outputPricePerMillionTokens,
   onDecideAction,
   canDecideAction,
+  currency,
 }: {
   message: ChatMessage;
+  model?: string;
+  timestamp?: string;
+  onRetry?: () => void;
   isStreaming?: boolean;
   pricePerMillionTokens?: number;
   inputPricePerMillionTokens?: number;
   outputPricePerMillionTokens?: number;
   onDecideAction?: (id: string, decision: "approve" | "reject") => void;
   canDecideAction?: boolean;
+  currency?: CurrencyRateDetail;
 }) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
@@ -201,7 +231,7 @@ export default function MessageBubble({
           aria-hidden
           className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
         >
-          <ChatBubbleIcon className="h-3.5 w-3.5" />
+          <svg width="14" height="14" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 2l1.8 4.7L15.5 8.5l-4.7 1.8L9 15l-1.8-4.7L2.5 8.5l4.7-1.8z" /></svg>
         </span>
       )}
       <div
@@ -242,17 +272,22 @@ export default function MessageBubble({
             ) : (
               blocks.map((b, i) => renderAssistantBlock(
                 b, i, isStreaming, blocks.slice(i + 1).some((later) => later.kind === "text"),
-                onDecideAction, canDecideAction,
+                onDecideAction, canDecideAction, onRetry, currency,
               ))
             )}
             {!isStreaming && !blocks.some((block) => block.kind === "pending_action" ||
               (block.kind === "text" && stripThinkTags(block.text))) && (
               <p className="text-sm italic text-muted-foreground">{t("assistant.chat.noResponse")}</p>
             )}
-            {message.usage && <UsageLabel usage={message.usage} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} />}
+            {message.usage && <UsageLabel usage={message.usage} model={model}
+              copyText={blocks.filter((block): block is Extract<AssistantBlock, { kind: "text" }> => block.kind === "text").map((block) => block.text).join("\n\n")}
+              pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} />}
           </div>
         )}
       </div>
+      {isUser && <small className="t3-assistant-message-time">{timestamp
+        ? new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
+        : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}</small>}
       {isUser && (
         <span
           aria-hidden

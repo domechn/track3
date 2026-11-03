@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { I18nProvider } from "@/i18n";
 import MarkdownRenderer from "./markdown-renderer";
 
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
@@ -35,4 +36,31 @@ describe("assistant markdown links", () => {
       "href", "https://solscan.io/account/9WzDXwBbmkg8XDbB4dNq3uVQhQ6C7PDkA9Aw6t4C3kLw",
     );
   });
+});
+
+it("styles a currency loss, table caption, and total row in an assistant reply", () => {
+  const { container } = render(<MarkdownRenderer content={`Change in value by asset, 24 Oct to 31 Oct.
+
+| Asset | Change |
+| --- | ---: |
+| AAPL | −$1,357.50 |
+| Total | +$26,010.84 |`} />);
+  expect(screen.getByText("−$1,357.50").closest("td")).toHaveClass("t3-assistant-loss");
+  expect(screen.getByText("Total").closest("td")).toHaveClass("t3-assistant-total-label");
+  expect(container.querySelector("tbody tr:last-child td")).toHaveClass("t3-assistant-total-label");
+});
+
+it("styles non-dollar losses and a translated total row", () => {
+  const language = vi.spyOn(navigator, "language", "get").mockReturnValue("zh-CN");
+  try {
+    const { container } = render(<I18nProvider><MarkdownRenderer content={`| 资产 | 变动 |
+| --- | ---: |
+| EUR | −€1,357.50 |
+| 总计 | +€2,010.84 |`} /></I18nProvider>);
+    expect(screen.getByText("−€1,357.50").closest("td")).toHaveClass("t3-assistant-loss");
+    expect(screen.getByText("总计").closest("td")).toHaveClass("t3-assistant-total-label");
+    expect(container.querySelector("tbody tr:last-child td")).toHaveClass("t3-assistant-total-label");
+  } finally {
+    language.mockRestore();
+  }
 });

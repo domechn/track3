@@ -20,6 +20,8 @@ import {
   getBlacklistCoins,
   getLastAutoImportAt,
   getLastAutoBackupAt,
+  getConfiguration,
+  loadAIConfig,
   removeFromBlacklist,
   saveAutoBackupDirectory,
 } from "@/middlelayers/configuration";
@@ -60,11 +62,17 @@ import { redactSecrets } from "@/middlelayers/security/redact";
 import { useOutletContext } from "react-router-dom";
 import { queryBackupSummary, type BackupSummary } from "@/middlelayers/backup-summary";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
+import { loadSyncSettings } from "@/middlelayers/sync/settings";
 import { SyncRecoveryExport } from "@/components/settings/sync-recovery";
+import { BlacklistDesign } from "@/components/blacklist-design";
+import { SecurityDesign } from "@/components/security-design";
+import { BackupDesign } from "@/components/backup-design";
+import { useWideDesktop } from "@/components/use-wide-desktop";
 
 const App = ({ onDataImported, currency }: { onDataImported?: () => void; currency?: CurrencyRateDetail }) => {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const wide = useWideDesktop();
   const section = useOutletContext<string | null>();
   const showBackup = !section || section === "backup";
   const showBlacklist = !section || section === "blacklist";
@@ -85,10 +93,33 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   const [lastImportAt, setLastImportAt] = useState<Date>();
   const [backupSummary, setBackupSummary] = useState<BackupSummary>();
   const [blacklist, setBlacklist] = useState<string[]>([]);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("t3-blacklist-count", { detail: blacklist.length }));
+  }, [blacklist]);
   const { run: runBlacklistDelete } = useOptimisticDelete(setBlacklist);
   const [encKeyInput, setEncKeyInput] = useState("");
   const [encKeyConfirm, setEncKeyConfirm] = useState("");
   const [encKeySaving, setEncKeySaving] = useState(false);
+  const [keyRotated, setKeyRotated] = useState(false);
+  const [secretInventory, setSecretInventory] = useState<{ exchanges: string[]; brokers: string[]; assistant?: string; sync?: string }>();
+  useEffect(() => {
+    if (!showSecurity || !wide) return;
+    let active = true;
+    void Promise.all([
+      getConfiguration().catch(() => undefined),
+      loadAIConfig().catch(() => undefined),
+      loadSyncSettings().catch(() => undefined),
+    ]).then(([config, ai, sync]) => {
+      if (!active) return;
+      setSecretInventory({
+        exchanges: config?.exchanges.filter((item) => item.active !== false).map((item) => item.alias || item.name) ?? [],
+        brokers: config?.stockConfig?.brokers.filter((item) => item.active !== false).map((item) => item.alias || item.name) ?? [],
+        assistant: ai?.endpoint ? (() => { try { return new URL(ai.endpoint).hostname; } catch { return ai.endpoint; } })() : undefined,
+        sync: sync?.enabled ? sync.bucket : undefined,
+      });
+    });
+    return () => { active = false; };
+  }, [showSecurity, wide]);
   async function handleChangeEncryptionKey() {
     if (!encKeyInput || encKeyInput !== encKeyConfirm) {
       toast({
@@ -116,6 +147,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       await runEncryptionKeyRotation(() =>
         invoke("rotate_encryption_key", { newKey: encKeyInput }),
       );
+      setKeyRotated(true);
       toast({ description: t("data.encryption.key.success") });
       setEncKeyInput("");
       setEncKeyConfirm("");
@@ -289,15 +321,28 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         ? prev : [...prev, symbol],
       commit: () => removeFromBlacklist(symbol),
       undo: () => addToBlacklist(symbol),
-      successMessage: t("data.removedFromBlacklist").replace("{symbol}", symbol),
+      successTitle: t("fidelity.blacklist.removedTitle").replace("{symbol}", symbol),
+      successMessage: t("fidelity.blacklist.removedDesc"),
       undoLabel: t("common.undo"),
       undoAltText: t("data.undoBlacklistRemoval"),
       undoWindowMs: 5000,
     });
   }
 
+  async function onAddToBlacklist(symbol: string) {
+    await addToBlacklist(symbol);
+    setBlacklist((current) => [...current, symbol]);
+  }
+
+  const securityDesign = section === "security" && wide;
+  const backupDesign = section === "backup" && wide;
   return (
     <div className="space-y-6">
+      {securityDesign && <SecurityDesign
+        syncReady={syncStatus.mode === "ready"} encKeyInput={encKeyInput} setEncKeyInput={setEncKeyInput}
+        encKeyConfirm={encKeyConfirm} setEncKeyConfirm={setEncKeyConfirm}
+        encKeySaving={encKeySaving} keyRotated={keyRotated} secretInventory={secretInventory}
+        onRotate={() => { void handleChangeEncryptionKey(); }} />}
       <Dialog open={!!itemPreview} onOpenChange={(open) => { if (!open && !itemBusy) setItemPreview(undefined); }}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[680px]">
           <DialogHeader><DialogTitle>{t("data.importPreview.title")}</DialogTitle></DialogHeader>
@@ -328,14 +373,20 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         </DialogContent>
       </Dialog>
 
-      <div>
+      {backupDesign && <BackupDesign summary={backupSummary} directory={autoBackupDirectory} lastBackupAt={lastBackupAt}
+        exportConfiguration={exportConfiguration} setExportConfiguration={setExportConfiguration}
+        onExport={onExportDataClick} onReviewImport={() => { void onReviewImportClick(); }}
+        onChooseFolder={() => { void onChooseAutoBackupFolderButtonClick(); }} onClearFolder={onClearAutoBackupFolderButtonClick}
+        onPreview={(data, rows) => { setItemResult(undefined); setItemPreview({ data, rows, backup: true }); }} locale={locale} />}
+
+      <div className={securityDesign || backupDesign ? "t3-b-legacy-header" : ""}>
         <h3 className="text-lg font-medium tracking-tight">{t(section === "backup" ? "settings.phase6.backup" : section === "blacklist" ? "settings.phase6.blacklist" : section === "security" ? "settings.phase6.security" : "data.title")}</h3>
         <p className="text-sm text-muted-foreground">
           {t("data.subtitle")}
         </p>
       </div>
 
-      {showBackup && <Card role="region" aria-label={t("data.phase6.onDevice")}>
+      {showBackup && !backupDesign && <Card role="region" aria-label={t("data.phase6.onDevice")}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">{t("data.phase6.onDevice")}</CardTitle>
         </CardHeader>
@@ -347,7 +398,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         </CardContent>
       </Card>}
 
-      {showBackup && <div className="grid gap-4 sm:grid-cols-2">
+      {showBackup && !backupDesign && <div className="grid gap-4 sm:grid-cols-2">
         <Card className="flex flex-col">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">
@@ -400,7 +451,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         </Card>
       </div>}
 
-      {showBackup && <Card>
+      {showBackup && !backupDesign && <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("data.autoBackup")}
@@ -460,7 +511,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         </CardContent>
       </Card>}
 
-      {showBackup && <Card role="region" aria-label={t("data.restore.title")}>
+      {showBackup && !backupDesign && <Card role="region" aria-label={t("data.restore.title")}>
         <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">{t("data.restore.title")}</CardTitle></CardHeader>
         <CardContent>
           <BackupRestoreList directory={autoBackupDirectory} t={t} locale={locale}
@@ -509,13 +560,14 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
           )}
         </CardContent>
       </Card>}
+      {section === "blacklist" && <BlacklistDesign symbols={blacklist} onAdd={onAddToBlacklist} onRemove={onRemoveFromBlacklist} />}
 
-      {showSecurity && syncStatus.mode === "ready" && <Card>
+      {showSecurity && !securityDesign && syncStatus.mode === "ready" && <Card className="t3-b-security-legacy">
         <CardHeader className="pb-2"><CardTitle>{t("sync.recovery.title")}</CardTitle></CardHeader>
         <CardContent><SyncRecoveryExport t={t} /></CardContent>
       </Card>}
 
-      {showSecurity && <Card>
+      {showSecurity && !securityDesign && <Card className="t3-b-security-legacy">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("data.encryption.key.title")}

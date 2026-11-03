@@ -53,8 +53,11 @@ const EXAMPLES: Array<{ key: ExampleKey; Icon: React.ComponentType<{ className?:
 
 export default function ChatThread({
   messages,
+  model,
+  messageTimes = [],
   isStreaming,
   onPickPrompt,
+  onRetry,
   currency,
   pricePerMillionTokens,
   inputPricePerMillionTokens,
@@ -63,8 +66,11 @@ export default function ChatThread({
   canDecideAction,
 }: {
   messages: ChatMessage[];
+  model?: string;
+  messageTimes?: Array<string | undefined>;
   isStreaming: boolean;
   onPickPrompt?: (prompt: string) => void;
+  onRetry?: (prompt: string) => void;
   currency?: CurrencyRateDetail;
   pricePerMillionTokens?: number;
   inputPricePerMillionTokens?: number;
@@ -72,6 +78,7 @@ export default function ChatThread({
   onDecideAction?: (id: string, decision: "approve" | "reject") => void;
   canDecideAction?: boolean;
 }) {
+  const { t, locale } = useTranslation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const userScrolledAwayRef = useRef(false);
   const isEmpty = messages.length === 0 && !isStreaming;
@@ -161,13 +168,25 @@ export default function ChatThread({
         ref={scrollRef}
         className="flex h-full flex-col gap-3 px-3 py-4 sm:px-4 md:px-6"
         data-testid="chat-thread"
+        data-has-approved-followup={messages.some((message) => message.role === "assistant"
+          && message.blocks.some((block) => block.kind === "pending_action" && block.status === "approved"))
+          && messages.length > 2 ? "true" : undefined}
       >
         {isEmpty ? (
           <WelcomePanel onPickPrompt={onPickPrompt} currency={currency} />
         ) : (
-          messages.map((m, i) => (
-            <MessageBubble key={i} message={m} isStreaming={isStreaming && i === messages.length - 1} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} onDecideAction={onDecideAction} canDecideAction={canDecideAction} />
-          ))
+          <>
+            <div className="t3-assistant-day-label">{new Date(messageTimes[0] ?? Date.now()).toDateString() === new Date().toDateString()
+              ? t("fidelity.assistant.today") : new Date(messageTimes[0] ?? Date.now()).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short" })}</div>
+            {messages.map((m, i) => (
+              <MessageBubble key={i} message={m} timestamp={messageTimes[i]} model={model} currency={currency}
+                onRetry={m.role === "assistant" ? () => {
+                  const prior = messages.slice(0, i).reverse().find((message) => message.role === "user");
+                  if (prior?.role === "user") onRetry?.(prior.content);
+                } : undefined}
+                isStreaming={isStreaming && i === messages.length - 1} pricePerMillionTokens={pricePerMillionTokens} inputPricePerMillionTokens={inputPricePerMillionTokens} outputPricePerMillionTokens={outputPricePerMillionTokens} onDecideAction={onDecideAction} canDecideAction={canDecideAction} />
+            ))}
+          </>
         )}
         {isStreaming && messages.at(-1)?.role !== "assistant" && (
           <p className="text-sm italic text-muted-foreground">
@@ -197,6 +216,11 @@ function WelcomePanel({
       className="m-auto flex w-full max-w-3xl flex-col gap-6 py-6"
       data-testid="chat-welcome"
     >
+      <div className="t3-assistant-welcome-design">
+        <span aria-hidden="true"><svg width="22" height="22" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2l1.8 4.7L15.5 8.5l-4.7 1.8L9 15l-1.8-4.7L2.5 8.5l4.7-1.8z" /></svg></span>
+        <h2>{t("fidelity.assistant.welcome")}</h2>
+        <p>{t("fidelity.assistant.welcomeDescription")}</p>
+      </div>
       <div className="space-y-2 text-center sm:text-left">
         <h2 className="text-lg font-semibold tracking-tight text-foreground">
           {t("assistant.chat.welcome.greeting")}
@@ -206,7 +230,7 @@ function WelcomePanel({
         </p>
       </div>
 
-      <InsightsCard currency={currency} />
+      <InsightsCard currency={currency} assistantView onPickPrompt={onPickPrompt} />
 
       <div>
         <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">

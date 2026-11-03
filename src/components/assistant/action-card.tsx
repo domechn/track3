@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
 import type { PendingAction } from "@/middlelayers/ai/actions/lifecycle";
 import { Link } from "react-router-dom";
+import { queryLastAssetsBySymbol } from "@/middlelayers/charts-assets";
+import type { CurrencyRateDetail } from "@/middlelayers/types";
+import { BellIcon, CheckIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 
 export const actionFieldKeys: Record<string, string> = {
   method: "assistant.action.field.method",
@@ -53,14 +56,24 @@ const actionPage: Record<string, { route: string; key: string }> = {
 };
 
 export default function ActionCard({
-  action, onDecide, canDecide = true,
+  action, onDecide, canDecide = true, currency,
 }: {
   action: PendingAction;
   onDecide?: (id: string, decision: "approve" | "reject") => void;
   canDecide?: boolean;
+  currency?: CurrencyRateDetail;
 }) {
   const { t } = useTranslation();
   const [expired, setExpired] = useState(() => Date.now() >= Date.parse(action.expiresAt));
+  const [currentPrice, setCurrentPrice] = useState<number>();
+  useEffect(() => {
+    if (action.name !== "create_alert" || action.args.kind !== "asset_price_target" || typeof action.args.symbol !== "string") return;
+    let cancelled = false;
+    void queryLastAssetsBySymbol(action.args.symbol).then((asset) => {
+      if (!cancelled) setCurrentPrice(asset?.price);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [action.name, action.args]);
   useEffect(() => {
     const remaining = Date.parse(action.expiresAt) - Date.now();
     setExpired(remaining <= 0);
@@ -107,6 +120,24 @@ export default function ActionCard({
 
   return (
     <section aria-label={t("assistant.action.confirmation")} className="t3-action-confirmation rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+      {action.name === "create_alert" && action.args.kind === "asset_price_target" && typeof action.args.symbol === "string" && typeof action.args.threshold === "number" && <div className="t3-assistant-action-design">
+        <div className="t3-assistant-action-head">
+          <span>{status === "approved" ? <CheckIcon aria-hidden="true" /> : <BellIcon aria-hidden="true" />}{status === "approved" ? t("fidelity.assistant.alertCreated") : t("fidelity.assistant.approvalNeeded")}</span>
+          <span className={status === "approved" ? "approved" : "waiting"}>{status === "approved" ? t("assistant.action.status.approved") : t("fidelity.assistant.waiting")}</span>
+        </div>
+        <h3>{t("fidelity.assistant.createAlert").replace("{symbol}", action.args.symbol).replace("{threshold}", Number(action.args.threshold).toLocaleString("en-US"))}</h3>
+        <p>{t("fidelity.assistant.whatChanges")}</p>
+        <dl>
+          <div><dt>{t("fidelity.assistant.adds")}</dt><dd>{t("fidelity.assistant.oneRule")}</dd></div>
+          <div><dt>{t("fidelity.assistant.condition")}</dt><dd>{t("fidelity.assistant.priceCondition").replace("{symbol}", action.args.symbol).replace("{threshold}", Number(action.args.threshold).toLocaleString("en-US"))}</dd></div>
+          <div><dt>{t("fidelity.assistant.rightNow")}</dt><dd>{currentPrice === undefined ? "—" : `${new Intl.NumberFormat("en-US", { style: "currency", currency: currency?.currency ?? "USD" }).format(currentPrice * (currency?.rate ?? 1))}, ${(currentPrice / Number(action.args.threshold) * 100).toFixed(1)}% ${t("fidelity.assistant.ofWay")}`}</dd></div>
+        </dl>
+        <p className="t3-assistant-action-note">{t("fidelity.assistant.noOtherChanges")}</p>
+        {pending ? <div className="t3-assistant-action-buttons">
+          <Button type="button" size="sm" onClick={() => onDecide?.(action.id, "approve")} disabled={!canDecide || !onDecide}><CheckIcon aria-hidden="true" />{t("assistant.action.approve")}</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => onDecide?.(action.id, "reject")} disabled={!canDecide || !onDecide}>{t("assistant.action.reject")}</Button>
+        </div> : status === "approved" && <Link to="/goals">{t("fidelity.assistant.openGoals")}<ChevronRightIcon aria-hidden="true" /></Link>}
+      </div>}
       <h3 className="font-semibold">{t(`assistant.action.name.${action.name}`)}</h3>
       <p className="text-xs text-muted-foreground">{t("assistant.action.risk")}: {t(`assistant.action.risk.${action.risk}`)}</p>
       <dl className="mt-2 grid gap-1 text-xs">

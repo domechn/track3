@@ -32,6 +32,9 @@ import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { requestOnboardingReplay } from "@/middlelayers/onboarding";
 import { useOutletContext } from "react-router-dom";
+import { ProDesign } from "./pro-design";
+import { AboutDesign } from "./about-design";
+import { useWideDesktop } from "./use-wide-desktop";
 
 const App = ({
   onProStatusChange,
@@ -40,6 +43,7 @@ const App = ({
 }) => {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
+  const wide = useWideDesktop();
   const section = useOutletContext<string | null>();
   const showPro = !section || section === "pro";
   const showAbout = !section || section === "about";
@@ -51,6 +55,7 @@ const App = ({
   const [inputLicense, setInputLicense] = useState<string | undefined>();
   const [showLicense, setShowLicense] = useState(false);
   const [saveLicenseLoading, setSaveLicenseLoading] = useState(false);
+  const [activationError, setActivationError] = useState<string>();
   const [inactiveLicenseLoading, setInactiveLicenseLoading] = useState(false);
   const [showLegacyInput, setShowLegacyInput] = useState(false);
 
@@ -185,6 +190,7 @@ const App = ({
       });
       return;
     }
+    setActivationError(undefined);
     setSaveLicenseLoading(true);
     activeDevice(inputLicense)
       .then(() => {
@@ -195,6 +201,7 @@ const App = ({
         });
       })
       .catch((err) => {
+        setActivationError(safeError(err));
         toast({
           description: safeError(err),
           variant: "destructive",
@@ -323,6 +330,19 @@ const App = ({
     </div>
     <SystemInfoCard title="Track3" description={t("common.loading")} version={version} t={t} />
   </div>;
+
+  if (section === "pro" && wide) {
+    return <ProDesign license={activeLicense} inputLicense={inputLicense} setInputLicense={(value) => { setInputLicense(value); setActivationError(undefined); }}
+      subscriptionInfo={subscriptionInfo} usageEnforced={usageEnforced} devices={licenseDevices}
+      saveLicenseLoading={saveLicenseLoading} inactiveLicenseLoading={inactiveLicenseLoading} portalLoading={portalLoading}
+      activationError={activationError}
+      onSaveLicenseClick={onSaveLicenseClick} onInactiveLicenseClick={onInactiveLicenseClick}
+      onManageSubscription={() => { void onManageSubscription(); }} onSubscribe={() => { void onSubscribe("yearly"); }}
+      onViewBenefits={() => { void onViewBenefits(); }} />;
+  }
+  if (section === "about" && wide) {
+    return <AboutDesign version={version} />;
+  }
 
   return (
     <div className={`space-y-6 ${section === "about" ? "t3-system-about" : ""}`}>

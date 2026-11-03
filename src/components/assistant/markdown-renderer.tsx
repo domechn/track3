@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import { redactSecrets } from "@/middlelayers/security/redact";
+import { useTranslation } from "@/i18n";
 
 /**
  * Renders AI assistant reply text as styled Markdown.
@@ -154,9 +155,14 @@ const components: Components = {
       {children}
     </th>
   ),
-  td: ({ children }) => (
-    <td className="px-3 py-2 text-sm text-foreground/80">{children}</td>
-  ),
+  td: ({ children }) => {
+    const { t } = useTranslation();
+    const text = String(children).trim();
+    const tone = text.startsWith("+") ? "t3-assistant-gain"
+      : /^[−-]\s*[\p{Sc}\d]/u.test(text) ? "t3-assistant-loss"
+        : text === "Total" || text === t("common.totalLabel") ? "t3-assistant-total-label" : "";
+    return <td className={`px-3 py-2 text-sm text-foreground/80 ${tone}`}>{children}</td>;
+  },
   pre: ({ children }) => <>{children}</>,
 };
 

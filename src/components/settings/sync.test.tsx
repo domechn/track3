@@ -8,6 +8,8 @@ import type { ReactNode } from "react";
 const toastMock = vi.fn((_options: { action?: ReactNode }) => ({ dismiss: dismissMock }));
 const dismissMock = vi.fn();
 const syncListeners = vi.hoisted(() => new Set<() => void>());
+let wide = false;
+vi.mock("@/components/use-wide-desktop", () => ({ useWideDesktop: () => wide }));
 vi.mock("@/components/ui/use-toast", () => ({
   useToast: () => ({ toast: toastMock }),
 }));
@@ -45,6 +47,7 @@ const status = { mode: "disabled", sync: {
 let configuredEndpoint = "";
 
 afterEach(() => {
+  wide = false;
   configuredEndpoint = "";
   status.mode = "disabled";
   status.sync.phase = "idle";
@@ -66,6 +69,64 @@ afterEach(() => {
 });
 
 describe("Sync settings page", () => {
+  it("keeps category focus and loaded devices through a report refresh", async () => {
+    wide = true;
+    status.mode = "ready";
+    vi.mocked(syncRuntime.devices).mockResolvedValue([{ id: "local", name: "Laptop", current: true }]);
+    const view = render(<SyncSettingsPage />);
+    const history = screen.getByRole("switch", { name: "History" });
+    history.focus();
+    expect(history).toHaveFocus();
+    expect(await screen.findByText("Laptop")).toBeVisible();
+    vi.mocked(syncRuntime.devices).mockImplementation(() => new Promise(() => {}));
+    status.sync.report = { pulled: 0, pushed: 1 };
+    view.rerender(<SyncSettingsPage />);
+    expect(screen.getByRole("switch", { name: "History" })).toBe(history);
+    expect(history).toHaveFocus();
+    expect(screen.getByText("Laptop")).toBeVisible();
+    expect(view.container.querySelector(".t3-sync-devices .t3-b-sync-skeleton")).toBeNull();
+  });
+
+  it("keeps category switches available during the first device load", () => {
+    wide = true;
+    status.mode = "ready";
+    vi.mocked(syncRuntime.devices).mockImplementation(() => new Promise(() => {}));
+    const { container } = render(<SyncSettingsPage />);
+    expect(screen.getByRole("switch", { name: "History" })).toBeVisible();
+    expect(container.querySelector(".t3-sync-devices .t3-b-sync-skeleton")).not.toBeNull();
+  });
+
+  it("does not show devices from an old connection while a new one loads", async () => {
+    wide = true;
+    status.mode = "ready";
+    vi.mocked(syncRuntime.devices).mockResolvedValue([{ id: "old", name: "Old laptop", current: true }]);
+    const view = render(<SyncSettingsPage />);
+    expect(await screen.findByText("Old laptop")).toBeVisible();
+    status.mode = "disabled";
+    view.rerender(<SyncSettingsPage />);
+    vi.mocked(syncRuntime.devices).mockImplementation(() => new Promise(() => {}));
+    status.mode = "ready";
+    view.rerender(<SyncSettingsPage />);
+    expect(screen.queryByText("Old laptop")).not.toBeInTheDocument();
+    expect(view.container.querySelector(".t3-sync-devices .t3-b-sync-skeleton")).not.toBeNull();
+  });
+
+  it("does not attribute a conflict to one device when several other devices exist", async () => {
+    wide = true;
+    status.mode = "ready";
+    vi.mocked(syncRuntime.configConflicts).mockResolvedValue([{ id: "7" }]);
+    vi.mocked(syncRuntime.devices).mockResolvedValue([
+      { id: "local", name: "Laptop", current: true },
+      { id: "phone", name: "Phone", current: false },
+      { id: "tablet", name: "Tablet", current: false },
+    ]);
+    render(<SyncSettingsPage />);
+    expect(await screen.findByText("Base currency")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Use the other device's value" }));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("Base currency will take the value set on the other device.");
+    expect(screen.getByRole("alertdialog")).not.toHaveTextContent("set on Phone");
+  });
+
   function fillConnection() {
     for (const [label, value] of [
       ["S3 endpoint", "https://s3.example.test"], ["Region", "us-east-1"],

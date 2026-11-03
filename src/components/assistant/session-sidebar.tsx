@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { useTranslation } from "@/i18n";
+import { useTranslation, type Locale } from "@/i18n";
 import { cn } from "@/lib/utils";
 import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   PinTopIcon,
   Cross2Icon,
   PlusIcon,
+  LockClosedIcon,
 } from "@radix-ui/react-icons";
 import type { ChatSessionMeta } from "@/middlelayers/ai";
 
@@ -25,15 +26,14 @@ export type SessionSidebarProps = {
   onPin: (id: string, pinned: boolean) => void;
 };
 
-function relativeTime(iso: string, t: (key: string) => string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return t("ai.session.relative.justNow");
-  if (diffMin < 60) return t("ai.session.relative.minutesAgo").replace("{n}", String(diffMin));
-  const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) return t("ai.session.relative.hoursAgo").replace("{n}", String(diffHours));
-  const diffDays = Math.floor(diffHours / 24);
-  return t("ai.session.relative.daysAgo").replace("{n}", String(diffDays));
+function relativeTime(iso: string, t: (key: string) => string, locale: Locale): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return t("ai.session.relative.justNow");
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return t("fidelity.assistant.yesterday");
+  return date.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short" });
 }
 
 export default function SessionSidebar({
@@ -46,20 +46,22 @@ export default function SessionSidebar({
   onDelete,
   onPin,
 }: SessionSidebarProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const pinned = useMemo(() => sessions.filter((s) => s.pinned === 1), [sessions]);
   const recent = useMemo(() => sessions.filter((s) => s.pinned === 0), [sessions]);
+  const today = useMemo(() => recent.filter((s) => new Date(s.updatedAt).toDateString() === new Date().toDateString()), [recent]);
+  const earlier = useMemo(() => recent.filter((s) => new Date(s.updatedAt).toDateString() !== new Date().toDateString()), [recent]);
 
   return (
     <div
-      className="flex w-[260px] shrink-0 flex-col border-r border-[var(--glass-border)] bg-card/40"
+      className="flex h-full w-[300px] shrink-0 flex-col border-r border-[var(--glass-border)] bg-card/40"
       data-testid="session-sidebar"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--glass-border)] px-3 py-2.5">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {t("ai.session.title")}
+        <h2 className="text-[15px] font-semibold text-foreground">
+          {t("fidelity.assistant.chats")}
         </h2>
         <Button
           variant="ghost"
@@ -104,6 +106,7 @@ export default function SessionSidebar({
                     onDelete={onDelete}
                     onPin={onPin}
                     t={t}
+                    locale={locale}
                   />
                 ))}
               </div>
@@ -111,14 +114,14 @@ export default function SessionSidebar({
             {pinned.length > 0 && recent.length > 0 && (
               <Separator className="mx-3 my-1" />
             )}
-            {recent.length > 0 && (
+            {today.length > 0 && (
               <div>
                 <div className="px-3 pb-0.5 pt-2.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                    {t("ai.session.recent")}
+                  <span className="text-xs text-muted-foreground">
+                    {t("fidelity.assistant.today")}
                   </span>
                 </div>
-                {recent.map((s) => (
+                {today.map((s) => (
                   <SessionItem
                     key={s.id}
                     session={s}
@@ -128,6 +131,30 @@ export default function SessionSidebar({
                     onDelete={onDelete}
                     onPin={onPin}
                     t={t}
+                    locale={locale}
+                  />
+                ))}
+              </div>
+            )}
+            {earlier.length > 0 && (
+              <div>
+                <div className="px-3 pb-0.5 pt-2.5">
+                  <span className="text-xs text-muted-foreground">
+                    <span className="t3-assistant-earlier-label">{t("fidelity.assistant.earlier")}</span>
+                    <span className="t3-assistant-recent-label">{t("ai.session.recent")}</span>
+                  </span>
+                </div>
+                {earlier.map((s) => (
+                  <SessionItem
+                    key={s.id}
+                    session={s}
+                    isActive={s.id === activeId}
+                    isProcessing={s.id === processingId}
+                    onSelect={onSelect}
+                    onDelete={onDelete}
+                    onPin={onPin}
+                    t={t}
+                    locale={locale}
                   />
                 ))}
               </div>
@@ -135,6 +162,7 @@ export default function SessionSidebar({
           </div>
         )}
       </ScrollArea>
+      <div className="t3-assistant-session-foot"><LockClosedIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />{t("fidelity.assistant.storage")}</div>
     </div>
   );
 }
@@ -147,6 +175,7 @@ function SessionItem({
   onDelete,
   onPin,
   t,
+  locale,
 }: {
   session: ChatSessionMeta;
   isActive: boolean;
@@ -155,6 +184,7 @@ function SessionItem({
   onDelete: (id: string) => void;
   onPin: (id: string, pinned: boolean) => void;
   t: (key: string) => string;
+  locale: Locale;
 }) {
   const handlePin = useCallback(
     (e: React.MouseEvent) => {
@@ -194,10 +224,9 @@ function SessionItem({
                 {session.title || t("ai.session.untitled")}
               </span>
             </span>
-            <span className="mt-0.5 block text-[11px] text-muted-foreground">
-              {relativeTime(session.updatedAt, t)}
-            </span>
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">{session.preview || relativeTime(session.updatedAt, t, locale)}</span>
           </button>
+          <span className="t3-assistant-session-time">{relativeTime(session.updatedAt, t, locale)}</span>
           {/* Hover actions */}
           <span className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 touch:opacity-100 motion-reduce:opacity-100">
             <button
