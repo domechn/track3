@@ -86,6 +86,22 @@ it("shows phone cost lots inline with their signed gain", async () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
+it("wraps large phone cost totals without changing ordinary totals", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  vi.mocked(loadCostBasisReport).mockResolvedValue({
+    ...report,
+    totals: { ...report.totals, proceeds: 999_999_999.99, gainLoss: 999_999_999.99 },
+  } as never);
+  render(<CostBasisPage />);
+  await screen.findByRole("button", { name: "Dispositions 1" });
+  expect(document.querySelector(".fidelity-kpi-primary > :first-child strong")).toHaveClass("fidelity-long-money");
+  expect(document.querySelector(".fidelity-kpi-primary > :nth-child(2) strong")).not.toHaveClass("fidelity-long-money");
+  expect(document.querySelector(".fidelity-kpi-secondary > :first-child strong")).toHaveClass("fidelity-long-money");
+});
+
 it("keeps stock and crypto lots with the same symbol in separate groups", async () => {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({

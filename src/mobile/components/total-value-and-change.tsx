@@ -40,6 +40,7 @@ import { hasPartialGap } from "@/middlelayers/chart-gap";
 import { AnimatedAmount, DeltaPill, SegmentedControl, Switch, useHaptics, useIsMobile } from "@/mobile/components/mobile";
 import { visibleHistoryIndices } from "@/mobile/components/mobile/chart-range";
 import { useTheme } from "@/mobile/components/common/theme";
+import { formatOverviewAxisTicks } from "@/components/overview-chart-scale";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -501,10 +502,12 @@ const App = ({
             font: { ...glassScaleOptions.ticks.font, family: isMobile ? phoneChartFontFamily : undefined },
             precision: 2,
             maxTicksLimit: 3,
-            callback: (value: any) => {
-              return showPercentageInChart
-                ? `${value.toLocaleString()}%`
-                : isMobile ? simplifyNumber(value).replace(/^-/, "−") : simplifyNumber(value);
+            callback: (value: number, index: number, ticks: { value: number }[]) => {
+              if (showPercentageInChart) return `${value.toLocaleString()}%`;
+              const label = btcAsBase
+                ? simplifyNumber(value)
+                : formatOverviewAxisTicks(ticks.map((tick) => tick.value))[index];
+              return isMobile ? label.replace(/^-/, "−") : label;
             },
           },
           grid: {

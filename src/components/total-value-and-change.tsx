@@ -37,7 +37,7 @@ import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { downsampleIndices } from "@/middlelayers/chart-downsample";
 import { hasPartialGap } from "@/middlelayers/chart-gap";
-import { chartBounds, shouldShowOverviewDateTick } from "./overview-chart-scale";
+import { chartBounds, formatOverviewAxisTicks, shouldShowOverviewDateTick } from "./overview-chart-scale";
 import { overviewUseLastKnownEvent } from "./source-status-event";
 
 interface TotalValueShower {
@@ -545,10 +545,10 @@ const App = ({
             ...glassScaleOptions.ticks,
             precision: 2,
             maxTicksLimit: metrics ? 5 : 4,
-            callback: (value: any) => {
+            callback: (value: number, index: number, ticks: { value: number }[]) => {
               return showPercentageInChart
                 ? `${value.toLocaleString()}%`
-                : metrics ? simplifyNumber(value).replace("k", "K") : simplifyNumber(value);
+                : metrics ? formatOverviewAxisTicks(ticks.map((tick) => tick.value))[index].replace("k", "K") : simplifyNumber(value);
             },
           },
           grid: {

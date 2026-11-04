@@ -26,6 +26,7 @@ import { requestRefreshSource } from "@/mobile/components/refresh-progress-event
 import { BottomSheet } from "@/mobile/components/mobile";
 import { Switch } from "@/mobile/components/mobile";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
+import { formatOverviewAxisTicks } from "@/components/overview-chart-scale";
 import { isValid, parse } from "date-fns";
 import { enUS, zhCN } from "date-fns/locale";
 import "@/mobile/components/mobile/fidelity.css";
@@ -103,6 +104,10 @@ function Chart({ points, values, formatValue, formatTick, change, best }: { poin
   const x = (index: number) => 44 + index / Math.max(1, points.length - 1) * 210;
   const y = (value: number) => 164 - (value - low) / Math.max(1, high - low) * 138;
   const ticks = Array.from({ length: Math.floor((high - low) / step) + 1 }, (_, index) => low + index * step);
+  const roundedLabels = ticks.map(formatTick);
+  const tickLabels = new Set(roundedLabels).size === roundedLabels.length ? roundedLabels :
+    formatOverviewAxisTicks(ticks).map((label) => formatTick(0).endsWith("%") ? `${label}%` :
+      formatTick(0).endsWith("K") ? label.replace(/k$/, "K") : label);
   const labelIndices = [...new Set([0, Math.round((points.length - 1) / 3), Math.round(2 * (points.length - 1) / 3), points.length - 1])];
   const bestIndex = best ? points.findIndex((point) => new Date(point.timestamp).toDateString() === best.date.toDateString()) : -1;
   const pick = (clientX: number, left: number, width: number) =>
@@ -115,7 +120,7 @@ function Chart({ points, values, formatValue, formatTick, change, best }: { poin
     onPointerDown={(event) => { const r = event.currentTarget.getBoundingClientRect(); setSelected(pick(event.clientX, r.left, r.width)); }}
     onPointerMove={(event) => { const r = event.currentTarget.getBoundingClientRect(); setSelected(pick(event.clientX, r.left, r.width)); }}
     onPointerLeave={(event) => { if (event.pointerType === "mouse") setSelected(null); }}>
-    {ticks.map((value) => <g key={value}><line x1="44" x2="324" y1={y(value)} y2={y(value)} stroke="#262629" shapeRendering="crispEdges" /><text x="36" y={y(value) + 4} textAnchor="end" fill="var(--fd-faint)" fontSize="12">{formatTick(value)}</text></g>)}
+    {ticks.map((value, index) => <g key={value}><line x1="44" x2="324" y1={y(value)} y2={y(value)} stroke="#262629" shapeRendering="crispEdges" /><text x="36" y={y(value) + 4} textAnchor="end" fill="var(--fd-faint)" fontSize="12">{tickLabels[index]}</text></g>)}
     {bestIndex >= 0 && best && <><line x1={x(bestIndex)} x2={x(bestIndex)} y1="29" y2="166" stroke="var(--fd-faint)" opacity=".45" shapeRendering="crispEdges" />
       <line x1={x(bestIndex)} x2={x(bestIndex)} y1="22" y2="29" stroke="var(--fd-faint)" opacity=".45" shapeRendering="crispEdges" />
       <text x="11" y="17" fill="var(--fd-faint)" fontSize="11">{t("fidelity.overview.bestDayChart").replace("{date}", shortDate(best.date, locale)).replace("{change}", best.change).replace("{symbol}", best.symbol).replace("{symbolChange}", best.symbolChange)}</text></>}
