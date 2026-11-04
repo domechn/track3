@@ -92,6 +92,8 @@ jobs:
       - name: Install Playwright Chromium
         timeout-minutes: 10
         run: corepack yarn playwright install chromium
+      - name: Check generated brand icons
+        run: node --test scripts/brand-export.test.mjs
       - name: Check browser tests
         run: corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit
       - name: Test production startup

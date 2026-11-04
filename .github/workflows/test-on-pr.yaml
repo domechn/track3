@@ -81,6 +81,8 @@ jobs:
         run: corepack yarn install --immutable
       - name: install Chromium
         run: corepack yarn playwright install --with-deps chromium
+      - name: Check generated brand icons
+        run: node --test scripts/brand-export.test.mjs
       - name: type-check browser tests
         run: corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit
       - name: smoke test

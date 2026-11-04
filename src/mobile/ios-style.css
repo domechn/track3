@@ -63,6 +63,7 @@
     --negative: 349 70% 40%;
     --warning: 37 79% 32%;
     --accent-data: 213 63% 43%;
+    --track-logo-tint: 213 63% 65%;
     --chart-blue-soft: 204 48% 43%;
     --chart-green-soft: 165 30% 38%;
     --gain: var(--positive);
@@ -112,6 +113,7 @@
     --negative: 349 81% 67%;
     --warning: 39 66% 55%;
     --accent-data: 213 63% 56%;
+    --track-logo-tint: 213 63% 73%;
     --chart-blue-soft: 204 48% 64%;
     --chart-green-soft: 165 30% 60%;
     --gain: var(--positive);
