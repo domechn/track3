@@ -33,9 +33,10 @@
     />
     <link rel="canonical" href="https://track3.dev/success.html" />
     <link rel="icon" type="image/png" href="images/app-icon.png" />
+    <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="site.css" />
       <script>
-      /* Keep the Stripe session id out of the page URL before any third-party script can read it. */
+      /* Keep the Stripe session id out of the visible URL and browser history. */
       (function () {
         var p = new URLSearchParams(location.search), s = p.get("session_id");
         if (!s) return;
@@ -45,14 +46,6 @@
         history.replaceState(history.state, "", location.pathname + (q ? "?" + q : "") + location.hash);
       })();
     </script>
-    <!-- X conversion tracking base code -->
-    <script>
-      !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
-      },s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',
-      a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
-      twq('config','rhy6t');
-    </script>
-    <!-- End X conversion tracking base code -->
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -68,7 +61,7 @@
         >
         <nav aria-label="Primary">
           <a href="./index.html#features">Features</a
-          ><a href="./index.html#ios">iPhone &amp; iPad</a
+          ><a href="./index.html#sources">Sources</a
           ><a href="./index.html#privacy">Privacy</a
           ><a href="./index.html#pro">Pro</a
           ><a href="./docs/index.html">Docs</a>
@@ -77,7 +70,7 @@
           <summary>Menu</summary>
           <div class="menu-links">
             <a href="./index.html#features">Features</a
-            ><a href="./index.html#ios">iPhone &amp; iPad</a
+            ><a href="./index.html#sources">Sources</a
             ><a href="./index.html#privacy">Privacy</a
             ><a href="./index.html#pro">Pro</a
             ><a href="./docs/index.html">Docs</a>
@@ -176,24 +169,12 @@
               >
               and include the email on your Stripe receipt.
             </p>
-            <p><a class="btn primary" href="./index.html">Back to home</a></p>
+            <p><a class="btn" href="./index.html">Back to home</a></p>
           </div>
         </div>
       </section>
     </main>
-    <footer>
-      <div class="wrap">
-        <span>© 2026 Track3 · Source available</span
-        ><a href="https://github.com/domechn/track3">GitHub</a
-        ><a href="https://github.com/domechn/track3/releases">Releases</a
-        ><a href="https://deepwiki.com/domechn/track3">Wiki</a
-        ><a href="./index.html#privacy">Privacy</a
-        ><a href="./docs/index.html">Docs</a
-        ><a href="https://github.com/domechn/track3/blob/master/LICENSE"
-          >License</a
-        >
-      </div>
-    </footer>
+    <footer><div class="wrap footer-inner"><span>© 2026 Track3 · Source available · <a href="https://github.com/domechn/track3/blob/master/LICENSE">License</a></span><a href="./download.html">Download</a><a href="./docs/index.html">Docs</a><a href="./index.html#privacy">Privacy</a><a href="https://github.com/domechn/track3">GitHub</a></div></footer>
     <script>
       (() => {
         const params = new URLSearchParams(location.search);

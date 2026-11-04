@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Get Track3 — Desktop Downloads (iPhone and iPad Coming Soon)</title>
+    <title>Download Track3 — Desktop Downloads (iPhone and iPad Coming Soon)</title>
     <meta
       name="description"
       content="Get the latest Track3 desktop installer for macOS, Windows, or Linux. iPhone and iPad are coming soon."
     />
     <meta
       property="og:title"
-      content="Get Track3 — Desktop Downloads (iPhone and iPad Coming Soon)"
+      content="Download Track3 — Desktop Downloads (iPhone and iPad Coming Soon)"
     />
     <meta
       property="og:description"
@@ -25,7 +25,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="Get Track3 — Desktop Downloads (iPhone and iPad Coming Soon)"
+      content="Download Track3 — Desktop Downloads (iPhone and iPad Coming Soon)"
     />
     <meta
       name="twitter:description"
@@ -37,17 +37,10 @@
     />
     <link rel="canonical" href="https://track3.dev/download.html" />
     <link rel="icon" type="image/png" href="images/app-icon.png" />
+    <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="site.css" />
-      <!-- X conversion tracking base code -->
-    <script>
-      !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
-      },s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',
-      a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
-      twq('config','rhy6t');
-    </script>
-    <!-- End X conversion tracking base code -->
   </head>
-  <body>
+  <body class="download-page">
     <a class="skip-link" href="#main">Skip to content</a>
     <header>
       <div class="wrap">
@@ -61,7 +54,7 @@
         >
         <nav aria-label="Primary">
           <a href="./index.html#features">Features</a
-          ><a href="./index.html#ios">iPhone &amp; iPad</a
+          ><a href="./index.html#sources">Sources</a
           ><a href="./index.html#privacy">Privacy</a
           ><a href="./index.html#pro">Pro</a
           ><a href="./docs/index.html">Docs</a>
@@ -70,7 +63,7 @@
           <summary>Menu</summary>
           <div class="menu-links">
             <a href="./index.html#features">Features</a
-            ><a href="./index.html#ios">iPhone &amp; iPad</a
+            ><a href="./index.html#sources">Sources</a
             ><a href="./index.html#privacy">Privacy</a
             ><a href="./index.html#pro">Pro</a
             ><a href="./docs/index.html">Docs</a>
@@ -83,7 +76,7 @@
       <section class="page-intro">
         <div class="wrap">
           <div class="kicker">Download Track3</div>
-          <h1>Get Track3 for your device.</h1>
+          <h1>Download Track3 for desktop.</h1>
           <div class="recommendation__actions" id="recommendedActions"></div>
           <p id="recommendedText">
             Choose a desktop installer for macOS, Windows, or Linux. iPhone and
@@ -125,19 +118,7 @@
         </div>
       </section>
     </main>
-    <footer>
-      <div class="wrap">
-        <span>© 2026 Track3 · Source available</span
-        ><a href="https://github.com/domechn/track3">GitHub</a
-        ><a href="https://github.com/domechn/track3/releases">Releases</a
-        ><a href="https://deepwiki.com/domechn/track3">Wiki</a
-        ><a href="./index.html#privacy">Privacy</a
-        ><a href="./docs/index.html">Docs</a
-        ><a href="https://github.com/domechn/track3/blob/master/LICENSE"
-          >License</a
-        >
-      </div>
-    </footer>
+    <footer><div class="wrap footer-inner"><span>© 2026 Track3 · Source available · <a href="https://github.com/domechn/track3/blob/master/LICENSE">License</a></span><a href="./download.html">Download</a><a href="./docs/index.html">Docs</a><a href="./index.html#privacy">Privacy</a><a href="https://github.com/domechn/track3">GitHub</a></div></footer>
     <script type="module">
       import {
         detectPlatform,
@@ -272,7 +253,7 @@
             title: "Track3 for iPhone and iPad",
             text: "iPhone and iPad are coming soon. Track3 is available for macOS, Windows, and Linux today.",
             actions: [
-              '<a class="download-button" href="#ios">iPhone &amp; iPad: coming soon</a>',
+              '<a class="download-button--ghost" href="#ios">iOS coming soon</a>',
             ],
           };
         }

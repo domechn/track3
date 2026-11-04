@@ -1,764 +1,85 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>
-      Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop (iOS Coming Soon)
-    </title>
-    <meta
-      name="description"
-      content="Track3 tracks crypto and stock portfolios across exchanges, brokers, and wallets on desktop, with iPhone and iPad coming soon. Explore history, analytics, goals, and an AI assistant with local storage and optional encrypted sync."
-    />
-    <meta
-      name="keywords"
-      content="portfolio tracker, crypto, stocks, AI assistant, IBKR, Interactive Brokers, Bitcoin, Ethereum, Binance, OKX, iPhone, iPad, macOS, Windows, Linux, encrypted sync"
-    />
-    <meta
-      property="og:title"
-      content="Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop (iOS Coming Soon)"
-    />
-    <meta
-      property="og:description"
-      content="Track crypto and stocks on desktop; iPhone and iPad coming soon. Explore portfolio history, analytics, goals, and an AI assistant."
-    />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://track3.dev/" />
-    <meta
-      property="og:image"
-      content="https://track3.dev/images/social-overview.jpg"
-    />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta
-      name="twitter:title"
-      content="Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop (iOS Coming Soon)"
-    />
-    <meta
-      name="twitter:description"
-      content="Track crypto and stocks on desktop, with iPhone and iPad coming soon, plus portfolio analytics and an AI assistant."
-    />
-    <meta
-      name="twitter:image"
-      content="https://track3.dev/images/social-overview.jpg"
-    />
-    <link rel="canonical" href="https://track3.dev/" />
-    <link rel="icon" type="image/png" href="images/app-icon.png" />
-    <link rel="stylesheet" href="site.css" />
-      <!-- X conversion tracking base code -->
-    <script>
-      !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
-      },s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',
-      a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
-      twq('config','rhy6t');
-    </script>
-    <!-- End X conversion tracking base code -->
-  </head>
-  <body id="top">
-    <a class="skip-link" href="#main">Skip to content</a>
-    <header>
-      <div class="wrap">
-        <a class="brand" href="./index.html"
-          ><img
-            src="images/app-icon.png"
-            alt=""
-            width="30"
-            height="30"
-          />Track3</a
-        >
-        <nav aria-label="Primary">
-          <a href="#features">Features</a><a href="#ios">iPhone &amp; iPad</a
-          ><a href="#privacy">Privacy</a><a href="#pro">Pro</a
-          ><a href="./docs/index.html">Docs</a>
-        </nav>
-        <details class="mobile-menu">
-          <summary>Menu</summary>
-          <div class="menu-links">
-            <a href="#features">Features</a><a href="#ios">iPhone &amp; iPad</a
-            ><a href="#privacy">Privacy</a><a href="#pro">Pro</a
-            ><a href="./docs/index.html">Docs</a>
-          </div>
-        </details>
-        <a class="btn primary" href="./download.html">Download</a>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop (iOS Coming Soon)</title>
+  <meta name="description" content="Track crypto and stocks across exchanges, wallets and Interactive Brokers. Explore holdings, cost basis and rebalancing on desktop; iPhone and iPad coming soon." />
+  <meta name="keywords" content="portfolio tracker, crypto, stocks, AI assistant, IBKR, Interactive Brokers, Bitcoin, Ethereum, Binance, OKX, iPhone, iPad, macOS, Windows, Linux, encrypted sync" />
+  <meta property="og:title" content="Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop (iOS Coming Soon)" />
+  <meta property="og:description" content="Track crypto and stocks across exchanges, wallets and Interactive Brokers. Explore holdings, cost basis and rebalancing on desktop; iOS coming soon." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://track3.dev/" />
+  <meta property="og:image" content="https://track3.dev/images/social-overview.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Track3 — Crypto &amp; Stock Portfolio Tracker for Desktop (iOS Coming Soon)" />
+  <meta name="twitter:description" content="Track crypto and stocks across exchanges, wallets and Interactive Brokers. Explore holdings, cost basis and rebalancing on desktop; iOS coming soon." />
+  <meta name="twitter:image" content="https://track3.dev/images/social-overview.jpg" />
+  <link rel="canonical" href="https://track3.dev/" />
+  <link rel="icon" type="image/png" href="images/app-icon.png" />
+  <link rel="preload" href="fonts/public-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="images/desktop/overview-dark.webp" as="image" media="(prefers-color-scheme: dark)" />
+  <link rel="preload" href="images/desktop/overview.webp" as="image" media="(prefers-color-scheme: light)" />
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body id="top">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header"><div class="wrap header-inner">
+    <a class="brand" href="./index.html"><img src="images/app-icon.png" alt="" width="30" height="30" />Track3</a>
+    <nav aria-label="Primary"><a href="#features">Features</a><a href="#sources">Sources</a><a href="#privacy">Privacy</a><a href="#pro">Pro</a><a href="./docs/index.html">Docs</a></nav>
+    <details class="mobile-menu"><summary>Menu</summary><div class="menu-links"><a href="#features">Features</a><a href="#sources">Sources</a><a href="#privacy">Privacy</a><a href="#pro">Pro</a><a href="./docs/index.html">Docs</a></div></details>
+    <a class="btn primary" href="./download.html">Download</a>
+  </div></header>
+  <main id="main">
+    <section class="hero"><div class="wrap hero-grid">
+      <div class="hero-copy"><p class="kicker">YOUR PORTFOLIO, IN FOCUS</p><h1>See balances.<br />Track changes.</h1>
+        <p class="lead">Track crypto and stocks across exchanges, wallets and Interactive Brokers. See what changed, what you own and what it cost.</p>
+        <div class="cta"><a class="btn primary" href="./download.html">Download</a><a class="quiet-link" href="https://github.com/domechn/track3">View on GitHub <span aria-hidden="true">↗</span></a></div>
+        <p class="meta">macOS · Windows · Linux <span aria-hidden="true">/</span> iOS coming soon</p>
       </div>
-    </header>
-
-    <main id="main">
-      <section class="hero">
-        <div class="wrap grid">
-          <div>
-            <h1>Know your portfolio, wherever you are.</h1>
-            <p class="lead">
-              Crypto and stocks across exchanges, wallets and Interactive
-              Brokers in one private place. History, PnL, cost basis and a
-              Pro-only assistant that answers from your own data.
-            </p>
-            <div class="cta">
-              <a class="btn primary" data-primary-cta href="./download.html"
-                >Get Track3</a
-              >
-              <a class="btn" href="https://github.com/domechn/track3"
-                >View on GitHub</a
-              >
-            </div>
-            <p class="meta">
-              macOS · Windows · Linux · iOS coming soon · Source available
-            </p>
-          </div>
-          <div class="shot">
-            <div class="win">
-              <img
-                src="images/desktop/overview.webp"
-                width="1600"
-                height="1000"
-                alt="Track3 desktop overview"
-              />
-            </div>
-            <div class="phone">
-              <img
-                src="images/ios/overview-light.webp"
-                width="600"
-                height="1298"
-                alt="Track3 on iPhone"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div class="sources" id="exchanges">
-        <div class="wrap">
-          <div class="row">
-            <b>Exchanges &amp; brokers</b>
-            <ul>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/binance-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Binance</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/okex-logo.svg"
-                  alt="OKX"
-                  class="wide"
-                  width="72"
-                  height="16"
-                />
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/bitget-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Bitget</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/kraken-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Kraken</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/gate-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Gate.io</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/coinbase-logo.jpg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Coinbase</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/bybit-logo.svg"
-                  alt="Bybit"
-                  class="wide"
-                  width="72"
-                  height="14"
-                />
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/htx-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>HTX</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/mexc-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>MEXC</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/backpack-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Backpack</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/ibkr-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Interactive Brokers</span>
-              </li>
-            </ul>
-          </div>
-          <div class="row">
-            <b>Wallets &amp; chains</b>
-            <ul>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/btc-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Bitcoin</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/eth-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Ethereum</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/binance-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>BNB Chain</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/sol-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Solana</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/doge-logo.webp"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>Dogecoin</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/ton-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>TON</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/sui-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>SUI</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/eth-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>EVM (Pro)</span>
-              </li>
-              <li>
-                <img
-                  loading="lazy"
-                  src="images/logos/tron-logo.svg"
-                  alt=""
-                  width="24"
-                  height="24"
-                /><span>TRON (Pro)</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <section id="features">
-        <div class="wrap">
-          <div class="head">
-            <div class="kicker">What it does</div>
-            <h2>A calmer command center for your portfolio.</h2>
-            <p>
-              Your portfolio database stays on your device. Connect with
-              read-only credentials, refresh when you want, and see where every
-              balance sits.
-            </p>
-          </div>
-
-          <div class="feature">
-            <div class="win">
-              <img
-                loading="lazy"
-                src="images/desktop/history.webp"
-                width="1600"
-                height="1000"
-                alt="Track3 portfolio history on desktop"
-              />
-            </div>
-            <div class="copy">
-              <h3>Your whole history, one tap away.</h3>
-              <p>
-                Each successful refresh saves a snapshot. Scroll back through
-                days and months, open any day, and compare two periods side by
-                side.
-              </p>
-              <ul>
-                <li>A snapshot for every successful refresh, with change and asset counts</li>
-                <li>Automatic insights in the desktop Pro Assistant after refreshes</li>
-                <li>Compare any two snapshot dates</li>
-                <li>Per-exchange and per-wallet asset views (Pro)</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="feature flip">
-            <div class="win">
-              <img
-                loading="lazy"
-                src="images/desktop/cost-basis.webp"
-                width="1600"
-                height="1000"
-                alt="Cost basis"
-              />
-            </div>
-            <div class="copy">
-              <h3>Know what you actually made.</h3>
-              <p>
-                Realized and unrealized PnL, cost basis with your chosen method,
-                and reports with CSV and JSON export — not just a balance.
-              </p>
-              <ul>
-                <li>FIFO, LIFO, HIFO and weighted average cost basis</li>
-                <li>Profit attribution by asset</li>
-                <li>Goals and alerts with notifications</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="feature" id="ai">
-            <div class="win">
-              <img
-                loading="lazy"
-                src="images/desktop/assistant.webp"
-                width="1600"
-                height="1000"
-                alt="Track3 AI assistant on desktop"
-              />
-            </div>
-            <div class="copy">
-              <h3>Ask your portfolio anything (Pro).</h3>
-              <p>
-                “How much BTC do I hold?” “What moved most this month?” The
-                assistant answers from your local data using any
-                OpenAI-compatible endpoint. Chat messages are encrypted before
-                storage; chat titles and previews are not.
-              </p>
-              <ul>
-                <li>Natural-language questions on holdings and trends</li>
-                <li>Proposed changes always need your approval</li>
-                <li>Rebalancing suggestions from your targets</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="more">
-        <div class="wrap">
-          <div class="head">
-            <div class="kicker">More to explore</div>
-            <h2>See the details behind every balance.</h2>
-            <p>Track3 has room for the daily work beyond an overview.</p>
-          </div>
-          <div class="more-grid">
-            <article class="more-card">
-              <img
-                loading="lazy"
-                src="images/desktop/wallets.webp"
-                width="1600"
-                height="1000"
-                alt="Wallet and source breakdown in Track3"
-              />
-              <div class="copy">
-                <h3>Wallets and sources</h3>
-                <p>
-                  See refresh status for each source, with retry controls in the
-                  refresh status dialog. Pro adds per-source asset views. Interactive
-                  Brokers positions import through Flex Web Service using a
-                  Query ID and Token.
-                </p>
-              </div>
-            </article>
-            <article class="more-card">
-              <img
-                loading="lazy"
-                src="images/desktop/rebalance.webp"
-                width="1600"
-                height="1000"
-                alt="Rebalance target planning in Track3"
-              />
-              <div class="copy">
-                <h3>Plan a rebalance</h3>
-                <p>
-                  Set target weights and trade constraints, review suggested
-                  changes, then export them to CSV.
-                </p>
-              </div>
-            </article>
-            <article class="more-card">
-              <img
-                loading="lazy"
-                src="images/desktop/goals.webp"
-                width="1600"
-                height="1000"
-                alt="Portfolio goals and alerts in Track3"
-              />
-              <div class="copy">
-                <h3>Goals and alerts</h3>
-                <p>
-                  Watch portfolio targets, prices and allocation drift. Review
-                  alert history and receive local notifications.
-                </p>
-              </div>
-            </article>
-            <article class="more-card">
-              <img
-                loading="lazy"
-                src="images/desktop/settings.webp"
-                width="1600"
-                height="1000"
-                alt="Track3 data and security settings"
-              />
-              <div class="copy">
-                <h3>Make it yours</h3>
-                <p>
-                  Import and export files, set up optional encrypted S3 sync,
-                  rotate the local encryption key, and choose English or
-                  Simplified Chinese.
-                </p>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="tint" id="ios">
-        <div class="wrap">
-          <div class="head">
-            <div class="kicker">iPhone &amp; iPad · Coming soon</div>
-            <h2>The same portfolio, built for touch.</h2>
-            <p>
-              Tabs on iPhone, a sidebar and split views on iPad. The same local
-              portfolio data and encrypted sensitive settings, with a Face ID
-              app lock and Files import and export.
-            </p>
-          </div>
-          <div class="devices" id="screenshots">
-            <div>
-              <div class="dev">
-                <img
-                  loading="lazy"
-                  src="images/ios/overview-light.webp"
-                  width="600"
-                  height="1298"
-                  alt="Track3 portfolio overview on iPhone"
-                />
-              </div>
-              <p class="cap">Overview</p>
-            </div>
-            <div>
-              <div class="dev">
-                <img
-                  loading="lazy"
-                  src="images/ios/history-light.webp"
-                  width="600"
-                  height="1298"
-                  alt="Track3 portfolio history on iPhone"
-                />
-              </div>
-              <p class="cap">History</p>
-            </div>
-            <div>
-              <div class="dev">
-                <img
-                  loading="lazy"
-                  src="images/ios/assistant-light.webp"
-                  width="600"
-                  height="1298"
-                  alt="Track3 AI assistant on iPhone"
-                />
-              </div>
-              <p class="cap">Assistant (Pro)</p>
-            </div>
-            <div>
-              <div class="dev ipad">
-                <img
-                  loading="lazy"
-                  src="images/ios/pro-landscape-history-detail.webp"
-                  width="1100"
-                  height="825"
-                  alt="Track3 portfolio history detail on iPad"
-                />
-              </div>
-              <p class="cap">iPad, landscape</p>
-            </div>
-          </div>
-          <p class="note">
-            <b>Coming soon.</b> The iPhone and iPad app is not available to
-            install yet. Watch the
-            <a href="https://github.com/domechn/track3">GitHub repository</a>
-            for updates.
-          </p>
-        </div>
-      </section>
-
-      <section class="dark" id="privacy">
-        <div class="wrap">
-          <div class="head">
-            <div class="kicker">Privacy</div>
-            <h2>Your data, your control.</h2>
-            <p>
-              Portfolio records stay in a local SQLite database. Refreshes
-              contact your sources, assistant requests reach your chosen
-              provider, and optional sync uses your S3 storage. Crypto prices
-              and public wallet balances may come from public APIs such as
-              CoinGecko. Currency rates, the stablecoin list, stock prices, Pro
-              refreshes, and license checks use Track3's services. Pro wallet
-              refreshes send wallet addresses to Track3's service, and Track3
-              service requests include a persistent client ID.
-            </p>
-            <p>
-              The desktop and iOS apps send usage events for launches,
-              refreshes, and subscription-button clicks to Aptabase at
-              eu.aptabase.com. There is no in-app opt-out. Events carry a
-              persistent client ID and session ID, plus details such as OS,
-              user agent, locale, app and Tauri versions; refresh events may
-              include source IDs.
-            </p>
-          </div>
-          <div class="facts">
-            <div class="fact">
-              <b>Read-only keys</b
-              ><span
-                >Read-only API keys are enough; don't grant trade or withdrawal
-                permission.</span
-              >
-            </div>
-            <div class="fact">
-              <b>Encrypted storage</b
-              ><span
-                >Sensitive configuration and chat messages are encrypted before
-                storage; chat titles and previews are not. On desktop, set your
-                own encryption key for stronger protection. Portfolio records
-                are not app-encrypted.</span
-              >
-            </div>
-            <div class="fact">
-              <b>No wallet signatures</b
-              ><span
-                >Only public on-chain data is read. Nothing to approve.</span
-              >
-            </div>
-            <div class="fact">
-              <b>Source available</b
-              ><span
-                >Read the code on GitHub. Export and back up your data when you
-                choose.</span
-              >
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="pro">
-        <div class="wrap">
-          <div class="head">
-            <div class="kicker">Track3 Pro</div>
-            <h2>More chains, fresher data.</h2>
-            <p>
-              Pro adds the AI assistant, broader EVM and TRON coverage, and
-              live values. Free Ethereum and BNB Chain tracking covers native
-              ETH and BNB; token balances need Pro.
-            </p>
-          </div>
-          <div class="plans">
-            <div class="card">
-              <h3>Monthly</h3>
-              <div class="price">$9.99<small> / month</small></div>
-              <p class="sub">Cancel any time.</p>
-            </div>
-            <div class="card">
-              <h3>Yearly</h3>
-              <div class="price">$83.99<small> / year</small></div>
-              <p class="sub">About 30% less than monthly.</p>
-            </div>
-            <div class="card limits">
-              <h3>Both plans include</h3>
-              <ul>
-                <li>AI assistant</li>
-                <li>Per-exchange and per-wallet asset views</li>
-                <li>300 ERC20 wallet refreshes per month</li>
-                <li>300 TRON asset refreshes per month</li>
-                <li>All-chain refresh on supported Pro EVM networks</li>
-                <li>Real-time portfolio value in the top bar and live prices during refresh</li>
-              </ul>
-              <p class="sub usage-note">
-                One wallet refresh counts as one use.
-              </p>
-            </div>
-          </div>
-          <p class="plan-note">
-            Subscribe on this website or in the desktop app under
-            Settings → System → Subscribe. Enter an existing Pro license key in
-            the desktop app under Settings → System → Pro license.
-          </p>
-        </div>
-      </section>
-
-      <section id="faq">
-        <div class="wrap">
-          <div class="head">
-            <div class="kicker">Common questions</div>
-            <h2>Before you start.</h2>
-          </div>
-          <div class="faq">
-            <div>
-              <h3>Which desktop platforms work?</h3>
-              <p>
-                Releases provide macOS, Windows and Linux installers. The
-                <a href="./download.html">download page</a> picks a recommended
-                package and lists every available format.
-              </p>
-            </div>
-            <div>
-              <h3>When is the iPhone and iPad app coming?</h3>
-              <p>
-                Soon. It is not available to install yet. Watch the
-                <a href="https://github.com/domechn/track3">GitHub repository</a>
-                for updates.
-              </p>
-            </div>
-            <div>
-              <h3>Are all records encrypted?</h3>
-              <p>
-                Portfolio assets and transactions use a local SQLite database
-                and are not encrypted by the app. Credentials, configured wallet
-                addresses and chat messages are encrypted before storage; chat
-                titles and previews are not. On desktop, set your own encryption
-                key for stronger protection.
-                <a
-                  href="https://github.com/domechn/track3/blob/master/README.md#notice"
-                  >Privacy details</a
-                >
-              </p>
-            </div>
-            <div>
-              <h3>Can I move data between devices?</h3>
-              <p>
-                Use file import and export, a backup folder such as iCloud
-                Drive, or optional encrypted sync with S3 storage you configure.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="tint final" id="download">
-        <div class="wrap">
-          <div>
-            <h2>Start tracking the private way.</h2>
-            <p>
-              Free to download for desktop. iPhone and iPad are coming soon.
-              Source available on GitHub.
-            </p>
-          </div>
-          <div class="cta">
-            <a class="btn primary" data-primary-cta href="./download.html"
-              >Get Track3</a
-            ><a class="btn" href="./download.html">All platforms</a>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer>
-      <div class="wrap">
-        <span>© 2026 Track3 · Source available</span
-        ><a href="https://github.com/domechn/track3">GitHub</a
-        ><a href="https://github.com/domechn/track3/releases">Releases</a
-        ><a href="https://deepwiki.com/domechn/track3">Wiki</a
-        ><a href="./index.html#privacy">Privacy</a
-        ><a href="./docs/index.html">Docs</a
-        ><a href="https://github.com/domechn/track3/blob/master/LICENSE"
-          >License</a
-        >
-      </div>
-    </footer>
-    <script type="module">
-      import { detectPlatform } from "./download-page.mjs";
-      import { recommendedCta } from "./site-cta.mjs";
-      const cta = recommendedCta(detectPlatform());
-      document.querySelectorAll("[data-primary-cta]").forEach((link) => {
-        link.textContent = cta.label;
-        link.href = cta.href;
-      });
-      document.querySelectorAll(".mobile-menu a").forEach((link) => {
-        link.addEventListener(
-          "click",
-          () => (link.closest("details").open = false),
-        );
-      });
-    </script>
-  </body>
+      <picture class="shot"><source media="(prefers-color-scheme: light)" srcset="images/desktop/overview.webp" /><img src="images/desktop/overview-dark.webp" width="1600" height="1000" alt="Track3 Overview showing portfolio value, holdings, history chart and daily changes" fetchpriority="high" /></picture>
+    </div></section>
+    <div class="statement"><div class="wrap">Track3 is a local portfolio tracker for your balances, history and decisions.</div></div>
+    <section id="features" class="section"><div class="wrap">
+      <div class="section-head"><p class="kicker">01 / THE CORE VIEWS</p><h2>From balance to understanding.</h2></div>
+      <article class="feature"><div class="feature-copy"><p class="eyebrow">Overview</p><h3>Know what changed.</h3><p>See total value, holdings and the assets driving each change since your last snapshot.</p></div><picture class="screen"><source media="(prefers-color-scheme: light)" srcset="images/desktop/overview.webp" /><img src="images/desktop/overview-dark.webp" width="1600" height="1000" loading="lazy" alt="Track3 Overview with portfolio chart, holdings and daily change" /></picture></article>
+      <article class="feature reverse"><div class="feature-copy"><p class="eyebrow">Cost basis</p><h3>See realized profit and loss.</h3><p>Review cost basis and realized and unrealized P&amp;L using FIFO, LIFO, HIFO or weighted average.</p></div><div class="screen"><img src="images/desktop/cost-basis.webp" width="1600" height="1000" loading="lazy" alt="Track3 Cost basis showing realized P&amp;L, holding periods and asset breakdown" /></div></article>
+      <article class="feature"><div class="feature-copy"><p class="eyebrow">Rebalance</p><h3>Plan your next move.</h3><p>Set target weights and trade constraints, review suggested changes, then export them to CSV.</p></div><div class="screen"><img src="images/desktop/rebalance.webp" width="1600" height="1000" loading="lazy" alt="Track3 Rebalance planning with allocation targets and suggested changes" /></div></article>
+    </div></section>
+    <section id="sources" class="section tint"><div class="wrap">
+      <div class="section-head"><p class="kicker">02 / SOURCES</p><h2>Connected where your assets live.</h2><p>Bring exchanges, a broker and public wallet balances into one portfolio.</p></div>
+      <div class="source-group"><h3>Exchanges &amp; broker</h3><ul class="source-grid">
+        <li><img src="images/logos/binance-logo.svg" width="24" height="24" alt="" loading="lazy" />Binance</li><li><img src="images/logos/okex-logo.svg" width="72" height="20" alt="OKX" loading="lazy" /></li><li><img class="detailed-logo" src="images/logos/bitget-logo.svg" width="24" height="24" alt="" loading="lazy" />Bitget</li><li><img src="images/logos/kraken-logo.svg" width="24" height="24" alt="" loading="lazy" />Kraken</li><li><img src="images/logos/gate-logo.svg" width="24" height="24" alt="" loading="lazy" />Gate.io</li><li><img src="images/logos/coinbase-logo.png" width="24" height="24" alt="" loading="lazy" />Coinbase</li><li><img src="images/logos/bybit-logo.svg" width="72" height="24" alt="Bybit" loading="lazy" /></li><li><img src="images/logos/htx-logo.svg" width="24" height="24" alt="" loading="lazy" />HTX</li><li><img src="images/logos/mexc-logo.svg" width="24" height="24" alt="" loading="lazy" />MEXC</li><li><img class="detailed-logo" src="images/logos/backpack-logo.svg" width="24" height="24" alt="" loading="lazy" />Backpack</li><li><img src="images/logos/ibkr-logo.svg" width="24" height="24" alt="" loading="lazy" />Interactive Brokers</li>
+      </ul></div>
+      <div class="source-group"><h3>Wallets &amp; chains</h3><ul class="source-grid">
+        <li><img class="detailed-logo" src="images/logos/btc-logo.svg" width="24" height="24" alt="" loading="lazy" />Bitcoin</li><li><img class="detailed-logo" src="images/logos/eth-logo.svg" width="24" height="24" alt="" loading="lazy" />Ethereum</li><li><img src="images/logos/binance-logo.svg" width="24" height="24" alt="" loading="lazy" />BNB Chain</li><li><img src="images/logos/sol-logo.svg" width="24" height="24" alt="" loading="lazy" />Solana</li><li><img class="detailed-logo" src="images/logos/doge-logo.webp" width="24" height="24" alt="" loading="lazy" />Dogecoin</li><li><img class="detailed-logo" src="images/logos/ton-logo.svg" width="24" height="24" alt="" loading="lazy" />TON</li><li><img src="images/logos/sui-logo.svg" width="24" height="24" alt="" loading="lazy" />SUI</li><li><img class="detailed-logo" src="images/logos/eth-logo.svg" width="24" height="24" alt="" loading="lazy" />EVM <small>Pro</small></li><li><img class="detailed-logo" src="images/logos/tron-logo.svg" width="24" height="24" alt="" loading="lazy" />TRON <small>Pro</small></li>
+      </ul></div>
+    </div></section>
+    <section id="privacy" class="section"><div class="wrap"><div class="section-head"><p class="kicker">03 / PRIVACY</p><h2>Built around local control.</h2></div>
+      <div class="facts"><div><h3>Local database</h3><p>Portfolio records stay in a local SQLite database on your device.</p></div><div><h3>Read-only credentials</h3><p>Use read-only exchange keys. Never grant trade or withdrawal permission.</p></div><div><h3>Optional encrypted sync</h3><p>Sync through S3 storage you configure, with end-to-end encryption.</p></div></div>
+      <details class="privacy-details"><summary>How data and services work</summary>
+        <p>Refreshes contact your sources, assistant requests reach your chosen provider, and optional sync uses your S3 storage. Crypto prices and public wallet balances may come from public APIs such as CoinGecko. Currency rates, the stablecoin list, stock prices, Pro refreshes, and license checks use Track3's services. Pro wallet refreshes send wallet addresses to Track3's service, and Track3 service requests include a persistent client ID.</p>
+        <p>Sensitive configuration and chat messages are encrypted before storage; chat titles and previews are not. Portfolio records are not app-encrypted. On desktop, set your own encryption key for stronger protection. Only public on-chain wallet data is read; no wallet signatures are needed.</p>
+        <p>The desktop and iOS apps send usage events for launches, refreshes, and subscription-button clicks to Aptabase at eu.aptabase.com. There is no in-app opt-out. Events carry a persistent client ID and session ID, plus details such as OS, user agent, locale, app and Tauri versions; refresh events may include source IDs. <a href="https://github.com/domechn/track3/blob/master/README.md#notice">Privacy details</a></p>
+      </details>
+    </div></section>
+    <section id="pro" class="section tint"><div class="wrap"><div class="section-head"><p class="kicker">04 / TRACK3 PRO</p><h2>More chains, fresher data.</h2><p>Pro adds the AI assistant, broader EVM and TRON coverage, and live values. Free Ethereum and BNB Chain tracking covers native ETH and BNB; token balances need Pro.</p></div>
+      <div class="plans"><div class="card"><h3>Monthly</h3><div class="price">$9.99 <small>/ month</small></div><p>Cancel any time.</p></div><div class="card"><h3>Yearly</h3><div class="price">$83.99 <small>/ year</small></div><p>About 30% less than monthly.</p></div><div class="card limits"><h3>Both plans include</h3><ul><li>AI assistant</li><li>Per-exchange and per-wallet asset views</li><li>300 ERC20 wallet refreshes per month</li><li>300 TRON asset refreshes per month</li><li>All-chain refresh on supported Pro EVM networks</li><li>Real-time portfolio value in the top bar and live prices during refresh</li></ul><p>One wallet refresh counts as one use.</p></div></div>
+      <p class="plan-note">Subscribe on this website or in the desktop app under Settings → System → Subscribe. Enter an existing Pro license key in the desktop app under Settings → System → Pro license.</p>
+    </div></section>
+    <section id="ios" class="section"><div class="wrap"><div class="section-head"><p class="kicker">05 / iOS COMING SOON</p><h2>Your portfolio, built for touch.</h2><p>Tabs on iPhone, a sidebar and split views on iPad. The same local portfolio data and encrypted sensitive settings, with a Face ID app lock and Files import and export.</p></div>
+      <div class="devices"><figure><picture class="device"><source media="(prefers-color-scheme: light)" srcset="images/ios/overview-light.webp" /><img src="images/ios/overview-dark.webp" width="600" height="1298" loading="lazy" alt="Track3 portfolio Overview on iPhone" /></picture><figcaption>Overview</figcaption></figure><figure><picture class="device"><source media="(prefers-color-scheme: light)" srcset="images/ios/history-light.webp" /><img src="images/ios/history-dark.webp" width="600" height="1298" loading="lazy" alt="Track3 portfolio History on iPhone" /></picture><figcaption>History</figcaption></figure><figure class="tablet"><picture class="device"><source media="(prefers-color-scheme: light)" srcset="images/ios/pro-landscape-overview-light.webp" /><img src="images/ios/pro-landscape-overview-dark.webp" width="1100" height="825" loading="lazy" alt="Track3 portfolio Overview on iPad in landscape" /></picture><figcaption>iPad overview</figcaption></figure></div>
+      <p class="ios-note">iPhone and iPad are coming soon. The app is not available to install yet. Watch the <a href="https://github.com/domechn/track3">GitHub repository</a> for updates.</p>
+    </div></section>
+    <section id="download" class="final tint"><div class="wrap final-inner"><div><p class="kicker">GET STARTED</p><h2>Put your portfolio in view.</h2><p>Free to download for macOS, Windows and Linux. iOS coming soon.</p></div><a class="btn primary" href="./download.html">Download</a></div></section>
+  </main>
+  <footer><div class="wrap footer-inner"><span>© 2026 Track3 · Source available · <a href="https://github.com/domechn/track3/blob/master/LICENSE">License</a></span><a href="./download.html">Download</a><a href="./docs/index.html">Docs</a><a href="./index.html#privacy">Privacy</a><a href="https://github.com/domechn/track3">GitHub</a></div></footer>
+  <script>
+    document.querySelectorAll(".mobile-menu a").forEach((link) => {
+      link.addEventListener("click", () => { link.closest("details").open = false; });
+    });
+  </script>
+</body>
 </html>

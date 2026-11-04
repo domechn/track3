@@ -49,26 +49,29 @@ test("exchange docs links work locally and external links use HTTPS", () => {
 
 test("docs skip link text has AA contrast in light and dark themes", () => {
   const css = read("site.css");
-  const rule = (pattern) => {
+  const tokens = (pattern) => {
     const match = css.match(pattern);
-    assert.ok(match, `missing CSS rule: ${pattern}`);
-    return Object.fromEntries([...match[1].matchAll(/([\w-]+)\s*:\s*([^;]+);/g)].map(([, key, value]) => [key, value.trim()]));
+    assert.ok(match, `missing token block: ${pattern}`);
+    return Object.fromEntries([...match[1].matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)].map(([, key, value]) => [key, value.trim()]));
   };
-  const light = rule(/:root\s*\{([^}]+)\}/);
-  const dark = rule(/@media \(prefers-color-scheme: dark\)\s*\{\s*\.docs-page\s*\{([^}]+)\}/);
-  const skip = rule(/\.skip-link\s*\{([^}]+)\}/);
-  const luminance = (value) => {
-    let hex = value.replace("#", "");
-    if (hex.length === 3) hex = [...hex].map((digit) => digit + digit).join("");
-    assert.match(hex, /^[\da-f]{6}$/i);
-    const channels = [0, 2, 4].map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255);
-    return channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
-      .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+  const dark = tokens(/:root\s*\{([^}]+)\}/);
+  const light = tokens(/@media\s*\(prefers-color-scheme:\s*light\)\s*\{\s*:root\s*\{([^}]+)\}/);
+  const skip = css.match(/\.skip-link\s*\{([^}]+)\}/)?.[1];
+  assert.match(skip, /background:\s*hsl\(var\(--accent-data\)\)/);
+  assert.match(skip, /color:\s*hsl\(var\(--accent-ink\)\)/);
+  const luminance = (hsl) => {
+    const [, hue, saturation, lightness] = hsl.match(/^(\d+) (\d+)% (\d+)%$/).map(Number);
+    const a = saturation / 100 * Math.min(lightness / 100, 1 - lightness / 100);
+    const channel = (n) => {
+      const k = (n + hue / 30) % 12;
+      const srgb = lightness / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+      return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+    };
+    return channel(0) * 0.2126 + channel(8) * 0.7152 + channel(4) * 0.0722;
   };
-  for (const [theme, variables] of [["light", light], ["dark", { ...light, ...dark }]]) {
-    const resolve = (value) => value.startsWith("var(") ? variables[value.slice(4, -1)] : value;
-    const foreground = luminance(resolve(skip.color));
-    const background = luminance(resolve(skip.background));
+  for (const [theme, variables] of [["dark", dark], ["light", { ...dark, ...light }]]) {
+    const foreground = luminance(variables["--accent-ink"]);
+    const background = luminance(variables["--accent-data"]);
     const contrast = (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
     assert.ok(contrast >= 4.5, `${theme} skip link contrast: ${contrast.toFixed(2)}:1`);
   }
