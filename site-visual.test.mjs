@@ -28,6 +28,13 @@ test("every footer links to the source license", () => {
   }
 });
 
+test("every footer links the source claim to the repository", () => {
+  for (const file of pages) {
+    const footer = read(file).match(/<footer\b[\s\S]*?<\/footer>/i)?.[0];
+    assert.match(footer, /href="https:\/\/github\.com\/domechn\/track3"[^>]*>Source available<\/a>/, file);
+  }
+});
+
 test("pages make no third-party font or script requests", () => {
   for (const file of pages) {
     const html = read(file);
