@@ -10,6 +10,22 @@ export function shouldShowOverviewDateTick(index: number, count: number) {
   return index === end || index % 5 === 0 && (end - index >= 4 || index === 0);
 }
 
+export function formatOverviewAxisTicks(ticks: number[]) {
+  const largest = Math.max(0, ...ticks.map(Math.abs));
+  const [unit, suffix] = largest >= 1e9 ? [1e9, "b"] : largest >= 1e6 ? [1e6, "m"] :
+    largest >= 1e3 ? [1e3, "k"] : [1, ""];
+  let precision = 0;
+  while (precision < 15 && (
+    new Set(ticks.map((tick) => Number((tick / unit).toFixed(precision)))).size < ticks.length ||
+    ticks.some((tick) =>
+      Math.abs(Number((tick / unit).toFixed(precision)) * unit - tick) > Math.max(1e-7, Math.abs(tick) * 1e-10))
+  )) {
+    precision++;
+  }
+  const labels = ticks.map((tick) => `${Number((tick / unit).toFixed(precision))}${suffix}`);
+  return new Set(labels).size === ticks.length ? labels : ticks.map((tick) => tick.toExponential());
+}
+
 export function chartBounds<T extends { totalValue: number }>(points: T[]) {
   let minimum = Infinity;
   let maximum = -Infinity;

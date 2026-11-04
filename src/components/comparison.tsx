@@ -683,7 +683,7 @@ const App = ({
                         {baseDate}
                       </p>
                       <p
-                        className="text-xl font-semibold tracking-tight truncate tabular-nums"
+                        className="text-xl font-semibold tracking-tight break-all tabular-nums"
                         title={formatVal(totalValue.base, "value")}
                       >
                         {formatVal(totalValue.base, "value")}
@@ -718,7 +718,7 @@ const App = ({
                         {headDate}
                       </p>
                       <p
-                        className="text-xl font-semibold tracking-tight truncate tabular-nums"
+                        className="text-xl font-semibold tracking-tight break-all tabular-nums"
                         title={formatVal(totalValue.head, "value")}
                       >
                         {formatVal(totalValue.head, "value")}

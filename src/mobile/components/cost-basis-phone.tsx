@@ -118,6 +118,8 @@ export function PhoneCostBasis({
   const gainsAreGreen = quoteColor === "green-up-red-down";
   const tone = (value: number) => value === 0 ? "neutral" : (value > 0) === gainsAreGreen ? "gain" : "loss";
   const gain = (value: number) => <span className="cost-gain ios-money" data-tone={tone(value)}>{signed(value)}</span>;
+  const kpiGain = (value: number) => <strong className={signed(value).length > 12 ? "fidelity-long-money" : undefined}>{gain(value)}</strong>;
+  const kpiMoney = (value: number) => <strong className={money(value).length > 12 ? "fidelity-long-money" : undefined}>{money(value)}</strong>;
   const unrealized = report?.unrealized.reduce((sum, row) => sum + row.gainLoss, 0) ?? 0;
   const openValue = report?.unrealized.reduce((sum, row) => sum + row.marketValue, 0) ?? 0;
   const openCost = report?.unrealized.reduce((sum, row) => sum + row.costBasis, 0) ?? 0;
@@ -299,23 +301,23 @@ export function PhoneCostBasis({
         data-average={method === "AVERAGE"}>
         <div className="fidelity-kpi-primary">
           <div className="fidelity-kpi-metric">
-            <span>{t("cost.design.realizedPnl")}</span><strong>{gain(report.totals.gainLoss)}</strong>
+            <span>{t("cost.design.realizedPnl")}</span>{kpiGain(report.totals.gainLoss)}
             <small>{sales ? t("fidelity.cost.salesUnknown").replace("{sales}", String(sales))
               .replace("{unknown}", String(unknown.length)) : t("fidelity.cost.noSales")}</small>
           </div>
           <div className="fidelity-kpi-metric"><span>{t("finance.unrealizedPnl")}</span>
-            <strong>{gain(unrealized)}</strong><small>{t("fidelity.cost.openToday").replace("{count}", String(openRows.length))}</small>
+            {kpiGain(unrealized)}<small>{t("fidelity.cost.openToday").replace("{count}", String(openRows.length))}</small>
           </div>
           <div className="fidelity-kpi-metric"><span>{t("cost.design.totalPnl")}</span>
-            <strong>{gain(report.totals.gainLoss + unrealized)}</strong><small>{t("cost.design.realizedPlusUnrealized")}</small>
+            {kpiGain(report.totals.gainLoss + unrealized)}<small>{t("cost.design.realizedPlusUnrealized")}</small>
           </div>
         </div>
         <div className="fidelity-kpi-secondary">
-          <div><span>{t("fidelity.cost.saleProceeds")}</span><strong>{money(report.totals.proceeds)}</strong>
+          <div><span>{t("fidelity.cost.saleProceeds")}</span>{kpiMoney(report.totals.proceeds)}
             <small>{t("fidelity.cost.disposalsCount").replace("{count}", String(report.disposals.length))}</small></div>
-          <div><span>{t("fidelity.cost.soldCost")}</span><strong>{money(report.totals.costBasis)}</strong>
+          <div><span>{t("fidelity.cost.soldCost")}</span>{kpiMoney(report.totals.costBasis)}
             <small>{t("fidelity.cost.soldCostNote")}</small></div>
-          <div><span>{t("cost.design.openValue")}</span><strong>{money(openValue)}</strong>
+          <div><span>{t("cost.design.openValue")}</span>{kpiMoney(openValue)}
             <small>{t("fidelity.cost.openCost").replace("{amount}", money(openCost))}</small></div>
         </div>
       </section>
