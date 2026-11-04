@@ -74,15 +74,15 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         await toggle.click();
       }
       if (state.name === "overview-expanded-1024") {
-        const subtitle = await page.locator(".t3-overview-heading p").boundingBox();
         const controls = await page.locator(".t3-topbar-controls").boundingBox();
-        expect(controls!.y).toBeGreaterThanOrEqual(subtitle!.y + subtitle!.height);
+        const main = await page.locator("#app-main-content").boundingBox();
+        expect(controls!.y + controls!.height).toBeLessThanOrEqual(main!.y);
         const hero = await page.locator(".t3-grid-hero").boundingBox();
         const holdings = await page.locator(".t3-grid-holdings").boundingBox();
         expect(Math.abs(hero!.x - 244)).toBeLessThan(1);
-        expect(Math.abs(hero!.y - 182)).toBeLessThan(1);
+        expect(Math.abs(hero!.y - 228)).toBeLessThan(1);
         expect(Math.abs(hero!.height - 457)).toBeLessThan(1);
-        expect(Math.abs(holdings!.y - 655)).toBeLessThan(1);
+        expect(Math.abs(holdings!.y - 701)).toBeLessThan(1);
         await expect(page.locator(".t3-live-label").first()).toBeVisible();
       }
       if (state.name === "overview-expanded-1440") {
@@ -99,8 +99,8 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
       if (state.name === "overview-range") {
         await page.getByRole("button", { name: "Choose date range" }).click();
         const popover = await page.locator(".t3-date-popover").boundingBox();
-        expect(Math.abs(popover!.x - 852)).toBeLessThan(1);
-        expect(Math.abs(popover!.y - 126)).toBeLessThan(1);
+        expect(Math.abs(popover!.x - 715)).toBeLessThan(1);
+        expect(Math.abs(popover!.y - 51)).toBeLessThan(1);
         await page.getByRole("textbox", { name: "From" }).fill("8 Oct 2026");
         await page.getByRole("textbox", { name: "To" }).fill("24 Oct 2026");
         await page.getByRole("textbox", { name: "To" }).blur();
@@ -115,13 +115,20 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
       }, undefined, { timeout: 60_000 });
       await expect(page.locator(".desktop-sync-status-indicator button").first())
         .toContainText("Synced 09:41", { timeout: 30_000 });
+      const bell = page.locator(".t3-topbar-bell");
+      const badge = bell.locator("span");
+      await expect(badge).toBeVisible();
+      const bellBox = (await bell.boundingBox())!;
+      const badgeBox = (await badge.boundingBox())!;
+      expect(Math.abs(badgeBox.x + badgeBox.width - bellBox.x - bellBox.width)).toBeLessThanOrEqual(8);
+      expect(Math.abs(badgeBox.y - bellBox.y)).toBeLessThanOrEqual(8);
       if (state.name === "overview-sync") {
         await page.locator(".desktop-sync-status-indicator button").first().click();
         await expect(page.getByRole("dialog")).toBeVisible();
         await expect(page.getByRole("dialog")).toContainText("Backup & sync");
       }
       if (state.name === "overview-stale") {
-        expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(1551);
+        expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(1501);
         const sources = page.locator(".t3-sources-panel");
         const lastSource = sources.locator(".t3-source-row").last();
         const cardBox = await sources.boundingBox();
@@ -134,7 +141,7 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
       if (state.name === "overview") {
         const hero = await page.locator(".t3-grid-hero").boundingBox();
         expect(Math.abs(hero!.y - 132)).toBeLessThan(1);
-        expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(1523);
+        expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(1473);
         const sourceStatus = page.getByRole("button", { name: "Source status" });
         await expect(sourceStatus).toBeVisible({ timeout: 5_000 });
         await sourceStatus.click();
@@ -143,8 +150,8 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         await page.mouse.move(700, 20);
       }
       if (state.name === "overview-hover") {
-        const height = await page.evaluate(() => document.documentElement.scrollHeight);
-        await page.setViewportSize({ width: state.width, height });
+        const height = await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight);
+        await page.setViewportSize({ width: state.width, height: height + 50 });
         const chart = page.locator(".t3-hero-chart canvas");
         const box = await chart.boundingBox();
         await chart.hover({ position: { x: box!.width * 0.38, y: box!.height / 2 } });
@@ -177,22 +184,26 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         const hero = await page.locator(".t3-grid-hero").boundingBox();
         expect(Math.round(hero!.x)).toBe(84);
         expect(Math.round(hero!.y)).toBe(132);
-        expect(Math.round(hero!.width)).toBe(880);
+        expect(Math.round(hero!.width)).toBe(870);
         expect(Math.round(hero!.height)).toBe(449);
         const rail = await page.locator("aside").boundingBox();
-        expect(Math.round(rail!.height)).toBeGreaterThan(1400);
+        expect(Math.round(rail!.height)).toBe(900);
+        const settings = await page.locator("aside a[href='#/settings']").boundingBox();
+        expect(settings!.y + settings!.height).toBeLessThanOrEqual(900);
         const heroValue = await page.locator(".t3-hero-value").evaluate((element) => {
           const box = element.getBoundingClientRect();
           const range = document.createRange();
           range.selectNodeContents(element);
-          return { y: box.y + window.scrollY, textWidth: range.getBoundingClientRect().width };
+          return { y: box.y + document.getElementById("app-main-content")!.scrollTop, textWidth: range.getBoundingClientRect().width };
         });
         // The source HTML's .kpis .v.big starts at y=173 at this viewport.
         expect(heroValue.textWidth).toBeLessThan(216);
         expect(Math.round(heroValue.y)).toBeGreaterThanOrEqual(171);
         expect(Math.round(heroValue.y)).toBeLessThanOrEqual(175);
         const segment = await page.locator(".t3-fidelity-ranges").boundingBox();
-        expect(Math.round(segment!.y)).toBeGreaterThanOrEqual(80);
+        const main = await page.locator("#app-main-content").boundingBox();
+        expect(segment!.y).toBeGreaterThanOrEqual(0);
+        expect(segment!.y + segment!.height).toBeLessThanOrEqual(main!.y);
         await expect(page.locator(".t3-fidelity-ranges button")).toHaveCount(6);
         await expect(page.locator(".t3-fidelity-ranges button[aria-pressed='true']")).toContainText("30D");
         await expect(page.locator(".t3-date-range-display")).toHaveAttribute("data-range", "1 Oct – 31 Oct 2026");
@@ -225,15 +236,18 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         await expect(page.locator(".t3-moved-list li").last()).toContainText("AAPL");
         const firstBar = await page.locator(".t3-moved-list li:first-child .t3-moved-track > span").boundingBox();
         const lastBar = await page.locator(".t3-moved-list li:last-child .t3-moved-track > span").boundingBox();
-        expect(Math.abs(firstBar!.x - 1088.3)).toBeLessThan(2);
-        expect(Math.abs(firstBar!.width - 197.2)).toBeLessThan(3);
-        expect(Math.abs(lastBar!.x + lastBar!.width - 1088.3)).toBeLessThan(2);
+        expect(Math.abs(firstBar!.x - 1077.6)).toBeLessThan(2);
+        expect(Math.abs(firstBar!.width - 193)).toBeLessThan(3);
+        expect(Math.abs(lastBar!.x + lastBar!.width - 1077.6)).toBeLessThan(2);
         await expect(page.locator(".t3-top-head")).toContainText("24h");
         await expect(page.locator(".t3-top-head")).toContainText("7D");
         await expect(page.getByTestId("overview-coin-row").first()).toContainText("+6.4%");
         await expect(page.locator(".t3-topbar-bell")).toBeVisible();
         await expect(page.locator(".t3-overview-footer")).toContainText("Local database");
         await expect(page.locator(".t3-overview-footer")).not.toContainText("1 devices");
+        await page.setViewportSize({ width: 1280, height: 720 });
+        const monthlyComparison = page.locator(".t3-pnl-compact-card > div > div > div:last-child p");
+        expect((await monthlyComparison.boundingBox())!.height).toBeLessThanOrEqual(18);
       }
       await page.setViewportSize({ width: 1600, height: 900 });
       await page.screenshot({ path: `${output}/${state.name}-1600.png`, fullPage: true });

@@ -59,7 +59,7 @@ export default function SyncSettingsPage() {
     if (!busy) return;
     const frame = requestAnimationFrame(() => {
       if (window.innerWidth > 700 && window.innerWidth < 1100) {
-        window.scrollTo(0, 0);
+        document.getElementById("app-main-content")?.scrollTo(0, 0);
         return;
       }
       const button = document.querySelector(".sync-settings-page button[aria-busy=true]");

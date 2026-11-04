@@ -492,7 +492,7 @@ for (const state of [
           for (const element of document.querySelectorAll<HTMLElement>("*")) {
             if (element.scrollTop) element.scrollTop = 0;
           }
-          window.scrollTo(0, 0);
+          document.getElementById("app-main-content")!.scrollTo(0, 0);
         });
       }
       if (state === "appearance-system") await page.getByRole("button", { name: /System.*Follow system/ }).click();

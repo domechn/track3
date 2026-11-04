@@ -102,9 +102,9 @@ test("Overview rail keeps Settings clear of the fixed collapse toggle at page bo
   await page.goto("/#/overview");
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible({ timeout: 30_000 });
   await expect(page.locator("[aria-busy='true']")).toHaveCount(0, { timeout: 30_000 });
-  await page.locator("main").evaluate((element) => { element.style.minHeight = "1500px"; });
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await page.locator("main > div").first().evaluate((element) => { element.style.minHeight = "1500px"; });
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, document.getElementById("app-main-content")!.scrollHeight));
+  expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(0);
   const settings = await page.getByRole("link", { name: "Settings" }).boundingBox();
   const toggle = await page.getByRole("button", { name: "Expand sidebar" }).boundingBox();
   expect(settings!.y + settings!.height + 8).toBeLessThanOrEqual(toggle!.y);

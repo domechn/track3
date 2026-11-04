@@ -207,7 +207,7 @@ test("partial snapshot excludes the failed source and keeps changes unknown", as
   writeFileSync("/tmp/fidelity/flows/refresh-partial-geometry.json", JSON.stringify(await page.evaluate(() =>
     Array.from(document.querySelectorAll(".fd-partial-head,.fd-partial-head .fd-range,.fd-partial-banner,.fd-partial-grid>.fd-card,.fd-partial-kpis,.fd-partial-chart"), (element) => {
       const r = element.getBoundingClientRect();
-      return { className: element.className, x: r.x, y: r.y + scrollY, width: r.width, height: r.height };
+      return { className: element.className, x: r.x, y: r.y + document.getElementById("app-main-content")!.scrollTop, width: r.width, height: r.height };
     })), null, 2));
 });
 

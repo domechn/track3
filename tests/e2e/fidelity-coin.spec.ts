@@ -62,7 +62,7 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         await expect(page.locator(".fd-coin-trend > .fd-outline-pill")).toHaveCSS("font-weight", "500");
       }
       if (symbol !== "NOVA") {
-        expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(symbol === "BTC" ? 2506 : 1964);
+        expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(symbol === "BTC" ? 2506 : 1964);
       }
       mkdirSync(`/tmp/fidelity/coin-${symbol.toLowerCase()}`, { recursive: true });
       writeFileSync(`/tmp/fidelity/coin-${symbol.toLowerCase()}/geometry.json`, JSON.stringify(await page.evaluate(() => ({
@@ -78,7 +78,7 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
           const rect = element.getBoundingClientRect();
           return { text: element.textContent, y: rect.y, height: rect.height };
         }),
-        height: document.documentElement.scrollHeight,
+        height: document.getElementById("app-main-content")!.scrollHeight,
       })), null, 2));
       await page.screenshot({ path: `/tmp/fidelity/coin-${symbol.toLowerCase()}/coin-${symbol.toLowerCase()}-phone-long.png`, fullPage: true });
       await page.screenshot({ path: `/tmp/fidelity/coin-${symbol.toLowerCase()}/coin-${symbol.toLowerCase()}-phone.png` });
@@ -92,7 +92,7 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         await expect(page.locator(".fd-position-grid .fd-coin-metric").nth(2)).toContainText("$71,000.00");
         await expect(page.locator(".fd-tx-row").nth(3)).toContainText("← Binance");
         await page.getByRole("button", { name: "Price", exact: true }).click();
-        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
         await expect(page.locator("#app-top-bar")).toBeHidden();
         await page.screenshot({ path: "/tmp/fidelity/coin-btc/coin-btc-price-phone.png" });
         const priceCard = page.locator(".fd-coin-trend");
@@ -107,7 +107,7 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
             const style = getComputedStyle(element);
             return [selector, { y: rect.y, height: rect.height, margin: style.margin, padding: style.padding }];
           }))), null, 2));
-        await priceCard.evaluate((node) => window.scrollTo(0, node.getBoundingClientRect().top + window.scrollY - 100));
+        await priceCard.evaluate((node) => document.getElementById("app-main-content")!.scrollTo(0, node.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100));
         await priceCard.screenshot({ path: "/tmp/fidelity/coin-btc/coin-btc-price-card.png" });
         await page.getByRole("button", { name: "Value", exact: true }).click();
         await page.locator(".fd-tx-row").nth(1).click();
@@ -297,14 +297,14 @@ test("transaction sheet keeps the designed page backdrop and restores the transa
     await page.goto("/#/coins/BTC");
     const row = page.locator(".fd-tx-row").first();
     await row.scrollIntoViewIfNeeded();
-    const before = await page.evaluate(() => scrollY);
+    const before = await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop);
     expect(before).toBeGreaterThan(500);
     await row.click();
     await expect(page.getByRole("dialog")).toBeVisible();
-    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+    await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => scrollY)).toBe(before);
+    await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(before);
     await expect(row).toBeFocused();
   } finally { await context.close(); }
 });

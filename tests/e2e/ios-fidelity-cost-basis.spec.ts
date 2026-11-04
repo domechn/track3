@@ -341,10 +341,10 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
   await expect(page.locator(".fidelity-cost")).toHaveAttribute("aria-busy", "false");
   await expect(page.locator(".fidelity-cost-kpis")).toContainText("+$44,752.75");
   await expect(page.locator(".fidelity-cost-kpis")).toContainText("$85,603.18");
-  await page.evaluate(() => window.scrollTo(0, 200));
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(64);
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 200));
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(64);
   await expect(page.locator("#app-top-bar .mobile-compact-title")).toBeHidden();
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
   await page.screenshot({ path: `${dir}/cost-basis-open-phone.png` });
   await page.screenshot({ path: `${dir}/cost-basis-open-phone-long.png`, fullPage: true,
     style: ".mobile-tab-bar { display: none !important; }" });
@@ -353,7 +353,7 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
   await expect(page.getByRole("button", { name: /^Export$/ })).toBeEnabled();
   await page.getByLabel("Tax year").blur();
   await page.mouse.click(20, 20);
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
   expect((await page.locator(".fidelity-cost-kpis").boundingBox())?.y).toBe(338);
   expect((await page.locator(".fidelity-cost-kpis").boundingBox())?.height).toBe(425);
   const emptyValueGap = await page.locator(".fidelity-kpi-primary").evaluate((root) => {

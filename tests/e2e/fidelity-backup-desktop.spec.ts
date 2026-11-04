@@ -46,7 +46,7 @@ for (const state of ["default", "no-folder", "exporting", "conflicts", "restore"
     await settingsBShot(page, "backup", state);
     if (state === "restore") {
       expect(page.viewportSize()?.height).toBe(1222);
-      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
       const overlay = await page.locator('div[data-state="open"].fixed.inset-0').first().boundingBox();
       expect(overlay?.y).toBe(0);
       expect(overlay?.height).toBe(1222);

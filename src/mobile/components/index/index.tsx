@@ -334,7 +334,7 @@ function Layout({
   const scrollCaptured = useRef(false);
   const rememberScroll = () => {
     const key = scrollKey(currentTab, routePath);
-    routeScroll.current.set(key, window.scrollY);
+    routeScroll.current.set(key, document.getElementById("app-main-content")?.scrollTop ?? 0);
     containerScroll.current.set(key, scrollContainers().map((element) => element.scrollTop));
     scrollCaptured.current = true;
   };
@@ -353,26 +353,28 @@ function Layout({
   useLayoutEffect(() => {
     const previous = previousRoute.current;
     if (previous.tab === currentTab && previous.path === routePath) return;
-    if (!scrollCaptured.current) routeScroll.current.set(scrollKey(previous.tab, previous.path), window.scrollY);
+    if (!scrollCaptured.current) routeScroll.current.set(scrollKey(previous.tab, previous.path), document.getElementById("app-main-content")?.scrollTop ?? 0);
     scrollCaptured.current = false;
     const key = scrollKey(currentTab, routePath);
     const target = resetRootScroll.current === key ? 0 : routeScroll.current.get(key) ?? 0;
     const containers = containerScroll.current.get(key) ?? [];
     resetRootScroll.current = null;
     const restore = () => {
-      window.scrollTo({ top: target, behavior: "auto" });
+      const main = document.getElementById("app-main-content");
+      if (main) main.scrollTop = target;
       const elements = scrollContainers();
       elements.forEach((element, index) => { element.scrollTop = containers[index] ?? 0; });
-      return Math.abs(window.scrollY - target) < 2 && containers.every((value, index) =>
+      return Math.abs((main?.scrollTop ?? 0) - target) < 2 && containers.every((value, index) =>
         Math.abs((elements[index]?.scrollTop ?? -1) - value) < 2);
     };
     restore();
     const main = document.getElementById("app-main-content");
+    main?.focus({ preventScroll: true });
     const observer = (target > 0 || containers.some((value) => value > 0)) && main && typeof ResizeObserver !== "undefined"
       ? new ResizeObserver(() => {
         if (restore()) observer?.disconnect();
       }) : null;
-    if (main && observer) observer.observe(main);
+    if (main && observer) observer.observe(main.firstElementChild ?? main);
     const stopRestoring = () => observer?.disconnect();
     window.addEventListener("touchstart", stopRestoring, { once: true, passive: true });
     previousRoute.current = { tab: currentTab, path: routePath };
@@ -382,10 +384,11 @@ function Layout({
     };
   }, [currentTab, routePath]);
   useEffect(() => {
-    const update = () => setHeaderCollapsed(window.scrollY > 64);
+    const main = document.getElementById("app-main-content");
+    const update = () => setHeaderCollapsed((main?.scrollTop ?? 0) > 64);
     update();
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
+    main?.addEventListener("scroll", update, { passive: true });
+    return () => main?.removeEventListener("scroll", update);
   }, [location.pathname]);
   useEffect(() => {
     if (sizeClass.width !== "compact" && sizeClass.height === "compact") {
@@ -404,7 +407,7 @@ function Layout({
   };
 
   return (
-    <div className="app-layout min-h-screen" data-width-class={sizeClass.width} data-route={location.pathname}
+    <div className="app-layout" data-width-class={sizeClass.width} data-route={location.pathname}
       data-height-class={sizeClass.height} data-sidebar-collapsed={sidebarCollapsed}
       data-header-collapsed={headerCollapsed}>
       <MobileSidebar unread={unread} collapsed={sidebarCollapsed} onCollapse={() => setSidebarCollapsed((value) => !value)}
@@ -431,7 +434,7 @@ function Layout({
         />
 
         {/* Main content */}
-        <main id="app-main-content" tabIndex={-1} className="p-5" data-route={location.pathname}
+        <main id="app-main-content" tabIndex={0} className="p-5" data-route={location.pathname}
           onContextMenuCapture={(event) => {
             if ((event.target as Element).closest("canvas")) event.preventDefault();
           }}
@@ -1227,7 +1230,7 @@ const App = () => {
   }, [originalQuerySize]);
 
   return (
-    <div>
+    <div className="t3-mobile-app">
       <AutoBackupIndicator status={autoBackupStatus} />
       <DataChangedContext.Provider value={dataChangedVersion}>
         <HashRouter>

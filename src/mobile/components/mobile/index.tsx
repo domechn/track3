@@ -253,7 +253,7 @@ export function PullToRefresh({ children, onRefresh, disabled, className, source
   return <div data-testid="pull-to-refresh" className={className}
     onTouchStart={(event) => {
       if (!event.currentTarget.contains(event.target as Node)) return;
-      if (disabled || refreshing || window.scrollY > 0) return;
+      if (disabled || refreshing || (document.getElementById("app-main-content")?.scrollTop ?? 0) > 0) return;
       for (let element = event.target as Element | null; element; element = element.parentElement) {
         if (element.scrollTop > 0 && element.scrollHeight > element.clientHeight &&
           /^(auto|scroll|overlay)$/.test(getComputedStyle(element).overflowY)) return;

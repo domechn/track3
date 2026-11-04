@@ -123,7 +123,7 @@ async function capture(page: Page, route: string, path: string, options: { amoun
     await document.fonts.ready;
     await Promise.all([...document.images].map((image) => image.decode().catch(() => {})));
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    window.scrollTo(0, 0);
+    document.getElementById("app-main-content")!.scrollTo(0, 0);
     for (const node of document.querySelectorAll<HTMLElement>("[data-radix-scroll-area-viewport]")) node.scrollTop = 0;
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     return faces.every((loaded) => loaded.length > 0);

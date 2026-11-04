@@ -96,10 +96,10 @@ test.describe("Wallets desktop fidelity", () => {
           expect(Math.abs(balances!.y - 374)).toBeLessThan(1);
           const headerCells = await page.locator(".t3-wallet-balances thead th").evaluateAll((cells) =>
             cells.map((cell) => cell.getBoundingClientRect().x));
-          expect(headerCells.every((x, index) => Math.abs(x - [105, 430.7, 620.8, 743.8, 930.2][index]) < 1)).toBe(true);
+          expect(headerCells.every((x, index) => Math.abs(x - [105, 427.3, 615.3, 737, 921.4][index]) < 1)).toBe(true);
           const matrixCells = await page.locator(".t3-wallet-matrix thead th").evaluateAll((cells) =>
             cells.map((cell) => cell.getBoundingClientRect().x));
-          expect(matrixCells.every((x, index) => Math.abs(x - [105, 156.4, 299.5, 430, 600.9, 731.5, 906.5][index]) < 1)).toBe(true);
+          expect(matrixCells.every((x, index) => Math.abs(x - [105, 155.8, 297.4, 426.6, 595.7, 724.8, 897.9][index]) < 1)).toBe(true);
           await expect(page.locator(".t3-wallet-status-list")).toContainText(
             "Rate limit exceeded. Showing the last good balances from 09:12.");
           const failedMessage = await page.locator(".t3-wallet-status-list .failed p").boundingBox();

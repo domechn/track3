@@ -242,8 +242,9 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
   };
   const beginEdit = (txn: Transaction) => { editSession.current += 1; setSelected(txn); setEditType(txn.txnType); setEditPrice(fmt(txn.price * currency.rate,currentPriceDigits)); setEditPriceDirty(false); setEditPriceRate(currency.rate); setEditing(true); };
   const openTransaction = (txn: Transaction) => {
-    transactionScroll.current = window.scrollY;
-    window.scrollTo(0, 0);
+    const main = document.getElementById("app-main-content");
+    transactionScroll.current = main?.scrollTop ?? 0;
+    main?.scrollTo(0, 0);
     setSelected(txn);
   };
   const closeTransaction = () => {
@@ -252,7 +253,7 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
     setEditing(false);
     const scroll = transactionScroll.current;
     transactionScroll.current = null;
-    if (scroll !== null) requestAnimationFrame(() => window.scrollTo(0, scroll));
+    if (scroll !== null) requestAnimationFrame(() => document.getElementById("app-main-content")?.scrollTo(0, scroll));
   };
   const goBack = () => { if (window.history.state?.idx > 0 || window.history.length > 2) navigate(-1); else navigate("/overview"); };
   const applyTransactionEdit = async (nextType: Transaction["txnType"], nextPrice: number) => {

@@ -181,7 +181,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await goalEditor.getByRole("spinbutton", { name: "Threshold" }).fill("90000");
     await goalEditor.getByRole("button", { name: "Add rule" }).click();
     await expect(goalEditor).not.toBeVisible();
-    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
     await capture(page, phone.name, theme, "goals");
     const addFill = await page.locator(".pf-add").first().evaluate((element) => getComputedStyle(element, "::before").backgroundColor);
     expect(addFill).toBe(theme === "dark" ? "rgb(255, 255, 255)" : "rgb(23, 23, 28)");
@@ -358,7 +358,7 @@ test("D3 pushed titles replace the large title after scrolling", async ({ page }
   await page.goto("/#/settings/data?section=backup");
   await expect(page.getByRole("heading", { name: "Backup & data", level: 1 })).toBeVisible();
   await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toBeHidden();
-  await page.evaluate(() => window.scrollTo(0, 300));
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 300));
   await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup & data");
   await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toBeVisible();
   const compact = await page.locator("#app-top-bar .ios-d3-pushed-title").boundingBox();

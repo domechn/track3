@@ -12,13 +12,13 @@ test.beforeEach(async ({ page }) => {
 const directory = "/tmp/fidelity-desktop/cost-basis";
 const backupDirectory = "/tmp/fidelity-wdb-locked/cost-basis";
 async function capture(page: Page, name: string) {
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
   await seedFidelityCompletedSync(page);
   const stamp = page.locator(".fidelity-page-head .desktop-sync-status-indicator button");
   await expect(stamp).toHaveText("Synced 09:41");
   const box = (await stamp.boundingBox())!;
-  expect(box.x).toBeCloseTo(1356, 0);
+  expect(box.x).toBeCloseTo(1341, 0);
   expect(box.y).toBeCloseTo(46, 0);
   expect(box.width).toBeCloseTo(92, 0);
   await expect(stamp).toHaveCSS("color", "rgb(155, 157, 163)");
@@ -161,13 +161,13 @@ test("empty tax year retains open lots and chart empty state", async ({ page }) 
   expect(tableEmpty.height).toBeCloseTo(140, 0);
   expect(tableEmpty.y).toBeGreaterThan(chartEmpty.y);
   expect((await page.getByRole("button", { name: "Show open lots" }).boundingBox())!.y).toBeCloseTo(934.5, 0);
-  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(1094);
+  expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(1094);
   expect((await page.getByTestId("cost-desktop-table").boundingBox())!.height).toBeCloseTo(230, 0);
   await capture(page, "cost-basis-empty");
   await expect.poll(() => page.evaluate(() =>
     JSON.parse(localStorage.getItem("track3-cost-basis-settings") ?? "{}").from)).toBe("2025-01-01");
   await page.getByRole("button", { name: "Records controls" }).click();
-  await page.getByRole("link", { name: "Settings" }).click();
+  await page.locator(".t3-records-settings-link").click();
   await expect(page).toHaveURL(/#\/settings/, { timeout: 15_000 });
   await page.getByRole("link", { name: "Cost basis" }).click();
   await expect(page).toHaveURL(/#\/cost-basis/, { timeout: 15_000 });
@@ -211,7 +211,7 @@ test("cost table headings align with their data and holding days can be edited",
     .toHaveCSS("text-align", "right");
   await expect(page.locator(".fidelity-cost-table th").first()).toHaveCSS("padding-left", "0px");
   const rule = (await page.locator(".fidelity-holding-rule").boundingBox())!;
-  expect(rule.x).toBeCloseTo(1233, 0);
+  expect(rule.x).toBeCloseTo(1218, 0);
   expect(rule.y).toBeCloseTo(111, 0);
   expect(rule.height).toBeCloseTo(18, 0);
   const field = page.getByRole("spinbutton", { name: "Long-term after (days)" });

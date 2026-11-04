@@ -57,7 +57,7 @@ test("iOS confirms before replacing a local snapshot", async ({ page }) => {
   await review.getByRole("button", { name: "应用所选操作" }).click();
   await confirm.getByRole("button", { name: "确认替换" }).click();
   await expect(review).toBeHidden();
-  expect(bridge.snapshotValue()).toBe(50000);
+  await expect.poll(() => bridge.snapshotValue()).toBe(50000);
 });
 
 test("iOS backup and review screens are captured in light and dark", async ({ page }) => {

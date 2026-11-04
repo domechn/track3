@@ -40,6 +40,15 @@ it("updates the Pro header total when live portfolio prices change", async () =>
   expect(screen.getByLabelText("Total")).toHaveTextContent("$120");
 });
 
+it("shows the bolt and label while the first Pro value connects", () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: true }));
+  vi.mocked(queryRealTimeAssetsValue).mockImplementation(() => new Promise(() => {}));
+  render(<MobileHeaderTotal live fidelity currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }} />);
+  expect(screen.getByLabelText("Live total")).toHaveTextContent("Live total");
+  expect(screen.getByTestId("mobile-live-bolt")).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveAttribute("aria-label", "Live total, Connecting");
+});
+
 it("pauses live price queries while the app is hidden and resumes on return", async () => {
   vi.clearAllMocks();
   vi.useFakeTimers();

@@ -398,10 +398,11 @@ const App = ({
 
   function notifyConfigurationSaved() {
     if (!onConfigurationSave) return;
-    const scrollY = window.scrollY;
+    const main = document.getElementById("app-main-content");
+    const scrollY = main?.scrollTop ?? 0;
     onConfigurationSave();
     requestAnimationFrame(() => {
-      window.scrollTo({ top: scrollY });
+      if (main) main.scrollTop = scrollY;
     });
   }
 

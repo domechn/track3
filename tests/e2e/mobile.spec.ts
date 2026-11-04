@@ -37,7 +37,7 @@ test("data screens expose grouped history and analytics destinations", async ({ 
     await expect(page.getByRole("dialog", { name: "Top coins" })).toBeVisible();
     await page.getByRole("dialog", { name: "Top coins" }).getByRole("button", { name: "Close" }).click();
     await page.locator(".fd-ath .fd-big-value").evaluate((node) =>
-      window.scrollTo(0, node.getBoundingClientRect().top + window.scrollY - 100));
+      document.getElementById("app-main-content")!.scrollTo(0, node.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100));
     const hero = (await page.locator(".fd-ath .fd-big-value").boundingBox())!;
     const tab = (await page.locator(".mobile-tab-bar").boundingBox())!;
     expect(hero.y + hero.height).toBeLessThan(tab.y);
@@ -194,13 +194,13 @@ for (const width of [320, 375, 390, 430]) {
         expect(metricWidths.every((value) => value.whiteSpace === "nowrap" &&
           value.scroll <= value.client + 1), JSON.stringify(metricWidths)).toBe(true);
         await page.locator(".fd-profit-loss").evaluate((node) =>
-          window.scrollTo({ top: node.getBoundingClientRect().top + window.scrollY - 100, behavior: "auto" }));
+          document.getElementById("app-main-content")!.scrollTo({ top: node.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100, behavior: "auto" }));
         await expect.poll(() => page.locator(".fd-profit-loss").evaluate((node) =>
           Math.round(node.getBoundingClientRect().top))).toBeLessThanOrEqual(110);
         await capture("profit-metrics");
         await page.locator(".fd-profit-summary").evaluate((node) => {
           node.scrollIntoView({ block: "start" });
-          window.scrollBy(0, -72);
+          document.getElementById("app-main-content")!.scrollBy(0, -72);
         });
         await capture("profit-summary");
         await page.locator(".fd-attribution").scrollIntoViewIfNeeded();
@@ -373,7 +373,7 @@ test("scrolled bars keep text behind them quiet when blur is unavailable", async
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
     await expect(page.locator(".fd-overview-holdings .fd-overview-row")).toHaveCount(7);
-    await page.evaluate(() => window.scrollTo(0, 700));
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 700));
     await expect(page.locator("#app-top-bar")).toHaveClass(/mobile-topbar-collapsed/);
     for (const selector of ["#app-top-bar", ".mobile-tab-bar"]) {
       const color = await page.locator(selector).evaluate((node) => getComputedStyle(node).backgroundColor);
@@ -654,19 +654,19 @@ for (const size of sizes) {
         await page.reload();
         await expect(page.locator(".fd-overview-holdings .fd-overview-row")).toHaveCount(7);
         await page.locator(".fd-overview-holdings").evaluate((card) =>
-          window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
+          document.getElementById("app-main-content")!.scrollTo(0, card.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100));
         await expect.poll(() => page.locator(".fd-overview-holdings")
           .evaluate((card) => Math.round(card.getBoundingClientRect().top))).toBeLessThanOrEqual(110);
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-performance.png` });
         await page.locator(".fd-overview-daily").scrollIntoViewIfNeeded();
         await page.locator(".fd-overview-daily").evaluate((card) =>
-          window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
+          document.getElementById("app-main-content")!.scrollTo(0, card.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100));
         await expect.poll(() => page.locator(".fd-overview-daily")
           .evaluate((card) => Math.round(card.getBoundingClientRect().top))).toBeLessThanOrEqual(110);
         await expect(page.locator(".fd-overview-value")).toBeVisible();
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-details.png` });
         await page.locator(".fd-overview-moved").evaluate((card) =>
-          window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
+          document.getElementById("app-main-content")!.scrollTo(0, card.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100));
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-movers.png` });
         await page.locator(".fd-overview-sources").scrollIntoViewIfNeeded();
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-bottom.png` });
@@ -708,19 +708,19 @@ for (const size of sizes) {
         await page.reload();
         await expect(page.locator(".fd-overview-holdings .fd-overview-row")).toHaveCount(7);
         await page.locator(".fd-overview-holdings").evaluate((card) =>
-          window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
+          document.getElementById("app-main-content")!.scrollTo(0, card.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100));
         await expect.poll(() => page.locator(".fd-overview-holdings")
           .evaluate((card) => Math.round(card.getBoundingClientRect().top))).toBeLessThanOrEqual(110);
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-performance-dark.png` });
         await page.locator(".fd-overview-daily").scrollIntoViewIfNeeded();
         await page.locator(".fd-overview-daily").evaluate((card) =>
-          window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
+          document.getElementById("app-main-content")!.scrollTo(0, card.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100));
         await expect.poll(() => page.locator(".fd-overview-daily")
           .evaluate((card) => Math.round(card.getBoundingClientRect().top))).toBeLessThanOrEqual(110);
         await expect(page.locator(".fd-overview-value")).toBeVisible();
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-details-dark.png` });
         await page.locator(".fd-overview-moved").evaluate((card) =>
-          window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100));
+          document.getElementById("app-main-content")!.scrollTo(0, card.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100));
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-movers-dark.png` });
         await page.locator(".fd-overview-sources").scrollIntoViewIfNeeded();
         await page.screenshot({ path: `test-results/mobile/${size.width}x${size.height}-overview-bottom-dark.png` });
@@ -791,7 +791,7 @@ test("history swipe reveals delete, then confirm and undo restore the row", asyn
     await expect(row).toBeVisible();
     await row.scrollIntoViewIfNeeded();
     expect(await row.evaluate((node) => getComputedStyle(node).touchAction)).toBe("pan-y");
-    await page.evaluate(() => window.scrollBy(0, 300));
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollBy(0, 300));
     const box = (await row.boundingBox())!;
     const cdp = await context.newCDPSession(page);
     const startX = box.x + box.width - 12;
@@ -868,7 +868,7 @@ test("comparison dates use a snapshot selection sheet", async ({ browser }) => {
     await expect(sheet).toBeVisible();
     await expect(sheet.locator(".fd-comparison-days button:not([disabled])").first()).toBeVisible();
     await expect(sheet.getByRole("button", { name: "Use this snapshot" })).toBeVisible();
-    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
     const handle = sheet.locator(".mobile-sheet-handle-area");
     const swipeHandle = async (fromX: number, fromY: number, toX: number, toY: number) => {
       await handle.evaluate((element, points) => {
@@ -1116,13 +1116,13 @@ test("large route titles collapse into the sticky header while scrolling", async
     await expect(page.locator(".fd-overview-head h1")).toBeVisible();
     await expect(page.locator("#app-top-bar .mr-4")).toHaveCount(0);
     await expect(page.locator("#app-top-bar .mobile-compact-title")).toBeHidden();
-    await page.evaluate(() => scrollTo(0, 180));
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 180));
     await expect(page.locator("#app-top-bar .mobile-compact-title")).toBeVisible();
     await expect(page.locator("#app-top-bar")).toContainText("Overview");
     await page.goto("/#/history");
     await expect(page.locator(".history-mobile-list")).toBeVisible();
     await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50);
-    await page.evaluate(() => scrollTo(0, 180));
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 180));
     const historyTitle = page.locator("#app-top-bar .mobile-compact-title");
     await expect(historyTitle).toBeVisible();
     const historyTitleBounds = (await historyTitle.boundingBox())!;
@@ -1162,15 +1162,15 @@ test("pushing a detail route starts at the top and Back returns to its source", 
     await installTauriBridge(page);
     await page.goto("/#/overview");
     await expect(page.locator(".fd-overview-hero")).toBeVisible();
-    await page.evaluate(() => scrollTo(0, 1000));
-    expect(await page.evaluate(() => scrollY)).toBeGreaterThan(500);
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 1000));
+    expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(500);
     await page.locator(".fd-overview-rank .fd-overview-row").first().click();
     await expect(page).toHaveURL(/#\/coins\//);
-    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+    await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
     const back = page.locator(".fd-coin-head nav").getByRole("button", { name: "Overview" });
     await expect(back).toBeVisible();
     expect((await back.boundingBox())!.y).toBeGreaterThanOrEqual(0);
-    await page.evaluate(() => scrollTo(0, 180));
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 180));
     const stickyBack = page.locator("#app-top-bar").getByRole("button", { name: "Back" });
     await expect(stickyBack).toBeVisible();
     await expect(page.locator("#app-top-bar .mobile-compact-title")).toContainText("BTC");
@@ -1192,7 +1192,7 @@ test("coin Back returns to Summary when opened from Top coins", async ({ browser
     await page.getByRole("dialog", { name: "Top coins" }).locator(".top-coins-rank-mobile .mobile-list-row").first().click();
     await expect(page).toHaveURL(/#\/coins\//);
     await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
-    await page.evaluate(() => scrollTo(0, 180));
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 180));
     const stickyBack = page.locator("#app-top-bar").getByRole("button", { name: "Back" });
     await expect(stickyBack).toBeVisible();
     await stickyBack.click({ timeout: 5_000 });
@@ -1227,14 +1227,14 @@ test("tab switches restore position and tapping the active tab returns to its ro
     await installTauriBridge(page);
     await page.goto("/#/overview");
     await expect(page.locator(".fd-overview-hero")).toBeVisible();
-    await page.evaluate(() => scrollTo(0, 500));
-    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(400);
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 500));
+    await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(400);
     await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
-    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+    await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
     await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
-    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(400);
+    await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(400);
     await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
-    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+    await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
     await page.locator(".fd-overview-rank .fd-overview-row").first().click();
     await expect(page).toHaveURL(/#\/coins\//);
     await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Analytics" }).click();
@@ -1367,7 +1367,7 @@ test("pulling down identifies a local view refresh", async ({ browser }) => {
     await installTauriBridge(page);
     await page.goto("/#/overview");
     await expect(page.locator(".fd-overview-hero")).toBeVisible();
-    await page.evaluate(() => scrollTo(0, 0));
+    await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
     const cdp = await context.newCDPSession(page);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: 180, y: 140 }] });
     await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: 180, y: 185 }] });

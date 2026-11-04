@@ -107,8 +107,9 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
       <NavItem item={overview} collapsed={collapsed} fidelity={fidelity} />
       <NavGroup label={t("nav.analyze", "Analyze")} items={analyze} collapsed={collapsed} unread={unread} fidelity={fidelity} />
       <NavGroup label={t("nav.manage", "Manage")} items={isProUser ? manage : manage.slice(0, -1)} collapsed={collapsed} unread={unread} fidelity={fidelity} />
-      <div className="mt-auto border-t border-border pt-2">{records
-        ? <button type="button" aria-label={t("records.controls")} aria-haspopup="true"
+    </nav><div className={cn("shrink-0 border-t border-border px-[10px] touch:px-[5px] pt-2 pb-2",
+      collapsed && "-mx-[10px] px-[5px] touch:-mx-[5px]")}>{records &&
+        <button type="button" aria-label={t("records.controls")} aria-haspopup="true"
           aria-expanded={recordsToolsOpen} aria-controls="t3-records-toolbar-panel"
           onClick={() => window.dispatchEvent(new Event("records-controls-toggle"))}
           className={cn("group relative flex h-9 w-full touch:min-h-11 items-center gap-3 rounded-md px-[9px] text-[13px] font-medium whitespace-nowrap text-muted-foreground hover:bg-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -118,8 +119,9 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
             {recordsIcons["/settings"]}
           </svg>
           {!collapsed && <span>{t("records.controls")}</span>}
-        </button> : <NavItem item={settings} collapsed={collapsed} fidelity={fidelity} />}</div>
-    </nav></TooltipProvider>
+        </button>}
+      <NavItem item={settings} collapsed={collapsed} fidelity={fidelity} />
+    </div></TooltipProvider>
     <button type="button" aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")}
       aria-expanded={!collapsed} onClick={onToggle}
       className={cn("mx-[6px] mb-2 flex h-11 shrink-0 items-center rounded-md text-muted-foreground hover:bg-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
