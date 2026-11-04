@@ -272,6 +272,17 @@ describe("Overview semantic controls", () => {
     }
   });
 
+  it("gives nearby iPad Overview value ticks distinct labels", async () => {
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" />);
+    await screen.findByTestId("line-chart");
+    const callback = vi.mocked(Line).mock.calls.at(-1)?.[0].options?.scales?.y?.ticks?.callback;
+    const ticks = [1_700_000, 1_750_000, 1_800_000].map((value) => ({ value }));
+    expect(ticks.map((tick, index) => callback?.call({} as never, tick.value, index, ticks)))
+      .toEqual(["1.7m", "1.75m", "1.8m"]);
+  });
+
   it("renders profit coin entries as detail links", async () => {
     renderWithProviders(
       <Profit

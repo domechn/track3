@@ -1124,16 +1124,21 @@
 .overview-sections .t3-total-overview .mobile-hero-header { display: flex; padding: 16px 16px 0; }
 .overview-sections .t3-total-overview .mobile-hero-content { order: 0; padding: 0 16px 16px; }
 .overview-sections .t3-total-overview .mobile-hero-tools { order: 0; width: auto; margin: 0; }
-.overview-sections .t3-total-overview .mobile-hero-value { font-size: clamp(32px, 9vw, 48px); }
+.overview-sections .t3-total-overview .mobile-hero-value { font-size: clamp(12px, 10cqi - 6px, 48px); white-space: nowrap; overflow: visible; }
 .overview-sections .t3-total-overview .mobile-hero-chart { height: 166px; min-height: 166px; }
 .overview-sections .t3-pnl-compact { margin: 10px 0; }
 .overview-sections .t3-pnl-compact-card { border: 0; border-top: 1px solid hsl(var(--border)); border-bottom: 1px solid hsl(var(--border)); border-radius: 0; box-shadow: none; background: transparent; }
 .overview-sections .t3-pnl-compact-card > div { padding: 8px 0 !important; }
 .overview-sections .t3-pnl-compact-card > div > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
-.overview-sections .t3-pnl-compact-card .overview-pnl-metric { grid-column: auto; min-height: 60px; align-items: flex-start; padding: 2px 6px !important; border: 0; border-right: 1px solid hsl(var(--border)); text-align: left; }
+.overview-sections .t3-pnl-compact-card .overview-pnl-metric { grid-column: auto; min-height: 60px; align-items: flex-start; padding: 2px 16px !important; border: 0; border-right: 1px solid hsl(var(--border)); text-align: left; }
 .overview-sections .t3-pnl-compact-card .overview-pnl-metric:first-child { padding-left: 0 !important; }
 .overview-sections .t3-pnl-compact-card .overview-pnl-metric:last-child { border-right: 0; }
 .overview-sections .t3-pnl-compact-card .overview-pnl-metric-value { font-size: clamp(14px, 4vw, 18px); }
+@container (max-width: 360px) {
+  .overview-sections .t3-total-overview .t3-pnl-compact-card > div > div { grid-template-columns: minmax(0, 1fr); }
+  .overview-sections .t3-total-overview .t3-pnl-compact-card .overview-pnl-metric { border-right: 0; border-top: 1px solid hsl(var(--border)); }
+  .overview-sections .t3-total-overview .t3-pnl-compact-card .overview-pnl-metric:first-child { border-top: 0; }
+}
 .overview-sections .t3-overview-panel { border: 1px solid hsl(var(--border)); background: hsl(var(--card)); box-shadow: var(--shadow-card); }
 .overview-sections .overview-insights { display: flex; flex-direction: column; height: 100%; }
 .overview-sections .overview-insights .mobile-section-header { min-height: 0; margin: 0; }
@@ -2054,6 +2059,7 @@ body:has(.fidelity-cost) {
   color: var(--f-faint); font-size: 17px; line-height: 22px; font-weight: 500; white-space: nowrap; margin-top: 2px;
   font-variant-numeric: normal;
 }
+.fidelity-cost-kpis strong.fidelity-long-money { white-space: normal; overflow-wrap: anywhere; }
 .fidelity-cost .ios-money { letter-spacing: normal; font-variant-numeric: normal; }
 .fidelity-cost .fidelity-asset-bar .ios-money { font-variant-numeric: tabular-nums; }
 .fidelity-cost .fidelity-segments button { font-variant-numeric: tabular-nums; }
