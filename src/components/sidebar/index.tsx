@@ -4,6 +4,8 @@ import { useTranslation } from "@/i18n";
 import type { ReactNode } from "react";
 import { useAlertBadge } from "../use-alert-badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TrackLogo } from "@/components/brand/track-logo";
+import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 
 const overview = { to: "/overview", labelKey: "nav.overview" };
 const analyze = [
@@ -93,15 +95,12 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
     }}
     className={cn("t3-desktop-rail fixed inset-y-0 left-0 z-20 flex flex-col overflow-hidden border-r bg-background transition-[width] duration-300 ease-in-out",
       !fidelity && "fidelity-records-rail", !fidelity && collapsed && "fidelity-records-rail-collapsed", fidelity && "t3-fidelity-sidebar")}>
-    <div className="flex h-14 shrink-0 items-center gap-2 px-[10px]">
-      <button type="button" aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")}
-        aria-expanded={!collapsed} onClick={onToggle} className={cn("flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", fidelity ? "h-7 w-7" : "h-11 w-11")}>
-        <svg aria-hidden="true" className="h-7 w-7" viewBox="0 0 28 28">
-          <rect width="28" height="28" rx="7" fill="#4a8ad6" />
-          <path d="M8 20v-6M14 20V8M20 20v-4.5" stroke="#0d0d0e" strokeWidth="2.4" strokeLinecap="round" />
-        </svg>
-      </button>
-      {!collapsed && <span className="truncate text-[15px] font-bold">{t("app.brand")}</span>}
+    <div className="flex h-14 shrink-0 items-center gap-2 px-[6px]">
+      <Link to="/overview" aria-label={collapsed ? "Track3" : undefined}
+        className="flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <TrackLogo size={28} decorative />
+        {!collapsed && <span className="truncate text-[15px] font-semibold">{t("app.brand")}</span>}
+      </Link>
       {isProUser && !collapsed && <span className="rounded-pill bg-accent-data/15 px-2 text-xs text-foreground dark:text-accent-data">{t("app.proBadge")}</span>}
     </div>
     <TooltipProvider delayDuration={220}><nav aria-label={t("nav.main", "Main navigation")} className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-[10px] touch:px-[5px] pb-2">
@@ -121,5 +120,12 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
           {!collapsed && <span>{t("records.controls")}</span>}
         </button> : <NavItem item={settings} collapsed={collapsed} fidelity={fidelity} />}</div>
     </nav></TooltipProvider>
+    <button type="button" aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")}
+      aria-expanded={!collapsed} onClick={onToggle}
+      className={cn("mx-[6px] mb-2 flex h-11 shrink-0 items-center rounded-md text-muted-foreground hover:bg-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        collapsed ? "w-11 justify-center" : "gap-3 px-[9px] text-[13px]")}>
+      {collapsed ? <ChevronRightIcon aria-hidden="true" /> : <ChevronLeftIcon aria-hidden="true" />}
+      {!collapsed && <span>{t("sidebar.collapse")}</span>}
+    </button>
   </aside>;
 }

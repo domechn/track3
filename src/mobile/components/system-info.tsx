@@ -29,6 +29,7 @@ import { getVersion } from "@/utils/app";
 import { trackCheckoutCompleted, trackCheckoutPhase, trackSubscribeClicked, trackCheckoutCancelled, trackOpenClicked } from "@/middlelayers/ui-state/telemetry";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/mobile/i18n";
+import { TrackLogo } from "@/components/brand/track-logo";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { requestOnboardingReplay } from "@/middlelayers/onboarding";
 import { isIOS } from "@/utils/platform";
@@ -323,7 +324,7 @@ const App = ({
     <p className="fidelity-b-subtitle">{t("fidelity.b.about.subtitle")}</p>
     <section className="fidelity-b-card fidelity-b-about-app">
       <div className="fidelity-b-about-brand">
-        <span className="fidelity-b-about-logo" aria-hidden="true"><i /><i /><i /></span>
+        <TrackLogo size={56} decorative />
         <div><h2>Track3</h2><p>{t("fidelity.b.about.versionLine").replace("{version}", version)}</p></div>
       </div>
       <dl className="fidelity-b-pro-dl">

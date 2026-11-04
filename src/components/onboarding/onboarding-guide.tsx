@@ -13,6 +13,7 @@ import guideArt3 from "./guide-art-3.svg?raw"
 import guideArt4 from "./guide-art-4.svg?raw"
 import guideArt5 from "./guide-art-5.svg?raw"
 import PhoneFidelityArt from "./phone-fidelity-art"
+import { TrackLogo } from "@/components/brand/track-logo"
 import "./onboarding.css"
 
 const steps = ["welcome", "sources", "history", "deeper", "backup"] as const
@@ -143,7 +144,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose, 
             }
           }}>
             <header className="ob-fidelity-top">
-              <div className="ob-fidelity-brand"><svg viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#4a8ad6"/><path d="M8 20v-6M14 20V8M20 20v-4.5" stroke="#0d0d0e" strokeWidth="2.4" strokeLinecap="round"/></svg>Track3</div>
+              <div className="ob-fidelity-brand"><TrackLogo size={28} decorative />Track3</div>
               <span className="ob-fidelity-count">{step + 1} of {steps.length}</span>
               <button type="button" data-testid="onboarding-skip" className="ob-fidelity-skip" onClick={skip}>{last ? t("onboarding.fidelity.close") : t("onboarding.skip")}</button>
             </header>
@@ -209,7 +210,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose, 
         >
           {phoneFidelity ? <>
             <div className="fd-guide-top">
-              <div className="fd-guide-brand"><span className="fd-guide-logo" aria-hidden="true"><i /><i /><i /></span>Track3</div>
+              <div className="fd-guide-brand"><TrackLogo size={28} decorative />Track3</div>
               <span className="fd-guide-count">{count}</span>
               <button type="button" data-testid="onboarding-skip" className="fd-guide-skip" onClick={skip}>{t(last ? "fidelity.guide.close" : "onboarding.skip")}</button>
             </div>

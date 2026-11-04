@@ -257,7 +257,7 @@ test("desktop rail keeps the same icons and collapse control across routes", asy
   const icon = page.locator('aside a[href="#/history"] svg');
   const before = await icon.innerHTML();
   const controlBefore = (await page.getByRole("button", { name: "Expand sidebar" }).boundingBox())!;
-  expect(controlBefore.y).toBeLessThan(40);
+  expect(controlBefore.y).toBeGreaterThan(page.viewportSize()!.height / 2);
   await page.getByRole("link", { name: "History" }).click();
   await expect(page.getByRole("heading", { name: "History", exact: true })).toBeVisible();
   await expect(icon).toBeVisible();
@@ -381,12 +381,12 @@ test("an empty edit filter can be cleared", async ({ page }) => {
   await expect(page.getByTestId("history-snapshot-row")).toHaveCount(1);
 });
 
-test("records rail expands from the design logo and keeps navigation working", async ({ page }) => {
+test("records rail expands from its toggle and keeps navigation working", async ({ page }) => {
   await installTauriBridge(page, { fidelityRecords: "history" });
   await page.goto("/#/history");
   await expect(page.getByRole("heading", { name: "History", exact: true })).toBeVisible();
   const expand = page.getByRole("button", { name: "Expand sidebar" });
-  expect((await expand.boundingBox())!.y).toBeLessThan(40);
+  expect((await expand.boundingBox())!.y).toBeGreaterThan(page.viewportSize()!.height / 2);
   await expand.click();
   await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
   await page.getByRole("link", { name: "Cost basis" }).click();

@@ -43,4 +43,6 @@ The guide has five content variants; the dot and counter identify the current st
 
 ## Remaining differences
 
-App capture: `/tmp/fidelity-desktop/guide/guide-1-desktop.png`. Source render: `/tmp/fidelity-desktop/design-flows/guide-1.png`. Pixel diff at the review gate's RGB-difference sum greater than 60: **0.00%** (1600 × 900). The source render and app capture were viewed side by side. No structural, copy, colour, typography, or spacing difference remains at this threshold.
+App capture: `/tmp/fidelity-desktop/guide/guide-1-desktop.png`. Source render: `/tmp/fidelity-desktop/design-flows/guide-1.png`. Pixel diff at the review gate's RGB-difference sum greater than 60: **0.00%** (1600 × 900). The source render and app capture were viewed side by side. This figure predates the brand change.
+
+The current app shows the text-free, two-peak Track3 mark at top left instead of the source's blue chart tile.

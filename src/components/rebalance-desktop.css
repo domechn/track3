@@ -14,8 +14,9 @@
 .t3-fidelity-rail-live .t3-live-label { display: none; }
 .t3-fidelity-refresh-progress { position: fixed; z-index: 32; top: 0; right: 0; left: 56px; pointer-events: none; }
 .t3-fidelity-rail { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; display: flex; width: 56px; flex-direction: column; gap: 2px; overflow: hidden; padding: 12px 10px; border-right: 1px solid #222224; background: #0d0d0e; }
-.t3-fidelity-brand { display: flex; height: 36px; flex: none; align-items: center; margin: 0 0 12px 1px; }
+.t3-fidelity-brand { display: flex; height: 44px; flex: none; align-items: center; justify-content: center; margin: -4px -4px 8px; border-radius: 6px; }
 .t3-fidelity-brand svg { width: 28px; height: 28px; }
+.t3-fidelity-brand:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
 .t3-fidelity-rail-item { position: relative; display: flex; height: 36px; flex: none; align-items: center; justify-content: center; border-radius: 6px; color: #8c8e95; }
 .t3-fidelity-rail-item:hover { background: #18181c; color: #fff; }
 .t3-fidelity-rail-item.selected { background: #1c1c20; color: #fff; }

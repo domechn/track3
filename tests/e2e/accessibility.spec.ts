@@ -136,6 +136,7 @@ test("navigation follows visual order and shows a keyboard focus ring", async ({
   await page.goto("/#/overview");
   await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeAttached();
   const skip = page.getByRole("link", { name: "Skip to main content" });
+  const brand = page.getByRole("link", { name: "Track3" });
   const collapse = page.getByRole("button", { name: "Expand sidebar" });
   const overview = page.getByRole("link", { name: "Overview" });
   const summary = page.getByRole("link", { name: "Summary" });
@@ -143,8 +144,8 @@ test("navigation follows visual order and shows a keyboard focus ring", async ({
   await expect(skip).toBeFocused();
   expect(await skip.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
   await page.keyboard.press("Tab");
-  await expect(collapse).toBeFocused();
-  expect(await collapse.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
+  await expect(brand).toBeFocused();
+  expect(await brand.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
   await page.keyboard.press("Tab");
   await expect(overview).toBeFocused();
   expect(await overview.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
@@ -158,6 +159,8 @@ test("navigation follows visual order and shows a keyboard focus ring", async ({
   await expect(page.locator("main")).toBeFocused();
   await page.keyboard.press("Tab");
   expect(await page.locator("main").evaluate((node) => node.contains(document.activeElement))).toBe(true);
+  await collapse.focus();
+  expect(await collapse.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
 });
 
 test.describe("coarse pointer date picker", () => {

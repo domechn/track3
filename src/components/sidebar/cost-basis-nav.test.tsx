@@ -29,6 +29,16 @@ it("lets keyboard users reach and activate the sidebar toggle", () => {
   expect(onToggle).toHaveBeenCalledOnce();
 });
 
+it("links the collapsed two-peak brand to Overview without consuming the sidebar toggle", () => {
+  const onToggle = vi.fn();
+  render(<MemoryRouter initialEntries={["/history"]}><Sidebar collapsed onToggle={onToggle} isProUser={false} /></MemoryRouter>);
+  const brand = screen.getByRole("link", { name: "Track3" });
+  expect(brand).toHaveAttribute("href", "/overview");
+  expect(brand.querySelectorAll("polygon")).toHaveLength(2);
+  fireEvent.click(brand);
+  expect(onToggle).not.toHaveBeenCalled();
+});
+
 it("uses the same Goals & alerts wording on Overview", () => {
   render(<MemoryRouter initialEntries={["/overview"]}><Sidebar collapsed={false} onToggle={() => {}} isProUser={false} /></MemoryRouter>);
   expect(screen.getByRole("link", { name: "Goals & alerts 2 unread alerts" })).toHaveAttribute("href", "/goals");

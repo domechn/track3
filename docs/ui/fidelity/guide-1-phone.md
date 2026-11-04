@@ -21,5 +21,7 @@ App: `/tmp/fidelity/flows/guide-1-phone.png`. Source: `/tmp/fidelity/flows/desig
 
 ## Remaining differences
 
+- The top-left brand now uses the current text-free, two-peak Track3 mark instead of the source's blue chart tile.
+- The pixel figures above predate this brand change.
 - Current 390px viewport pixel diff: **3.79%** (any RGB channel differs by more than 20).
 - The art, copy, and measured section positions match. The app is an interactive focus-managed guide in a mobile browser context; the desktop-context HTML reference uses different subpixel text and SVG rasterization. Keeping the dialog focus behavior preserves accessibility.

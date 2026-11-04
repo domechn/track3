@@ -811,7 +811,7 @@ for (const [name, width, height] of viewports) {
             const box = node.getBoundingClientRect();
             return box.width >= 44 && box.height >= 44;
           })), { message: `${name} ${theme} ${route} nav targets`, timeout: 15_000 })
-            .toEqual(Array(size === "compact" ? 4 : 10).fill(true));
+            .toEqual(Array(size === "compact" ? 4 : 11).fill(true));
           const clipped = await page.evaluate(() => {
             const root = document.querySelector("#app-main-content")!;
             return [...root.querySelectorAll<HTMLElement>("*")]
