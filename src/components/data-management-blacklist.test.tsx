@@ -117,6 +117,15 @@ describe("Data Management", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply selected choices" }));
     await waitFor(() => expect(mocks.importSelected).toHaveBeenCalledWith(expect.objectContaining({ client: "own-device" }), { "snapshot-one": "import" }));
     expect(mocks.importHistoricalData).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith({ description: "Import data successfully", tone: "success" });
+  });
+  it("reports a completed export with a success tone", async () => {
+    mocks.exportHistoricalData.mockResolvedValue(true);
+    render(<DataManagement />);
+    fireEvent.click(screen.getByRole("button", { name: /^Export$/ }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
+      description: "Export data successfully", tone: "success",
+    }));
   });
   it("shows local history counts and names the two export categories", async () => {
     render(<DataManagement />);
@@ -348,6 +357,7 @@ describe("Data Management", () => {
     expect(mocks.toast).toHaveBeenCalledWith({
       description:
         "Encryption key updated. Sensitive configuration and chat message content were re-encrypted; assets and transactions remain unchanged.",
+      tone: "success",
     });
   });
 

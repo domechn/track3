@@ -54,6 +54,16 @@ it("offers the originating page after an approved setup action", () => {
   expect(screen.getByRole("link", { name: "Open Rebalance" })).toHaveAttribute("href", "/rebalance");
 });
 
+it("describes a below-target alert as below in the approval preview", () => {
+  render(<MemoryRouter><ActionCard action={{
+    ...action, name: "create_alert",
+    args: { kind: "asset_price_target", comparator: "lte", symbol: "BTC", threshold: 200 },
+  }} /></MemoryRouter>);
+  expect(screen.getByText("Create alert: BTC below $200")).toBeVisible();
+  expect(screen.getByText("Asset price target: BTC goes below $200")).toBeVisible();
+  expect(screen.queryByText(/above/)).toBeNull();
+});
+
 it("shows changed settings as a readable field diff", () => {
   render(<ActionCard action={{
     ...action, name: "set_cost_basis_settings",

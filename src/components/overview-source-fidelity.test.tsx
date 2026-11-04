@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
+import { I18nProvider } from "@/i18n";
 import { SourceStatusCard } from "./overview-panels";
 import { overviewRefreshRequestedEvent } from "./source-status-event";
 
@@ -56,6 +57,28 @@ it("shows a quota source as quota limited and offers its plan action without ret
   expect(card.querySelector(".t3-source-banner")).toBeNull();
   expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Manage plan" })).not.toBeInTheDocument();
+});
+
+it("shows the completed source count in Chinese when one source failed", () => {
+  const storedLocale = vi.spyOn(Storage.prototype, "getItem").mockReturnValue(null);
+  const browserLocale = vi.spyOn(navigator, "language", "get").mockReturnValue("zh-CN");
+  try {
+    render(<I18nProvider><SourceStatusCard variant="card" desktopFidelity
+      currency={{ currency: "USD", rate: 1, alias: "US Dollar", symbol: "$" }}
+      statuses={[
+        { sourceId: "cex:0", label: "Binance", status: "ok", kind: "exchange", provider: "binance" },
+        { sourceId: "cex:1", label: "OKX", status: "failed", kind: "exchange", provider: "okx" },
+      ]}
+      sources={[
+        { wallet: "Binance", walletAlias: "Binance", walletType: "binance", amount: 2, value: 100, percentage: 50, chartColor: "" },
+        { wallet: "OKX", walletAlias: "OKX", walletType: "okx", amount: 2, value: 100, percentage: 50, chartColor: "" },
+      ]} /></I18nProvider>);
+    expect(screen.getByText("2 个来源中有 1 个已更新")).toBeVisible();
+    expect(screen.queryByText(/\{count\}/)).toBeNull();
+  } finally {
+    browserLocale.mockRestore();
+    storedLocale.mockRestore();
+  }
 });
 
 it("keeps the shared source card's existing presentation unless desktop fidelity is requested", () => {

@@ -374,7 +374,7 @@ function Layout({
       />
 
       <div
-        style={{ marginLeft: railFidelityPage || fidelityPage || recordsPage ? 56 : sidebarWidth }}
+        style={{ marginLeft: sidebarWidth }}
         className={`transition-[margin-left] duration-300 ease-in-out ${recordsPage ? "t3-records-fidelity-shell" : ""}`}
       >
         <SummaryFidelityRangeContext.Provider value={{ range: summaryRange, setRange: setSummaryRange }}>

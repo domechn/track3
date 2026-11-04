@@ -83,6 +83,10 @@ export default function ActionCard({
   }, [action.expiresAt]);
   const pending = action.status === "pending" && !expired;
   const status = action.status === "pending" && expired ? "expired" : action.status;
+  const alertThreshold = new Intl.NumberFormat("en-US", {
+    style: "currency", currency: "USD", minimumFractionDigits: Number.isInteger(action.args.threshold) ? 0 : 2,
+    maximumFractionDigits: 8,
+  }).format(Number(action.args.threshold));
   const preview = (value: string) => value.startsWith("assistant.action.preview.acknowledgedAll:")
     ? t("assistant.action.preview.acknowledgedAll").replace("{count}", value.split(":")[1])
     : value.startsWith("assistant.action.") ? t(value, value) : value;
@@ -120,17 +124,17 @@ export default function ActionCard({
 
   return (
     <section aria-label={t("assistant.action.confirmation")} className="t3-action-confirmation rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
-      {action.name === "create_alert" && action.args.kind === "asset_price_target" && action.args.comparator === "gte" && typeof action.args.symbol === "string" && typeof action.args.threshold === "number" && <div className="t3-assistant-action-design">
+      {action.name === "create_alert" && action.args.kind === "asset_price_target" && (action.args.comparator === "gte" || action.args.comparator === "lte") && typeof action.args.symbol === "string" && typeof action.args.threshold === "number" && <div className="t3-assistant-action-design">
         <div className="t3-assistant-action-head">
           <span>{status === "approved" ? <CheckIcon aria-hidden="true" /> : <BellIcon aria-hidden="true" />}{status === "approved" ? t("fidelity.assistant.alertCreated") : t("fidelity.assistant.approvalNeeded")}</span>
           <span className={status === "approved" ? "approved" : "waiting"}>{status === "approved" ? t("assistant.action.status.approved") : t("fidelity.assistant.waiting")}</span>
         </div>
-        <h3>{t("fidelity.assistant.createAlert").replace("{symbol}", action.args.symbol).replace("{threshold}", Number(action.args.threshold).toLocaleString("en-US"))}</h3>
+        <h3>{t(action.args.comparator === "lte" ? "fidelity.assistant.createAlertBelow" : "fidelity.assistant.createAlert").replace("{symbol}", action.args.symbol).replace("{threshold}", alertThreshold)}</h3>
         <p>{t("fidelity.assistant.whatChanges")}</p>
         <dl>
           <div><dt>{t("fidelity.assistant.adds")}</dt><dd>{t("fidelity.assistant.oneRule")}</dd></div>
-          <div><dt>{t("fidelity.assistant.condition")}</dt><dd>{t("fidelity.assistant.priceCondition").replace("{symbol}", action.args.symbol).replace("{threshold}", Number(action.args.threshold).toLocaleString("en-US"))}</dd></div>
-          <div><dt>{t("fidelity.assistant.rightNow")}</dt><dd>{currentPrice === undefined ? "—" : `${new Intl.NumberFormat("en-US", { style: "currency", currency: currency?.currency ?? "USD" }).format(currentPrice * (currency?.rate ?? 1))}, ${(currentPrice / Number(action.args.threshold) * 100).toFixed(1)}% ${t("fidelity.assistant.ofWay")}`}</dd></div>
+          <div><dt>{t("fidelity.assistant.condition")}</dt><dd>{t(action.args.comparator === "lte" ? "fidelity.assistant.priceConditionBelow" : "fidelity.assistant.priceCondition").replace("{symbol}", action.args.symbol).replace("{threshold}", alertThreshold)}</dd></div>
+          <div><dt>{t("fidelity.assistant.rightNow")}</dt><dd>{currentPrice === undefined ? "—" : `${new Intl.NumberFormat("en-US", { style: "currency", currency: currency?.currency ?? "USD" }).format(currentPrice * (currency?.rate ?? 1))}${action.args.comparator === "gte" ? `, ${(currentPrice / Number(action.args.threshold) * 100).toFixed(1)}% ${t("fidelity.assistant.ofWay")}` : ""}`}</dd></div>
         </dl>
         <p className="t3-assistant-action-note">{t("fidelity.assistant.noOtherChanges")}</p>
         {pending ? <div className="t3-assistant-action-buttons">

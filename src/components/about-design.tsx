@@ -33,7 +33,7 @@ export function AboutDesign({ version }: Props) {
       setUpdate(result);
       setCheckResult(result ? "available" : "current");
       setUpdateOpen(!!result);
-      if (!result) toast({ title: t("fidelity.settingsB.about.upToDate"),
+      if (!result) toast({ title: t("fidelity.settingsB.about.upToDate"), tone: "success",
         description: t("fidelity.settingsB.about.upToDateDetail").replace("{version}", version) });
     } catch {
       setCheckResult("error");

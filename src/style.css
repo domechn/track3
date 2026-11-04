@@ -14,11 +14,11 @@ body:has(.sync-settings-page) .desktop-toast-viewport {
   right: 0;
   bottom: 0;
   flex-direction: column;
-  max-width: min(100vw, 380px, 35vw);
+  max-width: min(100vw, 380px, 38vw);
 }
 
 body:has(.desktop-toast-viewport) .sync-settings-page {
-  margin-right: min(380px, 35vw);
+  margin-right: min(380px, 38vw);
   padding-bottom: 8rem;
 }
 
@@ -56,6 +56,10 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
   min-width: 44px;
   min-height: 44px;
   opacity: 1;
+}
+
+.desktop-toast-viewport > li.t3-fidelity-toast {
+  padding-right: 56px;
 }
 
 .sync-toast [toast-close] {
@@ -329,9 +333,15 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
   body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-topbar-sync-button:has(svg) {
     min-height: 30px; height: 30px; padding: 0 12px; border-color: hsl(var(--control));
   }
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-live-trigger,
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-topbar-sync,
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-topbar-bell { transform: translateY(7px); }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-live-trigger {
+    transform: translateY(7px);
+  }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-topbar-controls .t3-topbar-sync {
+    position: absolute; top: -69px; right: 42px; margin-left: 0;
+  }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-topbar-controls .t3-topbar-bell {
+    position: absolute; top: -69px; right: 0;
+  }
   body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-sync-popover:has(.t3-sync-fidelity) {
     width: 360px; max-width: 360px; padding: 16px;
     border-color: hsl(var(--control)); border-radius: 10px;
@@ -664,7 +674,7 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
   body .desktop-toast-viewport { right: 24px; bottom: 24px; top: auto; width: 330px; max-width: 330px; padding: 0; gap: 10px; }
   .t3-fidelity-toast {
     width: 330px; min-height: 76px; align-items: flex-start; justify-content: flex-start; gap: 10px;
-    padding: 12px 12px 12px 14px; border: 1px solid #3a3a3e; border-left: 3px solid #4a8ad6;
+    padding: 12px 56px 12px 14px; border: 1px solid #3a3a3e; border-left: 3px solid #4a8ad6;
     border-radius: 6px; background: #1b1a20; color: #fff;
     font-family: "Public Sans Variable", sans-serif; font-size: 12px; line-height: 18px;
     box-shadow: 0 12px 28px rgb(0 0 0 / .28);
@@ -2125,12 +2135,7 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
 @media (min-width: 1500px) {
   body:has(.t3-settings) .desktop-toast-viewport { right: 0; bottom: 0; width: 416px; max-width: 416px; padding: 16px 24px; }
   body:has(.t3-settings) .desktop-toast-viewport > li.t3-fidelity-toast { width: 100%; }
-  body:has(.t3-settings) .desktop-toast-viewport > li:not(.sync-toast) { min-height: 68px; padding: 12px 56px 12px 48px; border-left-color: hsl(var(--positive)); }
-  body:has(.t3-settings) .desktop-toast-viewport > li:not(.sync-toast)::before { position: absolute; top: 18px; left: 18px; color: hsl(var(--positive)); font-size: 18px; line-height: 18px; content: "✓"; }
-  body:has(.t3-settings) .desktop-toast-viewport > li.destructive { border-left-color: hsl(var(--negative)); }
-  body:has(.t3-settings) .desktop-toast-viewport > li.destructive::before { color: hsl(var(--negative)); content: "!"; }
   body:has(.t3-settings) .desktop-toast-viewport [toast-close] { display: grid; place-items: center; min-width: 44px; min-height: 44px; opacity: 1; }
-  body:has(.t3-settings) .desktop-toast-viewport > li.sync-toast { padding-right: 20px; }
   .t3-b-ai { color: hsl(var(--foreground)); font: 400 13px/18px "Public Sans Variable","Public Sans",sans-serif; }
   .t3-b-grid { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap: 16px; }
   .t3-b-card { min-width: 0; padding: 20px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--card)); box-shadow: var(--shadow-card); }
@@ -2445,7 +2450,7 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
   .t3-b-update-progress progress { width: 100%; accent-color: hsl(var(--accent-data)); }
   .t3-settings[data-design-section="sync"] .sync-settings-page { display: grid; grid-template-columns: minmax(0,7fr) minmax(0,5fr); align-items: stretch; gap: 16px; margin-right: 0; padding-bottom: 0; color: hsl(var(--foreground)); font: 400 13px/18px "Public Sans Variable","Public Sans",sans-serif; }
   body:has(.t3-settings[data-design-section="sync"]) .desktop-toast-viewport { max-width: 416px; padding: 16px 24px; }
-  body:has(.t3-settings[data-design-section="sync"]) .desktop-toast-viewport > li { min-height: 64px; padding: 12px 34px 12px 48px; }
+  body:has(.t3-settings[data-design-section="sync"]) .desktop-toast-viewport > li { min-height: 64px; padding: 12px 56px 12px 48px; }
   .t3-settings[data-design-section="sync"] .sync-settings-page > * { margin-top: 0 !important; }
   .t3-settings[data-design-section="sync"] .sync-settings-page > .t3-settings-page-head { display: none; }
   .t3-settings[data-design-section="sync"] .sync-settings-page > [role="alert"] { grid-column: 1/-1; }
@@ -2534,7 +2539,7 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
   .t3-b-sync-device-kpis small { color: hsl(var(--faint)); font-size: 12px; }
   .t3-b-sync-device-kpis b { margin-top: 3px; font-size: 16px; font-weight: 600; }
   .t3-settings-design-header .desktop-sync-status-indicator button { border-color: hsl(var(--input)); background: transparent; color: hsl(var(--foreground)); font: 500 13px/18px "Public Sans Variable","Public Sans",sans-serif; }
-  .t3-sync-popover:not(.ios-d3-sync-popover) { width: 392px; max-width: 392px; border-color: hsl(var(--input)); border-radius: 6px; background: hsl(var(--card)); color: hsl(var(--foreground)); }
+  .t3-sync-popover:not(.ios-d3-sync-popover, .t3-sync-lock-dialog) { width: 392px; max-width: 392px; border-color: hsl(var(--input)); border-radius: 6px; background: hsl(var(--card)); color: hsl(var(--foreground)); }
   .t3-sync-popover.t3-b-sync-popover { max-height: none; overflow: visible; }
 }
 
@@ -2691,7 +2696,10 @@ body:not(:has(.app-layout)):has(.t3-refresh-overview) .t3-fidelity-ranges { disp
 }
 @media (min-width: 761px) and (max-width: 1180px) {
   body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-topbar-controls {
-    top: 126px; left: 28px; right: auto;
+    top: 126px; left: 28px; right: 28px;
+  }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-topbar-controls :is(.t3-topbar-sync, .t3-topbar-bell) {
+    top: -113px;
   }
   body:not(:has(.app-layout)) .t3-overview-heading { margin-bottom: 56px; }
   body:not(:has(.app-layout)):has(aside[style*="--sidebar-width"]) .t3-overview-heading { margin-bottom: 66px; }
@@ -2743,7 +2751,10 @@ body:not(:has(.app-layout)):has(.t3-refresh-overview) .t3-fidelity-ranges { disp
 }
 @media (min-width: 1200px) and (max-width: 1399px) {
   body:not(:has(.app-layout)):has(.t3-overview-grid):has(aside[style*="--sidebar-width"]) .t3-topbar-controls {
-    top: 126px; left: calc(var(--sidebar-width) + 28px); right: auto;
+    top: 126px; left: 28px; right: 28px;
+  }
+  body:not(:has(.app-layout)):has(.t3-overview-grid):has(aside[style*="--sidebar-width"]) .t3-topbar-controls :is(.t3-topbar-sync, .t3-topbar-bell) {
+    top: -113px;
   }
   body:not(:has(.app-layout)):has(.t3-overview-grid):has(aside[style*="--sidebar-width"]) .t3-overview-heading { margin-bottom: 56px; }
 }
@@ -3374,8 +3385,6 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .coin-fidelity-sheet-row .coin-fidelity-pill { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; background: #212023; color: #bdbdc0; font-weight: 500; }
 .coin-fidelity-sheet-row strong.positive { color: hsl(var(--gain)); }
 .coin-fidelity-sheet-row strong.negative { color: hsl(var(--loss)); }
-.coin-fidelity-sheet.fidelity-reverse .coin-fidelity-sheet-row strong.positive { color: hsl(var(--loss)); }
-.coin-fidelity-sheet.fidelity-reverse .coin-fidelity-sheet-row strong.negative { color: hsl(var(--gain)); }
 .coin-fidelity-sheet-row span { color: #9b9da3; }
 .coin-fidelity-sheet-row strong { font-weight: 400; }
 .coin-fidelity-sheet > .coin-fidelity-sheet-action { width: 100%; height: 34px; border-radius: 24px; margin-top: 10px; }
@@ -3418,12 +3427,6 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .coin-fidelity-transactions table { min-width: 900px; }
   .coin-fidelity-metrics { min-width: 0; }
 }
-.fidelity-reverse .fidelity-month-bar i.positive,
-.fidelity-reverse .fidelity-leader-track i.positive { background: hsl(var(--loss)); }
-.fidelity-reverse .fidelity-month-bar i.negative,
-.fidelity-reverse .fidelity-leader-track i.negative { background: hsl(var(--gain)); }
-.coin-fidelity.fidelity-reverse .positive { color: hsl(var(--loss)) !important; }
-.coin-fidelity.fidelity-reverse .negative { color: hsl(var(--gain)) !important; }
 .light .coin-fidelity { color: hsl(var(--foreground)); }
 .light :is(.fidelity-page-head strong, .fidelity-card-head h2, .fidelity-card-head h3, .fidelity-month-head b, .fidelity-year-head b, .fidelity-ath-value) { color: hsl(var(--foreground)); }
 .light :is(.fidelity-page-head p, .fidelity-caption, .fidelity-small, .fidelity-kpis small, .fidelity-facts > div > span:first-child, .coin-fidelity-heading p, .coin-fidelity-metric > small) { color: hsl(var(--muted-foreground)); }
@@ -3479,6 +3482,9 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 @media (min-width: 761px) {
   .t3-records-fidelity-shell > main { max-width: 1560px; padding: 20px 28px 40px; }
   .t3-records-toolbar { position: fixed; z-index: 30; left: 56px; bottom: 10px; width: max-content; max-width: calc(100vw - 68px); }
+  body:has(.t3-records-fidelity-shell):has(.fidelity-records-rail:not(.fidelity-records-rail-collapsed)) .t3-records-toolbar {
+    left: var(--sidebar-width); max-width: calc(100vw - var(--sidebar-width) - 12px);
+  }
   .t3-records-toolbar-panel { width: max-content; min-width: 280px; max-width: calc(100vw - 68px); border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--card)); box-shadow: var(--shadow-card); }
   .t3-records-toolbar[data-open="false"] .t3-records-toolbar-panel { visibility: hidden; pointer-events: none; }
   .t3-records-toolbar .t3-records-refresh-progress { left: 0; right: auto; top: auto; bottom: 48px; width: 280px; }
@@ -3487,6 +3493,9 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .fidelity-cost-assistant { display: none; }
   body:has(.t3-records-toolbar[data-open="true"]) .fidelity-cost-assistant {
     display: block; position: fixed; z-index: 30; left: 56px; bottom: 60px; width: min(430px, calc(100vw - 72px));
+  }
+  body:has(.t3-records-fidelity-shell):has(.fidelity-records-rail:not(.fidelity-records-rail-collapsed)) .fidelity-cost-assistant {
+    left: var(--sidebar-width);
   }
   .fidelity-records-rail-collapsed > div:first-child { height: 62px; }
   .fidelity-records-rail-collapsed .fidelity-records-rail-group {
@@ -3790,7 +3799,6 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-delete-dialog button:last-child { display: inline-flex; align-items: center; gap: 6px; border: 1px solid hsl(var(--negative) / .35); color: hsl(var(--negative)); }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-edit-links { display: flex; gap: 8px; flex-wrap: wrap; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-edit-links button { padding: 6px 12px; border: 1px solid hsl(var(--control)); border-radius: 999px; }
-body:where(:has(.t3-records-fidelity-shell)):has(.fidelity-history) .desktop-toast-viewport [data-state="open"] { border-left-color: hsl(var(--positive)); }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-undo-title { display: inline-flex; align-items: center; gap: 12px; font-weight: 600; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-undo-title svg { width: 18px; height: 18px; }
 :where(body:has(.t3-records-fidelity-shell)) .desktop-toast-viewport:has(.fidelity-history-undo-toast) { right: 28px; bottom: 24px; width: 330px; max-width: 330px; padding: 0; }

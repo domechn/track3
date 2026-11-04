@@ -16,12 +16,12 @@ const amount = (value: number, currency: CurrencyRateDetail) => `${currency.symb
 const clock = (at?: string) => at ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(at)) : "—";
 const date = (at?: string) => at ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(at)) : "—";
 
-export default function PartialOverviewFidelity({ view, statuses, currency, quoteColor, onRefresh }: {
+export default function PartialOverviewFidelity({ view, statuses, currency, quoteColor, onRefresh, withLastKnown, setWithLastKnown }: {
   view: View; statuses: PortfolioSourceStatus[]; currency: CurrencyRateDetail; quoteColor: QuoteColor;
   onRefresh?: () => void | Promise<void>;
+  withLastKnown: boolean; setWithLastKnown: (value: boolean) => void;
 }) {
   const { t } = useTranslation();
-  const [withLastKnown, setWithLastKnown] = useState(false);
   const [statusSheetOpen, setStatusSheetOpen] = useState(false);
   const missing = view.latest?.partial?.missing ?? [];
   const failed = missing[0];
@@ -77,7 +77,7 @@ export default function PartialOverviewFidelity({ view, statuses, currency, quot
         .replace("{date}", date(failed?.lastSuccessAt)).replace("{time}", clock(failed?.lastSuccessAt))
         .replace("{value}", amount(excludedValue, currency))}</p>
       <div className="fd-partial-actions">{isQuota ? <Link to="/settings/systemInfo">{t("fidelity.refresh.seeUsage")}</Link> : <button type="button" onClick={onRetry}>{t("refresh.retryButton")}</button>}
-        <button type="button" onClick={() => setWithLastKnown((value) => !value)}>{t(withLastKnown ? "fidelity.refresh.excludeLastKnown" : "refresh.useLastKnown")}</button></div>
+        <button type="button" onClick={() => setWithLastKnown(!withLastKnown)}>{t(withLastKnown ? "fidelity.refresh.excludeLastKnown" : "refresh.useLastKnown")}</button></div>
     </div></div>
     <main className="fd-partial-grid">
       <section className="fd-card fd-partial-hero"><div className="fd-card-heading"><h3>{t("fidelity.firstRun.portfolioValue")}</h3><span>{currency.currency} · {t("fidelity.refresh.completeSnapshots")}</span></div>

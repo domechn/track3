@@ -65,7 +65,10 @@ for (const state of ["default", "testing", "fail", "reveal", "saved", "json-erro
       await expect(page.getByTestId("assistant-advanced-error")).toContainText("Invalid JSON on line 9");
       await expect(page.locator(".t3-b-option-list")).toContainText("last valid");
     }
-    if (state === "saved") await page.getByTestId("assistant-save").click();
+    if (state === "saved") {
+      await page.getByTestId("assistant-save").click();
+      await expect(page.locator(".desktop-toast-viewport .t3-fidelity-toast-success")).toHaveCount(2);
+    }
     if (state === "testing" || state === "fail") {
       await page.getByTestId("assistant-test-connection").click();
       await expect(page.getByText(state === "testing" ? "Testing" : "Failed", { exact: true })).toBeVisible();

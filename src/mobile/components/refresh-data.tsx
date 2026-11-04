@@ -8,7 +8,7 @@ import type { PortfolioSourceResult, PortfolioSourceStatus } from "@/middlelayer
 import { v4 as uuidv4 } from "uuid";
 import { trackRefreshEvent } from "@/middlelayers/ui-state/telemetry";
 import { retries, retryInterval, readStoredStatuses, writeStoredStatuses, retryRefresh, mobileRefreshOptions } from "@/middlelayers/ui-state/source-status-store";
-import { publishSourceStatuses } from "@/components/source-status-event";
+import { overviewUseLastKnownEvent, publishSourceStatuses } from "@/components/source-status-event";
 import { bindRefreshRetry, refreshRetryScheduler } from "@/middlelayers/refresh-retry-scheduler";
 import { useToast } from "@/mobile/components/ui/use-toast";
 import { ToastAction } from "@/mobile/components/ui/toast";
@@ -522,6 +522,7 @@ const App = ({
           {showLastKnownOffer && <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
             <p>{t("refresh.lastKnownSaved")}</p>
             <Button className="mt-2" variant="outline" size="sm" onClick={() => {
+              window.dispatchEvent(new Event(overviewUseLastKnownEvent));
               setShowLastKnownOffer(false);
               setStatusDialogOpen(false);
             }}>{t("refresh.useLastKnown")}</Button>
