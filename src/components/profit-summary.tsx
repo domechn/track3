@@ -496,11 +496,11 @@ const App = ({
     const hint = unknownHint(coins, t);
     return (
       <>
-        <button type="button" className="absolute right-1 top-1 flex h-8 w-8 touch:h-11 touch:w-11 items-center justify-center rounded-full text-xs text-muted-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2"
+        <button type="button" className="absolute right-1 top-1 flex h-8 w-8 touch:h-11 touch:w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label={t("profitSummary.explain").replace("{period}", label)}
           aria-expanded={explainedPartial === key}
           title={hint}
-          onClick={() => setExplainedPartial(explainedPartial === key ? null : key)}>ⓘ</button>
+          onClick={() => setExplainedPartial(explainedPartial === key ? null : key)}><span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] leading-none">?</span></button>
         <div className={cn("mt-1 text-xs text-muted-foreground",
           explainedPartial === key ? "" : "hidden group-hover:block group-focus-within:block")}>{hint}</div>
       </>
@@ -534,16 +534,16 @@ const App = ({
       oneSnapshot ? <div className="fidelity-empty fidelity-period-empty">{t("summary.fidelity.monthEmpty")}</div> :
       <div className="fidelity-month-grid">
         {monthCards.filter((item) => item.inRange).map((item) => {
-          const value = item.hasData ? item.total : null;
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
-          return <div key={item.key} className="fidelity-month-card group">
+          const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
+          return <div key={item.key} className="fidelity-month-card group" data-partial={partial}>
             <button type="button" className="fidelity-month-main" disabled={!item.hasData && !item.noSnapshot}
               onClick={() => item.hasData ? onMonthClick(item.month) : setExplainedMonth(item.month)}
               aria-label={item.noSnapshot ? `${item.label}: ${t("profitSummary.noSnapshot")}` : undefined}>
               <span className="fidelity-month-head"><b>{item.label}</b><span>{item.month === dateRange.end.getMonth() && selectedYear === dateRange.end.getFullYear()
                 ? t("summary.fidelity.toDate").replace("{date}", `${dateRange.end.getDate()} ${item.label}`) : selectedYear}</span></span>
               <span className={cn("fidelity-month-value", value == null ? "text-muted-foreground" : getToneClass(value, quoteColor))}>
-                {partial && item.knownTotal !== null ? `~${fidelityAmount(item.knownTotal)}` : fidelityAmount(value)}
+                {fidelityAmount(value)}
               </span>
               <span className="fidelity-month-percent">{fidelityPercentage(item.percentage)}</span>
               <span className="fidelity-month-bar"><i className={value != null && value < 0 ? "negative" : "positive"}
@@ -562,8 +562,9 @@ const App = ({
       <div className="analyze-period-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
         {monthCards.map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
-          return <div key={item.key} className={cn("group relative rounded-lg border p-2",
-            !item.hasData || item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor))}>
+          const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
+          return <div key={item.key} data-partial={partial} className={cn("group relative rounded-lg border p-2",
+            value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor))}>
           <button
             type="button"
             disabled={!item.hasData && !item.noSnapshot}
@@ -576,10 +577,10 @@ const App = ({
             <div
               className={cn(
                 "analyze-period-amount mt-1 text-sm font-semibold tracking-tight",
-                !item.hasData || item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
+                value === null ? "text-muted-foreground" : getToneClass(value, quoteColor)
               )}
             >
-              {item.hasData ? partial && item.knownTotal !== null ? `~${renderAmount(item.knownTotal)}` : renderAmount(item.total) : "—"}
+              {item.hasData ? renderAmount(value) : "—"}
             </div>
             {item.gapDate && <div className="mt-1 text-xs text-muted-foreground">{gapHint(item.gapDate, selectedYear)}</div>}
             {item.noSnapshot && <div className={cn("mt-1 text-xs text-muted-foreground",
@@ -597,12 +598,13 @@ const App = ({
   function renderYearSummary() {
     if (fidelity) return oneSnapshot ? <div className="fidelity-empty fidelity-period-empty">{t("summary.fidelity.yearEmpty")}</div> : <div className="fidelity-year-stack">{yearCards.map((item) => {
       const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
+      const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
       const span = yearSpan(item.year, dateRange.start, dateRange.end);
-      return <div className="fidelity-year-item group" key={item.year}><button type="button" className={cn("fidelity-year-card", item.year === selectedYear && "selected")}
+      return <div className="fidelity-year-item group" key={item.year} data-partial={partial}><button type="button" className={cn("fidelity-year-card", item.year === selectedYear && "selected")}
         onClick={() => setSelectedYear(item.year)}>
         <span className="fidelity-year-head"><b>{item.year}</b><span>{getMonthAbbreviation(span.first)}–{getMonthAbbreviation(span.last)}</span></span>
-        <strong className={item.total == null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)}>
-          {partial && item.knownTotal !== null ? `~${fidelityAmount(item.knownTotal)}` : fidelityAmount(item.hasData ? item.total : null)}
+        <strong className={value == null ? "text-muted-foreground" : getToneClass(value, quoteColor)}>
+          {fidelityAmount(value)}
         </strong>
         <span className={cn("fidelity-year-percent", item.total == null ? "text-muted-foreground" : getToneClass(item.total, quoteColor))}>{fidelityPercentage(item.percentage)}</span>
         <span className="fidelity-year-deposits"><span>{t("summary.fidelity.deposits")}</span><span>{item.deposits == null ? "–" : fidelityAmount(item.deposits)}</span></span>
@@ -614,22 +616,24 @@ const App = ({
       <div className="analyze-period-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
         {yearCards.map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
+          const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
           return (
           <div
             key={`y-profit-summary-${item.year}`}
+            data-partial={partial}
             className={cn(
               "group relative rounded-lg border p-2 text-left",
-              !item.hasData || item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor)
+              value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor)
             )}
           >
             <div className="text-xs text-muted-foreground">{item.year}</div>
             <div
               className={cn(
                 "analyze-period-amount mt-1 text-sm font-semibold tracking-tight",
-                !item.hasData || item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
+                value === null ? "text-muted-foreground" : getToneClass(value, quoteColor)
               )}
             >
-              {item.hasData ? partial && item.knownTotal !== null ? `~${renderAmount(item.knownTotal)}` : renderAmount(item.total) : "—"}
+              {item.hasData ? renderAmount(value) : "—"}
             </div>
             {partial && renderPartialInfo(item.unknownCoins, String(item.year), `year-${item.year}`)}
           </div>

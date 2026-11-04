@@ -1,5 +1,6 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import DesktopSummary from "./profit-summary";
 import MobileSummary from "@/mobile/components/profit-summary";
@@ -126,8 +127,9 @@ it.each([
   expect(screen.getByText("Periods 3")).toBeInTheDocument();
   expect(screen.getByText("Up 1")).toBeInTheDocument();
   const feb = screen.getByText("Feb").closest("button")!;
-  expect(feb).toHaveTextContent("~+$4.2k");
-  expect(screen.getByText("~+$4.2k")).toHaveClass("text-muted-foreground");
+  expect(feb).toHaveTextContent("+$4.2k");
+  expect(screen.getByText("+$4.2k")).toHaveClass("text-positive");
+  expect(feb.parentElement).toHaveAttribute("data-partial", "true");
   expect(screen.getByText("Jan").closest("button")).toHaveTextContent("—");
   fireEvent.click(screen.getByRole("button", { name: "Explain partial profit for Jan" }));
   expect(screen.getByText("Jan").closest("button")!.parentElement).toHaveTextContent(
@@ -141,7 +143,7 @@ it.each([
   fireEvent.click(screen.getByRole("button", { name: /Back|All months/ }));
   fireEvent.click(screen.getByRole("radio", { name: "Y" }));
   await waitFor(() => expect(screen.getByText("Partial 1")).toBeInTheDocument());
-  expect(screen.getByText("2024").closest(".grid > div")).toHaveTextContent("~+$4.2k");
+  expect(screen.getByText("2024").closest(".grid > div")).toHaveTextContent("+$4.2k");
   fireEvent.click(screen.getByRole("button", { name: "Explain partial profit for 2024" }));
   expect(screen.getByText("2024").closest(".grid > div")).toHaveTextContent(/2 coins \(BTC, ETH\) have withdrawals without a matching deposit/);
 });
@@ -164,11 +166,127 @@ it.each([
     quoteColor="green-up-red-down"
   />);
   await waitFor(() => expect(screen.getByText("Down 1")).toBeInTheDocument());
-  expect(screen.getByText("Feb").closest("button")).toHaveTextContent("~-$25");
+  expect(screen.getByText("Feb").closest("button")).toHaveTextContent("-$25");
   const info = screen.getByRole("button", { name: "Explain partial profit for Feb" });
   fireEvent.click(info);
   expect(info.parentElement).toHaveTextContent("A, B, C, D, E +2 more");
   expect(info.parentElement).not.toHaveTextContent("F, G");
+});
+
+it.each([
+  ["desktop", DesktopSummary],
+  ["mobile", MobileSummary],
+])("%s gives partial periods the same tone and surface as complete periods", async (_platform, Summary) => {
+  vi.mocked(calculateTotalProfit).mockImplementation(async (range) => {
+    const value = [4200, -25, 0][range.start.getMonth()] ?? 0;
+    const partial = range.start.getFullYear() === 2024;
+    return {
+      total: partial ? null : value,
+      knownTotal: value,
+      unknownCoins: partial ? [{ symbol: "ETH", assetType: "crypto" }] : [],
+      coins: [],
+      lastRecordDate: new Date(range.start.getFullYear(), range.start.getMonth(), 15),
+    };
+  });
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  for (const quoteColor of ["green-up-red-down", "red-up-green-down"] as const) {
+    for (const [year, isPartial] of [[2024, true], [2023, false]] as const) {
+      const view = render(<Summary
+        dateRange={{ start: new Date(year, 0, 1), end: new Date(year, 2, 31, 23, 59, 59, 999) }}
+        currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+        quoteColor={quoteColor}
+      />);
+      await waitFor(() => expect(screen.getByText("Periods 3")).toBeInTheDocument());
+      for (const [label, amount, toneClass, surfaceClass] of [
+        ["Jan", "+$4.2k", quoteColor === "green-up-red-down" ? "text-positive" : "text-negative",
+          quoteColor === "green-up-red-down" ? "bg-positive/10" : "bg-negative/10"],
+        ["Feb", "-$25", quoteColor === "green-up-red-down" ? "text-negative" : "text-positive",
+          quoteColor === "green-up-red-down" ? "bg-negative/10" : "bg-positive/10"],
+        ["Mar", _platform === "desktop" ? "+$0" : "$0", "text-muted-foreground", "bg-muted/40"],
+      ]) {
+        const card = screen.getByText(label).closest(".group")!;
+        expect(card).toHaveAttribute("data-partial", isPartial ? "true" : "false");
+        expect(card).toHaveClass(surfaceClass);
+        expect(card.querySelector("button > div:nth-child(2)")).toHaveClass(toneClass);
+        const badge = card.querySelector("button[aria-expanded]");
+        if (isPartial) {
+          expect(badge).toHaveTextContent("?");
+          expect(badge).toHaveAttribute("aria-label", `Explain partial profit for ${label}`);
+          expect(badge).toHaveClass("focus-visible:ring-2");
+        } else expect(badge).toBeNull();
+        expect(card).toHaveTextContent(amount);
+        expect(card).not.toHaveTextContent(`~${amount}`);
+      }
+      if (isPartial) {
+        const badge = screen.getByRole("button", { name: "Explain partial profit for Jan" });
+        badge.focus();
+        await user.keyboard("{Enter}");
+        expect(badge).toHaveAttribute("aria-expanded", "true");
+      }
+      view.unmount();
+    }
+  }
+});
+
+it.each([
+  ["desktop", DesktopSummary],
+  ["mobile", MobileSummary],
+])("%s gives partial years the same positive, negative, and zero tones as complete years", async (_platform, Summary) => {
+  for (const quoteColor of ["green-up-red-down", "red-up-green-down"] as const) {
+    for (const [value, toneClass, surfaceClass] of [
+      [4200, quoteColor === "green-up-red-down" ? "text-positive" : "text-negative",
+        quoteColor === "green-up-red-down" ? "bg-positive/10" : "bg-negative/10"],
+      [-25, quoteColor === "green-up-red-down" ? "text-negative" : "text-positive",
+        quoteColor === "green-up-red-down" ? "bg-negative/10" : "bg-positive/10"],
+      [0, "text-muted-foreground", "bg-muted/40"],
+    ] as const) {
+      vi.mocked(calculateTotalProfit).mockImplementation(async (range) => ({
+        total: range.start.getFullYear() === 2024 ? null : value,
+        knownTotal: value,
+        unknownCoins: range.start.getFullYear() === 2024 ? [{ symbol: "ETH", assetType: "crypto" }] : [],
+        coins: [],
+        lastRecordDate: new Date(range.start.getFullYear(), 5, 15),
+      }));
+      const view = render(<Summary
+        dateRange={{ start: new Date(2023, 0, 1), end: new Date(2024, 11, 31, 23, 59, 59, 999) }}
+        currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+        quoteColor={quoteColor}
+      />);
+      fireEvent.click(screen.getByRole("radio", { name: "Y" }));
+      await waitFor(() => expect(screen.getByText("Partial 1")).toBeInTheDocument());
+      for (const [year, partial] of [[2023, false], [2024, true]] as const) {
+        const card = screen.getByText(String(year)).closest(".grid > div")!;
+        expect(card).toHaveAttribute("data-partial", String(partial));
+        expect(card).toHaveClass(surfaceClass);
+        expect(card.querySelector("div:nth-child(2)")).toHaveClass(toneClass);
+        if (partial) expect(card.querySelector("button[aria-expanded]")).toHaveTextContent("?");
+        else expect(card.querySelector("button[aria-expanded]")).toBeNull();
+        expect(card).not.toHaveTextContent("~");
+      }
+      view.unmount();
+    }
+  }
+});
+
+it.each([
+  ["desktop", DesktopSummary],
+  ["mobile", MobileSummary],
+])("%s keeps an unknown total without excluded coins unmarked", async (_platform, Summary) => {
+  vi.mocked(calculateTotalProfit).mockResolvedValue({
+    total: null, knownTotal: 4200, unknownCoins: [], coins: [],
+    lastRecordDate: new Date(2024, 1, 15),
+  });
+  render(<Summary
+    dateRange={{ start: new Date(2024, 1, 1), end: new Date(2024, 1, 29, 23, 59, 59, 999) }}
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+    quoteColor="green-up-red-down"
+  />);
+  await waitFor(() => expect(screen.getByText("Periods 1")).toBeInTheDocument());
+  const card = screen.getByText("Feb").closest(".group")!;
+  expect(card).toHaveTextContent("—");
+  expect(card).not.toHaveTextContent("$4.2k");
+  expect(card).toHaveAttribute("data-partial", "false");
+  expect(card.querySelector("button[aria-expanded]")).toBeNull();
 });
 
 it.each([
