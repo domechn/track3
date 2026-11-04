@@ -16,3 +16,10 @@ it("shows Assistant to Pro users", () => {
   render(<MemoryRouter><FidelityRail isProUser /></MemoryRouter>);
   expect(screen.getByRole("link", { name: "Assistant" })).toBeInTheDocument();
 });
+
+it("links the two-peak Track3 mark to Overview", () => {
+  render(<MemoryRouter><FidelityRail /></MemoryRouter>);
+  const brand = screen.getByRole("link", { name: "Track3" });
+  expect(brand).toHaveAttribute("href", "/overview");
+  expect(brand.querySelectorAll("polygon")).toHaveLength(2);
+});

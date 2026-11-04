@@ -38,7 +38,7 @@ The design has invented per-source totals and a precise `5 of 5` count. Current 
 
 ## Product behaviour
 
-The design rail icons and logo collapse control now stay consistent across desktop routes. On Records, the bottom rail control opens the existing Refresh and Pro live-total controls plus Settings. The empty History `Refresh now` action opens those controls and starts Refresh, so its progress and live announcement remain available. A configured sync control also appears in the empty History header, allowing unlock there; disabled sync renders no stamp. Captures seed completed runtime status at 09:41 for populated states.
+The design rail icons stay consistent across desktop routes. The Track3 mark links to Overview, and a separate bottom button expands or collapses the rail. On Records, the bottom navigation control opens the existing Refresh and Pro live-total controls plus Settings. The empty History `Refresh now` action opens those controls and starts Refresh, so its progress and live announcement remain available. A configured sync control also appears in the empty History header, allowing unlock there; disabled sync renders no stamp. Captures seed completed runtime status at 09:41 for populated states.
 
 The app selects the newest snapshot on load. The fidelity test selects 28 Oct to reproduce the design's preselected detail, delete dialog and undo sequence. The detail keeps asset deletion, optional blacklisting, confirmation and Undo inside the five-column grid. List and edit-log query errors remain visible and retryable where possible; empty filter results can be cleared. Light theme, locale formatting, keyboard access, and partial status use existing app behaviour.
 

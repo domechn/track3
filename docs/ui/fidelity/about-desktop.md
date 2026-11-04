@@ -23,7 +23,7 @@ The Goals unread dot follows actual alert state; its size and placement differ s
 
 Small font, icon, spacing, and colour rendering differences could be matched but are not worth another round.
 
-All nine source renders and captures were viewed side by side. Screenshots: `/tmp/fidelity-desktop/about/<state>-desktop.png` (`about-desktop.png` for the default). Full-page 1600px pixel ratios at a 24/255 maximum-channel threshold:
+All nine source renders and captures were viewed side by side. Screenshots: `/tmp/fidelity-desktop/about/<state>-desktop.png` (`about-desktop.png` for the default). Full-page 1600px pixel ratios at a 24/255 maximum-channel threshold, measured before the Track3 mark change:
 
 | State | Differing pixels |
 | --- | ---: |
@@ -37,6 +37,7 @@ All nine source renders and captures were viewed side by side. Screenshots: `/tm
 | about-toast-ok | 3.27% |
 | about-guide | 3.22% |
 
+- **Brand mark:** The app uses the current text-free, two-peak Track3 mark in place of the reference's blue chart tile.
 - **App metadata:** The Tauri APIs provide a version and app-data path; the browser fixture identifies Linux x86_64 and `/e2e/app`. The approved source depicts macOS 15, Apple silicon and `~/Library/…/Track3`. The app does not expose the approved `build 2026.10.28` or `schema 14` metadata, so it displays the actual version and `SQLite` without those invented suffixes. The top four-row geometry remains the same while the values differ.
 - **Dependency card:** There is no inventory of 214 installed dependency licenses in the product. The source's Recharts entry is not a Track3 dependency. The card shows five real dependencies and their declared package versions from `package.json`, without range markers; its footer opens the project's actual license rather than promising a nonexistent all-dependency license viewer. The package count, rows and footer label differ from the source.
 - **Release notes:** The design labels its invented list “What’s new in 0.9.4” and assigns future release dates. The app shows actual supported Track3 features and links to the real GitHub releases page. It omits fabricated version history and unverified change claims, making the second-row right card visibly less dense.

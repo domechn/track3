@@ -1460,9 +1460,10 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
     overflow-y: auto; overflow-x: hidden;
   }
   .mobile-sidebar[data-collapsed="true"] { padding-left: calc(var(--mobile-safe-left) + 5px); padding-right: 5px; }
-  .mobile-rail-brand { display: flex; flex: none; align-items: center; height: 44px; gap: 10px; margin-bottom: 12px; white-space: nowrap; font-size: 15px; }
-  .mobile-rail-brand > span { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: var(--radius); background: hsl(var(--accent-data)); color: hsl(var(--background)); }
-  .mobile-rail-brand svg { width: 18px; height: 18px; }
+  .mobile-rail-brand { display: flex; flex: none; align-items: center; height: 44px; gap: 10px; margin-bottom: 12px; border-radius: var(--radius); white-space: nowrap; font-size: 15px; font-weight: 600; }
+  .mobile-rail-brand svg { width: 28px; height: 28px; flex: none; }
+  .mobile-sidebar[data-collapsed="true"] .mobile-rail-brand { justify-content: center; }
+  .mobile-sidebar .mobile-rail-brand:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
   .mobile-rail-group { flex: none; border-top: 1px solid hsl(var(--border)); margin-top: 8px; padding-top: 8px; }
   .mobile-rail-group:first-of-type { border: 0; margin-top: 0; padding-top: 0; }
   .mobile-rail-group-label { padding: 2px 9px 4px; color: hsl(var(--faint)); font-size: 12px; }
@@ -3753,15 +3754,8 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .fidelity-b-pro-banner.is-error strong { display: block; color: #fff; font-weight: 600; }
   .fidelity-b-pro-banner.is-error p { margin: 0; }
   .fidelity-b-about-brand { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
-  .fidelity-b-about-logo {
-    width: 56px; height: 56px; flex: none; display: flex; align-items: flex-end;
-    justify-content: center; gap: 5px; padding-bottom: 13px;
-    border-radius: 14px; background: #4a8ad6;
-  }
-  .fidelity-b-about-logo i { width: 5px; border-radius: 3px; background: #0a0a0b; }
-  .fidelity-b-about-logo i:first-child { height: 17px; }
-  .fidelity-b-about-logo i:nth-child(2) { height: 29px; }
-  .fidelity-b-about-logo i:nth-child(3) { height: 14px; }
+  .fidelity-b-about-brand > svg { flex: none; }
+  html:not(.dark) .fidelity-b-about-brand > svg { border-radius: 12px; background: hsl(var(--background)); }
   .fidelity-b-about-brand h2 { font-size: 22px; line-height: 28px; }
   .fidelity-b-about-brand p { margin: 0; color: #b4b6bc; font-size: 13px; }
   #app-main-content .fidelity-b-about-check {

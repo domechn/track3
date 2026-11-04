@@ -113,6 +113,7 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
   const [range, setRange] = useState("All");
   const [rankOpen, setRankOpen] = useState(false);
   const [focusedMonth, setFocusedMonth] = useState<Date | null>(null);
+  const [explainedPartial, setExplainedPartial] = useState<string | null>(null);
   const [selectedStats, setSelectedStats] = useState<{ range: string; total: number | null; percentage: number | null | undefined } | null>(null);
   const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}-${version}`;
   useEffect(() => {
@@ -282,7 +283,13 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
   const unknownHint = (coins: Profit["unknownCoins"]) => t(coins.length === 1 ? "profitSummary.unknownWithdrawal" : "profitSummary.unknownWithdrawals")
     .replace("{n}", String(coins.length)).replace("{coins}", new Intl.ListFormat(locale === "zh" ? "zh-CN" : "en-US").format(coins.map((coin) => coin.symbol)));
   const profitText = (value: number | null, known: number | null, coins: Profit["unknownCoins"]) =>
-    value === null ? known !== null && coins.length ? `~${cash(known, 0, true)}` : "—" : cash(value, 0, true);
+    value === null ? known !== null && coins.length ? cash(known, 0, true) : "—" : cash(value, 0, true);
+  const partialBadge = (coins: Profit["unknownCoins"], period: string, key: string) => <button type="button"
+    className="fd-partial-badge" aria-label={t("profitSummary.explain").replace("{period}", period)}
+    aria-expanded={explainedPartial === key} title={unknownHint(coins)}
+    onClick={() => setExplainedPartial(explainedPartial === key ? null : key)}>
+    <span aria-hidden="true">?</span>
+  </button>;
   const emptyCopy = t("fidelity.summary.oneSnapshot.rich").split("**");
   const topRow = (coin: ProfitCoin) => {
     const stable = display?.stableSymbols.includes(coin.symbol) ?? false;
@@ -321,7 +328,9 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
           : m.date.getMonth() === lastDate.getMonth() && m.date.getFullYear() === lastDate.getFullYear()
             ? title("toDate.dynamic").replace("{date}", dateLabel(lastDate).replace(` ${lastDate.getFullYear()}`, ""))
             : String(m.date.getFullYear());
-        return <button type="button" className="fd-month" key={m.date.toISOString()} disabled={!m.hasData}
+        const partialKey = m.date.toISOString();
+        return <div className="fd-month" key={partialKey} data-partial={partial}>
+          <button type="button" className="fd-month-main" disabled={!m.hasData}
           onClick={() => { setFocusedMonth(m.date); document.querySelector(".fd-summary-chart")?.scrollIntoView({ block: "center" }); }}
           aria-label={`${monthLabel(m.date)} ${m.hasData ? amount : t("profitSummary.noSnapshot")}`}>
           <span className="fd-month-top"><b>{monthLabel(m.date)}</b><span>{period}</span></span>
@@ -329,8 +338,10 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
           <small data-tone={tone(m.profit)}>{m.hasData && m.percentage != null ? percent(m.percentage / 100) : dash}</small>
           <span className="fd-zero-bar"><i data-tone={tone(m.profit ?? m.knownTotal)} style={{width:`${Math.min(50, Math.abs((m.percentage ?? 0) / 100)/monthPercentMax*50)}%`}} /></span>
           <span className="fd-month-foot">{!m.hasData ? t("profitSummary.noSnapshot") : <><span data-tone={m.up ? "gain" : "neutral"}>{title("upCount").replace("{n}", String(m.up))}</span> · <span data-tone={m.down ? "loss" : "neutral"}>{title("downCount").replace("{n}", String(m.down))}</span>{m.flat > 0 && <span> · {title("flatCount").replace("{n}", String(m.flat))}</span>}</>}</span>
-          {partial && <span className="fd-unknown-hint">{unknownHint(m.unknownCoins)}</span>}
-        </button>;
+          </button>
+          {partial && partialBadge(m.unknownCoins, monthLabel(m.date), partialKey)}
+          {partial && <span className="fd-unknown-hint" hidden={explainedPartial !== partialKey}>{unknownHint(m.unknownCoins)}</span>}
+        </div>;
       })}</div><p className="fd-footnote">{title("profitNote.dynamic").replace("{symbols}", new Intl.ListFormat(locale === "zh" ? "zh-CN" : "en-GB").format(moving.map((coin) => coin.symbol)))}</p></>}
     </>,"fd-profit-summary")}
     {card(<><Heading title={title("byYear")} right={title("yearToDate").replace("{year}", yearsLabel)} />
@@ -340,14 +351,16 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
         const { year, profit, flow: deposits } = item;
         const moves = display?.yearMoves[year];
         const partial = profit.total === null && profit.unknownCoins.length > 0;
-        return <div key={year} className={`fd-year ${index===0?"selected":""}`}>
+        const partialKey = `year-${year}`;
+        return <div key={year} className={`fd-year ${index===0?"selected":""}`} data-partial={partial}>
           <span className="fd-month-top"><b>{year}</b><span>{monthLabel(item.start)}–{monthLabel(item.end)}</span></span>
           <strong data-tone={tone(profit.total ?? profit.knownTotal)}>{profitText(profit.total, profit.knownTotal, profit.unknownCoins)}</strong>
           <small data-tone={tone(profit.total)}>{profit.total === null || item.endingValue === profit.total
             ? dash : percent(profit.total / (item.endingValue - profit.total))}</small>
           <span className="fd-year-deposit">{title("deposits")}<span>{deposits === null ? dash : cash(deposits,0,true)}</span></span>
           <span className="fd-year-foot"><span><span data-tone="gain">{title("upCount").replace("{n}", String(moves?.up??0))}</span> · <span data-tone="loss">{title("downCount").replace("{n}", String(moves?.down??0))}</span></span><span>{title(item.months === 1 ? "monthCountOne" : "monthCount").replace("{n}", String(item.months))}</span></span>
-          {partial && <span className="fd-unknown-hint">{unknownHint(profit.unknownCoins)}</span>}
+          {partial && partialBadge(profit.unknownCoins, String(year), partialKey)}
+          {partial && <span className="fd-unknown-hint" hidden={explainedPartial !== partialKey}>{unknownHint(profit.unknownCoins)}</span>}
         </div>;
       })}</div>}
     </>,"fd-years")}

@@ -861,9 +861,7 @@ body:has(.t3-refresh-popover[data-state="open"]) [data-radix-popper-content-wrap
 .analyze-profit-summary .analyze-period-grid > * {
   min-width: 0;
   min-height: 106px;
-  border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
-  background: hsl(var(--sunken));
   padding: 12px;
 }
 .analyze-profit-summary .analyze-period-grid > *:hover { background: hsl(var(--hover)); }
@@ -1106,6 +1104,8 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-month-main { display: flex; flex-direction: column; gap: 2px; width: 100%; height: 100%; padding: 14px 14px 12px; text-align: left; font-variant-numeric: inherit; }
 .fidelity-month-main:focus-visible, .fidelity-year-card:focus-visible { outline: 2px solid #4a8ad6; outline-offset: 2px; }
 .fidelity-month-head, .fidelity-year-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; width: 100%; }
+.fidelity-month-card[data-partial="true"] .fidelity-month-head,
+.fidelity-year-item[data-partial="true"] .fidelity-year-head { padding-right: 22px; }
 .fidelity-month-head b, .fidelity-year-head b { color: #fff; font-size: 15px; font-weight: 600; }
 .fidelity-month-head > span, .fidelity-year-head > span { color: #9b9da3; font-size: 13px; }
 .fidelity-month-value { margin-top: 6px; font-size: 17px; line-height: 24px; font-weight: 500; font-variant-numeric: normal; }
@@ -1569,10 +1569,6 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
 .t3-assistant-usage-design { display: none; }
 
 @media (min-width: 761px) {
-  .t3-desktop-rail > div:last-child { position: absolute; top: 8px; right: 0; width: 16px; padding: 0; border: 0; opacity: 0; }
-  .t3-desktop-rail:hover > div:last-child,
-  .t3-desktop-rail:focus-within > div:last-child { opacity: 1; }
-  .t3-desktop-rail > div:last-child button { height: 32px; }
   .t3-assistant-page { color: hsl(var(--foreground)); font-size: 13px; line-height: 18px; font-variant-numeric: tabular-nums; }
   .t3-assistant-page-heading { display: flex; justify-content: space-between; align-items: flex-end; height: 52px; margin-bottom: 16px; }
   .t3-assistant-page-heading h1 { margin: 0; font: 600 26px/32px "Public Sans Variable", sans-serif; letter-spacing: -.01em; }
@@ -2390,10 +2386,7 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
   .t3-b-banner.info { color: hsl(var(--accent-data)); background: hsl(var(--accent-data) / .16); }
   .t3-b-banner.info .t3-b-button { margin-left: auto; }
   .t3-b-about-brand { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
-  .t3-b-about-logo { display: flex; flex: none; align-items: flex-end; justify-content: center; gap: 6px; width: 56px; height: 56px; padding-bottom: 13px; border-radius: 12px; background: hsl(var(--accent-data)); }
-  .t3-b-about-logo i { display: block; width: 5px; height: 18px; border-radius: 4px; background: hsl(var(--background)); }
-  .t3-b-about-logo i:nth-child(2) { height: 27px; }
-  .t3-b-about-logo i:nth-child(3) { height: 12px; }
+  .t3-b-about-brand > svg { flex: none; }
   .t3-b-about-brand b { display: block; font-size: 22px; font-weight: 600; line-height: 28px; }
   .t3-b-about-brand span { color: hsl(var(--muted-foreground)); }
   .t3-b-about-app .t3-b-dl dt, .t3-b-about-app .t3-b-dl dd { min-height: 35px; }
@@ -2563,7 +2556,13 @@ body:not(:has(.app-layout)):has(.t3-refresh-overview) .t3-fidelity-ranges { disp
   body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside {
     position: absolute; top: 0; bottom: 0; height: auto;
   }
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside nav { padding-top: 7px; }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside > button:last-child {
+    position: fixed; bottom: 8px; left: 6px; width: calc(var(--sidebar-collapsed-width) - 12px);
+  }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside[style*="--sidebar-width"] > button:last-child {
+    width: calc(var(--sidebar-width) - 12px);
+  }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside nav { padding-top: 7px; padding-bottom: 72px; }
   body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside nav a { height: 40px; }
   body:not(:has(.app-layout)) .t3-overview-grid { gap: 16px; }
   body:not(:has(.app-layout)) .t3-overview-footer {

@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useAlertBadge } from "./use-alert-badge";
 import { useTranslation } from "@/i18n";
 import SyncStatusIndicator from "./sync-status-indicator";
+import { TrackLogo } from "@/components/brand/track-logo";
 
 const entries = [
   { to: "/overview", labelKey: "nav.overview", icon: "overview" },
@@ -40,7 +41,7 @@ export default function FidelityRail({ isProUser = false }: { isProUser?: boolea
   const unread = useAlertBadge();
   const goalsLabel = t("overview.fidelity.alerts");
   return <nav className="t3-fidelity-rail" aria-label={t("nav.main")}>
-    <Link to="/overview" className="t3-fidelity-brand" aria-label="Track3"><svg viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#4a8ad6" /><path d="M8 20v-6M14 20V8M20 20v-4.5" stroke="#0d0d0e" strokeWidth="2.4" strokeLinecap="round" /></svg></Link>
+    <Link to="/overview" className="t3-fidelity-brand" aria-label="Track3"><TrackLogo size={28} decorative /></Link>
     {entries.map((entry, index) => "sep" in entry ? <div className="t3-fidelity-rail-sep" key={`sep-${index}`} /> :
       entry.to === "/assistant" && !isProUser ? null :
       <Link key={entry.to} to={entry.to} title={entry.to === "/goals" ? goalsLabel : t(entry.labelKey)} aria-label={`${entry.to === "/goals" ? goalsLabel : t(entry.labelKey)}${entry.to === "/goals" && unread > 0 ? ` ${t("goals.unread").replace("{count}", String(unread))}` : ""}`}

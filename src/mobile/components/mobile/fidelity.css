@@ -52,8 +52,14 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-facts>div>span:first-child { color:var(--fd-muted); }
 .fd-facts>div>span:last-child { text-align:right; }
 .fd-month-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
-.fd-month,.fd-year { display:flex; min-width:0; flex-direction:column; gap:2px; padding:14px 14px 12px; border:1px solid var(--fd-border); border-radius:6px; background:var(--fd-ground); color:var(--fd-text); text-align:left; }
+.fd-month,.fd-year { position:relative; display:flex; min-width:0; flex-direction:column; gap:2px; padding:14px 14px 12px; border:1px solid var(--fd-border); border-radius:6px; background:var(--fd-ground); color:var(--fd-text); text-align:left; }
 .fd-month { min-height:148px; }
+.fd-month-main { display:flex; flex:1; flex-direction:column; gap:2px; width:100%; text-align:left; }
+.fd-month-main:focus-visible { outline:2px solid var(--fd-accent); outline-offset:2px; }
+.fd-month[data-partial="true"] .fd-month-top,.fd-year[data-partial="true"] .fd-month-top { padding-right:26px; }
+.fd-partial-badge { position:absolute; top:0; right:0; display:grid; place-items:center; width:44px; height:44px; color:var(--fd-muted); }
+.fd-partial-badge span { display:grid; place-items:center; width:16px; height:16px; border:1px solid currentColor; border-radius:50%; font-size:10px; line-height:1; }
+.fd-partial-badge:focus-visible { outline:2px solid var(--fd-accent); outline-offset:-4px; border-radius:6px; }
 .fd-month-top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; width:100%; }
 .fd-month-top b { font-size:15px; font-weight:600; }
 .fd-month-top>span { color:var(--fd-faint); font-size:12px; white-space:nowrap; }
@@ -900,6 +906,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
   .fd-overview-clock,.fd-wallet-refresh { margin-left:auto; }
 }
 .fd-unknown-hint { display:block; margin-top:8px; color:var(--fd-faint); font-size:11px; line-height:15px; }
+.fd-unknown-hint[hidden] { display:none; }
 .fd-coin-trend:has(.fd-chart-controls>div:first-child button:nth-child(2)[aria-pressed="true"]) .fd-coin-chart,
 .fd-coin-trend:has(.fd-chart-controls>div:first-child button:nth-child(2)[aria-pressed="true"]) .fd-coin-stats { margin-top:14px; }
 .fd-year-deposit { margin-top:18px; }

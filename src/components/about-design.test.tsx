@@ -27,3 +27,8 @@ it("displays package versions without dependency range markers", () => {
   expect(reactRow).toHaveTextContent("18.3.1");
   expect(reactRow?.textContent).not.toContain("^");
 });
+
+it("shows the two-peak mark beside the app name", () => {
+  const { container } = render(<AboutDesign version="0.9.4" />);
+  expect(container.querySelectorAll(".t3-b-about-brand polygon")).toHaveLength(2);
+});

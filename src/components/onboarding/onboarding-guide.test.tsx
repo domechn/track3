@@ -15,6 +15,16 @@ function Guide({ onClose = vi.fn(), variant = "desktop" as "desktop" | "ios" }) 
 }
 
 describe("onboarding guide", () => {
+  it("shows the two-peak mark in the desktop guide", async () => {
+    const previousWidth = window.innerWidth
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 })
+    try {
+      render(<Guide />)
+      expect((await screen.findByTestId("onboarding-dialog")).querySelectorAll(".ob-fidelity-brand polygon")).toHaveLength(2)
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth })
+    }
+  })
   it("names the dialog and shows the trust points on step one", async () => {
     render(<Guide />)
     const dialog = await screen.findByTestId("onboarding-dialog")

@@ -67,7 +67,12 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
       if (state.name !== "overview-ai-off") {
         await expect(page.locator(".t3-insights-summary")).toBeVisible();
       }
-      if (state.name.includes("expanded")) await page.getByRole("button", { name: "Expand sidebar" }).click();
+      if (state.name.includes("expanded")) {
+        const toggle = page.getByRole("button", { name: "Expand sidebar" });
+        const box = await toggle.boundingBox();
+        expect(box!.y + box!.height).toBeLessThanOrEqual(900);
+        await toggle.click();
+      }
       if (state.name === "overview-expanded-1024") {
         const subtitle = await page.locator(".t3-overview-heading p").boundingBox();
         const controls = await page.locator(".t3-topbar-controls").boundingBox();
