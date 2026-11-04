@@ -85,7 +85,7 @@ See the [iOS feature inventory](docs/ios/FEATURE_PARITY.md),
 
 | Overview | History | Analytics |
 | --- | --- | --- |
-| <img src="docs/ios/screens/overview-light.png" width="180" alt="iPhone overview"> | <img src="docs/ios/screens/history-light.png" width="180" alt="iPhone history"> | <img src="docs/ios/screens/analytics-light.png" width="180" alt="iPhone analytics"> |
+| <img src="docs/ios/screens/overview-dark.png" width="180" alt="iPhone overview, dark theme"> | <img src="docs/ios/screens/history-dark.png" width="180" alt="iPhone history, dark theme"> | <img src="docs/ios/screens/analytics-dark.png" width="180" alt="iPhone analytics, dark theme"> |
 
 ## Installation
 
@@ -93,13 +93,13 @@ See the [iOS feature inventory](docs/ios/FEATURE_PARITY.md),
 
 ## Screenshots
 
-![sc1](./images/demo/sc1.jpg)
-![sc2](./images/demo/sc2.jpg)
-![sc3](./images/demo/sc3.jpg)
-![sc4](./images/demo/sc4.jpg)
-![sc5](./images/demo/sc5.jpg)
-![sc6](./images/demo/sc6.jpg)
-![sc7](./images/demo/sc7.jpg)
+![Track3 desktop overview](./images/demo/sc1.jpg)
+![Track3 desktop profit summary](./images/demo/sc2.jpg)
+![Track3 desktop wallets](./images/demo/sc3.jpg)
+![Track3 desktop cost basis](./images/demo/sc4.jpg)
+![Track3 desktop history](./images/demo/sc5.jpg)
+![Track3 desktop rebalance](./images/demo/sc6.jpg)
+![Track3 desktop goals](./images/demo/sc7.jpg)
 
 ### Notice
 
