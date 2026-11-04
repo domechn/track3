@@ -65,6 +65,37 @@ test("light desktop onboarding keeps both peaks legible on its dark backdrop", a
   await page.screenshot({ path: "/tmp/track3-brand-shots/desktop-guide-light.png" });
 });
 
+test("dark desktop onboarding keeps the new mark visible", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "dark"));
+  await installTauriBridge(page, { onboarding: true, emptyPortfolio: true });
+  await page.goto("/#/overview");
+  await expect(page.locator(".ob-fidelity-brand polygon")).toHaveCount(2);
+  mkdirSync("/tmp/track3-brand-shots", { recursive: true });
+  await page.screenshot({ path: "/tmp/track3-brand-shots/desktop-guide-dark.png" });
+});
+
+test("wide desktop About keeps the mark visible in both themes", async ({ browser }) => {
+  mkdirSync("/tmp/track3-brand-shots", { recursive: true });
+  for (const theme of ["light", "dark"] as const) {
+    const context = await browser.newContext({
+      viewport: { width: 1600, height: 900 }, colorScheme: theme, reducedMotion: "reduce",
+    });
+    try {
+      const page = await context.newPage();
+      await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
+      await installTauriBridge(page);
+      await page.goto("/#/settings/systemInfo?section=about");
+      const mark = page.locator(".t3-b-about-brand svg");
+      await expect(mark.locator("polygon")).toHaveCount(2, { timeout: 30_000 });
+      await expect(page.locator(".t3-b-about-brand").getByText("Track3")).toBeVisible();
+      await page.screenshot({ path: `/tmp/track3-brand-shots/desktop-about-${theme}.png` });
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test("Overview rail keeps Settings clear of the fixed collapse toggle at page bottom", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await installFidelityBridge(page, { fidelitySample: "full" });

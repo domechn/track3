@@ -35,9 +35,57 @@ test("phone About and iPad rail show the two-peak brand in both themes", async (
         }
         await expect(page.locator("[aria-busy='true']")).toHaveCount(0, { timeout: 30_000 });
         await page.screenshot({ path: `${output}/${device}-${theme}.png` });
+        if (device === "ipad") {
+          await page.goto("/#/settings/systemInfo?section=about");
+          await expect(page.locator(".fidelity-b-about-brand polygon")).toHaveCount(2, { timeout: 30_000 });
+          await page.screenshot({ path: `${output}/ipad-about-${theme}.png` });
+        }
       } finally {
         await context.close();
       }
+    }
+  }
+});
+
+test("phone startup lock is checked beside the new brand views", async ({ browser }) => {
+  mkdirSync("/tmp/track3-brand-shots", { recursive: true });
+  for (const theme of ["light", "dark"] as const) {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 }, userAgent: phoneAgent,
+      isMobile: true, hasTouch: true, colorScheme: theme, reducedMotion: "reduce",
+    });
+    try {
+      const page = await context.newPage();
+      await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
+      await installTauriBridge(page, { lockedStartup: true });
+      await page.goto("/#/overview");
+      await expect(page.getByRole("alert")).toContainText("Track3 is locked");
+      await page.screenshot({ path: `/tmp/track3-brand-shots/phone-lock-${theme}.png` });
+    } finally {
+      await context.close();
+    }
+  }
+});
+
+test("iPad first-run guide retains the Peaks mark in both themes", async ({ browser }) => {
+  mkdirSync("/tmp/track3-brand-shots", { recursive: true });
+  for (const theme of ["light", "dark"] as const) {
+    const context = await browser.newContext({
+      viewport: { width: 820, height: 1180 }, userAgent: phoneAgent,
+      isMobile: true, hasTouch: true, colorScheme: theme, reducedMotion: "reduce",
+    });
+    try {
+      const page = await context.newPage();
+      await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
+      await installTauriBridge(page, { onboarding: true, emptyPortfolio: true });
+      await page.goto("/#/overview");
+      const dialog = page.getByTestId("onboarding-dialog");
+      await expect(dialog).toBeVisible();
+      await expect(dialog).toHaveCSS("opacity", "1");
+      await expect(page.locator(".mobile-rail-brand polygon")).toHaveCount(2);
+      await page.screenshot({ path: `/tmp/track3-brand-shots/ipad-onboarding-${theme}.png`, animations: "disabled" });
+    } finally {
+      await context.close();
     }
   }
 });

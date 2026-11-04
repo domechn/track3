@@ -1,5 +1,9 @@
 <p align="center">
-    <img src="src-tauri/app-icon.png" width="150">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="docs/brand/app-icon-dark.svg">
+        <source media="(prefers-color-scheme: light)" srcset="docs/brand/app-icon-light.svg">
+        <img src="images/app-icon.png" width="150" alt="Track3">
+    </picture>
 </p>
 
 <h1 align="center">Track3</h1>
