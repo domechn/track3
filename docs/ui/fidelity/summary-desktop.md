@@ -44,7 +44,7 @@ Header subtitle `Reading snapshots from the local database…`; range and Refres
 
 ## Error and transient states
 
-The design provides no error, open dialog, popover or toast image for Summary. Keep the six-card frame for a query error, show a concise error and Retry inside the failed card, retain last good sync time when available. Existing period detail, sync status popover, loading and sparse-month/unknown-profit explanations must remain reachable. Missing monthly snapshots stay grey dashes with their explanation; a partial unknown P&L stays marked partial instead of being coloured as certain.
+The design provides no error, open dialog, popover or toast image for Summary. Keep the six-card frame for a query error, show a concise error and Retry inside the failed card, retain last good sync time when available. Existing period detail, sync status popover, loading and sparse-month/unknown-profit explanations must remain reachable. Missing monthly snapshots stay grey dashes with their explanation. A partial month or year shows the known amount with the same sign tone and surface tint as a complete period, plus a question-mark badge in the card corner that explains which coins are excluded.
 
 ## Pixel comparison
 

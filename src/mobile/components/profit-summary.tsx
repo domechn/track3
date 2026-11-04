@@ -433,11 +433,11 @@ const App = ({
     const hint = unknownHint(coins, t);
     return (
       <>
-        <button type="button" className="absolute right-1 top-1 flex h-8 w-8 touch:h-11 touch:w-11 items-center justify-center rounded-full text-xs text-muted-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2"
+        <button type="button" className="absolute right-1 top-1 flex h-8 w-8 touch:h-11 touch:w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           aria-label={t("profitSummary.explain").replace("{period}", label)}
           aria-expanded={explainedPartial === key}
           title={hint}
-          onClick={() => setExplainedPartial(explainedPartial === key ? null : key)}>ⓘ</button>
+          onClick={() => setExplainedPartial(explainedPartial === key ? null : key)}><span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] leading-none">?</span></button>
         <div className={cn("mt-1 text-xs text-muted-foreground",
           explainedPartial === key ? "" : "hidden group-hover:block group-focus-within:block")}>{hint}</div>
       </>
@@ -480,8 +480,9 @@ const App = ({
       <div className="profit-period-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
         {(isMobile ? [...monthCards].reverse() : monthCards).map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
-          return <div key={item.key} className={cn("profit-month-card group relative rounded-lg border p-2",
-            !item.hasData || item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor))}>
+          const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
+          return <div key={item.key} data-partial={partial} className={cn("profit-month-card group relative rounded-lg border p-2",
+            value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor))}>
           <button
             type="button"
             disabled={!item.hasData && !item.noSnapshot}
@@ -494,10 +495,10 @@ const App = ({
             <div
               className={cn(
                 "mt-1 text-sm font-semibold tracking-tight",
-                !item.hasData || item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
+                value === null ? "text-muted-foreground" : getToneClass(value, quoteColor)
               )}
             >
-              {item.hasData ? partial && item.knownTotal !== null ? `~${renderAmount(item.knownTotal)}` : renderAmount(item.total) : "—"}
+              {item.hasData ? renderAmount(value) : "—"}
             </div>
             {item.gapDate && <div className="mt-1 text-xs text-muted-foreground">{gapHint(item.gapDate, selectedYear)}</div>}
             {item.noSnapshot && <div className={cn("mt-1 text-xs text-muted-foreground",
@@ -517,22 +518,24 @@ const App = ({
       <div className="profit-period-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
         {yearCards.map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
+          const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
           return (
           <div
             key={`y-profit-summary-${item.year}`}
+            data-partial={partial}
             className={cn(
               "group relative rounded-lg border p-2 text-left",
-              !item.hasData || item.total === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(item.total, quoteColor)
+              value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor)
             )}
           >
             <div className="text-xs text-muted-foreground">{item.year}</div>
             <div
               className={cn(
                 "mt-1 text-sm font-semibold tracking-tight",
-                !item.hasData || item.total === null ? "text-muted-foreground" : getToneClass(item.total, quoteColor)
+                value === null ? "text-muted-foreground" : getToneClass(value, quoteColor)
               )}
             >
-              {item.hasData ? partial && item.knownTotal !== null ? `~${renderAmount(item.knownTotal)}` : renderAmount(item.total) : "—"}
+              {item.hasData ? renderAmount(value) : "—"}
             </div>
             {partial && renderPartialInfo(item.unknownCoins, String(item.year), `year-${item.year}`)}
           </div>
