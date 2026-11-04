@@ -240,7 +240,7 @@ test("rule edit, invalid add, and delete use approved overlays", async ({ page }
   await expect(page.getByText("2 fields need attention")).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
   await page.getByRole("button", { name: "Delete SOL 7d move" }).click();
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
   await capture(page, "goals-delete", false);
   await expect(page.locator(".pf-delete h2")).toHaveCSS("font-variant-numeric", "normal");
   await expect(page.getByRole("alertdialog", { name: /Delete “SOL 7d move”/ })).toBeVisible();

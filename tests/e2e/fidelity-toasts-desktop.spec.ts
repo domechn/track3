@@ -200,7 +200,7 @@ export async function refreshAllData(setProgress) {
       }
       const toastBox = await page.locator(".desktop-toast-viewport > li[data-state='open']").first().boundingBox();
       expect(Math.round(1600 - toastBox!.x - toastBox!.width)).toBe(24);
-      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
       await page.mouse.move(800, 20);
       await page.screenshot({ path: `${output}/toasts-${state}-desktop.png`, fullPage: true, animations: "disabled" });
     } finally {

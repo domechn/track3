@@ -213,10 +213,13 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
   }
   html {
     scroll-behavior: smooth;
+    height: 100%;
+    overflow: hidden;
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    min-height: 100dvh;
+    height: 100%;
+    overflow: hidden;
     background-color: hsl(var(--background));
     font-size: 13px;
     line-height: 18px;
@@ -237,6 +240,55 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
     select {
       min-height: 44px;
     }
+  }
+}
+
+#root { height: 100%; overflow: hidden; }
+#root > .min-h-dvh { height: 100vh; height: 100dvh; overflow: hidden; }
+#root > .min-h-dvh > div:last-child { height: 100%; min-height: 0; }
+.t3-desktop-app { height: 100%; min-height: 0; }
+.t3-desktop-shell { height: 100%; min-height: 0; overflow: hidden; }
+.t3-desktop-column { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.t3-desktop-column > :not(main) { flex: none; }
+.t3-desktop-column #app-main-content {
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  scrollbar-gutter: stable; overscroll-behavior: contain;
+}
+.t3-desktop-rail { height: 100vh; height: 100dvh; }
+@media print {
+  html, body, #root, #root > .min-h-dvh, #root > .min-h-dvh > div:last-child,
+  .t3-desktop-app, .t3-desktop-shell, .t3-desktop-column,
+  .t3-desktop-column #app-main-content {
+    height: auto !important; min-height: 0 !important; overflow: visible !important;
+  }
+  .t3-desktop-column #app-main-content { flex: none !important; }
+}
+@media (min-width: 761px) {
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-desktop-column .t3-topbar-controls {
+    position: static; flex: 1 1 max-content; min-width: 0; flex-wrap: wrap; justify-content: flex-end; gap: 10px;
+  }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-desktop-column .t3-topbar-controls .t3-topbar-sync {
+    position: static;
+  }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-desktop-column .t3-topbar-controls .t3-topbar-bell {
+    position: relative; top: auto; right: auto;
+  }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-desktop-column .t3-topbar-sync { order: 10; }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-desktop-column .t3-topbar-bell { order: 11; }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-desktop-column .t3-live-trigger {
+    transform: none;
+  }
+}
+@media (min-width: 761px) {
+  .t3-desktop-column > .t3-fidelity-topbar {
+    position: relative; top: auto; right: auto; flex: none; min-height: 48px;
+    padding: 7px 28px; border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--background));
+  }
+}
+@media (min-width: 1500px) {
+  .t3-desktop-column > .t3-fidelity-topbar-coin :is(.t3-fidelity-live-control, .t3-fidelity-date-control, .t3-fidelity-refresh-control) {
+    position: static;
   }
 }
 
@@ -379,14 +431,14 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
   body:not(:has(.app-layout)):has(.t3-overview-grid) #app-main-content { padding-top: 14px; padding-bottom: 36px; }
   body:not(:has(.app-layout)):has(.t3-overview-grid) .glass-subtle:has(.t3-topbar-ranges) {
     position: relative; top: auto;
-    height: 50px;
+    height: auto; min-height: 50px;
     border: 0;
     background: hsl(var(--background));
     box-shadow: none;
   }
   body:not(:has(.app-layout)):has(.t3-overview-grid) .glass-subtle:has(.t3-topbar-ranges) > div:first-child {
-    height: 50px;
-    padding: 0 28px;
+    height: auto; min-height: 50px;
+    align-items: flex-start; padding: 7px 28px;
   }
   body:not(:has(.app-layout)) .t3-overview-heading { margin: 0 0 16px; }
   body:not(:has(.app-layout)) .t3-overview-heading h1 { font-size: 26px; line-height: 32px; letter-spacing: -.01em; }
@@ -754,6 +806,23 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
 .t3-live-trigger:hover, .t3-live-trigger[data-state="open"] { color: hsl(var(--accent-data)); }
 .t3-live-label { font-size: 12px; white-space: nowrap; }
 .t3-live-trigger strong { font-size: 13px; font-variant-numeric: tabular-nums; }
+.t3-live-amount { display: inline-flex; align-items: center; min-width: 12ch; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.t3-live-amount[data-state="connecting"] { opacity: .65; }
+.t3-live-amount[data-first="true"] { animation: t3-live-reveal 180ms ease-out both; }
+.t3-live-skeleton { display: block; width: 10ch; height: .8em; border-radius: 4px; background: hsl(var(--muted)); }
+.t3-live-skeleton { background: linear-gradient(100deg, hsl(var(--muted)) 20%, hsl(var(--raised)) 50%, hsl(var(--muted)) 80%); background-size: 200% 100%; animation: t3-live-shimmer 1.5s ease-in-out infinite; }
+.t3-live-dot { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--muted-foreground)); }
+.t3-live-dot[data-state="connecting"] { background: hsl(var(--positive)); animation: t3-live-pulse 1.6s ease-in-out infinite; }
+.t3-live-dot[data-state="live"] { background: hsl(var(--positive)); }
+.t3-live-dot[data-state="stale"] { background: hsl(var(--warning)); }
+body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-live-amount:empty + .t3-live-dot { transform: translateX(-12ch); }
+@keyframes t3-live-reveal { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes t3-live-shimmer { to { background-position: -200% 0; } }
+@keyframes t3-live-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) {
+  .t3-live-amount[data-first="true"], .t3-live-skeleton, .t3-live-dot[data-state="connecting"] { animation: none; }
+}
+.t3-fidelity-topbar .t3-live-amount { display: none; }
 .t3-live-popover { border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--popover)); box-shadow: var(--shadow-overlay); }
 @media (max-width: 767px) { .t3-live-label { display: none; } }
 .t3-refresh-controls > button { min-height: 34px; border-radius: var(--radius-pill); font-size: 12px; }
@@ -1529,8 +1598,10 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
 .t3-fidelity-sidebar { padding: 12px 10px; gap: 2px; background: #0d0d0e; }
 .t3-fidelity-sidebar > div:first-child { height: 36px; min-height: 36px; margin: 0 0 12px 1px; padding: 0; }
 .t3-fidelity-sidebar nav { margin-inline: -10px; padding: 0 10px; gap: 2px; }
+.t3-fidelity-sidebar[style*="--sidebar-width"] > div:nth-last-child(2) { margin-inline: -10px; }
 .t3-fidelity-sidebar nav > div:first-of-type { margin-top: 10px; }
 .t3-fidelity-sidebar nav a { height: 36px; padding: 0 9px; color: #8c8e95; }
+.t3-fidelity-sidebar > div:nth-last-child(2) a { color: #8c8e95; }
 .t3-fidelity-sidebar nav > div:not(:last-child) a { margin-bottom: 2px; }
 .t3-fidelity-sidebar nav a[aria-current="page"] { background: #1c1c20; color: #fff; }
 .t3-fidelity-sidebar nav a > span[aria-hidden="true"] { top: 7px; right: 7px; border: 2px solid #0d0d0e; background: #ee6a82; box-shadow: none; }
@@ -2554,18 +2625,8 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
 body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-fidelity-ranges,
 body:not(:has(.app-layout)):has(.t3-refresh-overview) .t3-fidelity-ranges { display: none; }
 @media (min-width: 761px) {
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen:has(> aside) { position: relative; }
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside {
-    position: absolute; top: 0; bottom: 0; height: auto;
-  }
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside > button:last-child {
-    position: fixed; bottom: 8px; left: 6px; width: calc(var(--sidebar-collapsed-width) - 12px);
-  }
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside[style*="--sidebar-width"] > button:last-child {
-    width: calc(var(--sidebar-width) - 12px);
-  }
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside nav { padding-top: 7px; padding-bottom: 72px; }
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .min-h-screen > aside nav a { height: 40px; }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-desktop-rail nav { padding-top: 7px; }
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-desktop-rail nav a { height: 40px; }
   body:not(:has(.app-layout)) .t3-overview-grid { gap: 16px; }
   body:not(:has(.app-layout)) .t3-overview-footer {
     display: flex; align-items: center; justify-content: space-between;
@@ -2620,6 +2681,9 @@ body:not(:has(.app-layout)):has(.t3-refresh-overview) .t3-fidelity-ranges { disp
   body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card:not(.mobile-hero-card) .t3-pnl-compact .t3-pnl-compact-card > div { padding-left: 0 !important; }
   body:not(:has(.app-layout)) .t3-pnl-compact-card > div > div > div:first-child { padding-left: 20px !important; }
   body:not(:has(.app-layout)) .t3-total-overview .t3-pnl-compact-card > div > div > div { padding-right: 20px !important; padding-left: 20px !important; }
+  @media (max-width: 1300px) {
+    body:not(:has(.app-layout)) .t3-total-overview .t3-pnl-compact-card > div > div > div { padding-inline: 16px !important; }
+  }
   body:not(:has(.app-layout)) .t3-pnl-fidelity .t3-pnl-compact-card > div > div > div > div:first-child { line-height: 18px; }
   body:not(:has(.app-layout)) .t3-pnl-fidelity .t3-pnl-compact-card > div > div > div > div:nth-child(2) { margin-top: 2px; }
   body:not(:has(.app-layout)) .t3-pnl-fidelity .t3-pnl-compact-card p { line-height: 18px; }

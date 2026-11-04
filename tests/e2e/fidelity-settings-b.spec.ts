@@ -245,7 +245,7 @@ for (const state of states) {
           for (const element of document.querySelectorAll<HTMLElement>("*")) {
             if (element.scrollTop) element.scrollTop = 0;
           }
-          window.scrollTo(0, 0);
+          document.getElementById("app-main-content")!.scrollTo(0, 0);
         });
       }
       if (state === "sync-disable") {
@@ -255,7 +255,7 @@ for (const state of states) {
           for (const element of document.querySelectorAll<HTMLElement>("*")) {
             if (element.scrollTop) element.scrollTop = 0;
           }
-          window.scrollTo(0, 0);
+          document.getElementById("app-main-content")!.scrollTo(0, 0);
         });
       }
       if (state === "sync-test-fail") {
@@ -270,7 +270,7 @@ for (const state of states) {
           for (const element of document.querySelectorAll<HTMLElement>("*")) {
             if (element.scrollTop) element.scrollTop = 0;
           }
-          window.scrollTo(0, 0);
+          document.getElementById("app-main-content")!.scrollTo(0, 0);
         });
       }
     }
@@ -352,7 +352,7 @@ for (const state of states) {
         for (const element of document.querySelectorAll<HTMLElement>("*")) {
           if (element.scrollTop) element.scrollTop = 0;
         }
-        window.scrollTo(0, 0);
+        document.getElementById("app-main-content")!.scrollTo(0, 0);
       });
       await expect(page.getByRole("heading", { name: "Connection" })).toBeInViewport();
     }
@@ -363,7 +363,7 @@ for (const state of states) {
         for (const element of document.querySelectorAll<HTMLElement>("*")) {
           if (element.scrollTop) element.scrollTop = 0;
         }
-        window.scrollTo(0, 0);
+        document.getElementById("app-main-content")!.scrollTo(0, 0);
       });
       await expect(page.locator("#app-main-content h1")).toBeInViewport();
     }
@@ -380,7 +380,7 @@ for (const state of states) {
           for (const element of document.querySelectorAll<HTMLElement>("*")) {
             if (element.scrollTop) element.scrollTop = 0;
           }
-          window.scrollTo(0, 0);
+          document.getElementById("app-main-content")!.scrollTo(0, 0);
         });
       }
       else await expect(page.getByRole("button", { name: "Activating…" })).toBeVisible();
@@ -403,7 +403,7 @@ for (const state of states) {
         for (const element of document.querySelectorAll<HTMLElement>("*")) {
           if (element.scrollTop && !element.closest('[role="dialog"]')) element.scrollTop = 0;
         }
-        window.scrollTo(0, 0);
+        document.getElementById("app-main-content")!.scrollTo(0, 0);
       });
     }
     if (state === "backup-toast-ok") {
@@ -415,7 +415,7 @@ for (const state of states) {
         for (const element of document.querySelectorAll<HTMLElement>("*")) {
           if (element.scrollTop) element.scrollTop = 0;
         }
-        window.scrollTo(0, 0);
+        document.getElementById("app-main-content")!.scrollTo(0, 0);
       });
     }
     if (state === "backup-toast-err") {

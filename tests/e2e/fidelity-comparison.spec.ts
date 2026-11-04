@@ -40,12 +40,12 @@ test("Comparison renders the October sample pair and ordered asset sections", as
       [element, ...element.querySelectorAll("*")].map((node) => {
         const rect = node.getBoundingClientRect();
         const style = getComputedStyle(node);
-        return { tag: node.tagName, text: node.textContent?.slice(0, 30), x: rect.x, y: rect.y + scrollY,
+        return { tag: node.tagName, text: node.textContent?.slice(0, 30), x: rect.x, y: rect.y + document.getElementById("app-main-content")!.scrollTop,
           width: rect.width, height: rect.height, font: style.font, color: style.color, border: style.borderColor };
       })), null, 2));
     writeFileSync("/tmp/fidelity/comparison/geometry.json", JSON.stringify(await page.evaluate(() =>
       [...document.querySelectorAll(".fd-comparison-head,.fd-comparison-snapshots,.fd-comparison-field,.fd-comparison-quick,.fd-comparison-kpis,.fd-comparison-assets,.fd-comparison-asset,.fd-comparison-info,.fd-comparison-movers")]
-        .map((element) => ({ selector: element.className, y: element.getBoundingClientRect().y + scrollY,
+        .map((element) => ({ selector: element.className, y: element.getBoundingClientRect().y + document.getElementById("app-main-content")!.scrollTop,
           h: element.getBoundingClientRect().height }))), null, 2));
     await captureLong(page, "/tmp/fidelity/comparison/comparison-phone-long.png");
   } finally { await context.close(); }

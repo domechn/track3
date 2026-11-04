@@ -224,14 +224,14 @@ for (const state of ["default", "setup", "locked", "loading", "testing", "test-f
       const closeBox = await close.boundingBox();
       expect(closeBox?.width).toBeGreaterThanOrEqual(44);
       expect(closeBox?.height).toBeGreaterThanOrEqual(44);
-      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
     } else if (state === "locked") {
       await page.keyboard.press("Escape");
     }
     await settingsBShot(page, "sync", state);
     if (state === "disable" || state === "forget" || state === "confirm-use") {
       expect(page.viewportSize()?.height).toBe(1111);
-      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
     }
     if (state === "default") {
       await page.locator(".t3-sync-connection").getByRole("button", { name: "Show secret access key" }).click();

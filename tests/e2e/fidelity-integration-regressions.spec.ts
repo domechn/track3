@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
 import { installTauriBridge as installDesktopFidelityBridge } from "./fidelity-desktop-scenes";
 
-test("Overview keeps sync and alerts in the top bar above its range controls", async ({ page }) => {
+test("Overview keeps sync, alerts, and range controls pinned above its content", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
@@ -15,20 +15,19 @@ test("Overview keeps sync and alerts in the top bar above its range controls", a
   const bell = await page.locator(".t3-topbar-bell").boundingBox();
   const date = await page.locator(".t3-date-trigger").boundingBox();
   expect(live!.x + live!.width).toBeLessThanOrEqual(sync!.x);
-  expect(sync!.y).toBeGreaterThanOrEqual(12);
-  expect(sync!.y).toBeLessThanOrEqual(17);
-  expect(bell!.y).toBeGreaterThanOrEqual(12);
-  expect(bell!.y).toBeLessThanOrEqual(17);
-  expect(date!.y).toBeGreaterThan(50);
+  expect(sync!.y).toBe(7);
+  expect(bell!.y).toBe(10);
+  expect(date!.y + date!.height).toBeLessThanOrEqual((await page.locator("#app-main-content").boundingBox())!.y);
   await page.getByRole("button", { name: "Continue without sync" }).click();
   await expect(page.locator(".t3-sync-lock-dialog")).toHaveCount(0);
   for (const width of [800, 1100, 1440, 1600]) {
     await page.setViewportSize({ width, height: 900 });
     const syncAtWidth = await page.locator(".desktop-sync-status-indicator").boundingBox();
     const bellAtWidth = await page.locator(".t3-topbar-bell").boundingBox();
-    expect(syncAtWidth!.y).toBeCloseTo(13, 0);
-    expect(bellAtWidth!.y).toBeCloseTo(13, 0);
-    expect(width - syncAtWidth!.x - syncAtWidth!.width).toBeCloseTo(70, 0);
+    const mainAtWidth = await page.locator("#app-main-content").boundingBox();
+    expect(syncAtWidth!.y + syncAtWidth!.height).toBeLessThanOrEqual(mainAtWidth!.y);
+    expect(bellAtWidth!.y + bellAtWidth!.height).toBeLessThanOrEqual(mainAtWidth!.y);
+    expect(width - syncAtWidth!.x - syncAtWidth!.width).toBeCloseTo(68, 0);
     expect(width - bellAtWidth!.x - bellAtWidth!.width).toBeCloseTo(28, 0);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -36,12 +35,11 @@ test("Overview keeps sync and alerts in the top bar above its range controls", a
   const bellBeforeScroll = await page.locator(".t3-topbar-bell").boundingBox();
   await page.mouse.move(800, 500);
   await page.mouse.wheel(0, 500);
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-  const scrolled = await page.evaluate(() => window.scrollY);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(0);
   const afterScroll = await page.locator(".desktop-sync-status-indicator").boundingBox();
   const bellAfterScroll = await page.locator(".t3-topbar-bell").boundingBox();
-  expect(beforeScroll!.y - afterScroll!.y).toBeCloseTo(scrolled, 0);
-  expect(bellBeforeScroll!.y - bellAfterScroll!.y).toBeCloseTo(scrolled, 0);
+  expect(afterScroll!.y).toBeCloseTo(beforeScroll!.y, 0);
+  expect(bellAfterScroll!.y).toBeCloseTo(bellBeforeScroll!.y, 0);
 });
 
 test("sync unlock dialog has the same dimensions and corners at desktop widths", async ({ page }) => {

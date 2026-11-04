@@ -165,7 +165,7 @@ test("summary full state follows the approved card order and captures at 390px",
         const rect = element.getBoundingClientRect();
         return { text: element.textContent?.slice(0, 32), className: element.className, x: rect.x, y: rect.y, height: rect.height };
       }),
-      height: document.documentElement.scrollHeight,
+      height: document.getElementById("app-main-content")!.scrollHeight,
     })), null, 2));
     await page.screenshot({ path: "/tmp/fidelity/summary/summary-phone-long.png", fullPage: true });
     await page.screenshot({ path: "/tmp/fidelity/summary/summary-phone.png" });
@@ -221,13 +221,13 @@ test("summary one-snapshot and loading states reserve all six sections", async (
         }),
         kpis: [...document.querySelectorAll(".fd-three,.fd-three>div:nth-child(2) strong,.fd-three>div:nth-child(2) small,.fd-three>div:nth-child(3) strong")].map((element) => {
           const rect = element.getBoundingClientRect();
-          return { text: element.textContent, y: rect.y + scrollY, height: rect.height };
+          return { text: element.textContent, y: rect.y + document.getElementById("app-main-content")!.scrollTop, height: rect.height };
         }),
         bars: [...document.querySelectorAll(".fd-attribution .fd-row-skeleton .fd-skeleton,.fd-top-coins .fd-row-skeleton .fd-skeleton")].slice(0, 4).map((element) => {
           const rect = element.getBoundingClientRect();
-          return { y: rect.y + scrollY, x: rect.x, width: rect.width };
+          return { y: rect.y + document.getElementById("app-main-content")!.scrollTop, x: rect.x, width: rect.width };
         }),
-        height: document.documentElement.scrollHeight,
+        height: document.getElementById("app-main-content")!.scrollHeight,
       })), null, 2));
       await page.screenshot({ path: `/tmp/fidelity/summary/summary-${state}-phone-long.png`, fullPage: true });
       await page.screenshot({ path: `/tmp/fidelity/summary/summary-${state}-phone.png` });

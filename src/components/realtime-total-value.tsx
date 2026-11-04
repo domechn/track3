@@ -23,6 +23,7 @@ import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import bluebird from "bluebird";
 import { getImageApiPath } from "@/utils/app";
 import { useTranslation } from "@/i18n";
+import { useLiveTotal } from "./use-live-total";
 
 const App = ({
   currency,
@@ -34,52 +35,43 @@ const App = ({
   recordsLabel?: boolean;
 }) => {
   const { t } = useTranslation();
-  const [loading, setLoading] = useState(false);
+  const [activated, setActivated] = useState(false);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [realtimeAssetValues, setRealtimeAssetValues] = useState<Asset[]>([]);
   const [lastRefreshAssetValues, setLastRefreshAssetValues] = useState<Asset[]>(
     []
   );
 
-  const realtimeTotalValue = useMemo(
-    () => realtimeAssetValues.reduce((s, a) => s + a.value, 0),
-    [realtimeAssetValues]
-  );
+  const liveTotal = useLiveTotal({
+    key: "portfolio-live-total",
+    enabled: activated,
+    live: true,
+    intervalMs: 60_000,
+    load: async () => {
+      const assets = (await queryRealTimeAssetsValue()).sort((a, b) => b.value - a.value);
+      setRealtimeAssetValues(assets);
+      void getLogoMap(assets).then(setLogoMap).catch(() => {});
+      return assets.reduce((sum, asset) => sum + asset.value, 0);
+    },
+  });
+  const realtimeTotalValue = liveTotal.value ?? 0;
 
   const lastRefreshTotalValue = useMemo(
     () => lastRefreshAssetValues.reduce((s, a) => s + a.value, 0),
     [lastRefreshAssetValues]
   );
 
-  const changedPercentage = useMemo(
-    () =>
-      ((realtimeTotalValue - lastRefreshTotalValue) /
-        (lastRefreshTotalValue + 0.0000000000001)) *
-      100,
-    [realtimeTotalValue, lastRefreshTotalValue]
-  );
+  const changedPercentage = lastRefreshTotalValue > 0
+    ? ((realtimeTotalValue - lastRefreshTotalValue) / lastRefreshTotalValue) * 100
+    : null;
 
   function onPopoverOpenChange(open: boolean) {
     if (!open) {
       return;
     }
-    loadRealTimeAssetsValue();
+    setActivated(true);
     // get last queried result for comparing
     loadLastRefreshAssetValues();
-  }
-
-  async function loadRealTimeAssetsValue() {
-    setLoading(true);
-    try {
-      const rts = await queryRealTimeAssetsValue();
-      setRealtimeAssetValues(rts.sort((a, b) => b.value - a.value));
-
-      // Load logo map
-      const logos = await getLogoMap(rts);
-      setLogoMap(logos);
-    } finally {
-      setLoading(false);
-    }
   }
 
   async function loadLastRefreshAssetValues() {
@@ -107,7 +99,7 @@ const App = ({
       const basePrice = basePriceMap.get(asset.symbol);
 
       if (!basePrice) {
-        return 0;
+        return null;
       }
 
       return (asset.price / basePrice) * 100 - 100;
@@ -125,7 +117,7 @@ const App = ({
                 currencyWrapper(currency)(realtimeTotalValue)
               )}
           </div>
-          <div
+          {changedPercentage !== null && <div
             className={`text-sm font-semibold ${positiveNegativeTextClass(
               changedPercentage,
               quoteColor,
@@ -134,7 +126,7 @@ const App = ({
           >
             {changedPercentage > 0 ? "+" : ""}
             {changedPercentage.toFixed(2)}%
-          </div>
+          </div>}
         </div>
         <Separator />
         <Carousel
@@ -178,8 +170,10 @@ const App = ({
                       700
                     )}`}
                   >
-                    {priceChangePercentageMap[asset.symbol] > 0 ? "+" : ""}
-                    {priceChangePercentageMap[asset.symbol]?.toFixed(2)}%
+                    {priceChangePercentageMap[asset.symbol] === null ? "—" : <>
+                      {(priceChangePercentageMap[asset.symbol] ?? 0) > 0 ? "+" : ""}
+                      {priceChangePercentageMap[asset.symbol]?.toFixed(2)}%
+                    </>}
                   </div>
                 </div>
               </CarouselItem>
@@ -200,19 +194,37 @@ const App = ({
             <LightningBoltIcon aria-hidden="true" height={16} width={16} />
             <span className="sr-only">{t("realtime.title")}</span>
             <span className="t3-live-label">{t("realtime.design.live")}</span>
-            {realtimeAssetValues.length > 0 && <strong className="t3-live-label">
-              {currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(realtimeTotalValue))}
-            </strong>}
+            <strong className="t3-live-amount t3-live-label" data-state={liveTotal.state}
+              data-first={liveTotal.firstReveal || undefined} aria-hidden="true">
+              {liveTotal.value === undefined
+                ? liveTotal.state === "connecting" ? <span className="t3-live-skeleton" /> : null
+                : currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(liveTotal.animatedValue ?? realtimeTotalValue))}
+            </strong>
+            <i className="t3-live-dot" data-state={liveTotal.state} aria-hidden="true" />
           </button>
         </PopoverTrigger>
+        <span role="status" aria-live="polite" className="sr-only"
+            aria-label={`${t("realtime.design.live")}, ${t(`realtime.state.${liveTotal.state}`)}`}>
+            {liveTotal.announcedValue === undefined ? t(`realtime.state.${liveTotal.state}`)
+              : `${t("realtime.design.live")}: ${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(liveTotal.announcedValue))}`}
+        </span>
         <PopoverContent className="t3-live-popover w-[calc(100vw-1rem)] max-w-80 p-4" collisionPadding={8}>
-          <div className="relative min-h-[110px]">
-            <RealtimeView />
-            <div
-              className={`absolute inset-0 rounded-md backdrop-blur-md bg-background/60 transition-opacity duration-500 ${
-                loading ? "opacity-100" : "opacity-0 pointer-events-none"
+          <div className="relative min-h-[110px]" aria-busy={liveTotal.value === undefined && liveTotal.state !== "error"}>
+            {liveTotal.value === undefined
+              ? liveTotal.state === "error" ? <div className="flex min-h-[110px] items-center justify-center text-sm text-muted-foreground">
+                  {t("realtime.state.error")}
+                </div> : <div className="space-y-4 pt-2" aria-hidden="true">
+                <div className="t3-live-skeleton h-3 w-1/2" />
+                <div className="t3-live-skeleton ml-auto h-5 w-3/4" />
+                <Separator />
+                <div className="t3-live-skeleton h-3 w-full" />
+              </div>
+              : <RealtimeView />}
+            {liveTotal.value !== undefined && <div
+              className={`absolute inset-0 rounded-md backdrop-blur-md bg-background/60 transition-opacity duration-200 ${
+                liveTotal.state === "connecting" ? "opacity-100" : "opacity-0 pointer-events-none"
               }`}
-            />
+            />}
           </div>
         </PopoverContent>
       </Popover>

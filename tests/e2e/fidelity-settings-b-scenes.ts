@@ -238,7 +238,7 @@ export async function settingsBShot(page: Page, area: SettingsBPage, state: stri
   const viewportShot = dialog || area === "sync" && (state.startsWith("pop-") || state === "toast")
     || area === "backup" && ["conflicts", "toast-ok", "toast-err"].includes(state);
   await page.setViewportSize({ width: 1600, height: Number(height) });
-  if (dialog) await page.evaluate(() => window.scrollTo(0, 0));
+  if (dialog) await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
   await page.evaluate(() => document.fonts.ready);
   const output = `${captureRoot}/${area}`;
   mkdirSync(output, { recursive: true });

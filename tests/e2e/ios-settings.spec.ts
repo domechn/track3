@@ -353,8 +353,8 @@ test("rebalance keeps its heading and rules at 375px", async ({ page }) => {
   await page.goto("/#/rebalance");
   await expect(page.getByRole("heading", { level: 1, name: "Rebalance" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Rules" })).toBeAttached();
-  await page.evaluate(() => window.scrollTo(0, 180));
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(64);
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 180));
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(64);
   const title = page.locator(".pf-head h1");
   await expect(title).toBeVisible();
   expect(await title.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);

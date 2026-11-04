@@ -349,6 +349,16 @@ function Layout({
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryRange, setSummaryRange] = useState<TDateRange>();
   const [recordsToolsOpen, setRecordsToolsOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+  const previousRoute = useRef(location.pathname);
+  useEffect(() => {
+    if (previousRoute.current === location.pathname) return;
+    previousRoute.current = location.pathname;
+    const main = mainRef.current;
+    if (!main) return;
+    main.scrollTop = 0;
+    main.focus({ preventScroll: true });
+  }, [location.pathname]);
   useEffect(() => {
     const open = () => setRecordsToolsOpen(true);
     const toggle = () => setRecordsToolsOpen((value) => !value);
@@ -361,7 +371,7 @@ function Layout({
   }, []);
 
   return (
-    <div className={["min-h-screen", fidelityPage && `t3-fidelity-shell t3-fidelity-${fidelityPage}-shell`,
+    <div className={["t3-desktop-shell", fidelityPage && `t3-fidelity-shell t3-fidelity-${fidelityPage}-shell`,
       location.pathname === "/comparison" && "t3-route-comparison", location.pathname === "/wallets" && "t3-route-wallets",
       location.pathname === "/overview" && !hasData && "t3-route-first-run",
       location.pathname === "/overview" && initializing && "t3-route-overview-loading"].filter(Boolean).join(" ")}>
@@ -375,7 +385,7 @@ function Layout({
 
       <div
         style={{ marginLeft: sidebarWidth }}
-        className={`transition-[margin-left] duration-300 ease-in-out ${recordsPage ? "t3-records-fidelity-shell" : ""}`}
+        className={`t3-desktop-column transition-[margin-left] duration-300 ease-in-out ${recordsPage ? "t3-records-fidelity-shell" : ""}`}
       >
         <SummaryFidelityRangeContext.Provider value={{ range: summaryRange, setRange: setSummaryRange }}>
         <SummaryLoadingContext.Provider value={setSummaryLoading}>
@@ -397,7 +407,7 @@ function Layout({
         />}
 
         {/* Main content */}
-        <main id="app-main-content" tabIndex={-1} className="mx-auto w-full max-w-[1560px] px-7 py-5">
+        <main ref={mainRef} id="app-main-content" tabIndex={0} className="mx-auto w-full max-w-[1560px] px-7 py-5">
           <div className="relative min-h-[400px]" aria-busy={initializing}>
             <div className="t3-desktop-loading-legacy">
             <React.Suspense
@@ -1005,7 +1015,7 @@ const App = () => {
   }, []);
 
   return (
-    <div>
+    <div className="t3-desktop-app">
       <AutoBackupIndicator status={autoBackupStatus} />
       <DataChangedContext.Provider value={dataChangedVersion}>
         <HashRouter>

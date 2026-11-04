@@ -43,7 +43,7 @@ export async function captureLong(page: import("@playwright/test").Page, path: s
     if (!nav) return null;
     const previous = nav.getAttribute("style");
     nav.style.setProperty("position", "absolute", "important");
-    nav.style.setProperty("top", `${document.documentElement.scrollHeight - 60}px`, "important");
+    nav.style.setProperty("top", `${document.getElementById("app-main-content")!.scrollHeight - 60}px`, "important");
     nav.style.setProperty("bottom", "auto", "important");
     return previous;
   });

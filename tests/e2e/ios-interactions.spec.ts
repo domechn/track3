@@ -97,17 +97,17 @@ test("tab taps open roots and Back restores route and tab scroll", async ({ page
   await page.goto("/#/overview");
   await expect(page.locator(".fd-overview-holdings .fd-overview-row").first()).toBeVisible({ timeout: 30_000 });
   await page.locator(".fd-overview-holdings .fd-overview-row").first().scrollIntoViewIfNeeded();
-  await page.evaluate(() => scrollTo(0, Math.max(scrollY, 450)));
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
-  const before = await page.evaluate(() => scrollY);
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, Math.max(document.getElementById("app-main-content")!.scrollTop, 450)));
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(300);
+  const before = await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop);
   await page.locator(".fd-overview-holdings .fd-overview-row").first().click();
   await expect(page).toHaveURL(/#\/coins\//);
   await clickCoinBack(page);
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before - 2);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThanOrEqual(before - 2);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
   await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50, { timeout: 30_000 });
-  await page.evaluate(() => scrollTo(0, 450));
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 450));
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(300);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await page.getByRole("link", { name: "Settings" }).click();
   await page.getByRole("navigation", { name: /settings sections/i }).getByRole("link", { name: "Appearance" }).click();
@@ -116,16 +116,16 @@ test("tab taps open roots and Back restores route and tab scroll", async ({ page
   await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" }).click();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(300);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "More" }).click();
   await expect(page).toHaveURL(/#\/more$/);
   await expect(page.locator(".mobile-more-hub")).toBeVisible();
   const historyTab = page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "History" });
   await historyTab.click();
   await expect(historyTab).toHaveAttribute("aria-current", "page");
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(300);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(300);
   await historyTab.click();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
 });
 
 test("History tab opens Analytics after its first load", async ({ page }) => {
@@ -145,17 +145,17 @@ test("Back to an expanded Overview rank list restores its scroll", async ({ page
   await page.getByRole("button", { name: /Show more \(/ }).click();
   const row = page.locator(".fd-overview-rank .fd-overview-row").first();
   await row.scrollIntoViewIfNeeded();
-  const before = await page.evaluate(() => scrollY);
+  const before = await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop);
   expect(before).toBeGreaterThan(300);
   await row.click();
   await expect(page).toHaveURL(/#\/coins\//);
   await clickCoinBack(page);
   await expect(page).toHaveURL(/#\/overview$/);
   await expect(page.getByRole("button", { name: "Show fewer" })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before - 2);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThanOrEqual(before - 2);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
   await expect(page.getByRole("button", { name: /Show more \(/ })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
 });
 
 test("scrollable assistant content restores after visiting the More root", async ({ page }) => {
@@ -204,14 +204,14 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await expect(page.getByRole("button", { name: "Custom range" })).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".fd-overview-holdings .fd-overview-row").first()).toBeVisible({ timeout: 30_000 });
   // The range button scrolls with the page, so keep it in view when testing the sheet.
-  await page.evaluate(() => scrollTo(0, 50));
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(50);
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 50));
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(50);
   await page.getByRole("button", { name: "Custom range" }).click();
   const dialog = page.getByRole("dialog", { name: "Date range" });
   await expect(dialog).toBeVisible();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(50);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(50);
   await dialog.getByRole("button", { name: "Close" }).click();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(50);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(50);
   await page.goto("/#/goals");
   await page.evaluate(async () => {
     for (let index = 0; index < 7; index += 1) {
@@ -225,29 +225,29 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await expect(page.locator(".pf-goal-row")).toHaveCount(7);
   const editRule = page.locator(".pf-goal-row").nth(2).getByRole("button", { name: /Edit/ });
   await editRule.scrollIntoViewIfNeeded();
-  const before = await page.evaluate(() => scrollY);
+  const before = await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop);
   expect(before).toBeGreaterThan(100);
   await editRule.click();
   await page.getByRole("dialog", { name: "Edit rule" }).getByRole("button", { name: "Cancel" }).click();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(before);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(before);
   await page.goto("/#/history");
   const historyRow = page.locator(".history-mobile-snapshot-button").first();
   await historyRow.scrollIntoViewIfNeeded();
-  const historyScroll = await page.evaluate(() => scrollY);
+  const historyScroll = await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop);
   await historyRow.click();
   await page.getByRole("dialog", { name: /snapshot details/i }).getByRole("button", { name: "Back" }).click();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(historyScroll);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(historyScroll);
   await page.goto("/#/summary");
   await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
   const tile = topCoinsTrigger(page);
   await expect(tile).toBeVisible();
   await expect(tile).toBeEnabled();
   await tile.scrollIntoViewIfNeeded();
-  const summaryScroll = await page.evaluate(() => scrollY);
+  const summaryScroll = await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop);
   expect(summaryScroll).toBeGreaterThan(0);
   await tile.click();
   await page.getByRole("dialog", { name: "Top coins" }).getByRole("button", { name: "Close" }).click();
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(summaryScroll);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(summaryScroll);
 });
 
 test("History paging stays bounded and Settings links preserve their page scroll", async ({ page }) => {
@@ -256,7 +256,7 @@ test("History paging stays bounded and Settings links preserve their page scroll
   await page.goto("/#/history");
   const rows = page.locator(".fidelity-history-pager button");
   await rows.scrollIntoViewIfNeeded();
-  const historyScroll = await page.evaluate(() => scrollY);
+  const historyScroll = await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop);
   expect(historyScroll).toBeGreaterThan(0);
   await rows.click();
   await expect(page.locator(".history-mobile-snapshot")).toHaveCount(10);
@@ -268,14 +268,14 @@ test("History paging stays bounded and Settings links preserve their page scroll
   await expect(page.getByRole("navigation", { name: "Settings sections" })).toBeVisible();
   const backup = page.getByRole("navigation", { name: /settings sections/i }).getByRole("link", { name: "Backup & data", exact: true });
   await backup.scrollIntoViewIfNeeded();
-  const settingsScroll = await page.evaluate(() => scrollY);
+  const settingsScroll = await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop);
   expect(settingsScroll).toBeGreaterThan(0);
   await backup.click();
   await expect(page).toHaveURL(/#\/settings\/data\?section=backup$/);
   await expect(page.locator("#app-top-bar .ios-d3-pushed-title")).toHaveText("Backup & data");
   await page.locator("#app-top-bar").getByRole("button", { name: "Back" }).click();
   await expect(page).toHaveURL(/#\/settings$/);
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(settingsScroll);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(settingsScroll);
 });
 
 test("rich History and Overview scrolling stay bounded without rebuilding charts", async ({ page, context }) => {
@@ -290,7 +290,7 @@ test("rich History and Overview scrolling stay bounded without rebuilding charts
     entries.find((entry) => entry.name === name)?.value ?? 0;
   const historyStart = await cdp.send("Performance.getMetrics");
   for (let step = 0; step < 8; step++) {
-    await page.evaluate((y) => scrollTo(0, y), step * 250);
+    await page.evaluate((y) => document.getElementById("app-main-content")!.scrollTo(0, y), step * 250);
   }
   const historyEnd = await cdp.send("Performance.getMetrics");
   const history = {
@@ -322,9 +322,9 @@ test("rich History and Overview scrolling stay bounded without rebuilding charts
     }).observe(document.body, { childList: true, subtree: true });
   });
   for (let step = 0; step < 8; step++) {
-    await page.evaluate((y) => scrollTo(0, y), step * 250);
+    await page.evaluate((y) => document.getElementById("app-main-content")!.scrollTo(0, y), step * 250);
   }
-  await page.evaluate(() => scrollTo(0, 0));
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
   await page.getByRole("button", { name: "Custom range" }).click();
   await page.getByRole("switch", { name: "Percent" }).click();
   const end = await cdp.send("Performance.getMetrics");
@@ -464,16 +464,16 @@ test("an active root tap does not discard scroll on the next programmatic route 
   await installTauriBridge(page, { emptyPortfolio: true });
   await page.goto("/#/overview");
   await expect(page.getByRole("button", { name: "Add an exchange" })).toBeVisible();
-  await page.evaluate(() => { document.querySelector<HTMLElement>("#app-main-content")!.style.minHeight = "1400px"; });
+  await page.evaluate(() => { document.querySelector<HTMLElement>("#app-main-content > div")!.style.minHeight = "1400px"; });
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
-  await page.evaluate(() => scrollTo(0, 220));
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(220);
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 220));
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(220);
   await page.getByRole("button", { name: "Add an exchange" }).evaluate((node: HTMLElement) => node.click());
   await expect(page).toHaveURL(/#\/settings\/configuration$/);
   await expect(page.getByRole("heading", { name: "Data sources" })).toBeVisible();
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
   await expect(page).toHaveURL(/#\/overview$/);
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(220);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(220);
 });
 
 test("an active root tap clears a route fragment and scrolls to the top", async ({ page }) => {
@@ -482,9 +482,9 @@ test("an active root tap clears a route fragment and scrolls to the top", async 
   await page.goto("/#/overview#details");
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await expect(page.locator(".fd-overview-holdings .fd-overview-row").first()).toBeVisible();
-  await page.evaluate(() => scrollTo(0, 220));
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(220);
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 220));
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(220);
   await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
   await expect(page).toHaveURL(/#\/overview$/);
-  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0);
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
 });

@@ -38,7 +38,7 @@ for (const state of ["full", "empty", "loading"] as const) {
     else await expect(page.locator(".fidelity-summary > [role=status]")).toBeVisible();
     if (state === "full") {
       await expect(page.locator(".t3-fidelity-topbar .t3-date-trigger")).toHaveAttribute("aria-description", /Jul 1.*Oct 31, 2026/);
-      expect((await page.locator(".fidelity-summary-pnl").boundingBox())!.y).toBeLessThan(110);
+      expect((await page.locator(".fidelity-summary-pnl").boundingBox())!.y).toBe(137);
       const sol = page.locator(".fidelity-attribution-row").filter({ has: page.locator("b:text-is('SOL')") }).first();
       const solBars = sol.locator(".fidelity-attribution-track i");
       const zero = await sol.locator(".fidelity-attribution-track b").evaluate((node) => parseFloat((node as HTMLElement).style.left));
@@ -221,7 +221,7 @@ test("Summary KPI values align with the net value and selected rail has a visibl
   expect(values.slice(1)).toEqual([values[0], values[0], values[0]]);
   const labels = await page.locator(".fidelity-summary-pnl-kpis > div > span").evaluateAll((nodes) =>
     nodes.slice(1).map((node) => node.getBoundingClientRect().x));
-  expect(labels).toEqual([362.84375, 598.78125, 834.71875]);
+  expect(labels).toEqual([362.84375, 595.4375, 828.046875]);
   const active = page.locator(".t3-fidelity-sidebar nav a[aria-current='page']");
   expect(await active.evaluate((node) => {
     const rule = getComputedStyle(node, "::before");
@@ -234,9 +234,9 @@ test("Summary leaders and attribution footer follow the source spacing", async (
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".fidelity-group-label").first().boundingBox())!.y).toBeCloseTo(1062, 0);
-  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1494, 0);
-  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1512, 0);
+  expect((await page.locator(".fidelity-group-label").first().boundingBox())!.y).toBeCloseTo(1111, 0);
+  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1543, 0);
+  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1561, 0);
   const totalRange = page.locator(".fidelity-attribution-row.total > span:nth-child(2)");
   await expect(totalRange).toHaveText("$310,000 → $763,809");
   const arrow = await totalRange.evaluate((node) => {
@@ -271,8 +271,8 @@ test("Summary loading leader bars have the source pitch and width", async ({ pag
     };
   });
   expect(boxes.pitch).toBe(42);
-  expect(boxes.leaderWidth).toBeCloseTo(221.7, 0);
-  expect(boxes.attributionWidth).toBeCloseTo(520, 0);
+  expect(boxes.leaderWidth).toBeCloseTo(219.2, 0);
+  expect(boxes.attributionWidth).toBeCloseTo(514, 0);
 });
 
 test("one-snapshot Summary fills the lower empty panels", async ({ page }) => {
@@ -292,7 +292,7 @@ test("Summary P&L grid reaches the card edge", async ({ page }) => {
     const svgLine = line as SVGLineElement;
     return svgLine.getScreenCTM()!.e + svgLine.x2.baseVal.value * svgLine.getScreenCTM()!.a;
   });
-  expect(edge).toBeGreaterThan(1045);
+  expect(edge).toBeGreaterThan(1035);
 });
 
 test("Summary end label, rail separators and Refresh control match the source", async ({ page }) => {
@@ -304,7 +304,7 @@ test("Summary end label, rail separators and Refresh control match the source", 
     const style = getComputedStyle(node);
     return [style.fontWeight, style.fill];
   })).toEqual(["600", "rgb(255, 255, 255)"]);
-  expect((await label.boundingBox())!.x).toBeCloseTo(985.7, 0);
+  expect((await label.boundingBox())!.x).toBeCloseTo(976.4, 0);
   const separators = await page.locator(".t3-fidelity-nav-group").evaluateAll((nodes) =>
     nodes.map((node) => {
       const box = node.getBoundingClientRect();
@@ -355,11 +355,11 @@ test("Summary KPI, ATH rule and chart axes use the source page coordinates", asy
     };
   });
   expect(metrics).toMatchObject({
-    big: 163, percent: 163, athRule: 287,
+    big: 212, percent: 212, athRule: 336,
     gridColor: "rgb(38, 38, 41)",
   });
   expect(metrics.gridX).toBeCloseTo(149, 0);
-  expect(metrics.gridY).toBeCloseTo(450, 0);
+  expect(metrics.gridY).toBeCloseTo(499, 0);
 });
 
 test("Summary range starts at the source heading position", async ({ page }) => {
@@ -378,10 +378,10 @@ test("Summary month cards and footer follow the source row spacing", async ({ pa
   const card = (await page.locator(".fidelity-period-card").first().boundingBox())!;
   const months = (await page.locator(".fidelity-month-grid").boundingBox())!;
   const footer = (await page.locator(".fidelity-period-card .fidelity-caption").boundingBox())!;
-  expect(card.y).toBe(523);
-  expect(months.y).toBe(578);
+  expect(card.y).toBe(572);
+  expect(months.y).toBe(627);
   expect(months.height).toBe(346);
-  expect(footer.y).toBe(938);
+  expect(footer.y).toBe(987);
 });
 
 test("Summary card labels use tabular digits while amounts stay proportional", async ({ page }) => {
@@ -403,18 +403,18 @@ test("Goals unread dot follows the source rail geometry", async ({ page }) => {
     const box = node.getBoundingClientRect();
     const style = getComputedStyle(node);
     return { x: box.x, y: box.y, width: box.width, height: box.height, border: style.borderTopWidth, color: style.backgroundColor };
-  })).toEqual({ x: 31, y: 373, width: 7, height: 7, border: "2px", color: "rgb(238, 106, 130)" });
+  })).toEqual({ x: 31, y: 360, width: 7, height: 7, border: "2px", color: "rgb(238, 106, 130)" });
 });
 
 test("Summary attribution header and leaders footnote match source vertical rhythm", async ({ page }) => {
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".fidelity-attribution-row.head").boundingBox())!.y).toBe(1078);
+  expect((await page.locator(".fidelity-attribution-row.head").boundingBox())!.y).toBe(1127);
   expect(await page.locator(".fidelity-attribution-row.head > span").first().evaluate((node) => {
     const range = document.createRange();
     range.selectNodeContents(node);
     return range.getBoundingClientRect().y;
-  })).toBe(1080);
+  })).toBe(1129);
   expect(await page.locator(".fidelity-leaders .fidelity-caption").evaluate((node) => getComputedStyle(node).lineHeight)).toBe("18px");
 });

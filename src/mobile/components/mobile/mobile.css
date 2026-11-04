@@ -203,6 +203,8 @@
   .mobile-more-hub .mobile-list-label svg { width: 22px; height: 22px; flex: none; color: hsl(var(--primary)); }
   .mobile-header-total-label { display: none; }
   .mobile-header-total-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .mobile-header-total-value.t3-live-amount { min-width: 10ch; }
+  .mobile-header-total-value .t3-live-skeleton { width: 9ch; }
   #app-top-bar .mr-4 { display: none; }
   #app-top-bar .ml-auto { gap: .25rem; }
   #app-top-bar .ml-auto > :is(div, button) { min-width: 2.75rem; }
@@ -1046,6 +1048,22 @@
 
 /* The mobile bundle owns these rules at every width, including pointer enabled iPads. */
 .mobile-sidebar { display: none; }
+#root > .min-h-dvh, #root > .min-h-dvh > div:last-child, .t3-mobile-app { height: 100%; min-height: 0; }
+#root > .min-h-dvh { height: 100vh; height: 100dvh; overflow: hidden; }
+.app-layout { height: 100%; min-height: 0; overflow: hidden; }
+.app-layout .app-content { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.app-layout #app-main-content {
+  flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: auto;
+  overscroll-behavior: contain;
+}
+.mobile-rail-scroll { min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; }
+@media print {
+  #root > .min-h-dvh, #root > .min-h-dvh > div:last-child, .t3-mobile-app,
+  .app-layout, .app-layout .app-content, .app-layout #app-main-content {
+    height: auto !important; min-height: 0 !important; overflow: visible !important;
+  }
+  .app-layout #app-main-content { flex: none !important; }
+}
 .d2-summary .mobile-segment { min-width: 44px; }
 .mobile-inline-detail { min-width: 0; border-radius: 16px; background: hsl(var(--card)); overflow: hidden; }
 .mobile-inline-detail .mobile-sheet-body { max-height: min(72dvh, 850px); overflow: auto; }
@@ -1205,8 +1223,8 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
   .overview-sections .overview-movers-card .profit-mobile-list { max-width: 760px; }
   .history-split { grid-template-columns: minmax(280px, 40%) minmax(0, 1fr); align-items: start; }
   .history-split > .mobile-split-detail {
-    position: sticky; top: calc(64px + var(--mobile-safe-top));
-    max-height: calc(100dvh - 64px - var(--mobile-safe-top) - var(--mobile-safe-bottom));
+    position: sticky; top: calc(44px + var(--mobile-safe-top));
+    max-height: calc(100dvh - 84px - var(--mobile-safe-top) - var(--mobile-safe-bottom));
     overflow: auto;
   }
   .history-mobile-snapshot-button { min-height: 64px; gap: 4px; padding: 8px 12px; }
@@ -1457,7 +1475,7 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
   .mobile-sidebar {
     padding: calc(var(--mobile-safe-top) + 12px) 10px calc(var(--mobile-safe-bottom) + 8px) calc(var(--mobile-safe-left) + 10px);
     border-right: 1px solid hsl(var(--border)); background: hsl(var(--background));
-    overflow-y: auto; overflow-x: hidden;
+    overflow: hidden;
   }
   .mobile-sidebar[data-collapsed="true"] { padding-left: calc(var(--mobile-safe-left) + 5px); padding-right: 5px; }
   .mobile-rail-brand { display: flex; flex: none; align-items: center; height: 44px; gap: 10px; margin-bottom: 12px; border-radius: var(--radius); white-space: nowrap; font-size: 15px; font-weight: 600; }
@@ -1472,7 +1490,7 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
   .mobile-rail-item[aria-current="page"] { background: hsl(var(--raised)); color: hsl(var(--foreground)); }
   .mobile-rail-item[aria-current="page"]::before { content: ""; position: absolute; top: 9px; bottom: 9px; left: -10px; width: 2px; background: hsl(var(--accent-data)); }
   .mobile-rail-badge { display: grid; min-width: 18px; height: 18px; place-items: center; margin-left: auto; padding: 0 5px; border-radius: var(--radius-pill); background: hsl(var(--negative)); color: hsl(var(--background)); font-size: 12px; font-weight: 700; }
-  .mobile-rail-spacer { flex: 1; min-height: 12px; }
+  .mobile-rail-spacer { flex: none; min-height: 12px; }
   .mobile-rail-spacer + .mobile-rail-item { border-top: 1px solid hsl(var(--border)); border-radius: 0; }
   .mobile-sidebar .mobile-sidebar-collapse { display: flex; min-height: 44px; padding: 0 9px; border-radius: var(--radius); font-size: 13px; }
   .mobile-sidebar[data-collapsed="true"] .mobile-rail-item { justify-content: center; padding-inline: 0; }

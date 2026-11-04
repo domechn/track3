@@ -260,7 +260,7 @@ for (const phone of phones) {
     await expect(createdRule).toBeVisible();
     await expect(createdRule).toContainText("$50,000");
     await createdRule.evaluate((rule) => {
-      window.scrollTo({ top: window.scrollY + rule.getBoundingClientRect().top - 16, behavior: "auto" });
+      document.getElementById("app-main-content")!.scrollTo({ top: document.getElementById("app-main-content")!.scrollTop + rule.getBoundingClientRect().top - 16, behavior: "auto" });
     });
     await expect.poll(async () => {
       const rule = (await createdRule.boundingBox())!;

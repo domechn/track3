@@ -99,7 +99,7 @@ test.describe("Comparison desktop fidelity", () => {
           await page.getByRole("button", { name: /Base Date|Snapshot A/ }).click();
           await expect(page.getByRole("button", { name: "Next month" })).toBeDisabled();
         }
-        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
         if (!picker) await page.mouse.move(800, 20);
         await page.screenshot({ path: `${output}/comparison${picker ? "-picker" : ""}-desktop.png`, fullPage: true });
         await expect(page.getByRole("heading", { name: "Snapshots" })).toBeVisible();

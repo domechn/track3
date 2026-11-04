@@ -70,8 +70,8 @@ test("pushed titles and goal editor actions use the same balanced insets", async
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/settings/data?section=backup");
   await expect(page.getByRole("heading", { name: "Backup & data" })).toBeVisible();
-  await page.evaluate(() => window.scrollTo(0, 500));
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(64);
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 500));
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThan(64);
   const pushedTitle = page.locator("#app-top-bar .ios-d3-pushed-title");
   await expect(pushedTitle).toBeVisible();
   expect(await pushedTitle.evaluate((node) => {

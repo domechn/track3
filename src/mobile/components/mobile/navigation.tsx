@@ -55,7 +55,7 @@ function Navigation({ unread = 0, onTabSwitch, sidebar = false, collapsed = fals
           if (id === "analytics" && !sidebar) {
             window.dispatchEvent(new Event(ANALYTICS_DESTINATIONS_EVENT));
           } else {
-            window.scrollTo(0, 0);
+            document.getElementById("app-main-content")?.scrollTo(0, 0);
           }
         } else {
           onTabSwitch?.(selected === id);
@@ -118,10 +118,10 @@ export function MobileSidebar(props: { unread?: number; onTabSwitch?: (rootTap: 
     <Link to="/overview" className="mobile-rail-brand" aria-label="Track3" onClick={() => onTabSwitch?.(false)}>
       <TrackLogo size={28} decorative />{!collapsed && <b>{t("app.brand")}</b>}
     </Link>
-    {groups.map((group, index) => <div className="mobile-rail-group" key={index}>
+    <div className="mobile-rail-scroll">{groups.map((group, index) => <div className="mobile-rail-group" key={index}>
       {group.label && !collapsed && <div className="mobile-rail-group-label">{group.label}</div>}
       {group.items.map(renderItem)}
-    </div>)}
+    </div>)}</div>
     <div className="mobile-rail-spacer" />
     {renderItem({ to: "/settings", key: "nav.settings", icon: GearIcon })}
     <button type="button" className="mobile-sidebar-collapse" onClick={onCollapse}

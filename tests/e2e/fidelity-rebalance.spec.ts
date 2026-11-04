@@ -29,7 +29,7 @@ for (const state of ["rebalance", "rebalance-empty"] as const) {
     if (state === "rebalance-empty") {
       await expect(page.getByRole("button", { name: "0.0 pts" })).toHaveAttribute("aria-pressed", "true");
       await page.getByRole("button", { name: "2.0 pts" }).click();
-      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
     }
     await capture(page, state);
     const cardBounds = await page.locator(".pf-rebalance > .pf-card").evaluateAll((cards) =>

@@ -49,16 +49,16 @@ test("Overview matches the approved phone card order and sample values", async (
     await expect(page.locator(".fd-overview-source [aria-label='Ledger cold wallet wallet']")).toHaveText("Lg");
     await page.screenshot({ path: `${dir}/overview-phone.png` });
     writeFileSync(`${dir}/geometry.json`, JSON.stringify(await page.evaluate(() => ({
-      height: document.documentElement.scrollHeight,
+      height: document.getElementById("app-main-content")!.scrollHeight,
       chart: document.querySelector(".fd-overview-chart path")?.getAttribute("d"),
       elements: [...document.querySelectorAll(".fd-overview-topbar,.fd-overview-head,.fd-overview-grid>*")]
-        .map((element) => { const r = element.getBoundingClientRect(); return { className: element.className, y: r.y + scrollY, height: r.height }; }),
+        .map((element) => { const r = element.getBoundingClientRect(); return { className: element.className, y: r.y + document.getElementById("app-main-content")!.scrollTop, height: r.height }; }),
     })), null, 2));
     await page.evaluate(() => {
       const nav = document.querySelector<HTMLElement>(".mobile-tab-bar");
       if (!nav) return;
       nav.style.setProperty("position", "absolute", "important");
-      nav.style.setProperty("top", `${document.documentElement.scrollHeight - 60}px`, "important");
+      nav.style.setProperty("top", `${document.getElementById("app-main-content")!.scrollHeight - 60}px`, "important");
       nav.style.setProperty("bottom", "auto", "important");
     });
     await page.screenshot({ path: `${dir}/overview-phone-long.png`, fullPage: true });
@@ -203,7 +203,7 @@ test("Overview expanded rankings capture six coins and show fewer", async ({ bro
     await page.getByRole("button", { name: /Show more \(3\)/ }).click();
     await expect(page.getByRole("button", { name: "Show fewer" })).toBeVisible();
     await page.locator(".fd-overview-rank").evaluate((element) =>
-      window.scrollTo(0, window.scrollY + element.getBoundingClientRect().top - 16));
+      document.getElementById("app-main-content")!.scrollTo(0, document.getElementById("app-main-content")!.scrollTop + element.getBoundingClientRect().top - 16));
     await expect(page.locator("#app-top-bar")).toBeHidden();
     expect((await page.locator(".fd-overview-rank").boundingBox())?.height).toBe(520);
     expect((await page.locator(".fd-overview-more").boundingBox())?.y).toBe(429);
@@ -218,7 +218,7 @@ test("expanded phone rankings survive coin detail Back and reset on the Overview
     await page.getByRole("button", { name: /Show more \(3\)/ }).click();
     const row = page.locator(".fd-overview-rank .fd-overview-row").first();
     await row.scrollIntoViewIfNeeded();
-    const before = await page.evaluate(() => scrollY);
+    const before = await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop);
     expect(before).toBeGreaterThan(300);
     await row.click();
     await expect(page).toHaveURL(/#\/coins\//);
@@ -227,7 +227,7 @@ test("expanded phone rankings survive coin detail Back and reset on the Overview
     else await page.locator(".fd-coin-head nav button").first().click();
     await expect(page).toHaveURL(/#\/overview$/);
     await expect(page.getByRole("button", { name: "Show fewer" })).toBeVisible();
-    await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThanOrEqual(before - 2);
+    await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBeGreaterThanOrEqual(before - 2);
     await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
     await expect(page.getByRole("button", { name: /Show more \(3\)/ })).toBeVisible();
   } finally { await context.close(); }
