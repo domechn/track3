@@ -207,7 +207,7 @@ test("locked sync status stays clear of the More tab and tab bar", async ({ page
   const tabBox = (await page.locator(".mobile-tab-bar").boundingBox())!;
   expect(pillBox.y + pillBox.height).toBeLessThanOrEqual(tabBox.y);
   await expect(page.getByRole("dialog")).toBeVisible();
-  await page.locator(".fidelity-sync-sheet-backdrop").click({ position: { x: 8, y: 100 } });
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toBeHidden();
   await pill.click();
   await page.getByRole("button", { name: "Continue without sync" }).click();

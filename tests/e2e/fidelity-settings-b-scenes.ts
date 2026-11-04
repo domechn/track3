@@ -1,5 +1,4 @@
 import { copyFileSync, mkdirSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { installTauriBridge, seedSettingsSnapshots } from "./fidelity-scenes";
@@ -7,8 +6,21 @@ import { FakeS3 } from "../../src/middlelayers/sync/object-store";
 
 export type SettingsBPage = "pro" | "ai" | "backup" | "security" | "sync" | "about";
 
-const designRoot = "/home/ubuntu/.hermes/projects/track3-design/desktop/settings-b";
 const captureRoot = "/tmp/fidelity-desktop";
+const designHeights: Record<number, string[]> = {
+  1111: ["about-downloading", "about-guide", "about-ready", "about-toast-ok", "about-update",
+    "security-rotate", "sync-confirm-use", "sync-disable", "sync-forget", "sync-pop-error",
+    "sync-pop-locked", "sync-pop-never", "sync-pop-ok", "sync-pop-stopped", "sync-pop-syncing",
+    "sync-toast"],
+  1222: ["backup-conflicts", "backup-restore", "backup-toast-err", "backup-toast-ok", "pro-deactivate"],
+  1666: ["about", "about-check-error", "about-checking", "about-later", "ai", "ai-fail",
+    "ai-json-error", "ai-reveal", "ai-saved", "ai-testing", "backup", "backup-exporting",
+    "backup-no-folder", "pro", "pro-activating", "pro-exhausted", "pro-expired", "pro-free",
+    "pro-invalid", "security", "security-lock-off", "security-recovery-missing",
+    "security-rotated", "security-rotating"],
+  2055: ["sync", "sync-loading", "sync-locked", "sync-rename", "sync-setup", "sync-test-fail",
+    "sync-testing"],
+};
 export const fidelitySyncSettings = {
   enabled: true,
   endpoint: "https://3f9a1c7e2b4d.r2.cloudflarestorage.com",
@@ -219,14 +231,13 @@ others:
 
 export async function settingsBShot(page: Page, area: SettingsBPage, state: string) {
   const stem = state === "default" ? area : `${area}-${state}`;
-  const jpg = `${designRoot}/${stem}-desktop.jpg`;
-  const size = execFileSync("file", [jpg], { encoding: "utf8" }).match(/1600x(\d+)/);
-  if (!size) throw new Error(`Design size unknown: ${jpg}`);
+  const height = Object.entries(designHeights).find(([, names]) => names.includes(stem))?.[0];
+  if (!height) throw new Error(`Design size unknown: ${stem}`);
   const syncDialog = area === "sync" && ["disable", "forget", "confirm-use"].includes(state);
   const dialog = syncDialog || area === "backup" && state === "restore";
   const viewportShot = dialog || area === "sync" && (state.startsWith("pop-") || state === "toast")
     || area === "backup" && ["conflicts", "toast-ok", "toast-err"].includes(state);
-  await page.setViewportSize({ width: 1600, height: Number(size[1]) });
+  await page.setViewportSize({ width: 1600, height: Number(height) });
   if (dialog) await page.evaluate(() => window.scrollTo(0, 0));
   await page.evaluate(() => document.fonts.ready);
   const output = `${captureRoot}/${area}`;

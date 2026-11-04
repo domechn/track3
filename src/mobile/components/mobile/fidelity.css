@@ -243,7 +243,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-position-grid>.fd-coin-metric { min-height:0; }
 .app-layout:has(.fd-page) .mobile-tab-bar { display:grid; grid-template-columns:27.1154% 24.2949% 27.1154% 21.4743%; padding:0 var(--mobile-safe-right) var(--mobile-safe-bottom) var(--mobile-safe-left); }
 .app-layout:has(.fd-page) .mobile-tab { flex:none; font-size:11px; font-weight:400; line-height:18px; }
-.app-layout:has(.fd-page) .mobile-tab-badge { top:-4px; left:calc(100% - 4px); min-width:16px; padding:0 5px; font-size:10px; font-weight:700; }
+.app-layout:has(.fd-page) .mobile-tab-badge { top:-4px; left:100%; min-width:16px; padding:0 5px; font-size:10px; font-weight:700; }
 .fd-coin-stats { margin-top:11px; }
 .fd-open-lots { margin-top:20px; }
 .fd-open-lots .fd-card-heading { margin-bottom:3px; }

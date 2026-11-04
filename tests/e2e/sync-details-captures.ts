@@ -59,7 +59,13 @@ export async function captureSyncDetails(page: Page, platform: "desktop" | "mobi
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
   if (platform === "mobile") {
-    await dialog.getByRole("link", { name: locale === "en" ? "Settings" : "设置" }).click();
+    await page.keyboard.press("Escape");
+    await page.getByRole("navigation", { name: locale === "en" ? "Tabs" : "标签页" })
+      .getByRole("link", { name: locale === "en" ? "More" : "更多" }).click();
+    await expect(page.locator("#app-main-content")).toHaveAttribute("data-route", "/more");
+    await page.locator('#app-main-content a[href="#/settings"]').click();
+    await expect(page.locator("#app-main-content")).toHaveAttribute("data-route", "/settings");
+    await page.locator('#app-main-content a[href="#/settings/sync"]').click();
     await expect(page).toHaveURL(/#\/settings\/sync$/);
   }
   const conflict = platform === "mobile" ? page.locator(".t3-sync-conflicts") : dialog;
