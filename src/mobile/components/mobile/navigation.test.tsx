@@ -27,6 +27,16 @@ describe("mobile navigation", () => {
     fireEvent.click(sidebar.querySelector('a[href="/history"]')!);
     expect(screen.getByText("/history")).toBeInTheDocument();
   });
+  it("uses an Overview link for the two-peak iPad brand", () => {
+    render(<MemoryRouter initialEntries={["/history"]}>
+      <MobileSidebar collapsed />
+      <Routes><Route path="*" element={<Path />} /></Routes>
+    </MemoryRouter>);
+    const brand = screen.getByRole("link", { name: "Track3", hidden: true });
+    expect(brand.querySelectorAll("polygon")).toHaveLength(2);
+    fireEvent.click(brand);
+    expect(screen.getByText("/overview")).toBeInTheDocument();
+  });
   it("names an asset detail page for its asset", () => {
     expect(routeTitle("/coins/BTC", (key) => key)).toBe("BTC");
     expect(tabForPath("/coins/BTC")).toBe("overview");

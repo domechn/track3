@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useTranslation } from "@/mobile/i18n";
 import { useHaptics, useSizeClass } from "@/mobile/components/mobile";
 import { MobileIcon } from "@/mobile/components/mobile/icons";
+import { TrackLogo } from "@/components/brand/track-logo";
 import {
   ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, DashboardIcon, BarChartIcon,
   BackpackIcon, MixIcon, LayersIcon, ClockIcon, ActivityLogIcon,
@@ -114,7 +115,9 @@ export function MobileSidebar(props: { unread?: number; onTabSwitch?: (rootTap: 
     </Link>;
   };
   return <nav aria-label={t("nav.main")} className="mobile-sidebar" data-collapsed={collapsed}>
-    <div className="mobile-rail-brand"><span aria-hidden="true"><DashboardIcon /></span>{!collapsed && <b>{t("app.brand")}</b>}</div>
+    <Link to="/overview" className="mobile-rail-brand" aria-label="Track3" onClick={() => onTabSwitch?.(false)}>
+      <TrackLogo size={28} decorative />{!collapsed && <b>{t("app.brand")}</b>}
+    </Link>
     {groups.map((group, index) => <div className="mobile-rail-group" key={index}>
       {group.label && !collapsed && <div className="mobile-rail-group-label">{group.label}</div>}
       {group.items.map(renderItem)}

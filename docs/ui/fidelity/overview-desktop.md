@@ -39,6 +39,8 @@ The type face is Public Sans with tabular numbers. Tokens: `--ground #0d0d0e`, `
 
 The native-width captures are in `/tmp/fidelity-desktop/overview/`; each state also has a `-1600.png` capture. The authoritative source renders are in `/tmp/fidelity-desktop/design/`. The review gate counts a pixel as changed when its three absolute RGB-channel differences sum to more than 60, over the overlapping top-left rectangle. Capture dimensions are reported separately. The permanent JPEGs were also checked visually; the source render takes precedence where its page height differs.
 
+The pixel figures below predate the Track3 mark change.
+
 | State | Measured difference | Source render / capture size |
 | --- | ---: | --- |
 | Overview | 5.17% | 1440 × 1523 / 1440 × 1523 |
@@ -58,7 +60,7 @@ The unchanged product-data regions account for most changed pixels. Excluding th
 - The `Rank` column contains portfolio-value positions because the persisted asset and price records lack market-cap rank. The reference explicitly uses sample market-cap ranks (#1, #3, #2, #6, #4, #7). Its market-cap footnote therefore becomes a portfolio-rank explanation.
 - The sync fixture performs a real pass through the local fake S3 service. It has one device with an ID and a dynamic last-run time; the reference has two named devices and Cloudflare R2. The `Waiting to upload` value is unknown until the actual sync manifest reports it, and the real scheduler says the next check is on activity. The other seven states show the same genuine fake-service status, not invented R2/device metadata.
 - A failed source retains a last-good timestamp and value, but the stored source-status normalizer only retains the generic timeout reason. The stale banner therefore says `Source timed out` rather than `Flex Query timed out`. The failed row's status copy is tighter and the retry chip has less space than the reference.
-- The rail and top controls use the app's existing icon set. Several pictograms, the active-rail edge and some pill/icon offsets differ from the reference. Small type raster, table text baselines and narrow chart strokes also differ; they are below the acceptance threshold.
+- The rail uses the current text-free Track3 two-peak mark, while the reference shows a blue chart tile. Top controls use the app's existing icon set. Several pictograms, the active-rail edge and some pill/icon offsets differ from the reference. Small type raster, table text baselines and narrow chart strokes also differ; they are below the acceptance threshold.
 - The Sources card now says `Refresh all` and the primary `Refresh` control keeps its own accessible name.
 - The footer includes `Show More`, which exposes the product's existing detailed Overview panels. The reference footer has only the sync stamp. The stamp reflects the real fake-service destination and device count.
 - The source's daily bars use a presentation-only series, while the app derives bars from persisted daily snapshot changes. The largest bars and some positions therefore differ. The app derives What moved from persisted asset changes too; bar lengths and the final dollar rounding differ. These panels keep the source's order and scales.

@@ -7,6 +7,7 @@ This update supersedes the font, chart color, and card surface guidance in the e
 ## Intentional layout deviations
 
 - The desktop sidebar starts collapsed at every desktop width. It can still be expanded to show the grouped navigation.
+- The brand slot uses the text-free Track3 two-peak mark from the existing app icon; the reference screenshots show a blue chart tile. The desktop and iPad brand links go to Overview.
 - The desktop date popover aligns to the right edge of its trigger.
 - Overview puts the total value trend in the hero card and removes the separate P&L chart. Profit is under Show More.
 - iOS shows source status in the Sources card and refresh sheet, without an Overview source teaser. Its Source status button remains available while a refresh runs, as on desktop.

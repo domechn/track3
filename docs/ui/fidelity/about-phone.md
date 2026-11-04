@@ -74,6 +74,7 @@ State: **default**. Button actions, input validity, status, overlays, and toasts
 
 Capture: `/tmp/fidelity/settings-b/about.png` (full page: `about-long.png`). Design and app were compared side by side at 390 × 844 CSS px. Remaining differences are listed below.
 
+- The app uses the current text-free, two-peak Track3 mark in place of the source's blue chart tile.
 - The source shows a build date, iOS version/device name, SQLite schema number, and a data-folder path; the app exposes the version and platform but has no UI data source for those extra fields. They are shown as the closest verified values.
 - The source has an in-app update check/status in the first card; the iOS product has no updater command. The app links to releases and defers installation to its distribution channel.
 - The first card and Help card remain different in height because the updater status line and some source descriptions are absent; this shifts subsequent rows and the fold. This is visible UI geometry.
@@ -81,3 +82,4 @@ Capture: `/tmp/fidelity/settings-b/about.png` (full page: `about-long.png`). Des
 ## Pixel difference
 
 Viewport: **5.695%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).
+This figure predates the Track3 mark change.

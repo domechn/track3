@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { requestOnboardingReplay } from "@/middlelayers/onboarding";
 import { reloadApp } from "@/utils/app";
 import packageJson from "../../package.json";
+import { TrackLogo } from "@/components/brand/track-logo";
 
 type Props = { version: string };
 
@@ -68,7 +69,7 @@ export function AboutDesign({ version }: Props) {
       <span>{t("fidelity.settingsB.about.updateAvailableDesc").replace("{current}", version)}</span></div>
       <button className="t3-b-button small primary" onClick={() => setUpdateOpen(true)}>{t("fidelity.settingsB.about.viewUpdate")}</button></div>}
     <section className="t3-b-card t3-b-about-app">
-      <div className="t3-b-about-brand"><div className="t3-b-about-logo" aria-hidden="true"><i /><i /><i /></div><div><b>Track3</b><span>{t("fidelity.settingsB.about.version")} {version} · {t("fidelity.settingsB.about.stable")}</span></div></div>
+      <div className="t3-b-about-brand"><TrackLogo size={56} decorative /><div><b>Track3</b><span>{t("fidelity.settingsB.about.version")} {version} · {t("fidelity.settingsB.about.stable")}</span></div></div>
       <dl className="t3-b-dl">
         <dt>{t("fidelity.settingsB.about.version")}</dt><dd>{version}</dd>
         <dt>{t("fidelity.settingsB.about.platform")}</dt><dd>{platform}</dd>
