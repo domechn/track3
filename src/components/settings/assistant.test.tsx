@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AssistantSettings from "./assistant";
 
+const toastMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/middlelayers/configuration", async () => {
   const actual = await vi.importActual<
     typeof import("@/middlelayers/configuration")
@@ -26,8 +28,7 @@ vi.mock("@/middlelayers/ai", async () => {
 });
 
 vi.mock("@/components/ui/use-toast", () => {
-  const toast = vi.fn();
-  return { useToast: () => ({ toast }) };
+  return { useToast: () => ({ toast: toastMock }) };
 });
 
 import {
@@ -44,9 +45,27 @@ beforeEach(() => {
   vi.mocked(saveAIConfig).mockReset();
   vi.mocked(cleanAIConfig).mockReset();
   vi.mocked(probeConnection).mockReset();
+  toastMock.mockReset();
 });
 
 describe("AssistantSettings", () => {
+  it("reports saved settings and a working connection with success tones", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue({
+      endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192,
+    });
+    vi.mocked(saveAIConfig).mockResolvedValue(undefined);
+    vi.mocked(probeConnection).mockResolvedValue(undefined);
+    render(<AssistantSettings />);
+    await screen.findByLabelText(/endpoint/i);
+    await userEvent.click(screen.getByTestId("assistant-save"));
+    await waitFor(() => expect(toastMock).toHaveBeenCalledWith({
+      description: "Assistant settings saved", tone: "success",
+    }));
+    await userEvent.click(screen.getByRole("button", { name: /test connection/i }));
+    await waitFor(() => expect(toastMock).toHaveBeenCalledWith({
+      description: "Connection succeeded", tone: "success",
+    }));
+  });
   it("explains that encrypted assistant data can sync to the user's bucket", async () => {
     vi.mocked(loadAIConfig).mockResolvedValue({
       endpoint: "https://api.example.com/v1", apiKey: "", model: "test", contextSize: 8192,

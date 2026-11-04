@@ -148,7 +148,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         invoke("rotate_encryption_key", { newKey: encKeyInput }),
       );
       setKeyRotated(true);
-      toast({ description: t("data.encryption.key.success") });
+      toast({ description: t("data.encryption.key.success"), tone: "success" });
       setEncKeyInput("");
       setEncKeyConfirm("");
     } catch (e) {
@@ -193,7 +193,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   async function onExportDataClick() {
     const exported = await exportHistoricalData(exportConfiguration);
     if (exported) {
-      toast({ description: t("data.exportSuccess") });
+      toast({ description: t("data.exportSuccess"), tone: "success" });
     }
   }
 
@@ -239,7 +239,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       }
       else {
         setItemPreview(undefined);
-        toast({ description: t("data.importSuccess") });
+        toast({ description: t("data.importSuccess"), tone: "success" });
       }
     } catch (error) {
       toast({ description: redactSecrets(String(error), [encKeyInput]), variant: "destructive" });
@@ -261,7 +261,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         if (!imported) {
           return;
         }
-        toast({ description: t("data.importSuccess") });
+        toast({ description: t("data.importSuccess"), tone: "success" });
         if (onDataImported) {
           onDataImported();
         }

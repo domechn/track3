@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { expect, it, vi } from "vitest";
 import type { PendingAction } from "@/middlelayers/ai/actions/lifecycle";
+import { I18nProvider } from "@/mobile/i18n";
 import PhoneActionCard from "./phone-action-card";
 import { queryLastAssetsBySymbol } from "@/middlelayers/charts-assets";
 
@@ -36,14 +37,26 @@ it("clears the displayed market price when the proposed symbol changes", async (
 });
 
 it("uses the complete shared preview for a below-target alert", () => {
-  render(<MemoryRouter><PhoneActionCard action={alertAction({
-    comparator: "lte", assetType: "stock", enabled: false, window: "7d",
-  })} /></MemoryRouter>);
+  render(<I18nProvider><MemoryRouter><PhoneActionCard action={alertAction({
+    comparator: "lte", assetType: "stock", enabled: false, window: "7d", threshold: 1200.5,
+  })} /></MemoryRouter></I18nProvider>);
+  expect(screen.getByText("Create alert: BTC below $1,200.50")).toBeVisible();
+  expect(screen.getByText("Asset price target: BTC goes below $1,200.50")).toBeVisible();
+  expect(screen.getByText("Nothing else changes. No trades are made and no data leaves the device beyond this chat.")).toBeInTheDocument();
   expect(screen.queryByText(/above/)).toBeNull();
   expect(screen.getByText(/"comparator": "lte"/)).toBeVisible();
   expect(screen.getByText(/"assetType": "stock"/)).toBeVisible();
   expect(screen.getByText(/"enabled": false/)).toBeVisible();
   expect(screen.getByText(/"window": "7d"/)).toBeVisible();
+});
+
+it("translates progress in the shared fallback card for an invalid phone alert", async () => {
+  render(<I18nProvider><MemoryRouter><PhoneActionCard action={alertAction({
+    comparator: "gte", threshold: 0,
+  })} /></MemoryRouter></I18nProvider>);
+  expect(screen.getByText("Asset price target: BTC goes above $0")).toBeVisible();
+  expect(await screen.findByText(/of the way/)).toBeVisible();
+  expect(screen.queryByText(/fidelity\.assistant\.ofWay/)).toBeNull();
 });
 
 it("shows every additional field in a rising-price alert", () => {

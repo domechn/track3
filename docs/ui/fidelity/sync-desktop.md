@@ -20,6 +20,8 @@ The live Refresh and date-range controls remain visible in wide Settings; the st
 
 Settings toasts retain a visible 44px close × target for keyboard and pointer dismissal; the reference toasts omit it.
 
+At 901–1085px, the Sync page reserves up to 38vw for its toast column. The earlier 35vw width wrapped status text past the 181px toast height cap.
+
 The category switches remain usable during the first device load; the reference replaces them with skeletons. Loaded device and conflict rows remain in place while a later sync refreshes their details, so keyboard focus survives. The toast close × remains visible with a 44px target, including on pending and error toasts; the reference omits it.
 
 The Goals unread dot follows actual alert state; its size and placement differ slightly from the source rail.

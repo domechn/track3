@@ -28,6 +28,7 @@ for (const state of ["default", "no-folder", "exporting", "conflicts", "restore"
     } else if (state === "toast-ok" || state === "conflicts") {
       await page.getByRole("button", { name: "Export JSON" }).click();
       await expect(page.getByText("Export data successfully", { exact: true })).toBeVisible();
+      await expect(page.locator(".desktop-toast-viewport .t3-fidelity-toast-success")).toBeVisible();
       if (state === "conflicts") {
         await page.getByRole("button", { name: "Choose file and review" }).click();
         await expect(page.getByRole("dialog")).toBeVisible({ timeout: 60_000 });

@@ -421,6 +421,9 @@ describe("System Info subscription management", () => {
     fireEvent.change(screen.getByPlaceholderText(/license key/i), { target: { value: "restored-license" } });
     fireEvent.click(screen.getByRole("button", { name: /^activate$/i }));
     await waitFor(() => expect(mocks.saveLicense).toHaveBeenCalledWith("restored-license"));
+    expect(mocks.toast).toHaveBeenCalledWith({
+      description: "License key saved", tone: "success",
+    });
     expect(localStorage.getItem(checkoutPendingKey)).toBeNull();
     expect(screen.queryByText(/waiting for payment/i)).not.toBeInTheDocument();
   });
@@ -437,7 +440,9 @@ describe("System Info subscription management", () => {
     fireEvent.click(screen.getByRole("button", { name: "Switch language" }));
     mocks.getCheckoutStatus.mockResolvedValue({ status: "completed", license: "license-from-stripe" });
     fireEvent.click(screen.getByRole("button", { name: /我已付款/ }));
-    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ description: "Pro 订阅已激活！" }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
+      description: "Pro 订阅已激活！", tone: "success",
+    }));
   });
 
   it("clears the license cache after inactivating the device", async () => {
@@ -463,6 +468,9 @@ describe("System Info subscription management", () => {
       expect(mocks.inactiveLicense).toHaveBeenCalledWith("stored-license");
       expect(mocks.cleanLicense).toHaveBeenCalled();
       expect(mocks.clearLicenseCache).toHaveBeenCalledTimes(1);
+    });
+    expect(mocks.toast).toHaveBeenCalledWith({
+      description: "Device is inactived", tone: "success",
     });
   });
 

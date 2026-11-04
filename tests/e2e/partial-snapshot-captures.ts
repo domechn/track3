@@ -25,6 +25,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   await page.goto("/#/overview");
   if (shell === "desktop") {
     await expect(page.locator(".t3-hero-value").getByText("Partial", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Dotted gap: partial refreshes are omitted from this chart.")).toBeVisible();
     const label = await page.locator(".t3-hero-header .text-sm").boundingBox();
     const amount = await page.locator(".t3-hero-value").boundingBox();
     expect(label && amount && label.y + label.height + 4 <= amount.y).toBe(true);
@@ -39,6 +40,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
     await capture("overview-excluding");
     await page.getByRole("combobox", { name: "Total value view" }).click();
     await page.getByRole("option", { name: "Including last known values" }).click();
+    await expect(page.locator(".t3-hero-value").getByText("Partial", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Source status" }).click();
     const initialStatus = page.getByRole("alertdialog", { name: "Refresh finished" });
     await expect(initialStatus).toBeVisible();
@@ -113,6 +115,15 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   await capture("refresh-offer");
   await status.getByRole("button", { name: "Use last known values" }).click();
   if (shell === "desktop") await expect(status).toHaveCount(0);
+  else if (phoneLayout) {
+    await expect(page.locator(".fd-partial-total")).toHaveText("$142,648.20");
+    await page.locator(".fd-partial-summary").click();
+    await expect(status).toBeVisible();
+    await expect(status.getByRole("button", { name: "Use last known values" })).toHaveCount(0);
+    await status.getByRole("button", { name: "Close" }).click();
+    await page.locator(".fd-partial-refresh").click();
+    await expect(page.locator(".fd-partial-total")).toHaveText("$84,000.00");
+  }
   else if (!phoneLayout) {
     await expect(status).toHaveCount(0);
     await page.getByRole("button", { name: "Source status" }).click();

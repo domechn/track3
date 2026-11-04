@@ -106,8 +106,8 @@ const App = () => {
     try {
       await saveAIConfig(cfg);
       toast(wide
-        ? { title: t("fidelity.settingsB.ai.savedTitle"), description: t("fidelity.settingsB.ai.savedDesc") }
-        : { description: t("settings.assistant.saved") });
+        ? { title: t("fidelity.settingsB.ai.savedTitle"), description: t("fidelity.settingsB.ai.savedDesc"), tone: "success" }
+        : { description: t("settings.assistant.saved"), tone: "success" });
     } catch (err) {
       toast({
         description: redactSecrets((err as Error).message ?? String(err), [currentKey(), ...settingsSecrets()]),
@@ -138,7 +138,7 @@ const App = () => {
         });
       } else {
         setProbeSuccess(true);
-        toast({ description: t("settings.assistant.testSuccess") });
+        toast({ description: t("settings.assistant.testSuccess"), tone: "success" });
       }
     } catch (err) {
       const message = redactSecrets((err as Error).message ?? String(err), [currentKey()]);

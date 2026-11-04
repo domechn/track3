@@ -175,9 +175,15 @@ export async function refreshAllData(setProgress) {
           return blue;
         })).toBeGreaterThan(100);
       }
-      if (state === "stack") await expect.poll(() =>
-        page.locator(".desktop-toast-viewport > li[data-state='open']").count()).toBeGreaterThanOrEqual(2);
-      else await expect(page.locator(".desktop-toast-viewport > li[data-state='open']")).toHaveCount(1);
+      if (state === "stack") {
+        const openToasts = page.locator(".desktop-toast-viewport > li[data-state='open']");
+        await expect(openToasts).toHaveCount(3);
+        expect(await openToasts.allTextContents()).toEqual([
+          expect.stringContaining("Pro refresh limit nearly used"),
+          expect.stringContaining("OKX refresh failed"),
+          expect.stringContaining("Snapshot deleted"),
+        ]);
+      } else await expect(page.locator(".desktop-toast-viewport > li[data-state='open']")).toHaveCount(1);
       if (state === "long") {
         const syncToast = page.locator(".desktop-toast-viewport [data-sync-status='error']");
         await expect(syncToast).toBeVisible();

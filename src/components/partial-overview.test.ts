@@ -42,6 +42,29 @@ it("shows the named failed source instead of its persisted wallet hash", () => {
   ])).toBe("BTC");
 });
 
+it("uses the failed source with the matching provider when a persisted partial omits its display identity", () => {
+  const source = { wallet: "ddf7fe606e048ac89f8a8c62bf23c4be", kind: "wallet" as const, provider: "ERC20" };
+  const statuses = [
+    { sourceId: "erc20:0", label: "0x4f…a91c", kind: "wallet" as const, provider: "ERC20",
+      status: "failed" as const, category: "quota" as const },
+    { sourceId: "okx:0", label: "OKX", kind: "exchange" as const, provider: "okx", status: "ok" as const },
+  ];
+  expect(resolvePartialSourceLabel(source, statuses)).toBe("0x4f…a91c");
+  render(createElement(PartialOverview, {
+    view: { at: "2026-10-31T09:41:00Z", sourcesTotal: 2, source, included: [], lastGood: [], points: [] },
+    statuses, currency: { currency: "USD", symbol: "$", rate: 1, alias: "USD" }, bannerOnly: true,
+  }));
+  expect(screen.getByText("0x4f…a91c not refreshed: Pro limit reached. Totals exclude 0x4f…a91c.")).toBeVisible();
+});
+
+it("does not name a different wallet as the failed partial source", () => {
+  expect(resolvePartialSourceLabel({
+    wallet: "ddf7fe606e048ac89f8a8c62bf23c4be", kind: "wallet", provider: "BTC",
+  }, [
+    { sourceId: "erc20:0", label: "Another wallet", kind: "wallet", provider: "ERC20", status: "failed" },
+  ])).toBe("BTC");
+});
+
 it("scales a long real history from its values without a fixed sample range", () => {
   const points = Array.from({ length: 100_000 }, (_, index) => ({
     timestamp: index, totalValue: index % 2 ? 731_000 : 763_000,

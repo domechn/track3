@@ -169,7 +169,7 @@ const App = ({
         setCheckoutPhase(phase);
         setCheckoutError(error);
         if (phase === "completed") {
-          toast({ description: tRef.current("system.checkout.completed") });
+          toast({ description: tRef.current("system.checkout.completed"), tone: "success" });
           void trackCheckoutCompleted().catch(() => {});
         }
         if (phase === "expired" || phase === "timed-out" || phase === "error") {
@@ -198,6 +198,7 @@ const App = ({
         setActiveLicense(inputLicense);
         toast({
           description: t("system.licenseSaved"),
+          tone: "success",
         });
       })
       .catch((err) => {
@@ -223,6 +224,7 @@ const App = ({
         setInputLicense(undefined);
         toast({
           description: t("system.deviceInactivated"),
+          tone: "success",
         });
       })
       .catch((err) => {

@@ -118,6 +118,11 @@ for (const state of ["new", "phone", "approved", "error", "nokey", "sessions", "
       ? "/#/assistant/assistant-main" : state === "error" ? "/#/assistant/assistant-error" : "/#/assistant");
     if (state === "nokey") await page.getByTestId("assistant-not-configured").waitFor();
     else await page.getByTestId("chat-session-layout").waitFor();
+    if (state === "phone") {
+      const box = await page.locator(".ios-d3-chat").boundingBox();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    }
     if (state === "new") {
       await expect(page.getByText(/Buying .+ of BTC would bring it back to 30\.0%, funded by selling USDT/)).toBeVisible();
     }

@@ -6,7 +6,7 @@ import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
 import { queryAssetChange, queryHistoricalData, queryLatestAssetsPercentage, queryTotalValue, queryTotalValues } from "@/middlelayers/charts";
 import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 import { useDataChangedVersion } from "@/contexts/data-changed";
-import { sourceStatusesChangedEvent } from "@/components/source-status-event";
+import { overviewUseLastKnownEvent, sourceStatusesChangedEvent } from "@/components/source-status-event";
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { buildAssetDetailsPath } from "@/utils/assets";
 import { currencyWrapper } from "@/utils/currency";
@@ -168,6 +168,12 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
   const { t, locale } = useTranslation();
   const version = useDataChangedVersion();
   const [view, setView] = useState<View | null>(null);
+  const [withLastKnown, setWithLastKnown] = useState(false);
+  useEffect(() => {
+    const includeLastKnown = () => setWithLastKnown(true);
+    window.addEventListener(overviewUseLastKnownEvent, includeLastKnown);
+    return () => window.removeEventListener(overviewUseLastKnownEvent, includeLastKnown);
+  }, []);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [statuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const [insightsEnabled, setInsightsEnabled] = useState(false);
@@ -222,6 +228,7 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
       Promise.all([getConfiguration(), isProVersion()]).then(([config, license]) => config ? listPortfolioSources(config, license) : []),
     ]).then(async ([points, snapshots, holdings, detail, sources]) => {
       if (!active) return;
+      setWithLastKnown(false);
       const latest = snapshots[0] ?? null;
       const wallets = [...new Set((latest?.assets ?? []).map((asset) => asset.wallet).filter((wallet): wallet is string => !!wallet))];
       const latestAt = from(latest)?.getTime() ?? 0;
@@ -393,7 +400,8 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
     return <FirstRunFidelity sources={view.sources} currency={currency} onRefresh={onRefresh} />;
   }
   if (status === "ready" && view?.partial && view.latest) {
-    return <PartialOverviewFidelity view={view} statuses={statuses} currency={currency} quoteColor={quoteColor} onRefresh={onRefresh} />;
+    return <PartialOverviewFidelity view={view} statuses={statuses} currency={currency} quoteColor={quoteColor} onRefresh={onRefresh}
+      withLastKnown={withLastKnown} setWithLastKnown={setWithLastKnown} />;
   }
   return <section className="fd-page fd-overview" data-state={status} data-quote-color={quoteColor}>
     <header className="fd-overview-head">

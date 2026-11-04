@@ -57,7 +57,7 @@ async function shot(page: Page, name: string) {
       pill!.y < box!.y + box!.height && pill!.y + pill!.height > box!.y,
     `${name}: sync status pill overlaps toast`).toBe(false);
   }
-  expect(box!.height).toBeLessThanOrEqual(name.startsWith("mobile") || page.viewportSize()!.width <= 900 || state === "error" ? 240 : 181);
+  expect(box!.height).toBeLessThanOrEqual(name.startsWith("mobile") || page.viewportSize()!.width <= 900 ? 240 : 181);
   expect(box!.width).toBeGreaterThanOrEqual(page.viewportSize()!.width === 320 ? 280
     : page.viewportSize()!.width <= 900 ? 220 : page.viewportSize()!.width < 1000 ? 270 : 300);
   const overlap = await toast.evaluate((node, mobile) => {
