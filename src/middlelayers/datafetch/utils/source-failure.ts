@@ -73,6 +73,8 @@ export const partialEndpointKeys: Record<string, string> = {
   "Portfolio INTX": "portfolioIntx", "Some assets": "assets",
   "USD-M Futures": "usdMFutures", "USD-M isolated positions": "usdMIsolatedPositions",
   "COIN-M Futures": "coinMFutures",
+  Spot: "spot", "USDT-FUTURES": "usdtFutures", "COIN-FUTURES": "coinFutures",
+  "USDC-FUTURES": "usdcFutures",
 };
 
 export function safePartialEndpoint(label: string): string | undefined {
@@ -111,7 +113,7 @@ export function recordOptionalSourceFailure(
   const detail = message.replace(/https?:\/\/[^\s)]+/gi, "");
   if (!reportAuth && !reportUnavailable &&
     /\b(?:code\s*700011|not (?:enabled|opened|activated|allowed|supported)|permission denied|no (?:margin|futures|earn|portfolio) account)\b/i.test(detail)) return;
-  const category = classifySourceError(error);
+  const category = reportUnavailable && /permission denied/i.test(detail) ? "auth" : classifySourceError(error);
   const current = optionalFailures.get(source);
   if (!current) {
     optionalFailures.set(source, { category, endpoints: [endpoint] });

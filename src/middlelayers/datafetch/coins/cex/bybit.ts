@@ -20,6 +20,15 @@ type WalletBalanceResp = {
   };
 };
 
+type FundBalanceResp = {
+  retCode: number;
+  retMsg: string;
+  result: {
+    accountType: string;
+    balance: { coin: string; walletBalance: string; transferBalance: string; bonus: string }[];
+  };
+};
+
 type TickerResp = {
   retCode: number;
   retMsg: string;
@@ -93,8 +102,12 @@ export class BybitExchange implements Exchanger {
   }
 
   async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-    const [walletBalance, earnBalance, advanceEarnBalance] = await Promise.all([
+    const [walletBalance, fundBalance, earnBalance, advanceEarnBalance] = await Promise.all([
       this.fetchWalletBalance(),
+      this.fetchFundBalance().catch((e) => {
+        recordOptionalSourceFailure(this, e, "Funding", true, true);
+        return {};
+      }),
       this.fetchEarnBalance().catch((e) => {
         console.error("Fetch Bybit earn balance failed:");
         recordOptionalSourceFailure(this, e, "Earn");
@@ -108,7 +121,25 @@ export class BybitExchange implements Exchanger {
     ]);
 
     // Merge wallet, contract, earn and advance earn (dual asset) balances
-    return mergeBalances([walletBalance, earnBalance, advanceEarnBalance]);
+    return mergeBalances([walletBalance, fundBalance, earnBalance, advanceEarnBalance]);
+  }
+
+  private async fetchFundBalance(): Promise<{ [k: string]: number }> {
+    const resp = await this.fetch<FundBalanceResp>("GET", "/asset/transfer/query-account-coins-balance", {
+      accountType: "FUND",
+    });
+    if (resp.retCode !== 0 || resp.result?.accountType !== "FUND" || !Array.isArray(resp.result.balance)) {
+      throw new Error(`Bybit FUND API error: ${resp.retCode} ${resp.retMsg}`);
+    }
+    const balances: { [k: string]: number } = {};
+    for (const coin of resp.result.balance) {
+      const amount = Number(coin.walletBalance);
+      if (!coin.coin?.trim() || !coin.walletBalance?.trim() || !Number.isFinite(amount)) {
+        throw new Error("Invalid Bybit FUND balance");
+      }
+      addToBalanceMap(balances, coin.coin, amount);
+    }
+    return balances;
   }
 
   private async fetchWalletBalance(): Promise<{ [k: string]: number }> {
