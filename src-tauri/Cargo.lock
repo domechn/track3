@@ -6055,7 +6055,7 @@ dependencies = [
 
 [[package]]
 name = "track3"
-version = "0.9.6"
+version = "0.9.7"
 dependencies = [
  "aes",
  "aes-gcm-siv",
