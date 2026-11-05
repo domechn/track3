@@ -1,4 +1,4 @@
-import { recordOptionalSourceFailure } from "../../utils/source-failure";
+import { recordOptionalSourceFailure, SanitizedSourceError } from "../../utils/source-failure";
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import { sendHttpRequest } from '../../utils/http'
@@ -68,6 +68,7 @@ type FixedTermLendListResp = {
 }
 
 type DualBalanceResp = {
+	user_asset_usdt: string
 	user_total_interest_usdt: string
 }
 
@@ -205,7 +206,7 @@ export class GateExchange implements Exchanger {
 			return balances
 		} catch (e) {
 			console.error("Fetch fixed-term balance failed")
-			recordOptionalSourceFailure(this, e, "Fixed-term Earn")
+			recordOptionalSourceFailure(this, new SanitizedSourceError(e), "Fixed-term Earn")
 			return {}
 		}
 	}
@@ -228,7 +229,7 @@ export class GateExchange implements Exchanger {
 			return balances
 		} catch (e) {
 			console.error("Fetch staking balance failed")
-			recordOptionalSourceFailure(this, e, "Staking")
+			recordOptionalSourceFailure(this, new SanitizedSourceError(e), "Staking")
 			return {}
 		}
 	}
@@ -236,13 +237,17 @@ export class GateExchange implements Exchanger {
 	private async fetchDualInvestmentBalance(): Promise<{ [k: string]: number }> {
 		try {
 			const resp = await this.fetch<DualBalanceResp>("GET", "/earn/dual/balance", "")
+			if (typeof resp.user_asset_usdt !== "string" || !resp.user_asset_usdt.trim() ||
+				!Number.isFinite(Number(resp.user_asset_usdt))) {
+				throw new Error("Gate dual investment response missing principal")
+			}
 			
 			const balances: { [k: string]: number } = {}
-			addToBalanceMap(balances, "USDT", toNumber(resp.user_total_interest_usdt))
+			addToBalanceMap(balances, "USDT", Number(resp.user_asset_usdt))
 			return balances
 		} catch (e) {
 			console.error("Fetch dual investment balance failed")
-			recordOptionalSourceFailure(this, e, "Dual investment")
+			recordOptionalSourceFailure(this, new SanitizedSourceError(e), "Dual investment")
 			return {}
 		}
 	}
@@ -262,7 +267,7 @@ export class GateExchange implements Exchanger {
 				console.debug("No portfolio account")
 				return {}
 			}
-			recordOptionalSourceFailure(this, e, "Portfolio")
+			recordOptionalSourceFailure(this, new SanitizedSourceError(e), "Portfolio")
 			return {}
 		}
 	}
@@ -291,7 +296,7 @@ export class GateExchange implements Exchanger {
 			return balances
 		} catch (e) {
 			console.error("Fetch margin balance failed")
-			recordOptionalSourceFailure(this, e, "Margin")
+			recordOptionalSourceFailure(this, new SanitizedSourceError(e), "Margin")
 			return {}
 		}
 	}
@@ -303,9 +308,14 @@ export class GateExchange implements Exchanger {
 
 		const balances: { [k: string]: number } = {}
 		Object.entries(resp.details)
-			.filter(([k]) => ["futures", "options", "payment", "quant"].includes(k))
+			.filter(([k]) => ["futures", "delivery", "options", "payment", "quant"].includes(k))
 			.forEach(([, value]) => {
-				addToBalanceMap(balances, value.currency, toNumber(value.amount))
+				if (typeof value.currency !== "string" || !value.currency.trim() ||
+					typeof value.amount !== "string" || !value.amount.trim() ||
+					!Number.isFinite(Number(value.amount))) {
+					throw new Error("Gate wallet total response has an invalid balance")
+				}
+				addToBalanceMap(balances, value.currency, Number(value.amount))
 			})
 		return balances
 	}
@@ -318,7 +328,7 @@ export class GateExchange implements Exchanger {
 			return await fetcher()
 		} catch (error) {
 			console.error(`Fetch Gate ${productName} balance failed`)
-			recordOptionalSourceFailure(this, error, productName)
+			recordOptionalSourceFailure(this, new SanitizedSourceError(error), productName)
 			return {}
 		}
 	}

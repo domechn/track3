@@ -56,20 +56,20 @@ export class KrakenExchange implements Exchanger {
 
 		const res: { [k: string]: number } = {}
 
-		// .F/.M is flexible earn, .B is locked earn
-		const earnSuffixes = [".F", ".B", ".M"]
+		// .S is staked and .P is parachain bonded; ETH2.S mapping is unverified.
+		const earnSuffixes = [".F", ".B", ".M", ".S", ".P"]
 		Object.entries(resp.result ?? {}).forEach(([k, v]) => {
 			let symbol = k
 			// SOL.F/xxx.F is in earn
 			for (const earnSuffix of earnSuffixes) {
-				if (k.endsWith(earnSuffix)) {
+				if (k.endsWith(earnSuffix) && k !== "ETH2.S") {
 					symbol = k.substring(0, k.length - earnSuffix.length)
 					break
 				}
 			}
 			symbol = normalizeKrakenSymbol(symbol)
 
-			const amount = (parseFloat(v.balance) || 0) + (parseFloat(v.hold_trade) || 0)
+			const amount = parseFloat(v.balance) || 0
 
 			const lastValue = res[symbol] ?? 0
 			if (amount > 0) {

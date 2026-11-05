@@ -1,4 +1,4 @@
-import { recordOptionalSourceFailure } from "../../utils/source-failure";
+import { recordOptionalSourceFailure, SanitizedSourceError } from "../../utils/source-failure";
 import nacl from 'tweetnacl'
 import { Exchanger } from './cex'
 import { sendHttpRequest } from '../../utils/http'
@@ -25,6 +25,7 @@ type BorrowLendPosition = {
 // leveraged notional is exposure, not an owned asset, so it is ignored.
 type FuturePosition = {
 	symbol?: string
+	marketType?: string
 	netQuantity?: string
 	pnlUnrealized?: string
 }
@@ -129,7 +130,9 @@ export class BackpackExchange implements Exchanger {
 		const resp = await this.fetchPrivate<FuturePosition[]>("/api/v1/position", "positionQuery")
 		const positions = Array.isArray(resp) ? resp : []
 
-		const unrealizedPnl = positions.reduce((sum, position) => sum + toNumberish(position?.pnlUnrealized), 0)
+		const unrealizedPnl = positions.reduce((sum, position) =>
+			sum + (position?.marketType === undefined || position.marketType === "PERP"
+				? toNumberish(position?.pnlUnrealized) : 0), 0)
 
 		const balances: { [k: string]: number } = {}
 		// Futures collateral (USDC) already shows up in the spot balance, so only
@@ -147,7 +150,7 @@ export class BackpackExchange implements Exchanger {
 			return await fetcher()
 		} catch (e) {
 			console.error(`Fetch Backpack ${productName} balance failed:`)
-			recordOptionalSourceFailure(this, e, productName)
+			recordOptionalSourceFailure(this, new SanitizedSourceError(e), productName)
 			return {}
 		}
 	}

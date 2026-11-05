@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendHttpRequest } from "../../utils/http";
 import { BackpackExchange } from "./backpack";
+import { takeOptionalSourceFailures } from "../../utils/source-failure";
 
-vi.mock("../../utils/http", () => ({
+vi.mock("../../utils/http", async () => ({
+  ...await vi.importActual<typeof import("../../utils/http")>("../../utils/http"),
   sendHttpRequest: vi.fn(),
 }));
 
@@ -30,6 +32,31 @@ afterEach(() => {
 });
 
 describe("BackpackExchange", () => {
+  it("includes PnL only for explicit PERP markets and retains the legacy response without marketType", async () => {
+    vi.mocked(sendHttpRequest)
+      .mockResolvedValueOnce({ USDC: { available: "100", locked: "0", staked: "0" } })
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { symbol: "SOL_USDC_PERP", marketType: "PERP", pnlUnrealized: "5" },
+        { symbol: "BTC_USDC_SPOT", marketType: "SPOT", pnlUnrealized: "50" },
+        { symbol: "ETH_USDC_PERP", pnlUnrealized: "-2" },
+      ]);
+    const exchange = new BackpackExchange("key", TEST_SECRET);
+
+    await expect(exchange.fetchTotalBalance()).resolves.toEqual({ USDC: 103 });
+  });
+
+  it("reports a failed position read while preserving capital even on an auth error", async () => {
+    vi.mocked(sendHttpRequest)
+      .mockResolvedValueOnce({ USDC: { available: "100", locked: "0", staked: "0" } })
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(Object.assign(new Error("unauthorized"), { status: 401 }));
+    const exchange = new BackpackExchange("key", TEST_SECRET);
+
+    await expect(exchange.fetchTotalBalance()).resolves.toEqual({ USDC: 100 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "auth", endpoints: ["Futures"] });
+  });
+
   it("exposes name, identity, and alias", () => {
     const exchange = new BackpackExchange("test-key", TEST_SECRET, "my-bp");
     expect(exchange.getExchangeName()).toBe("Backpack");

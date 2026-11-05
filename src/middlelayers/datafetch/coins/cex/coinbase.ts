@@ -1,4 +1,4 @@
-import { recordOptionalSourceFailure, recordSourceFailure } from "../../utils/source-failure";
+import { recordOptionalSourceFailure, recordSourceFailure, SanitizedSourceError } from "../../utils/source-failure";
 import { SignJWT, importPKCS8 } from 'jose'
 import CryptoJS from 'crypto-js'
 import { Exchanger } from './cex'
@@ -94,11 +94,15 @@ export class CoinbaseExchange implements Exchanger {
 						await this.addPerpPortfolioBalances(portfolio.uuid, balances)
 					}
 				} catch (error) {
+					if (portfolio.type === "INTX" &&
+						((error as { status?: number })?.status === 404 || (error as { status?: number })?.status === 410)) {
+						return
+					}
 					console.warn("Failed to fetch Coinbase portfolio balances")
 					if (portfolio.type === 'DEFAULT') {
 						recordSourceFailure(this, error)
 					} else {
-						recordOptionalSourceFailure(this, error, `Portfolio ${portfolio.type}`, true)
+						recordOptionalSourceFailure(this, new SanitizedSourceError(error), `Portfolio ${portfolio.type}`)
 					}
 				}
 			})

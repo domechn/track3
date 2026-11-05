@@ -22,6 +22,7 @@ it("keeps Gate spot balances and labels an unreadable Earn endpoint", async () =
     if (url.includes("/wallet/total_balance")) return { details: {} } as never;
     if (url.includes("/portfolio/accounts")) return { balances: {} } as never;
     if (url.includes("/earn/fixed-term")) return { code: 0, data: { list: [], total: 0 } } as never;
+    if (url.includes("/earn/dual/balance")) return { user_asset_usdt: "0", user_total_interest_usdt: "0" } as never;
     return [] as never;
   });
   const analyzer = new CexAnalyzer({
@@ -39,7 +40,7 @@ it("keeps Gate spot balances after a dual investment timeout", async () => {
     if (url.includes("/earn/dual/balance")) throw new Error("request timed out");
     if (url.includes("/spot/accounts")) return [{ currency: "BTC", available: "2", locked: "0" }] as never;
     if (url.includes("/earn/fixed-term")) return { code: 0, data: { list: [], total: 0 } } as never;
-    if (url.includes("/earn/dual/balance")) return { user_total_interest_usdt: "0" } as never;
+    if (url.includes("/earn/dual/balance")) return { user_asset_usdt: "0", user_total_interest_usdt: "0" } as never;
     if (url.includes("/wallet/total_balance")) return { details: {} } as never;
     if (url.includes("/portfolio/accounts")) return { balances: {} } as never;
     return [] as never;
@@ -58,7 +59,7 @@ it("rejects Gate when its primary spot request fails", async () => {
     if (url.includes("/wallet/total_balance")) return { details: {} } as never;
     if (url.includes("/portfolio/accounts")) return { balances: {} } as never;
     if (url.includes("/earn/fixed-term")) return { code: 0, data: { list: [], total: 0 } } as never;
-    if (url.includes("/earn/dual/balance")) return { user_total_interest_usdt: "0" } as never;
+    if (url.includes("/earn/dual/balance")) return { user_asset_usdt: "0", user_total_interest_usdt: "0" } as never;
     return [] as never;
   });
   const analyzer = new CexAnalyzer({
@@ -108,6 +109,57 @@ it("keeps Coinbase default holdings when an INTX portfolio returns 401", async (
   const analyzer = new CexAnalyzer({ exchanges: [{ name: "coinbase", initParams: { apiKey: "key", secret: "secret" } }] });
   expect(await analyzer.loadPortfolio()).toEqual([expect.objectContaining({ symbol: "BTC", amount: 2 })]);
   expect(takeOptionalSourceFailures(analyzer)).toEqual({ category: "auth", endpoints: ["Portfolio INTX"] });
+  vi.restoreAllMocks();
+});
+
+it.each([404, 410])("treats Coinbase INTX HTTP %i as unavailable without hiding default holdings", async (status) => {
+  vi.spyOn(CoinbaseExchange.prototype as unknown as { generateAuthHeaders: () => Promise<Record<string, string>> },
+    "generateAuthHeaders").mockResolvedValue({});
+  vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+    if (url.endsWith("/portfolios")) return { portfolios: [
+      { name: "Default", uuid: "default-id", type: "DEFAULT", deleted: false },
+      { name: "INTX", uuid: "secondary-id", type: "INTX", deleted: false },
+    ] } as never;
+    if (url.includes("/intx/balances/")) throw new HttpRequestError("retired", status);
+    return { breakdown: { spot_positions: [{ asset: "BTC", total_balance_crypto: 2 }] } } as never;
+  });
+  const analyzer = new CexAnalyzer({ exchanges: [{ name: "coinbase", initParams: { apiKey: "key", secret: "secret" } }] });
+  expect(await analyzer.loadPortfolio()).toEqual([expect.objectContaining({ symbol: "BTC", amount: 2 })]);
+  expect(takeOptionalSourceFailures(analyzer)).toBeUndefined();
+  vi.restoreAllMocks();
+});
+
+it("reports Coinbase INTX server failures while preserving default holdings", async () => {
+  vi.spyOn(CoinbaseExchange.prototype as unknown as { generateAuthHeaders: () => Promise<Record<string, string>> },
+    "generateAuthHeaders").mockResolvedValue({});
+  vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+    if (url.endsWith("/portfolios")) return { portfolios: [
+      { name: "Default", uuid: "default-id", type: "DEFAULT", deleted: false },
+      { name: "INTX", uuid: "secondary-id", type: "INTX", deleted: false },
+    ] } as never;
+    if (url.includes("/intx/balances/")) throw new HttpRequestError("server failure", 500);
+    return { breakdown: { spot_positions: [{ asset: "BTC", total_balance_crypto: 2 }] } } as never;
+  });
+  const analyzer = new CexAnalyzer({ exchanges: [{ name: "coinbase", initParams: { apiKey: "key", secret: "secret" } }] });
+  expect(await analyzer.loadPortfolio()).toEqual([expect.objectContaining({ symbol: "BTC", amount: 2 })]);
+  expect(takeOptionalSourceFailures(analyzer)).toEqual({ category: "network", endpoints: ["Portfolio INTX"] });
+  vi.restoreAllMocks();
+});
+
+it("reports a Coinbase INTX unsupported response because its retirement is unverified", async () => {
+  vi.spyOn(CoinbaseExchange.prototype as unknown as { generateAuthHeaders: () => Promise<Record<string, string>> },
+    "generateAuthHeaders").mockResolvedValue({});
+  vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+    if (url.endsWith("/portfolios")) return { portfolios: [
+      { name: "Default", uuid: "default-id", type: "DEFAULT", deleted: false },
+      { name: "INTX", uuid: "secondary-id", type: "INTX", deleted: false },
+    ] } as never;
+    if (url.includes("/intx/balances/")) throw new HttpRequestError("not supported", 400);
+    return { breakdown: { spot_positions: [{ asset: "BTC", total_balance_crypto: 2 }] } } as never;
+  });
+  const analyzer = new CexAnalyzer({ exchanges: [{ name: "coinbase", initParams: { apiKey: "key", secret: "secret" } }] });
+  expect(await analyzer.loadPortfolio()).toEqual([expect.objectContaining({ symbol: "BTC", amount: 2 })]);
+  expect(takeOptionalSourceFailures(analyzer)).toEqual({ category: "other", endpoints: ["Portfolio INTX"] });
   vi.restoreAllMocks();
 });
 
