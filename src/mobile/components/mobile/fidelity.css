@@ -100,7 +100,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
   .app-layout:has(.fd-summary) #app-top-bar { display:none; }
   #app-main-content:has(.fd-summary) .mobile-large-title,.app-layout:has(.fd-summary) .mobile-route-heading { display:none; }
 }
-.fd-coin-head { height:124px; margin:0 0 12px; display:flex; flex-direction:column; gap:4px; }
+.fd-coin-head { min-height:124px; margin:0 0 12px; display:flex; flex-direction:column; gap:4px; }
 .fd-coin-head nav { display:flex; align-items:center; gap:6px; color:var(--fd-faint); font-size:12px; line-height:18px; }
 .fd-coin-head nav>span:not(:last-child) { margin-inline:3px; }
 .fd-coin-head nav a { display:flex; align-items:center; height:44px; margin-block:-13px; color:var(--fd-faint); }
@@ -113,7 +113,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-coin-head h1 { margin:0; font:600 22px/28px "Public Sans Variable","Public Sans",sans-serif; }
 .fd-coin-head h1 span { color:var(--fd-faint); font-weight:400; }
 .fd-coin-head h1 em { display:inline-flex; align-items:center; vertical-align:4px; height:20px; margin-left:6px; padding:0 8px; border-radius:999px; background:var(--fd-selected); color:var(--fd-muted); font-size:12px; font-style:normal; font-weight:500; }
-.fd-coin-head p { margin:-2px 0 2px; font-size:13px; line-height:18px; }
+.fd-coin-head p { margin:-2px 0 2px; font-size:13px; line-height:18px; overflow-wrap:anywhere; }
 .fd-cost-link,.fd-outline-pill { align-self:start; display:inline-flex; align-items:center; justify-content:center; height:34px; padding:0 12px; border:1px solid var(--fd-control); border-radius:4px; color:var(--fd-text); background:var(--fd-surface); font-size:12px; font-weight:500; }
 .fd-cost-link { margin-top:6px; }
 .fd-coin .fd-card { margin-bottom:12px; }

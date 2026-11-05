@@ -16,6 +16,7 @@ import { ChevronRightIcon } from "@radix-ui/react-icons";
 import { buildAssetDetailsPath, formatAssetLabel, getAssetLogoKey } from "@/utils/assets";
 import { currencyWrapper } from "@/utils/currency";
 import { sourceDisplayNames } from "@/components/source-display-name";
+import { CoinSourceSummary } from "@/components/coin-source-summary";
 import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import "@/mobile/components/mobile/fidelity.css";
 
@@ -234,14 +235,11 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
     return ["binance", "okx", "okex", "kraken", "bybit", "coinbase", "gate", "bitget", "htx", "mexc"].includes(kind)
       ? label("exchange") : kind === "ibkr" ? label("broker") : label("wallet");
   };
-  const description = data?.manual
-    ? label("manualDescription.dynamic").replace("{source}", sourceName(data.sources[0]?.wallet ?? ""))
-    : assetType === "stock"
-      ? data?.sources.length ? label("stockDescription.full").replace("{name}", name).replace("{source}", sourceName(data.sources[0].wallet)) : ""
-      : data?.sources.length === 2
-        ? label(sourceKind(data.sources[1].wallet) === label("exchange") ? "heldOnTwoExchanges" : "heldOnTwo")
-          .replace("{first}", sourceName(data.sources[0].wallet)).replace("{second}", sourceName(data.sources[1].wallet))
-        : data?.sources.length ? label("heldOn").replace("{sources}", new Intl.ListFormat(locale === "zh" ? "zh-CN" : "en-US").format(data.sources.map((source)=>sourceName(source.name)))) : "";
+  const sourceNames = data?.sources.map((source) => sourceName(source.wallet)) ?? [];
+  const descriptionNames = data?.manual || assetType === "stock" ? sourceNames.slice(0, 1) : sourceNames;
+  const sourceTemplate = data?.manual ? label("manualDescription.dynamic")
+    : assetType === "stock" ? label("stockDescription.full").replace("{name}", name) : label("heldOn");
+  const lastSourcePrefix = !data?.manual && assetType !== "stock" && data?.sources.length === 2 && sourceKind(data.sources[1].wallet) !== label("exchange") && locale !== "zh" ? "a " : "";
   const transactionName = (txn: Transaction) => t(`coin.txnType.${txn.txnType}`);
   const transferCounterpart = (txn: Transaction) => {
     const opposite = txn.txnType === "deposit" ? "withdraw" : txn.txnType === "withdraw" ? "deposit" : null;
@@ -307,7 +305,7 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
     </div>
   </div>;
   return <div className="fd-page fd-coin d2-coin" data-state={loading?"loading":"ready"} data-asset-type={assetType} data-manual={Boolean(data?.manual)}>
-    <header className="fd-page-head fd-coin-head"><nav aria-label={label("breadcrumbs")}><button type="button" onClick={goBack}>{label("overview")}</button><ChevronRightIcon aria-hidden="true" /><button type="button" aria-expanded={coinSelectOpen} onClick={() => setCoinSelectOpen(true)}>{label("coins")}</button><ChevronRightIcon aria-hidden="true" /><span>{symbol}</span></nav><h1>{name} {name !== symbol && <span>{symbol}</span>} <em>{kind}</em></h1><p>{description}</p><button type="button" className="fd-cost-link" onClick={()=>navigate("/cost-basis")}><svg viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 2.5v13M12 5.5c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 2.2 3 1 3 2.3-1.3 2-3 2-3-.8-3-2" /></svg>{label("openCostBasis")}</button></header>
+    <header className="fd-page-head fd-coin-head"><nav aria-label={label("breadcrumbs")}><button type="button" onClick={goBack}>{label("overview")}</button><ChevronRightIcon aria-hidden="true" /><button type="button" aria-expanded={coinSelectOpen} onClick={() => setCoinSelectOpen(true)}>{label("coins")}</button><ChevronRightIcon aria-hidden="true" /><span>{symbol}</span></nav><h1>{name} {name !== symbol && <span>{symbol}</span>} <em>{kind}</em></h1>{descriptionNames.length ? <CoinSourceSummary names={descriptionNames} template={sourceTemplate} locale={locale} moreLabel={t("coin.sourcesMore")} allLabel={t("coin.sourcesAll")} lastPrefix={lastSourcePrefix} /> : <p /> }<button type="button" className="fd-cost-link" onClick={()=>navigate("/cost-basis")}><svg viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 2.5v13M12 5.5c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 2.2 3 1 3 2.3-1.3 2-3 2-3-.8-3-2" /></svg>{label("openCostBasis")}</button></header>
     <BottomSheet open={coinSelectOpen} onOpenChange={setCoinSelectOpen} title={t("coin.symbol")}>
       <input className="fd-coin-search" value={coinKeyword} onChange={(event) => setCoinKeyword(event.target.value)} placeholder={t("coin.searchPlaceholder")} aria-label={t("coin.searchPlaceholder")} />
       <div className="mobile-coin-options">{filteredSymbols.slice(0, 200).map((item) => <button type="button" key={getAssetLogoKey(item)} className="mobile-coin-option" onClick={() => { setCoinSelectOpen(false); navigate(buildAssetDetailsPath(item)); }}>{formatAssetLabel(item)}</button>)}</div>

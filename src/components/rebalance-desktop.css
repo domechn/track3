@@ -35,10 +35,10 @@
 }
 .t3-fidelity-page * { box-sizing: border-box; }
 .t3-fidelity-page :is(button,input,select) { font-variant-numeric: tabular-nums; }
-.t3-fidelity-head { display: flex; align-items: flex-end; gap: 16px; height: 52px; margin-bottom: 16px; }
+.t3-fidelity-head { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 16px; min-height: 52px; margin-bottom: 16px; }
 .t3-fidelity-head > div { flex: 1; min-width: 0; }
 .t3-fidelity-head h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -.01em; }
-.t3-fidelity-head p { margin: 2px 0 0; color: #b4b6bc; font-size: 13px; line-height: 18px; }
+.t3-fidelity-head p { margin: 2px 0 0; overflow-wrap: anywhere; color: #b4b6bc; font-size: 13px; line-height: 18px; }
 .t3-fidelity-stamp { display: inline-flex; align-items: center; gap: 6px; color: #9b9da3; font-size: 12px; white-space: nowrap; }
 .t3-fidelity-stamp i { width: 6px; height: 6px; border-radius: 50%; background: #5fc39c; }
 .t3-fidelity-stamp.stale i { background: #9b9da3; }

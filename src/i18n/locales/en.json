@@ -511,6 +511,8 @@
   "assetsPercentage.title": "Coins Percentage Overview",
   "coinTrend.title": "Trend of",
   "coin.openCostBasis": "Open cost basis",
+  "coin.sourcesMore": "+{count} more",
+  "coin.sourcesAll": "All sources",
   "coin.assetType.stock": "Stock",
   "coin.assetType.crypto": "Crypto",
   "coinTrend.mode": "Chart mode",

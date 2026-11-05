@@ -107,7 +107,7 @@ div.t3-fidelity-goal-drawer { position: fixed; top: 0; right: 0; bottom: 0; left
 .t3-fidelity-drawer-foot button.delete { padding-inline: 15px; }
 .t3-fidelity-drawer-foot button.primary { border-color: #fff; background: #fff; color: #0d0d0e; }
 .t3-fidelity-drawer-foot svg { width: 14px; height: 14px; }
-.t3-fidelity-kinds .t3-fidelity-head { height: 74px; }
+.t3-fidelity-kinds .t3-fidelity-head { min-height: 74px; }
 .t3-fidelity-kinds .t3-fidelity-head a { display: block; margin-bottom: 4px; color: #9b9da3; font-size: 12px; }
 .t3-fidelity-info { display: flex; gap: 12px; margin-bottom: 16px; padding: 12px 14px; border: 1px solid #1f3a5c; border-radius: 6px; background: #14243a; }
 .t3-fidelity-info svg { width: 18px; height: 18px; flex: none; color: #b4b6bc; }
