@@ -282,14 +282,12 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
 @media (min-width: 761px) {
   .t3-desktop-column > .t3-fidelity-topbar {
     position: relative; top: auto; right: auto; flex: none; min-height: 48px;
-    padding: 7px 28px; border-bottom: 1px solid hsl(var(--border));
+    padding: 7px 28px 5px; border-bottom: 1px solid hsl(var(--border));
     background: hsl(var(--background));
   }
-}
-@media (min-width: 1500px) {
-  .t3-desktop-column > .t3-fidelity-topbar-coin :is(.t3-fidelity-live-control, .t3-fidelity-date-control, .t3-fidelity-refresh-control) {
-    position: static;
-  }
+  .t3-fidelity-topbar > div:first-child { height: auto; min-height: 34px; }
+  .t3-fidelity-topbar-controls { min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .t3-fidelity-topbar-controls > * { flex-shrink: 0; }
 }
 
 @layer base {
@@ -1047,12 +1045,13 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .cost-dashboard-price-list > div span { text-align: right; }
 .cost-dashboard-empty { padding: 32px 0; text-align: center; color: hsl(var(--muted-foreground)); }
 .analyze-coin [data-ui-card] { overflow: hidden; }
-.coin-page-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.coin-page-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 14px; }
 .coin-page-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.coin-page-identity > div { min-width: 0; }
 .coin-page-identity img { width: 30px; height: 30px; border-radius: 50%; }
-.coin-page-heading h1 { font-size: 23px; line-height: 1.2; font-weight: 650; }
+.coin-page-heading h1 { overflow-wrap: anywhere; font-size: 23px; line-height: 1.2; font-weight: 650; }
 .coin-page-identity span { color: hsl(var(--muted-foreground)); font-size: 12px; }
-.coin-page-heading button { border-radius: var(--radius-pill); }
+.coin-page-heading button { flex-shrink: 0; border-radius: var(--radius-pill); }
 .coin-price-strip { display: grid; grid-template-columns: 1.8fr 1fr; margin-bottom: 14px; padding: 18px 20px; }
 .coin-price-strip > div { display: flex; flex-direction: column; min-width: 0; gap: 5px; padding-left: 18px; border-left: 1px solid hsl(var(--border)); }
 .coin-price-strip > div:first-child { border: 0; padding-left: 0; }
@@ -1077,8 +1076,10 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .t3-fidelity-shell > div:nth-child(2) { position: relative; }
   .t3-fidelity-shell #app-main-content { padding: 20px 28px 40px; }
   .t3-fidelity-topbar { z-index: 15; padding: 0; background: transparent; border: 0; font-family: "Fidelity Public Sans", sans-serif; }
-  .t3-fidelity-topbar > div:first-child { height: 34px; padding: 0; }
+  .t3-fidelity-topbar > div:first-child { padding: 0; }
   .t3-fidelity-topbar-controls { gap: 10px; }
+  .t3-fidelity-topbar-summary .t3-fidelity-live-control { order: -2; }
+  .t3-fidelity-topbar-summary .t3-fidelity-date-control { order: -1; }
   .t3-fidelity-ranges { display: inline-flex; gap: 0; width: 260px; padding: 2px; border-radius: 999px; background: #1a1a1e; }
   .t3-fidelity-ranges button { display: grid; place-items: center; min-width: 40px; height: 28px; padding: 0 12px; border-radius: 999px; color: #9b9da3; font-size: 12px; font-weight: 500; }
   .t3-fidelity-ranges button[aria-pressed="true"] { background: #2a2a30; color: #fff; }
@@ -1090,25 +1091,6 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .t3-fidelity-stamp i.off { background: #9b9da3; }
   .t3-fidelity-topbar .t3-refresh-button { width: 100px; height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 500; }
 }
-@media (min-width: 1001px) {
-  .t3-fidelity-topbar { position: absolute; top: var(--fidelity-topbar-top, 38px); right: var(--fidelity-topbar-right, 28px); }
-  .t3-fidelity-topbar-coin { --fidelity-topbar-top: 60px; --fidelity-topbar-right: 187px; }
-}
-@media (min-width: 1500px) {
-  .t3-fidelity-topbar-summary .t3-fidelity-live-control,
-  .t3-fidelity-topbar-summary .t3-fidelity-date-control,
-  .t3-fidelity-topbar-coin .t3-fidelity-live-control,
-  .t3-fidelity-topbar-coin .t3-fidelity-date-control,
-  .t3-fidelity-topbar-coin .t3-fidelity-refresh-control { position: absolute; }
-  .t3-fidelity-topbar-summary .t3-fidelity-live-control { right: 538px; top: 0; }
-  .t3-fidelity-topbar-summary .t3-fidelity-date-control { right: 488px; top: 0; }
-  .t3-fidelity-topbar-coin .t3-fidelity-live-control { right: 268px; top: 0; }
-  .t3-fidelity-topbar-coin .t3-fidelity-date-control { right: 218px; top: 0; }
-  .t3-fidelity-topbar-coin .t3-fidelity-refresh-control { right: 102px; top: 0; }
-}
-@media (min-width: 1001px) and (max-width: 1499px) {
-  .t3-fidelity-topbar-summary { --fidelity-topbar-top: 8px; }
-}
 @media (max-width: 1000px) {
   .t3-fidelity-topbar { padding: 10px 28px 0; }
   .t3-fidelity-topbar > div:first-child, .t3-fidelity-topbar-controls { height: auto; flex-wrap: wrap; }
@@ -1117,7 +1099,8 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 
 @font-face { font-family: "Fidelity Public Sans"; src: url("./components/fidelity-public-sans.woff2") format("woff2"); font-style: normal; font-weight: 100 900; font-display: swap; }
 .fidelity-summary { font: 400 13px/18px "Fidelity Public Sans", sans-serif; font-variant-numeric: tabular-nums; }
-:where(.fidelity-summary) .fidelity-page-head { height: 52px; margin-bottom: 16px; }
+:where(.fidelity-summary) .fidelity-page-head { min-height: 52px; margin-bottom: 16px; }
+:where(.fidelity-summary) .fidelity-page-head p { overflow-wrap: anywhere; }
 :where(.fidelity-summary) .fidelity-page-head h1 { font: 600 26px/32px "Fidelity Public Sans", sans-serif; letter-spacing: -.01em; }
 :where(.fidelity-summary) .fidelity-page-head p { margin: 2px 0 0; color: #b4b6bc; font-size: 13px; }
 :where(.fidelity-summary) .fidelity-page-head strong { color: #fff; font-weight: 600; }
@@ -1426,8 +1409,9 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .t3-manage-goals > :has(canvas),
   .t3-manage-goals > .t3-goals-editor,
   .t3-manage-goals > [data-ui-card]:not(.t3-goals-rules):not(.t3-goals-history) { grid-column: 1 / -1; }
-  .t3-goals-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
-  .t3-goals-heading button { border-radius: var(--radius-pill); }
+  .t3-goals-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+  .t3-goals-heading > div { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+  .t3-goals-heading button { flex-shrink: 0; border-radius: var(--radius-pill); }
   .t3-goals-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .t3-goals-summary > div { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 16px 20px; }
   .t3-goals-summary > div + div { border-left: 1px solid hsl(var(--border)); }
@@ -3059,10 +3043,11 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .t3-route-comparison #app-main-content { padding-top: 20px; padding-bottom: 40px; }
   .t3-cmp-legacy { display: none; }
   .t3-cmp-fidelity { display: block; font-size: 13px; line-height: 18px; font-variant-numeric: tabular-nums; }
-  .t3-cmp-heading { display: flex; justify-content: space-between; align-items: flex-end; min-height: 52px; margin-bottom: 16px; gap: 16px; }
+  .t3-cmp-heading { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; min-height: 52px; margin-bottom: 16px; gap: 16px; }
+  .t3-cmp-heading > div:first-child { flex: 1 1 280px; min-width: 0; overflow-wrap: anywhere; }
   .t3-cmp-heading h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -.01em; }
   .t3-cmp-heading p { margin: 2px 0 0; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 18px; }
-  .t3-cmp-actions { display: flex; align-items: center; gap: 10px; padding-bottom: 1px; }
+  .t3-cmp-actions { display: flex; align-items: center; flex-wrap: wrap; flex-shrink: 0; max-width: 100%; gap: 10px; padding-bottom: 1px; }
   .t3-cmp-actions .t3-topbar-sync-button { height: 34px; min-height: 34px; padding: 0; border: 0; background: transparent; color: hsl(var(--faint)); }
   .t3-cmp-actions .t3-topbar-sync-button:has(> span) > svg { display: none; }
   .t3-cmp-actions > button { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border: 1px solid hsl(var(--control)); border-radius: 999px; font-weight: 500; }
@@ -3168,10 +3153,11 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .t3-route-wallets #app-main-content { padding-top: 20px; padding-bottom: 40px; scrollbar-gutter: auto; }
   .t3-wallet-legacy { display: none; }
   .t3-wallet-fidelity { display: block; font-size: 13px; line-height: 18px; font-variant-numeric: tabular-nums; }
-  .t3-wallet-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; min-height: 52px; margin-bottom: 16px; }
+  .t3-wallet-heading { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 16px; min-height: 52px; margin-bottom: 16px; }
+  .t3-wallet-heading > div:first-child { flex: 1 1 280px; min-width: 0; overflow-wrap: anywhere; }
   .t3-wallet-heading h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -.01em; }
   .t3-wallet-heading p { margin: 2px 0 0; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 18px; }
-  .t3-wallet-actions { display: flex; align-items: center; gap: 10px; padding-bottom: 1px; }
+  .t3-wallet-actions { display: flex; align-items: center; flex-wrap: wrap; flex-shrink: 0; max-width: 100%; gap: 10px; padding-bottom: 1px; }
   .t3-wallet-ranges { display: inline-flex; width: 263px; height: 32px; align-items: center; border-radius: 999px; background: hsl(var(--secondary)); padding: 2px; }
   .t3-wallet-ranges button { flex: 1; height: 28px; min-width: 40px; padding: 0 4px; border-radius: 999px; color: hsl(var(--faint)); font-size: 12px; font-weight: 500; }
   .t3-wallet-ranges button[aria-pressed="true"] { background: #2a2a30; color: #fff; }
@@ -3330,15 +3316,25 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 }
 .coin-fidelity { color: #fff; font-family: "Fidelity Public Sans", sans-serif; font-variant-numeric: tabular-nums; }
 .coin-fidelity button, .coin-fidelity-dialog button { font-variant-numeric: inherit; }
-.coin-fidelity-heading { height: 90px; display: flex; align-items: center; justify-content: space-between; }
-.coin-fidelity-heading > div { transform: translateY(-8px); }
+.coin-fidelity-heading { min-height: 90px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.coin-fidelity-heading > div { flex: 1; min-width: 0; }
+@media (min-width: 1101px) {
+  .coin-fidelity-heading > div { transform: translateY(-8px); }
+  .coin-fidelity-heading > button { align-self: flex-end; transform: translateY(-16px); }
+}
 .coin-fidelity-crumb { display: flex; align-items: center; gap: 6px; color: #9b9da3; font-size: 12px; line-height: 18px; margin-bottom: 4px; }
 .coin-fidelity-crumb svg { flex: none; }
 .coin-fidelity-heading h1 { font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -.01em; }
 .coin-fidelity-heading h1 em { color: #aaa9b0; font-style: normal; font-weight: 400; }
 .coin-fidelity-heading h1 b { display: inline-block; vertical-align: 4px; margin-left: 6px; padding: 3px 8px; border-radius: 20px; background: #252429; color: #c2c1c8; font-size: 12px; line-height: 14px; font-weight: 500; letter-spacing: 0; }
-.coin-fidelity-heading p { color: #b4b6bc; font-size: 13px; line-height: 18px; margin-top: 2px; }
-.coin-fidelity-heading > button { align-self: flex-end; display: inline-flex; align-items: center; gap: 8px; color: #fff; background: transparent; border: 1px solid #3a3a3e; border-radius: 30px; padding: 0 14px; height: 34px; font-size: 13px; font-weight: 500; transform: translateY(-16px); }
+.coin-fidelity-heading p { color: #b4b6bc; font-size: 13px; line-height: 18px; margin-top: 2px; overflow-wrap: anywhere; }
+.coin-fidelity-heading > button { flex-shrink: 0; display: inline-flex; align-items: center; gap: 8px; color: #fff; background: transparent; border: 1px solid #3a3a3e; border-radius: 30px; padding: 0 14px; height: 34px; font-size: 13px; font-weight: 500; }
+.coin-source-name { display: inline-block; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.coin-source-more { color: hsl(var(--accent-data)); text-decoration: underline; text-underline-offset: 2px; }
+.coin-source-more:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.coin-source-popover { max-height: min(55vh, 440px); overflow-y: auto; }
+.coin-source-popover strong { display: block; margin-bottom: 8px; }
+.coin-source-popover li { padding: 4px 0; overflow-wrap: anywhere; }
 .coin-fidelity-card { background: #131217; border: 1px solid #222224; border-radius: 6px; box-shadow: 0 12px 28px #0003; }
 .coin-fidelity-hero { height: 265px; padding: 20px; }
 .coin-fidelity-metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
@@ -3553,12 +3549,17 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .fidelity-period-card, .fidelity-summary-pnl { min-height: 0; }
   .fidelity-attribution { overflow-x: auto; }
   .fidelity-attribution-row, .fidelity-attribution-axis { min-width: 430px; }
-  .coin-fidelity-heading { height: auto; min-height: 90px; gap: 12px; flex-wrap: wrap; }
+  .coin-fidelity-heading { gap: 12px; flex-wrap: wrap; }
+  .coin-fidelity-heading > div { flex-basis: 100%; }
   .coin-fidelity-hero, .coin-fidelity-custom .coin-fidelity-hero { height: auto; }
-  .coin-fidelity-metrics, .coin-fidelity-custom .coin-fidelity-metrics.top { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; gap: 16px 0; }
+  .coin-fidelity-metrics, .coin-fidelity-metrics.top, .coin-fidelity-metrics.bottom, .coin-fidelity-custom .coin-fidelity-metrics.top { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; gap: 16px 0; }
   .coin-fidelity-metric:nth-child(odd) { border-left: 0; padding-left: 0; }
   .coin-fidelity-grid > .coin-fidelity-card { min-height: 0; }
   .coin-fidelity-section-head { flex-wrap: wrap; }
+}
+@media (max-width: 1100px) {
+  .coin-fidelity-heading { flex-wrap: wrap; padding-block: 8px 16px; }
+  .coin-fidelity-heading > div { flex-basis: 100%; }
 }
 @media (max-width: 600px) {
   .coin-fidelity-metrics, .coin-fidelity-custom .coin-fidelity-metrics.top { grid-template-columns: minmax(0, 1fr); }
@@ -3619,15 +3620,12 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost .pos, :where(body:has(.t3-records-fidelity-shell)) .fidelity-history .pos { color: var(--f-positive); }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost .neg, :where(body:has(.t3-records-fidelity-shell)) .fidelity-history .neg { color: var(--f-negative); }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost .zero, :where(body:has(.t3-records-fidelity-shell)) .fidelity-history .zero { color: var(--f-faint); }
-:where(body:has(.t3-records-fidelity-shell)) .fidelity-page-head { display: flex; align-items: flex-end; gap: 16px; min-height: 52px; margin-bottom: 16px; }
-@media (min-width: 1201px) {
-  :where(body:has(.t3-records-fidelity-shell)) .fidelity-page-head { height: 52px; }
-}
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-page-head { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 16px; min-height: 52px; margin-bottom: 16px; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-page-head > div:first-child { flex: 1; min-width: 0; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-page-head h1 { font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -.01em; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-page-head p { margin-top: 2px; color: var(--f-muted); }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-page-head p strong { color: var(--f-text); font-weight: 600; }
-:where(body:has(.t3-records-fidelity-shell)) .fidelity-head-actions { display: flex; align-items: center; gap: 10px; }
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-head-actions { display: flex; align-items: center; flex-shrink: 0; gap: 10px; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-head-actions .t3-topbar-sync-button {
   height: auto; min-height: 0; padding: 0; border: 0; background: none;
   color: #9b9da3; font-size: 12px; line-height: 18px; letter-spacing: .333px; gap: 6px;

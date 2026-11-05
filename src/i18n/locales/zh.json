@@ -507,6 +507,8 @@
   "assetsPercentage.title": "币种占比概览",
   "coinTrend.title": "走势",
   "coin.openCostBasis": "查看成本基础",
+  "coin.sourcesMore": "+{count} 个来源",
+  "coin.sourcesAll": "所有来源",
   "coin.assetType.stock": "股票",
   "coin.assetType.crypto": "加密资产",
   "coinTrend.mode": "图表模式",

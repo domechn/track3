@@ -8,6 +8,7 @@ function value(input?: string) {
 const chainAddress = /^(?:0x[a-f\d]{24,}|bc1[a-z\d]{20,})$/i;
 const longAddress = /^[A-Za-z0-9_-]{25,}$/;
 const opaque = /^[a-f\d]{32,}$/i;
+const opaqueId = /^[a-f\d]{10,}$/i;
 const chain = /^(?:BTC|DOGE|ERC20|SOL|TRC20|TON|SUI)$/i;
 const short = (input: string) => `${input.slice(0, 6)}…${input.slice(-4)}`;
 
@@ -17,12 +18,12 @@ function sourceName(source: DisplaySource): string | undefined {
   const type = value(source.type);
   const id = value(source.id);
   if (alias && (chainAddress.test(alias) || alias === address && longAddress.test(alias))) return short(alias);
-  if (alias && !opaque.test(alias)) return alias;
+  if (alias && !opaque.test(alias) && !(opaqueId.test(alias) && (alias === id || alias === address))) return alias;
   if (type && !chain.test(type) && !opaque.test(type)) return type;
-  if (address && (chainAddress.test(address) || longAddress.test(address) && !opaque.test(address))) return short(address);
-  if (address && !opaque.test(address)) return address;
-  if (id && (chainAddress.test(id) || longAddress.test(id) && !opaque.test(id))) return short(id);
-  if (id && !opaque.test(id)) return id;
+  if (address && (chainAddress.test(address) || longAddress.test(address) && !opaqueId.test(address))) return short(address);
+  if (address && !opaqueId.test(address)) return address;
+  if (id && (chainAddress.test(id) || longAddress.test(id) && !opaqueId.test(id))) return short(id);
+  if (id && !opaqueId.test(id)) return id;
 }
 
 export function needsWalletName(source: DisplaySource): boolean {
@@ -44,6 +45,13 @@ export function sourceDisplayNames(
   });
   return names.map((name, index) => names.indexOf(name) === names.lastIndexOf(name)
     ? name : `${name} (${names.slice(0, index + 1).filter((item) => item === name).length})`);
+}
+
+export function previewSourceNames(names: readonly string[]) {
+  return {
+    visible: names.slice(0, 3),
+    remaining: Math.max(0, names.length - 3),
+  };
 }
 
 export function transactionSourceName(id: string, source?: DisplaySource) {

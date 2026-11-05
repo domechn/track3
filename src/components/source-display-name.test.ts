@@ -1,5 +1,35 @@
 import { expect, it } from "vitest";
-import { sourceDisplayNames } from "./source-display-name";
+import { previewSourceNames, sourceDisplayNames } from "./source-display-name";
+
+it("coin preview keeps three names and counts the hidden sources", () => {
+  expect(previewSourceNames(["A very long wallet alias", "Binance", "Ledger cold wallet", "OKX"])).toEqual({
+    visible: ["A very long wallet alias", "Binance", "Ledger cold wallet"],
+    remaining: 1,
+  });
+  expect(previewSourceNames(Array.from({ length: 16 }, (_, index) => `Source ${index + 1}`))).toEqual({
+    visible: ["Source 1", "Source 2", "Source 3"],
+    remaining: 13,
+  });
+});
+
+it("coin preview has no more count when every source is shown", () => {
+  expect(previewSourceNames(["Binance", "OKX"])).toEqual({
+    visible: ["Binance", "OKX"],
+    remaining: 0,
+  });
+});
+
+it("a ten digit opaque wallet id gets a readable source name", () => {
+  expect(sourceDisplayNames([{ id: "5fe4052fcf", wallet: "5fe4052fcf" }])).toEqual(["Wallet 1"]);
+});
+
+it("keeps short hexadecimal user aliases unless they identify the wallet", () => {
+  expect(sourceDisplayNames([
+    { id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", alias: "1234567890", type: "Binance" },
+    { id: "cccccccccccccccccccccccccccccccc", alias: "deadbeefcafe", type: "Binance" },
+    { id: "5fe4052fcf", wallet: "5fe4052fcf", alias: "5fe4052fcf" },
+  ])).toEqual(["1234567890", "deadbeefcafe", "Wallet 1"]);
+});
 
 it("prefers user aliases and otherwise uses an exchange or chain name", () => {
   expect(sourceDisplayNames([

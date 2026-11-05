@@ -19,6 +19,7 @@ import { toast } from "./ui/use-toast";
 import { downsampleIndices } from "@/middlelayers/chart-downsample";
 import { changeFromDaysAgo, coinAxisForValues, coinChartY, compactMoney, isExchangeSource, tickIndices } from "./fidelity-data";
 import { sourceDisplayNames } from "./source-display-name";
+import { CoinSourceSummary } from "./coin-source-summary";
 import { useLatestWalletOrdinals } from "./source-name-order";
 
 type Props = {
@@ -176,11 +177,9 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const tickDate = (timestamp: number | undefined) => timestamp ? format(new Date(timestamp), "d MMM") : "–";
   const coinName = symbol;
   const sourceCount = sources.length === 1 ? t("coin.fidelity.sourceOne") : t("coin.fidelity.sourcesCount").replace("{count}", String(sources.length));
-  const sourceNames = new Intl.ListFormat(locale === "zh" ? "zh-CN" : "en", { style: "long", type: "conjunction" })
-    .format(sources.map((source) => sourceName(source.wallet)));
-  const subtitle = custom ? t("coin.fidelity.customSubtitle").replace("{source}", sourceNames)
-    : t(assetType === "stock" ? "coin.fidelity.heldAtBrokerStandalone" : "coin.fidelity.held").replace("{sources}", sources.length === 2 && sources.some((source) => !isExchangeSource(source.walletType)) && locale !== "zh"
-      ? sourceNames.replace(" and ", " and a ") : sourceNames);
+  const sourceNames = sources.map((source) => sourceName(source.wallet));
+  const sourceTemplate = t(custom ? "coin.fidelity.customSubtitle" : assetType === "stock" ? "coin.fidelity.heldAtBrokerStandalone" : "coin.fidelity.held");
+  const lastSourcePrefix = sources.length === 2 && sources.some((source) => !isExchangeSource(source.walletType)) && locale !== "zh" ? "a " : "";
   const saleRange = disposals.length === 0 ? t("coin.fidelity.noSalesRange") : disposals.length === 1 ? t("coin.fidelity.saleRangeOne") : t("coin.fidelity.salesRange").replace("{count}", String(disposals.length));
   const saleFifo = disposals.length === 1 ? t("coin.fidelity.saleFifoOne") : t("coin.fidelity.salesFifo").replace("{count}", String(disposals.length));
   const metric = (label: string, main: string, sub: string, cls = "", note?: string) => <div className="coin-fidelity-metric"><span>{label}</span><strong className={main === "–" ? "zero" : cls}>{main}</strong><small>{sub}</small>{note && <small className="coin-fidelity-warning">{note}</small>}</div>;
@@ -204,7 +203,7 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const sheetGain = sheetDisposals.reduce((total, disposal) => total + disposal.gainLoss, 0);
   return <div className={`analyze-coin coin-fidelity${assetType === "stock" ? " coin-fidelity-stock" : ""}${custom ? " coin-fidelity-custom" : ""}${quoteColor === "red-up-green-down" ? " fidelity-reverse" : ""}`}>
     <div className="coin-fidelity-heading">
-      <div><div className="coin-fidelity-crumb"><span>{t("coin.fidelity.overview")}</span><CoinChevron /><span>{t("coin.fidelity.coins")}</span><CoinChevron /><span>{symbol}</span></div><h1>{coinName} <b>{custom ? t("coin.fidelity.customAsset") : assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")}</b></h1><p>{subtitle}</p></div>
+      <div><div className="coin-fidelity-crumb"><span>{t("coin.fidelity.overview")}</span><CoinChevron /><span>{t("coin.fidelity.coins")}</span><CoinChevron /><span>{symbol}</span></div><h1>{coinName} <b>{custom ? t("coin.fidelity.customAsset") : assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")}</b></h1><CoinSourceSummary names={sourceNames} template={sourceTemplate} locale={locale} moreLabel={t("coin.sourcesMore")} allLabel={t("coin.sourcesAll")} lastPrefix={lastSourcePrefix} /></div>
       <Button variant="outline" onClick={() => navigate("/cost-basis")}><svg aria-hidden="true" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2.5v13M12 5.5c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 2.2 3 1 3 2.3-1.3 2-3 2-3-.8-3-2" /></svg> {t("coin.openCostBasis")}</Button>
     </div>
     {loadError && <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => setRetry((value) => value + 1)}>{t("summary.fidelity.retry")}</button></div>}
@@ -256,7 +255,7 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
       <section className="coin-fidelity-card coin-fidelity-sources" tabIndex={0}>
         <div className="coin-fidelity-section-head"><h2>{t("coin.fidelity.holdingsSource")}</h2><small>{sourceCount}</small></div>
         <table><thead><tr><th>{t("coin.fidelity.source")}</th><th>{t("coin.fidelity.quantity")}</th><th>{t("coin.fidelity.value")}</th><th>{t("coin.fidelity.share")}</th></tr></thead>
-          <tbody>{sources.map(row => <tr key={row.wallet}><td title={row.wallet}>{sourceName(row.wallet)} <small>{assetType === "stock" ? t("coin.fidelity.broker") : isExchangeSource(row.walletType) ? t("coin.fidelity.exchange") : t("coin.fidelity.wallet")}</small></td><td>{num(row.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td>{money(row.value)}</td><td>{num(row.percentage,1)}%</td></tr>)}<tr className="total"><td>{t("coin.fidelity.total")}</td><td>{num(amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td>{money(value)}</td><td>100.0%</td></tr></tbody></table>
+          <tbody>{sources.map(row => <tr key={row.wallet}><td title={sourceName(row.wallet)}>{sourceName(row.wallet)} <small>{assetType === "stock" ? t("coin.fidelity.broker") : isExchangeSource(row.walletType) ? t("coin.fidelity.exchange") : t("coin.fidelity.wallet")}</small></td><td>{num(row.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td>{money(row.value)}</td><td>{num(row.percentage,1)}%</td></tr>)}<tr className="total"><td>{t("coin.fidelity.total")}</td><td>{num(amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td>{money(value)}</td><td>100.0%</td></tr></tbody></table>
         <div className="coin-fidelity-lots-head"><h2>{t("coin.fidelity.openLots")}</h2><small>{t("coin.fidelity.lotsCount").replace("{count}", String(lots.length + unpricedDeposits.length))}</small></div>
         <table><thead><tr><th>{t("coin.fidelity.acquired")}</th><th>{t("coin.fidelity.quantity")}</th><th>{t("coin.fidelity.costPrice")}</th><th>{t("coin.fidelity.unrealizedShort")}</th></tr></thead>
           <tbody>{lots.map((lot, i) => { const valued = valuedLots.find((row) => row.id === lot.id); return <tr key={`${lot.id}-${i}`}><td>{date(lot.acquiredAt)}</td><td>{num(lot.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td className={valued ? "" : "zero"}>{valued ? money(lot.costBasis / lot.amount, false, custom ? 4 : 2) : "–"}</td><td className={valued ? signedTone(valued.gainLoss) : "zero"}>{valued ? money(roundedCents(valued.gainLoss), true) : "–"}</td></tr>; })}
