@@ -10,6 +10,7 @@ import { useTranslation } from "@/i18n";
 import { currencyWrapper } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 import { axisForValues, compactMoney } from "./fidelity-data";
+import { AttributionPager, useAttributionPage } from "./attribution-pager";
 
 type Result = Awaited<ReturnType<typeof queryAttribution>>;
 const num = (n: number, decimals = 0) => new Intl.NumberFormat("en-US", {
@@ -47,6 +48,7 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
   const groups = useMemo(() => result
     ? groupAttribution(result.attribution.entries, dimension, result.aliases, t("profit.attribution.stock"))
     : [], [result, dimension, t]);
+  const paging = useAttributionPage(groups, `${rangeKey}:${dimension}`);
   const hasResidual = !!result && (Math.abs(result.attribution.totals.residual) >= 0.005 ||
     groups.some((group) => Math.abs(group.residual) >= 0.005));
   const coinGroups = useMemo(() => result
@@ -112,7 +114,7 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
         <div className="fidelity-attribution-key"><span><i />{t("summary.fidelity.marketMove")}</span><span><i />{t("summary.fidelity.quantityChange")}</span></div>
         <div role="table" aria-label={t("summary.attributionTitle")} className={hasResidual ? "fidelity-attribution-table has-residual" : "fidelity-attribution-table"}>
         <div className="fidelity-attribution-row head" role="row"><span role="columnheader">{t("summary.fidelity.asset")}</span><span role="columnheader"><span className="sr-only">{t("profit.attribution.chart")}</span></span><span role="columnheader">{t("summary.fidelity.market")}</span><span role="columnheader">{t("summary.fidelity.quantity")}</span>{hasResidual && <span role="columnheader">{t("profit.attribution.residual")}</span>}<span role="columnheader">{t("summary.fidelity.total")}</span></div>
-        {groups.map((group) => {
+        {paging.rows.map((group) => {
           const quantityStart = group.priceEffect * group.flowEffect < 0 ? 0 : group.priceEffect;
           return <div className="fidelity-attribution-row" role="row" key={group.key}>
           <b role="rowheader">{group.label.split(" · ")[0]}</b>
@@ -131,6 +133,7 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
           <span role="cell">{money(result!.attribution.totals.totalChange)}</span>
         </div>
         </div>
+        <AttributionPager count={groups.length} {...paging} t={t} />
       </>}
   </section>;
 }

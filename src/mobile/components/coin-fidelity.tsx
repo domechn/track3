@@ -15,13 +15,15 @@ import { BottomSheet } from "@/mobile/components/mobile";
 import { ChevronRightIcon } from "@radix-ui/react-icons";
 import { buildAssetDetailsPath, formatAssetLabel, getAssetLogoKey } from "@/utils/assets";
 import { currencyWrapper } from "@/utils/currency";
+import { sourceDisplayNames } from "@/components/source-display-name";
+import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import "@/mobile/components/mobile/fidelity.css";
 
 type Source = { name: string; amount: number; value: number; wallet: string };
 type Point = { date: Date; amount: number; value: number; price: number };
 type ImportedEdit = { type: Transaction["txnType"]; price: number };
 type Data = { points: Point[]; sources: Source[]; transactions: Transaction[]; currentTotal: number; manual: boolean; manualSetAt?: string; manualUsd?: number; followSymbol?: string; displayName?: string;
-  aliases: Record<string, { alias: string; type: string } | undefined>; edits: Record<number, ImportedEdit> };
+  aliases: Record<string, { wallet: string; alias: string; type: string } | undefined>; edits: Record<number, ImportedEdit> };
 const dash = "–";
 const formatDate = (value: string | Date, locale: string, withTime = false, short = false) => {
   const options: Intl.DateTimeFormatOptions = { day: "numeric", month: "short",
@@ -216,7 +218,16 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
   const ch1=change(1),ch7=change(7),ch30=change(30);
   const kind = data?.manual ? label("customAsset") : assetType === "stock" ? label("stock") : label("crypto");
   const name = data?.displayName?.trim() || symbol;
-  const sourceName = (wallet: string) => data?.aliases[wallet]?.alias ?? wallet;
+  const walletOrdinals = useLatestWalletOrdinals();
+  const sourceLabels = useMemo(() => {
+    const ordered = [...(data?.sources ?? [])].sort((a, b) => b.value - a.value || a.wallet.localeCompare(b.wallet));
+    const ids = [...new Set([...ordered.map((source) => source.wallet), ...transactions.map((tx) => tx.wallet).filter((wallet): wallet is string => !!wallet)])];
+    const labels = sourceDisplayNames(ids.map((id) => ({
+      id, wallet: data?.aliases[id]?.wallet, alias: data?.aliases[id]?.alias, type: data?.aliases[id]?.type,
+    })), (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals);
+    return Object.fromEntries(ids.map((id, index) => [id, labels[index]]));
+  }, [data, transactions, t, walletOrdinals]);
+  const sourceName = (wallet: string) => sourceLabels[wallet] ?? dash;
   const sourceKind = (wallet: string) => {
     if (assetType === "stock") return label("broker");
     const kind = (data?.aliases[wallet]?.type ?? wallet).toLowerCase();

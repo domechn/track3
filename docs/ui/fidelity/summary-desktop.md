@@ -58,6 +58,8 @@ Fresh 3 Nov 2026 Chromium renders of the source HTML are in `/tmp/fidelity-deskt
 
 ## Remaining differences
 
+- A fresh 5 Nov 2026 populated source render and app capture differ by **12.14%** over the 1600 × 1000 viewport before aligning the app's fixed 49 px product toolbar. Aligning the content below that toolbar and expanding only the capture scroll host gives **0.53%** across the 1600 × 1621 source page (RGB sum threshold 48). The source has no live total, date, refresh or sync toolbar; those product controls account for the vertical offset. The current two-peak mark and Settings cog also differ from the source tile and sun. Images and measured bounds are in `/tmp/ui3-remeasure/`.
+- With 47 attribution groups, the product adds ten-row pagination. The source has eight groups, so its populated image has no pager to compare. The total still covers all groups, and the contributor and detractor cards retain their full data.
 - The header keeps the live total, DatePicker, refresh control, and sync-status popover because those existing controls provide portfolio actions absent from the static design page. `Updated 09:41` describes a local refresh; the source's `Synced 09:41` would incorrectly imply S3 synchronization.
 - The one-snapshot attribution caption starts on the real first snapshot, 31 Oct 2026. The source says 1 Jul 2025 despite that snapshot being absent from its empty data.
 - The attribution date has a small disclosure chevron and a screen-reader name for its coin/source/wallet/asset-type grouping menu. The source shows the date alone. An `Unexplained` column appears only when recorded market and quantity effects leave a residual, so the total remains accountable; the design sample has no residual.

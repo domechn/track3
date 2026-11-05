@@ -58,6 +58,7 @@ import { ASSISTANT_APP_ACTION_EVENT, validateActionArgs } from "@/middlelayers/a
 import { setCurrentDateRange, clearCurrentDateRange, readAssistantDateRange, clearAssistantDateRange } from "@/middlelayers/ui-state/page-prefs";
 import { useTranslation } from "@/mobile/i18n";
 import { DataChangedContext } from "@/contexts/data-changed";
+import { LatestSourceNamesProvider } from "@/components/source-name-order";
 import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
@@ -1233,6 +1234,7 @@ const App = () => {
     <div className="t3-mobile-app">
       <AutoBackupIndicator status={autoBackupStatus} />
       <DataChangedContext.Provider value={dataChangedVersion}>
+        <LatestSourceNamesProvider ready={!initializing && !loadFailed}>
         <HashRouter>
           <FirstRunOnboarding variant="ios" ready={!initializing && !loadFailed} />
           <AppRoutes
@@ -1258,6 +1260,7 @@ const App = () => {
           handleConfigurationSave={handleConfigurationSave}
         />
         </HashRouter>
+        </LatestSourceNamesProvider>
       </DataChangedContext.Provider>
     </div>
   );

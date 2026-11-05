@@ -95,7 +95,7 @@ export default function PartialOverviewFidelity({ view, statuses, currency, quot
       </section>
       <section className="fd-card fd-partial-sources"><div className="fd-card-heading"><h3>{t("overview.design.sources")}</h3><span>{t("fidelity.refresh.sourcesCount").replace("{count}", String(orderedSources.length))}</span></div>
         <div className="fd-partial-source-list">{orderedSources.map(([wallet, value]) => {
-          const label = view.sourceLabels[wallet] ?? wallet;
+          const label = view.sourceLabels[wallet] ?? t("common.unknown");
           const isMissing = missingWallets.has(wallet);
           const status = statuses.find((item) => item.label === label || item.provider === label);
           return <div className="fd-partial-source" key={wallet}><SourceMark initialsOnly source={{ ...(view.sources.find((source) => source.label === label) ?? { sourceId: "", label }), kind: status?.kind, provider: status?.provider }} />
@@ -130,7 +130,7 @@ export default function PartialOverviewFidelity({ view, statuses, currency, quot
           <span>{t(isQuota ? "fidelity.refresh.quotaFinishedMeta" : "fidelity.refresh.finishedMeta").replace("{ok}", String(orderedSources.length - missing.length)).replace("{all}", String(orderedSources.length)).replace("{failed}", String(missing.length))}</span></div>
         <div className="fd-partial-progress"><i /></div>
         <div className="fd-partial-status-list">{orderedSources.map(([wallet]) => {
-          const label = view.sourceLabels[wallet] ?? wallet;
+          const label = view.sourceLabels[wallet] ?? t("common.unknown");
           const isMissing = missingWallets.has(wallet);
           const status = statuses.find((item) => item.label === label || item.provider === label);
           const duration = status?.startedAt && status.finishedAt

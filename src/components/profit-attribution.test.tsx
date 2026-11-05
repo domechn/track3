@@ -19,11 +19,60 @@ const filled = {
   },
   aliases: { w: { alias: "Main", type: "Binance" }, c: { alias: "Vault", type: "ERC20" } },
 };
+const many = {
+  attribution: {
+    entries: Array.from({ length: 47 }, (_, index) => ({
+      symbol: `COIN${index + 1}`, assetType: "crypto" as const, wallet: index % 2 ? "w" : "c",
+      priceEffect: index + 1, flowEffect: 0, residual: 0, totalChange: index + 1,
+    })),
+    totals: { priceEffect: 1128, flowEffect: 0, residual: 0, totalChange: 1128 },
+    startValue: 1000, endValue: 2128,
+  },
+  aliases: filled.aliases,
+};
 
 beforeEach(() => vi.clearAllMocks());
 function view() { return <ProfitAttribution currency={currency} dateRange={range} quoteColor="red-up-green-down" />; }
 
 describe("profit attribution", () => {
+  it("pages 47 groups while keeping all-row totals and leaders", async () => {
+    vi.mocked(queryAttribution).mockResolvedValue(many);
+    render(view());
+    const table = await screen.findByRole("table");
+    expect(within(table).getAllByRole("row")).toHaveLength(11);
+    expect(screen.getByText("Showing 1-10 of 47")).toBeInTheDocument();
+    expect(screen.getByText("Showing 1-10 of 47")).toHaveAttribute("aria-live", "polite");
+    expect(screen.getAllByText("+€2,256.00")[0]).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Showing 11-20 of 47")).toBeInTheDocument();
+    expect(within(table).queryByText("COIN47")).not.toBeInTheDocument();
+    expect(within(table).getByText("COIN37")).toBeInTheDocument();
+    for (let index = 0; index < 3; index++) fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Showing 41-47 of 47")).toBeInTheDocument();
+    expect(within(table).getAllByRole("row")).toHaveLength(8);
+    expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
+  });
+
+  it("resets on dimension or range changes and clamps when refreshed data shrinks", async () => {
+    vi.mocked(queryAttribution).mockResolvedValue(many);
+    const rendered = render(<DataChangedContext.Provider value={0}>{view()}</DataChangedContext.Provider>);
+    await screen.findByText("Showing 1-10 of 47");
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Source" }));
+    expect(screen.queryByText("Showing 11-20 of 47")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "Coin" }));
+    expect(screen.getByText("Showing 1-10 of 47")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    const nextRange = { start: range.start, end: new Date("2024-04-03T00:00:00.000Z") };
+    rendered.rerender(<DataChangedContext.Provider value={0}><ProfitAttribution currency={currency} dateRange={nextRange} quoteColor="red-up-green-down" /></DataChangedContext.Provider>);
+    expect(await screen.findByText("Showing 1-10 of 47")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    vi.mocked(queryAttribution).mockResolvedValueOnce({
+      ...many, attribution: { ...many.attribution, entries: many.attribution.entries.slice(0, 12) },
+    });
+    rendered.rerender(<DataChangedContext.Provider value={1}><ProfitAttribution currency={currency} dateRange={nextRange} quoteColor="red-up-green-down" /></DataChangedContext.Provider>);
+    expect(await screen.findByText("Showing 11-12 of 12")).toBeInTheDocument();
+  });
   it("shows loading, then an honest empty state when the range has no comparison", async () => {
     let resolve!: (value: typeof empty) => void;
     vi.mocked(queryAttribution).mockReturnValue(new Promise((done) => { resolve = done; }));
@@ -46,7 +95,21 @@ describe("profit attribution", () => {
     expect(screen.getAllByText("Binance").length).toBeGreaterThan(0);
     expect(screen.getAllByText("ERC20").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("radio", { name: "Wallet" }));
-    expect(screen.getAllByText("Main (Binance)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Main").length).toBeGreaterThan(0);
+  });
+
+  it("shortens an unaliased wallet address in attribution groups", async () => {
+    const address = "0x1234567890abcdef1234567890abcdefabcd1234";
+    vi.mocked(queryAttribution).mockResolvedValue({
+      ...filled,
+      attribution: { ...filled.attribution, entries: [{ ...filled.attribution.entries[0], wallet: "abcdef0123456789abcdef0123456789" }] },
+      aliases: { abcdef0123456789abcdef0123456789: { alias: address, type: "ERC20" } },
+    });
+    render(view());
+    await screen.findByText("Top contributors");
+    fireEvent.click(screen.getByRole("radio", { name: "Wallet" }));
+    expect(screen.getAllByText("0x1234…1234").length).toBeGreaterThan(0);
+    expect(screen.queryByText(new RegExp(address))).not.toBeInTheDocument();
   });
 
   it("ranks market gains and losses without treating an internal trade as profit", async () => {

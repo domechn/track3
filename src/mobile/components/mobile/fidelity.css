@@ -709,7 +709,8 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-wallet-range .fd-range { width:306px; max-width:none; height:44px; background:var(--fd-raised); }
 .fd-wallet-refresh { display:grid; flex:none; place-items:center; width:44px; height:44px; border:1px solid var(--fd-control); border-radius:50%; color:var(--fd-muted); font-size:22px; }
 .fd-wallet-chips { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0; }
-.fd-wallet-chips button { position:relative; isolation:isolate; display:inline-flex; align-items:center; gap:6px; min-height:44px; margin-block:-2px; padding:0 15px; border:0; color:var(--fd-muted); font-weight:500; white-space:nowrap; }
+.fd-wallet-chips button { position:relative; isolation:isolate; display:inline-flex; align-items:center; gap:6px; max-width:100%; min-height:44px; margin-block:-2px; padding:0 15px; border:0; color:var(--fd-muted); font-weight:500; white-space:nowrap; }
+.fd-wallet-chips button span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .fd-wallet-chips button::before { position:absolute; z-index:-1; inset:2px 0; border:1px solid var(--fd-control); border-radius:999px; content:""; }
 .fd-wallet-chips button.selected { color:var(--fd-ground); }
 .fd-wallet-chips button.selected::before { border-color:#fff; background:#fff; }

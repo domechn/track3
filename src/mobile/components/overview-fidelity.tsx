@@ -21,6 +21,8 @@ import FirstRunFidelity from "@/mobile/components/first-run-fidelity";
 import LoadingOverviewFidelity from "@/mobile/components/loading-overview-fidelity";
 import InsightsCard from "@/mobile/components/insights-card";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
+import { sourceDisplayNames } from "@/components/source-display-name";
+import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import PartialOverviewFidelity from "@/mobile/components/partial-overview-fidelity";
 import { requestRefreshSource } from "@/mobile/components/refresh-progress-event";
 import { BottomSheet } from "@/mobile/components/mobile";
@@ -173,6 +175,7 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
   const { t, locale } = useTranslation();
   const version = useDataChangedVersion();
   const [view, setView] = useState<View | null>(null);
+  const walletOrdinals = useLatestWalletOrdinals();
   const [withLastKnown, setWithLastKnown] = useState(false);
   useEffect(() => {
     const includeLastKnown = () => setWithLastKnown(true);
@@ -235,21 +238,29 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
       if (!active) return;
       setWithLastKnown(false);
       const latest = snapshots[0] ?? null;
-      const wallets = [...new Set((latest?.assets ?? []).map((asset) => asset.wallet).filter((wallet): wallet is string => !!wallet))];
+      const sourceTotals = new Map<string, number>();
+      for (const asset of latest?.assets ?? []) if (asset.wallet)
+        sourceTotals.set(asset.wallet, (sourceTotals.get(asset.wallet) ?? 0) + asset.value);
+      const wallets = [...sourceTotals.keys()].sort((a, b) =>
+        sourceTotals.get(b)! - sourceTotals.get(a)! || a.localeCompare(b));
+      const walletName = (index: number) => t("wallets.fallbackName").replace("{number}", String(index));
+      const fallbackNames = sourceDisplayNames(wallets.map((id) => ({ id })), walletName, walletOrdinals);
       const latestAt = from(latest)?.getTime() ?? 0;
       setView({ points, snapshots, latest, prior: snapshots[1] ?? null,
         week: nearest(snapshots, latestAt - 7 * 86400000), holdings,
         partial: !!latest?.partial, currentTotal: detail?.totalValue ?? latest?.total ?? points.at(-1)?.totalValue ?? 0,
-        excluded: detail?.excludedSources ?? [], sources, sourceLabels: {} });
+        excluded: detail?.excludedSources ?? [], sources,
+        sourceLabels: Object.fromEntries(wallets.map((wallet, index) => [wallet, fallbackNames[index]])) });
       setStatus("ready");
-      const aliases: Record<string, { alias: string } | undefined> =
+      const aliases: Record<string, { wallet: string; alias: string; type: string } | undefined> =
         await new WalletAnalyzer(async () => []).listWalletAliases(wallets).catch(() => ({}));
       if (!active) return;
-      const sourceLabels = Object.fromEntries(wallets.map((wallet) => [wallet, aliases[wallet]?.alias ?? wallet]));
+      const labels = sourceDisplayNames(wallets.map((id) => ({ id, ...aliases[id] })), walletName, walletOrdinals);
+      const sourceLabels = Object.fromEntries(wallets.map((wallet, index) => [wallet, labels[index]]));
       setView((current) => current ? { ...current, sourceLabels } : current);
     }).catch(() => { if (active) setStatus("error"); });
     return () => { active = false; };
-  }, [allTimeRange.start.getTime(), allTimeRange.end.getTime(), version]);
+  }, [allTimeRange.start.getTime(), allTimeRange.end.getTime(), version, t, walletOrdinals]);
   const points = view?.points ?? [];
   const last = points.at(-1);
   const lastAt = last?.timestamp ?? 0;
@@ -334,7 +345,7 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
   const highPoint = points.find((point) => point.totalValue === high);
   const sourceValues = new Map<string, number>();
   for (const asset of view?.latest?.assets ?? []) {
-    const wallet = view?.sourceLabels[asset.wallet ?? ""] ?? asset.wallet ?? dash;
+    const wallet = view?.sourceLabels[asset.wallet ?? ""] ?? dash;
     sourceValues.set(wallet, (sourceValues.get(wallet) ?? 0) + asset.value);
   }
   const orderedSources = [...sourceValues].sort((a, b) => b[1] - a[1]);

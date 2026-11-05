@@ -13,6 +13,9 @@ import { holdingsWeekPriceChanges } from "./overview-holdings";
 import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
+import { sourceDisplayNames } from "./source-display-name";
+import { matchSourceStatus } from "./source-status-match";
+import { useLatestWalletOrdinals } from "./source-name-order";
 import { buildAssetDetailsPath } from "@/utils/assets";
 import { currencyWrapper } from "@/utils/currency";
 import { Card } from "./ui/card";
@@ -225,11 +228,10 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
   desktopFidelity?: boolean;
 }) {
   const { t } = useTranslation();
+  const walletOrdinals = useLatestWalletOrdinals();
   const failed = unavailableSources(statuses);
   const firstFailed = statuses.find((status) =>
     (status.status === "failed" || status.status === "stale") && status.category !== "quota");
-  const firstFailedSource = sources.find((source) =>
-    (source.walletAlias ?? source.wallet).toLowerCase() === firstFailed?.label.toLowerCase());
   const lastGoodTime = firstFailed?.lastSuccessAt
     ? new Date(firstFailed.lastSuccessAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
   const failedReason = firstFailed?.detail === "Source timed out"
@@ -238,6 +240,15 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
     wallet: source.label, walletAlias: source.label, walletType: undefined as string | undefined,
     value: 0, percentage: 0, amount: 0, chartColor: "",
   }));
+  const displayLabels = sourceDisplayNames(listed.map((source) => ({
+    id: source.wallet, wallet: source.wallet, alias: source.walletAlias, type: source.walletType,
+  })), (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals);
+  const statusSources = sources.map((source, index) => ({ id: source.wallet, label: displayLabels[index] }));
+  const identities = Object.fromEntries(sources.map((source) => [source.wallet, {
+    wallet: source.wallet, type: source.walletType,
+  }]));
+  const firstFailedSource = firstFailed && sources.find((source, index) =>
+    matchSourceStatus(statusSources[index], identities, statusSources, statuses) === firstFailed);
   if (variant === "card" && !desktopFidelity) return <Card className="t3-overview-panel t3-sources-panel">
     <header className="t3-overview-panel-heading"><h2>{t("overview.design.sources")}</h2>
       <span>{t("overview.design.sourceCount").replace("{count}", String(statuses.length))}</span></header>
@@ -279,13 +290,13 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
       </div>
     </div>}
     {listed.length ? <div className="t3-sources-list">
-      {listed.map((source) => {
-        const label = source.walletAlias ?? source.wallet;
-        const status = statuses.find((item) => item.label.toLowerCase() === label.toLowerCase());
+      {listed.map((source, index) => {
+        const label = displayLabels[index];
+        const status = matchSourceStatus({ id: source.wallet, label }, identities, statusSources, statuses);
         const kind = status?.kind ?? (source.walletType === "ibkr" ? "broker" : source.walletType === "binance" || source.walletType === "okx" ? "exchange" : "wallet");
         return <div key={source.wallet} className="t3-source-row">
           <span className="t3-source-logo" aria-hidden="true">{sourceMonogram(label)}</span>
-          <span className="t3-source-name"><strong>{label}</strong>
+          <span className="t3-source-name" title={source.wallet}><strong>{label}</strong>
             <small>{t(`overview.fidelity.kind.${kind}`)} · <span className={`t3-source-dot ${status?.status ?? ""}`} /> {status?.status === "ok" && status.finishedAt
               ? `${t("overview.fidelity.updated")} ${new Date(status.finishedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}`
               : status?.status === "ok" ? t("refresh.status.ok") : !status ? t("overview.fidelity.snapshot") : null}</small>

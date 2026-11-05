@@ -24,8 +24,7 @@ Long capture: `/tmp/fidelity/wallets/wallets-all-phone-long.png` vs `/tmp/fideli
 
 ## Remaining differences
 
-- Current 390px viewport pixel diff: **2.41%** (any RGB channel differs by more than 20).
-- Current 390px full-page pixel diff: **5.20%** with the same threshold.
-- Viewport: the main card geometry and values match; glyph and text rasterization differ slightly.
+- Fresh 5 Nov 2026 390px viewport pixel diff: **6.06%** (any RGB channel differs by more than 20). The full-page diff is **7.15%** over the common 2673 px (source 2673 px; app 2725 px). These are direct source HTML and current app captures in `/tmp/ui3-remeasure/` and `/tmp/fidelity/wallets/`.
+- Viewport: the main card geometry and values match. The source was rasterized by desktop Chromium with coloured LCD text edges, while the phone WebView capture uses grayscale text edges. The same local Public Sans font file is loaded and the heading and card bounds agree; CSS font substitution did not change the diff. The product cannot reproduce desktop LCD antialiasing on an iPhone.
 - A 44px Back control is visible at the upper right so the Analytics subpage has an explicit return route; the static reference has no Back control. It now starts below the device's top safe area.
-- Full page: source status cannot assert that a configured API key is read-only, so it says “Exchange” instead. Stored quantities changed between snapshots, so the app omits the reference’s price-only footnote. The app keeps its Detailed analysis action reachable below the cards. These content differences and touch-webview text edges account for the rest.
+- Full page: source status cannot assert that a configured API key is read-only, so it says “Exchange” instead. Stored quantities changed between snapshots, so the app omits the reference’s price-only footnote. The app keeps its Detailed analysis action reachable below the cards; that action accounts for the extra 52 px. The 16-source fixture has no matching source page; its names, card containment and horizontal matrix scroll are verified separately.
