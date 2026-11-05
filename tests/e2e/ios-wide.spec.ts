@@ -8,10 +8,13 @@ test("regular width can refresh a configured source before its first snapshot", 
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 834, height: 1112 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   try {
-    await installTauriBridge(page, { emptyPortfolio: true, firstRunBinance: true });
+    await installTauriBridge(page, { emptyPortfolio: true, firstRunBinance: true,
+      fidelityBinance: { apiKey: "demo-key", secret: "demo-secret", balances: {}, prices: {} } });
     await page.goto("/#/overview");
     await expect(page.locator(".app-layout")).toHaveAttribute("data-width-class", "regular");
     await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Source status" })).toHaveAttribute("data-tone", "ok", { timeout: 30_000 });
   } finally {
     await context.close();
   }

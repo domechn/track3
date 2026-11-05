@@ -35,6 +35,26 @@ it("keeps Gate spot balances and labels an unreadable Earn endpoint", async () =
   errors.mockRestore();
 });
 
+it("marks a Binance isolated margin debt that the portfolio cannot represent as partial", async () => {
+  vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+    const path = new URL(url).pathname;
+    if (path === "/api/v3/account") return { balances: [] } as never;
+    if (path === "/sapi/v1/asset/get-funding-asset") return [] as never;
+    if (path.includes("/simple-earn/")) return { rows: [], total: 0 } as never;
+    if (path === "/sapi/v1/margin/account") return { userAssets: [] } as never;
+    if (path === "/sapi/v1/margin/isolated/account") return { assets: [{
+      symbol: "BTCUSDT",
+      baseAsset: { asset: "BTC", free: "0", locked: "0", borrowed: "1", interest: "0.1", netAsset: "-1.1" },
+      quoteAsset: { asset: "USDT", free: "0", locked: "0", borrowed: "0", interest: "0", netAsset: "0" },
+    }] } as never;
+    if (path === "/sapi/v1/dci/product/positions") return { total: 0, list: [] } as never;
+    return [] as never;
+  });
+  const analyzer = new CexAnalyzer({ exchanges: [{ name: "binance", initParams: { apiKey: "key", secret: "secret" } }] });
+  expect(await analyzer.loadPortfolio()).toEqual([]);
+  expect(takeOptionalSourceFailures(analyzer)).toEqual({ category: "other", endpoints: ["Isolated margin"] });
+});
+
 it("keeps Gate spot balances after a dual investment timeout", async () => {
   vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
     if (url.includes("/earn/dual/balance")) throw new Error("request timed out");

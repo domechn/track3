@@ -748,8 +748,8 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
           contentType = "text/plain";
           body = "fl=1\nip=8.8.8.8\n";
         }
-      } else if (requestUrl.hostname === "api.binance.com" || requestUrl.hostname === "fapi.binance.com") {
-        if (requestPath !== "/api/v3/ticker/price" && requestPath !== "/api/v3/time") {
+      } else if (requestUrl.hostname === "api.binance.com" || requestUrl.hostname === "fapi.binance.com" || requestUrl.hostname === "dapi.binance.com") {
+        if (requestPath !== "/api/v3/ticker/price" && requestPath !== "/api/v3/time" && requestPath !== "/fapi/v1/exchangeInfo") {
           const headers = Array.isArray(request.headers) ? Object.fromEntries(request.headers) : request.headers ?? {};
           const signature = requestUrl.searchParams.get("signature");
           const payload = requestUrl.search.slice(1).replace(/&signature=[^&]*$/, "");
@@ -765,7 +765,12 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
         else if (requestUrl.hostname === "api.binance.com" && requestPath === "/sapi/v1/asset/get-funding-asset" && request.method === "POST") body = "[]";
         else if (requestUrl.hostname === "api.binance.com" && (requestPath === "/sapi/v1/simple-earn/locked/position" || requestPath === "/sapi/v1/simple-earn/flexible/position")) body = '{"rows":[],"total":0}';
         else if (requestUrl.hostname === "api.binance.com" && requestPath === "/sapi/v1/margin/account") body = '{"userAssets":[]}';
+        else if (requestUrl.hostname === "api.binance.com" && requestPath === "/sapi/v1/margin/isolated/account") body = '{"assets":[]}';
+        else if (requestUrl.hostname === "api.binance.com" && requestPath === "/sapi/v1/dci/product/positions") body = '{"total":0,"list":[]}';
         else if (requestUrl.hostname === "fapi.binance.com" && requestPath === "/fapi/v2/balance") body = "[]";
+        else if (requestUrl.hostname === "fapi.binance.com" && requestPath === "/fapi/v2/positionRisk") body = "[]";
+        else if (requestUrl.hostname === "fapi.binance.com" && requestPath === "/fapi/v1/exchangeInfo") body = '{"symbols":[]}';
+        else if (requestUrl.hostname === "dapi.binance.com" && requestPath === "/dapi/v1/balance") body = "[]";
         else if (requestUrl.hostname === "api.binance.com" && requestPath === "/api/v3/ticker/price") body = "[]";
         else if (requestUrl.hostname === "api.binance.com" && requestPath === "/api/v3/time") body = JSON.stringify({ serverTime: Date.now() });
         else throw new Error("unexpected Binance endpoint");
