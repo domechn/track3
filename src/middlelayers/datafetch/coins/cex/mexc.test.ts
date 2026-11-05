@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendHttpRequest } from "../../utils/http";
 import { MexcExchange } from "./mexc";
+import { HttpRequestError } from "../../utils/http";
+import { takeOptionalSourceFailures } from "../../utils/source-failure";
 
-vi.mock("../../utils/http", () => ({
+vi.mock("../../utils/http", async () => ({
+  ...await vi.importActual<typeof import("../../utils/http")>("../../utils/http"),
   sendHttpRequest: vi.fn(),
 }));
 
@@ -19,6 +22,34 @@ afterEach(() => {
 });
 
 describe("MexcExchange", () => {
+  it("reports code 700011 and non-404 margin failures while preserving spot holdings", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("/api/v3/account?")) return { balances: [{ asset: "BTC", free: "2", locked: "0" }] } as never;
+      if (url.includes("/margin/account?")) throw new HttpRequestError('{"code":700011}', 400);
+      if (url.includes("/margin/isolated/account?")) throw new HttpRequestError("service unavailable", 503);
+      return { success: true, code: 0, data: [] } as never;
+    });
+    const exchange = new MexcExchange("key", "secret");
+
+    await expect(exchange.fetchTotalBalance()).resolves.toEqual({ BTC: 2 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({
+      category: "network", endpoints: ["Cross margin", "Isolated margin"],
+    });
+  });
+
+  it("treats 404 on the two unverified margin paths as unavailable but reports a futures 404", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("/api/v3/account?")) return { balances: [] } as never;
+      throw new HttpRequestError("not found", 404);
+    });
+    const exchange = new MexcExchange("key", "secret");
+
+    await expect(exchange.fetchTotalBalance()).resolves.toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toEqual({
+      category: "other", endpoints: ["Futures"],
+    });
+  });
+
   it("signs the sorted spot credential query deterministically", async () => {
     vi.mocked(sendHttpRequest).mockResolvedValue({ balances: [] });
     const exchange = new MexcExchange("test-key", "test-secret");

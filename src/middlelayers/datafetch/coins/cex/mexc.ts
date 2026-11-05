@@ -1,4 +1,4 @@
-import { recordOptionalSourceFailure } from "../../utils/source-failure";
+import { recordOptionalSourceFailure, SanitizedSourceError } from "../../utils/source-failure";
 import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import qs from 'qs'
@@ -187,12 +187,13 @@ export class MexcExchange implements Exchanger {
 		try {
 			return await fetcher()
 		} catch (e) {
-			if (this.isOptionalEndpointUnavailableError(e)) {
+			if ((productName === "cross margin" || productName === "isolated margin")
+				&& (e as { status?: number })?.status === 404) {
 				console.debug(`MEXC ${productName} endpoint is unavailable for this account`)
 				return {}
 			}
 			console.error(`Fetch MEXC ${productName} balance failed:`)
-			recordOptionalSourceFailure(this, e, productName)
+			recordOptionalSourceFailure(this, new SanitizedSourceError(e), productName)
 			return {}
 		}
 	}
@@ -218,16 +219,6 @@ export class MexcExchange implements Exchanger {
 		if (resp.code !== undefined && resp.code !== 200) {
 			throw new Error(`${messagePrefix}: ${resp.msg || resp.code}`)
 		}
-	}
-
-	private isOptionalEndpointUnavailableError(error: unknown): boolean {
-		if (!(error instanceof Error)) {
-			return false
-		}
-
-		return error.message.includes('"code":700011')
-			|| error.message.includes("This interface is not allowed")
-			|| error.message.includes("This interface is not supported")
 	}
 
 	private async fetchSpotPrivate<T>(path: string, params: Record<string, string | number> = {}): Promise<T> {

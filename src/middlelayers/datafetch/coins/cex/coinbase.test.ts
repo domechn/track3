@@ -11,7 +11,8 @@ import CryptoJS from "crypto-js";
 import { sendHttpRequest } from "../../utils/http";
 import { CoinbaseExchange } from "./coinbase";
 
-vi.mock("../../utils/http", () => ({
+vi.mock("../../utils/http", async () => ({
+  ...await vi.importActual<typeof import("../../utils/http")>("../../utils/http"),
   sendHttpRequest: vi.fn(),
 }));
 

@@ -10,6 +10,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2023-11-14T22:13:20.000Z"));
+  (KrakenExchange as unknown as { nonceSeq: number }).nonceSeq = 0;
 });
 
 afterEach(() => {
@@ -17,6 +18,26 @@ afterEach(() => {
 });
 
 describe("KrakenExchange", () => {
+  it("counts held trades once and restores documented staked and bonded suffixes without merging ETH2.S", async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValue({
+      error: [],
+      result: {
+        XXBT: { balance: "3", hold_trade: "2" },
+        "SOL.S": { balance: "4", hold_trade: "1" },
+        "DOT.P": { balance: "5", hold_trade: "0" },
+        "ETH2.S": { balance: "6", hold_trade: "0" },
+      },
+    });
+    const exchange = new KrakenExchange("key", "c2VjcmV0");
+
+    await expect(exchange.fetchTotalBalance()).resolves.toEqual({
+      BTC: 3,
+      SOL: 4,
+      DOT: 5,
+      "ETH2.S": 6,
+    });
+  });
+
   it("signs the nonce and normalizes Kraken asset and earn suffixes", async () => {
     vi.mocked(sendHttpRequest).mockResolvedValue({
       error: [],
@@ -32,7 +53,7 @@ describe("KrakenExchange", () => {
     );
 
     await expect(exchange.fetchTotalBalance()).resolves.toEqual({
-      BTC: 1.5,
+      BTC: 1,
       SOL: 2,
     });
     expect(sendHttpRequest).toHaveBeenCalledWith(
