@@ -72,15 +72,32 @@ test("each page starts in the saved theme and exposes the same theme control", a
   }
 });
 
-test("every page fits a 360px viewport", async () => {
+test("every page fits narrow mobile viewports", async () => {
   for (const file of pages) {
     const { page, context } = await open(file);
-    await page.setViewportSize({ width: 360, height: 900 });
-    const { scrollWidth, innerWidth } = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      innerWidth: window.innerWidth,
-    }));
-    assert.ok(scrollWidth <= innerWidth, `${file}: ${scrollWidth}px content at ${innerWidth}px viewport`);
+    for (const width of [320, 340, 360, 375, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth,
+      }));
+      assert.ok(scrollWidth <= innerWidth, `${file}: ${scrollWidth}px content at ${innerWidth}px viewport`);
+    }
+    await context.close();
+  }
+});
+
+test("compact mobile headers keep the Menu, theme, and Download controls on one row", async () => {
+  for (const file of pages) {
+    const { page, context } = await open(file);
+    for (const width of [320, 340, 360]) {
+      await page.setViewportSize({ width, height: 900 });
+      const controls = await page.locator(".mobile-menu summary, .theme-control, header .btn").evaluateAll((items) =>
+        items.map((item) => ({ top: item.getBoundingClientRect().top, height: item.getBoundingClientRect().height })));
+      assert.equal(controls.length, 3, file);
+      assert.ok(controls.every(({ top, height }) => top === controls[0].top && height === 44),
+        `${file} at ${width}px: ${JSON.stringify(controls)}`);
+    }
     await context.close();
   }
 });
