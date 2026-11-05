@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <style>.mark{fill:#4c68cd}@media (prefers-color-scheme: dark){.mark{fill:#5f7de0}}</style>
-  <rect width="128" height="128" rx="25" fill="#f7f7f8"/>
-  <!-- Logo geometry: change LOGO_PATH in theme.test.mjs, then replace every copy; the test enforces this. -->
-  <path class="mark" d="M7 89 42 13l23 50-13 26H7Zm57-26 22-50 35 76H76L64 63Z" transform="translate(0 14)"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28"><rect x=".0275" y=".0275" width="27.945" height="27.945" rx="6.16" fill="#FFFFFF" stroke="#E2E2E6" stroke-width=".055"/><polygon points="3.7,21.4 9.7,6.1 14.6,21.4" fill="hsl(213 63% 43%)" stroke="hsl(213 63% 43%)" stroke-width="1.15" stroke-linejoin="round"/><polygon points="14.6,21.4 18.5,10 24.3,21.4" fill="hsl(213 63% 65%)" stroke="hsl(213 63% 65%)" stroke-width="1.15" stroke-linejoin="round"/></svg>

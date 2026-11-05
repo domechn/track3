@@ -9,8 +9,7 @@ const pages = [
   ...readdirSync(root).filter((name) => name.endsWith(".html") && !name.startsWith("google")),
   ...readdirSync(new URL("docs/", root)).filter((name) => name.endsWith(".html")).map((name) => `docs/${name}`),
 ];
-// Logo geometry: change LOGO_PATH here, then replace every copy; the test enforces this.
-const LOGO_PATH = "M7 89 42 13l23 50-13 26H7Zm57-26 22-50 35 76H76L64 63Z";
+const LOGO_POINTS = ["3.7,21.4 9.7,6.1 14.6,21.4", "14.6,21.4 18.5,10 24.3,21.4"];
 let browser;
 let server;
 let origin;
@@ -56,15 +55,40 @@ test("each page starts in the saved theme and exposes the same theme control", a
   for (const file of pages) {
     const { page, context, external } = await open(file, { saved: "light", scheme: "dark" });
     assert.equal(await page.locator("html").getAttribute("data-theme"), "light", file);
-    assert.equal(await page.locator(".theme-control").getAttribute("aria-label"), "Theme: light", file);
+    assert.equal(await page.locator(".theme-control").getAttribute("aria-label"), "Theme: Light", file);
+    assert.equal(await page.locator(".theme-control").getAttribute("title"), "Theme: Light", file);
     assert.equal(await page.locator(".theme-control").getAttribute("aria-pressed"), null, file);
     assert.equal(await page.locator(".theme-control").isVisible(), true, file);
     assert.equal(await page.locator(".theme-control").evaluate((button) => Math.round(button.getBoundingClientRect().height)), 44, file);
+    assert.equal(await page.locator("header .btn").evaluate((button) => Math.round(button.getBoundingClientRect().height)), 44, file);
+    await page.setViewportSize({ width: 390, height: 900 });
+    assert.equal(await page.locator(".mobile-menu summary svg").count(), 1, `${file}: mobile Menu icon`);
     assert.equal(await page.locator('link[data-icon-theme="light"]').getAttribute("media"), "all", file);
     assert.equal(await page.locator('link[data-icon-theme="dark"]').getAttribute("media"), "not all", file);
     assert.equal(await page.locator('link[rel="icon"][type="image/png"]').getAttribute("href"),
       file.startsWith("docs/") ? "../images/app-icon.png" : "images/app-icon.png", file);
     assert.deepEqual(external, [], `${file}: external requests`);
+    await context.close();
+  }
+});
+
+test("every page fits a 360px viewport", async () => {
+  for (const file of pages) {
+    const { page, context } = await open(file);
+    await page.setViewportSize({ width: 360, height: 900 });
+    const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    }));
+    assert.ok(scrollWidth <= innerWidth, `${file}: ${scrollWidth}px content at ${innerWidth}px viewport`);
+    await context.close();
+  }
+});
+
+test("each page has the initial theme tooltip before JavaScript runs", async () => {
+  for (const file of pages) {
+    const { page, context } = await open(file, { javaScriptEnabled: false });
+    assert.equal(await page.locator(".theme-control").getAttribute("title"), "Theme: Auto", file);
     await context.close();
   }
 });
@@ -103,7 +127,7 @@ test("inline header and footer marks render on every page", async () => {
     }, screenshot.toString("base64"));
     assert.ok(pixels > 100, `${file}: blank logo`);
     assert.equal(await page.locator(".brand-mark use, .footer-mark use").count(), 0, `${file}: external mark reference`);
-    assert.equal(await page.locator(".brand-mark path, .footer-mark path").count(), 2, `${file}: inline mark geometry`);
+    assert.equal(await page.locator(".brand-mark polygon, .footer-mark polygon").count(), 4, `${file}: inline mark geometry`);
     await context.close();
   }
 });
@@ -111,13 +135,13 @@ test("inline header and footer marks render on every page", async () => {
 test("every inline and favicon mark uses the canonical logo geometry", async () => {
   for (const file of pages) {
     const { page, context } = await open(file);
-    const paths = await page.locator(".brand-mark path, .footer-mark path").evaluateAll((marks) => marks.map((mark) => mark.getAttribute("d")));
-    assert.deepEqual(paths, [LOGO_PATH, LOGO_PATH], file);
+    const points = await page.locator(".brand-mark polygon, .footer-mark polygon").evaluateAll((marks) => marks.map((mark) => mark.getAttribute("points")));
+    assert.deepEqual(points, [...LOGO_POINTS, ...LOGO_POINTS], file);
     await context.close();
   }
-  for (const file of ["images/favicon-light.svg", "images/favicon-dark.svg"]) {
+  for (const file of ["images/favicon-light.svg", "images/favicon-dark.svg", "images/brand/logo-mark.svg", "images/brand/logo-mono.svg"]) {
     const svg = readFileSync(new URL(file, root), "utf8");
-    assert.equal(svg.match(/<path\b[^>]*\bd="([^"]+)"/)?.[1], LOGO_PATH, file);
+    assert.deepEqual([...svg.matchAll(/<polygon\b[^>]*\bpoints="([^"]+)"/g)].map(match => match[1]), LOGO_POINTS, file);
   }
 });
 
@@ -125,12 +149,13 @@ test("control cycles auto, light, dark, persists the single key, and restores au
   const { page, context } = await open();
   const control = page.locator(".theme-control");
   for (const [label, attribute, stored, visibleImage] of [
-    ["Theme: auto", null, null, "dark"],
-    ["Theme: light", "light", "light", "light"],
-    ["Theme: dark", "dark", "dark", "dark"],
-    ["Theme: auto", null, null, "dark"],
+    ["Theme: Auto", null, null, "dark"],
+    ["Theme: Light", "light", "light", "light"],
+    ["Theme: Dark", "dark", "dark", "dark"],
+    ["Theme: Auto", null, null, "dark"],
   ]) {
     assert.equal(await control.getAttribute("aria-label"), label);
+    assert.equal(await control.getAttribute("title"), label);
     assert.equal(await control.getAttribute("aria-pressed"), null);
     assert.equal(await page.locator("html").getAttribute("data-theme"), attribute);
     assert.equal(await page.locator(".shot .theme-image--" + visibleImage).isVisible(), true);
@@ -141,16 +166,43 @@ test("control cycles auto, light, dark, persists the single key, and restores au
   await context.close();
 });
 
+test("hero image keeps high priority when it has another class", async () => {
+  const { page, context } = await open();
+  const image = page.locator(".hero-preview .theme-image--light");
+  await image.evaluate((element) => element.classList.add("extra"));
+  await page.locator(".theme-control").click();
+  assert.equal(await image.getAttribute("loading"), "eager");
+  assert.equal(await image.getAttribute("fetchpriority"), "high");
+  await context.close();
+});
+
 test("invalid saved choice falls back to system preference", async () => {
   const { page, context } = await open("index.html", { saved: "garbage", scheme: "light" });
   assert.equal(await page.locator("html").getAttribute("data-theme"), null);
-  assert.equal(await page.locator(".theme-control").getAttribute("aria-label"), "Theme: auto");
+  assert.equal(await page.locator(".theme-control").getAttribute("aria-label"), "Theme: Auto");
   assert.equal(await page.locator("body").evaluate((body) => getComputedStyle(body).backgroundColor), "rgb(247, 247, 248)");
   await context.close();
 });
 
 test("theme script fits the 1 KB budget", () => {
   assert.ok(readFileSync(new URL("theme.js", root)).byteLength <= 1024);
+});
+
+test("theme control works when system preference only supports addListener", async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    window.matchMedia = () => ({
+      matches: true,
+      addListener(listener) { window.notifyThemeChange = listener; },
+    });
+  });
+  await page.goto(new URL("index.html", origin).href);
+  assert.equal(await page.locator(".theme-control").isVisible(), true);
+  assert.equal(await page.evaluate(() => typeof window.notifyThemeChange), "function");
+  await page.locator(".theme-control").click();
+  assert.equal(await page.locator("html").getAttribute("data-theme"), "light");
+  await context.close();
 });
 
 test("without JavaScript, the control stays hidden and system colors and shots work", async () => {

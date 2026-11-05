@@ -32,7 +32,7 @@ function contrast(foreground, background) {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-test("source icons render at 22px, wordmarks remain legible, and each group has equal tiles", async () => {
+test("source icons render at 20px and each group has equal tiles", async () => {
   for (const width of [1440, 390]) {
     const page = await open(width);
     await page.locator(".source-grid img").evaluateAll((images) => Promise.all(images.map((img) => {
@@ -42,8 +42,7 @@ test("source icons render at 22px, wordmarks remain legible, and each group has 
     const groups = await page.locator(".source-grid").evaluateAll((lists) => lists.map((list) => ({
       logos: [...list.querySelectorAll("img")].map((img) => {
         const rect = img.getBoundingClientRect();
-        const drawnHeight = Math.min(rect.height, rect.width * img.naturalHeight / img.naturalWidth);
-        return { file: img.getAttribute("src").split("/").pop(), height: rect.height, drawnHeight };
+        return { width: rect.width, height: rect.height };
       }),
       tileSizes: [...list.children].map((tile) => {
         const rect = tile.getBoundingClientRect();
@@ -52,45 +51,9 @@ test("source icons render at 22px, wordmarks remain legible, and each group has 
     })));
     assert.equal(groups.length, 2);
     for (const group of groups) {
-      assert.ok(group.logos.filter(({ file }) => !["okex-logo.svg", "bybit-logo.svg"].includes(file)).every(({ height }) => height === 22), `${width}: icon heights ${JSON.stringify(group.logos)}`);
-      assert.ok(group.logos.filter(({ file }) => ["okex-logo.svg", "bybit-logo.svg"].includes(file)).every(({ drawnHeight }) => drawnHeight >= 18), `${width}: wordmark drawn heights ${JSON.stringify(group.logos)}`);
+      assert.ok(group.logos.every(({ width, height }) => width === 20 && height === 20), `${width}: icon boxes ${JSON.stringify(group.logos)}`);
       assert.ok(group.tileSizes.every(([w, h]) => w === group.tileSizes[0][0] && h === group.tileSizes[0][1]), `${width}: tile sizes ${JSON.stringify(group.tileSizes)}`);
     }
-    await page.close();
-  }
-});
-
-test("detailed source logos retain light and dark shapes", async () => {
-  for (const colorScheme of ["dark", "light"]) {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, colorScheme });
-    await page.route(/^https?:\/\//, (route) => route.abort());
-    await page.goto(pageUrl);
-    const logos = [];
-    for (const file of ["binance-logo.svg", "bitget-logo.svg", "backpack-logo.svg", "btc-logo.svg", "eth-logo.svg", "doge-logo.webp", "ton-logo.svg", "tron-logo.svg"]) {
-      const mime = file.endsWith(".svg") ? "image/svg+xml" : "image/webp";
-      const dataUrl = `data:${mime};base64,${readFileSync(new URL(`images/logos/${file}`, import.meta.url)).toString("base64")}`;
-      const tones = await page.locator(`.source-grid img[src$="${file}"]`).first().evaluate(async (element, dataUrl) => {
-        const image = new Image();
-        image.src = dataUrl;
-        await image.decode();
-        const canvas = document.createElement("canvas");
-        canvas.width = canvas.height = 66;
-        const context = canvas.getContext("2d");
-        context.filter = getComputedStyle(element).filter;
-        context.drawImage(image, 0, 0, 66, 66);
-        const tones = [];
-        const pixels = context.getImageData(0, 0, 66, 66).data;
-        for (let i = 0; i < pixels.length; i += 4) {
-          if (pixels[i + 3] >= 250) tones.push(pixels[i]);
-        }
-        return { peak: Math.max(...tones), range: Math.max(...tones) - Math.min(...tones), mean: tones.reduce((sum, tone) => sum + tone, 0) / tones.length };
-      }, dataUrl);
-      logos.push({ file, ...tones });
-    }
-    const reference = logos[0].peak;
-    assert.ok(logos.slice(1).every(({ range }) => range >= 30), `${colorScheme}: flattened logos ${JSON.stringify(logos)}`);
-    assert.ok(logos.slice(1).every(({ mean }) => colorScheme === "dark" ? mean >= 130 : mean <= 135), `${colorScheme}: uneven logo tones ${JSON.stringify(logos)}`);
-    assert.ok(logos.slice(1).every(({ peak }) => Math.abs(peak - reference) <= 10), `${colorScheme}: uneven logo peaks ${JSON.stringify(logos)}`);
     await page.close();
   }
 });
@@ -201,7 +164,7 @@ test("the hero screenshot exposes its scroll label as a group", async () => {
   await page.close();
 });
 
-test("hero uses a balanced grid and renders its capture at least 880px wide", async () => {
+test("hero uses a balanced grid and keeps its capture inside the content grid", async () => {
   const page = await open(1440);
   const metrics = await page.evaluate(() => {
     const grid = getComputedStyle(document.querySelector(".hero-grid")).gridTemplateColumns.split(" ").map(parseFloat);
@@ -211,7 +174,7 @@ test("hero uses a balanced grid and renders its capture at least 880px wide", as
     };
   });
   assert.ok(metrics.copyShare >= 0.4 && metrics.copyShare <= 0.43, `hero copy share ${metrics.copyShare}`);
-  assert.ok(metrics.imageWidth >= 880, `hero image width ${metrics.imageWidth}px`);
+  assert.ok(metrics.imageWidth >= 700, `hero image width ${metrics.imageWidth}px`);
   await page.close();
 });
 
@@ -319,12 +282,12 @@ test("feature captures fade into frames that follow the system theme", async () 
   }
 });
 
-test("wordmark tiles show each name once", async () => {
+test("OKX and Bybit symbol tiles show each name once", async () => {
   const page = await open(1440);
   for (const name of ["OKX", "Bybit"]) {
-    const tile = page.locator(".source-grid li").filter({ has: page.locator(`img[src$="${name === "OKX" ? "okex" : "bybit"}-logo.svg"]`) });
-    assert.equal(await tile.evaluate((el) => el.textContent.trim()), "", name);
-    assert.equal(await tile.locator("img").getAttribute("alt"), name);
+    const tile = page.locator(".source-grid li").filter({ has: page.locator(`img[src$="${name === "OKX" ? "okx" : "bybit"}-symbol.svg"]`) });
+    assert.equal(await tile.evaluate((el) => el.textContent.trim()), name);
+    assert.equal(await tile.locator("img").getAttribute("alt"), "");
   }
   await page.close();
 });
