@@ -65,11 +65,14 @@ export const partialEndpointKeys: Record<string, string> = {
   "Wallet total": "walletTotal", Futures: "futures", "Cross margin": "crossMargin",
   "Isolated margin": "isolatedMargin", "USDT isolated swap": "usdtIsolatedSwap",
   "USDT cross swap": "usdtCrossSwap", "Coin swap": "coinSwap",
+  "Coin delivery": "coinDelivery",
   "Flexible saving": "flexibleSaving", "On-chain Earn": "onChainEarn",
   "Advanced Earn": "advancedEarn", Savings: "savings", Funding: "funding",
   "ETH staking": "ethStaking", "DeFi staking": "defiStaking", Lending: "lending",
   "Solana Earn": "solanaEarn", "SUI DeFi": "suiDefi",
   "Portfolio INTX": "portfolioIntx", "Some assets": "assets",
+  "USD-M Futures": "usdMFutures", "USD-M isolated positions": "usdMIsolatedPositions",
+  "COIN-M Futures": "coinMFutures",
 };
 
 export function safePartialEndpoint(label: string): string | undefined {
@@ -96,7 +99,9 @@ export function recordSourceFailure(source: object, error: unknown): void {
   }
 }
 
-export function recordOptionalSourceFailure(source: object, error: unknown, label: string, includeAuth = false): void {
+export function recordOptionalSourceFailure(
+  source: object, error: unknown, label: string, includeAuth = false, reportUnavailable = false,
+): void {
   const endpoint = safePartialEndpoint(label);
   if (!endpoint) return;
   const status = (error as { status?: number })?.status;
@@ -104,7 +109,7 @@ export function recordOptionalSourceFailure(source: object, error: unknown, labe
   if ((status === 401 || status === 403) && !reportAuth) return;
   const message = error instanceof Error ? error.message : String(error);
   const detail = message.replace(/https?:\/\/[^\s)]+/gi, "");
-  if (!reportAuth &&
+  if (!reportAuth && !reportUnavailable &&
     /\b(?:code\s*700011|not (?:enabled|opened|activated|allowed|supported)|permission denied|no (?:margin|futures|earn|portfolio) account)\b/i.test(detail)) return;
   const category = classifySourceError(error);
   const current = optionalFailures.get(source);

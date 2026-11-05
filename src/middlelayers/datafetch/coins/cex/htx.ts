@@ -36,9 +36,14 @@ type TickerResp = {
 	}[]
 }
 
-// USDT-margined swap (isolated)
-type SwapAccountInfoResp = {
+type HtxApiResp = {
 	status: string
+	err_code?: number | string
+	err_msg?: string
+}
+
+// USDT-margined swap (isolated)
+type SwapAccountInfoResp = HtxApiResp & {
 	data: {
 		symbol: string
 		contract_code: string
@@ -49,8 +54,7 @@ type SwapAccountInfoResp = {
 }
 
 // USDT-margined swap (cross)
-type SwapCrossAccountInfoResp = {
-	status: string
+type SwapCrossAccountInfoResp = HtxApiResp & {
 	data: {
 		margin_balance: number
 		margin_static: number
@@ -66,11 +70,19 @@ type SwapCrossAccountInfoResp = {
 }
 
 // Coin-margined swap
-type CoinSwapAccountInfoResp = {
-	status: string
+type CoinSwapAccountInfoResp = HtxApiResp & {
 	data: {
 		symbol: string
 		contract_code: string
+		margin_balance: number
+		margin_static: number
+		profit_unreal: number
+	}[]
+}
+
+type CoinDeliveryAccountInfoResp = HtxApiResp & {
+	data: {
+		symbol: string
 		margin_balance: number
 		margin_static: number
 		profit_unreal: number
@@ -105,7 +117,7 @@ export class HtxExchange implements Exchanger {
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
 		const accounts = await this.fetchAccounts()
-		const [spotBalance, earnBalance, futuresBalance, crossMarginBalance] = await Promise.all([
+		const [spotBalance, earnBalance, futuresBalance, crossMarginBalance, isolatedMarginBalance] = await Promise.all([
 			this.fetchSpotBalance(accounts),
 			this.fetchEarnBalance(accounts).catch(e => {
 				console.error("Fetch HTX earn balance failed:")
@@ -119,65 +131,87 @@ export class HtxExchange implements Exchanger {
 			}),
 			this.fetchCrossMarginBalance(accounts).catch(e => {
 				console.error("Fetch HTX cross margin balance failed:")
-				recordOptionalSourceFailure(this, e, "Cross margin")
+				recordOptionalSourceFailure(this, e, "Cross margin", true, true)
 				return {}
-			})
+			}),
+			this.fetchIsolatedMarginBalance(accounts).catch(e => {
+				console.error("Fetch HTX isolated margin balance failed:")
+				recordOptionalSourceFailure(this, e, "Isolated margin", true, true)
+				return {}
+			}),
 		])
 
-		return mergeBalances([
+		const balances = mergeBalances([
 			spotBalance,
 			earnBalance,
 			futuresBalance,
 			crossMarginBalance,
+			isolatedMarginBalance,
 		])
+		if (Object.values(balances).some(amount => amount < 0)) {
+			recordOptionalSourceFailure(this, new Error("HTX net negative balance"), "Some assets")
+		}
+		return balances
 	}
 
 	private async fetchCrossMarginBalance(accounts: AccountResp['data']): Promise<{ [k: string]: number }> {
-		const crossMarginAccounts = accounts.filter(a => (a.type === "super-margin" || a.type === "cross-margin") && a.state === "working")
+		return this.fetchMarginBalance(accounts, ["super-margin", "cross-margin"], "Cross margin")
+	}
 
-		if (crossMarginAccounts.length === 0) {
-			return {}
-		}
+	private async fetchIsolatedMarginBalance(accounts: AccountResp['data']): Promise<{ [k: string]: number }> {
+		return this.fetchMarginBalance(accounts, ["margin"], "Isolated margin")
+	}
 
-		const includedTypes = new Set(["trade", "frozen", "loan", "interest"])
+	private async fetchMarginBalance(
+		accounts: AccountResp['data'],
+		accountTypes: string[],
+		label: string,
+	): Promise<{ [k: string]: number }> {
+		const marginAccounts = accounts.filter(a => accountTypes.includes(a.type) && a.state === "working")
+		const includedTypes = new Set(["trade", "frozen", "lock", "loan", "interest"])
 		const balances: { [k: string]: number } = {}
 
-		for (const account of crossMarginAccounts) {
-			const resp = await this.fetchSpot<AccountBalanceResp>("GET", `/v1/account/accounts/${account.id}/balance`)
-			if (resp.status !== "ok") {
-				continue
+		for (const account of marginAccounts) {
+			try {
+				const resp = await this.fetchSpot<AccountBalanceResp>("GET", `/v1/account/accounts/${account.id}/balance`)
+				if (resp.status !== "ok") throw new Error(`HTX API error: ${resp.status}`)
+
+				const grouped: { [k: string]: { trade: number, frozen: number, lock: number, loan: number, interest: number } } = {}
+				resp.data.list.forEach(item => {
+					if (!includedTypes.has(item.type)) return
+					const symbol = item.currency.toUpperCase()
+					const amount = this.readNumber(item.balance)
+					if (!grouped[symbol]) {
+						grouped[symbol] = { trade: 0, frozen: 0, lock: 0, loan: 0, interest: 0 }
+					}
+					grouped[symbol][item.type as keyof typeof grouped[string]] += amount
+				})
+
+				Object.entries(grouped).forEach(([symbol, component]) => {
+					const net = component.trade + component.frozen + component.lock - Math.abs(component.loan) - Math.abs(component.interest)
+					addToBalanceMap(balances, symbol, net)
+				})
+			} catch (error) {
+				recordOptionalSourceFailure(this, error, label, true, true)
 			}
-
-			const grouped: { [k: string]: { trade: number, frozen: number, loan: number, interest: number } } = {}
-			resp.data.list.forEach(item => {
-				if (!includedTypes.has(item.type)) {
-					return
-				}
-				const symbol = item.currency.toUpperCase()
-				const amount = parseFloat(item.balance) || 0
-				if (!grouped[symbol]) {
-					grouped[symbol] = { trade: 0, frozen: 0, loan: 0, interest: 0 }
-				}
-				if (item.type === "trade") {
-					grouped[symbol].trade += amount
-				} else if (item.type === "frozen") {
-					grouped[symbol].frozen += amount
-				} else if (item.type === "loan") {
-					grouped[symbol].loan += amount
-				} else if (item.type === "interest") {
-					grouped[symbol].interest += amount
-				}
-			})
-
-			Object.entries(grouped).forEach(([symbol, component]) => {
-				const loan = component.loan > 0 ? component.loan : -component.loan
-				const interest = component.interest > 0 ? component.interest : -component.interest
-				const net = component.trade + component.frozen - loan - interest
-				addToBalanceMap(balances, symbol, net)
-			})
 		}
 
 		return balances
+	}
+
+	private readNumber(value: number | string): number {
+		if (typeof value !== "number" && typeof value !== "string") throw new Error("HTX balance is missing")
+		if (typeof value === "string" && !value.trim()) throw new Error("HTX balance is empty")
+		const amount = Number(value)
+		if (!Number.isFinite(amount)) throw new Error("HTX balance is not numeric")
+		return amount
+	}
+
+	private hasContractAccount(resp: HtxApiResp): boolean {
+		if (resp.status === "ok") return true
+		// HTX DM documents 1010/1012 for accounts that have never been opened.
+		if (resp.err_code === 1010 || resp.err_code === 1012 || resp.err_code === "1010" || resp.err_code === "1012") return false
+		throw new Error(`HTX API error: ${resp.status} ${resp.err_code ?? ""} ${resp.err_msg ?? ""}`)
 	}
 
 	private async fetchAccounts(): Promise<AccountResp['data']> {
@@ -219,88 +253,97 @@ export class HtxExchange implements Exchanger {
 
 		const balances: { [k: string]: number } = {}
 		for (const account of earnAccounts) {
-			const resp = await this.fetchSpot<AccountBalanceResp>("GET", `/v1/account/accounts/${account.id}/balance`)
-			if (resp.status !== "ok") {
-				continue
+			try {
+				const resp = await this.fetchSpot<AccountBalanceResp>("GET", `/v1/account/accounts/${account.id}/balance`)
+				if (resp.status !== "ok") throw new Error(`HTX API error: ${resp.status}`)
+				const accountBalances: { [k: string]: number } = {}
+				resp.data.list.forEach(item => {
+					addToBalanceMap(accountBalances, item.currency.toUpperCase(), this.readNumber(item.balance))
+				})
+				Object.entries(accountBalances).forEach(([symbol, amount]) => addToBalanceMap(balances, symbol, amount))
+			} catch (error) {
+				recordOptionalSourceFailure(this, error, "Earn", true, true)
 			}
-			resp.data.list.forEach(item => {
-				addToBalanceMap(balances, item.currency.toUpperCase(), parseFloat(item.balance) || 0)
-			})
 		}
 
 		return balances
 	}
 
 	private async fetchFuturesBalance(): Promise<{ [k: string]: number }> {
-		const [usdtIsolated, usdtCross, coinSwap] = await Promise.all([
+		const [usdtIsolated, usdtCross, coinSwap, coinDelivery] = await Promise.all([
 			this.fetchUsdtSwapIsolatedBalance().catch(e => {
 				console.error("Fetch HTX USDT isolated swap balance failed:")
-				recordOptionalSourceFailure(this, e, "USDT isolated swap")
+				recordOptionalSourceFailure(this, e, "USDT isolated swap", true, true)
 				return {}
 			}),
 			this.fetchUsdtSwapCrossBalance().catch(e => {
 				console.error("Fetch HTX USDT cross swap balance failed:")
-				recordOptionalSourceFailure(this, e, "USDT cross swap")
+				recordOptionalSourceFailure(this, e, "USDT cross swap", true, true)
 				return {}
 			}),
 			this.fetchCoinSwapBalance().catch(e => {
 				console.error("Fetch HTX coin swap balance failed:")
-				recordOptionalSourceFailure(this, e, "Coin swap")
+				recordOptionalSourceFailure(this, e, "Coin swap", true, true)
 				return {}
-			})
+			}),
+			this.fetchCoinDeliveryBalance().catch(e => {
+				console.error("Fetch HTX coin delivery balance failed:")
+				recordOptionalSourceFailure(this, e, "Coin delivery", true, true)
+				return {}
+			}),
 		])
 
-		const merged: { [k: string]: number } = {};
-		for (const [k, v] of Object.entries(usdtIsolated)) merged[k] = (merged[k] || 0) + v;
-		for (const [k, v] of Object.entries(usdtCross)) merged[k] = (merged[k] || 0) + v;
-		for (const [k, v] of Object.entries(coinSwap)) merged[k] = (merged[k] || 0) + v;
-		return merged
+		return mergeBalances([usdtIsolated, usdtCross, coinSwap, coinDelivery])
 	}
 
 	// USDT-margined isolated swap balance → report as USDT
 	private async fetchUsdtSwapIsolatedBalance(): Promise<{ [k: string]: number }> {
 		const resp = await this.fetchFutures<SwapAccountInfoResp>("POST", "/linear-swap-api/v1/swap_account_info")
-		if (resp.status !== "ok") {
-			return {}
-		}
+		if (!this.hasContractAccount(resp)) return {}
 
 		let totalUsdt = 0
 		resp.data.forEach(item => {
-			totalUsdt += item.margin_balance || 0
+			totalUsdt += this.readNumber(item.margin_balance)
 		})
 
-		if (totalUsdt <= 0) return {}
+		if (totalUsdt === 0) return {}
 		return { "USDT": totalUsdt }
 	}
 
 	// USDT-margined cross swap balance → report as USDT
 	private async fetchUsdtSwapCrossBalance(): Promise<{ [k: string]: number }> {
 		const resp = await this.fetchFutures<SwapCrossAccountInfoResp>("POST", "/linear-swap-api/v1/swap_cross_account_info")
-		if (resp.status !== "ok") {
-			return {}
-		}
+		if (!this.hasContractAccount(resp)) return {}
 
 		let totalUsdt = 0
 		resp.data.forEach(item => {
-			totalUsdt += item.margin_balance || 0
+			totalUsdt += this.readNumber(item.margin_balance)
 		})
 
-		if (totalUsdt <= 0) return {}
+		if (totalUsdt === 0) return {}
 		return { "USDT": totalUsdt }
 	}
 
 	// Coin-margined swap balance → report in native coins
 	private async fetchCoinSwapBalance(): Promise<{ [k: string]: number }> {
 		const resp = await this.fetchFutures<CoinSwapAccountInfoResp>("POST", "/swap-api/v1/swap_account_info")
-		if (resp.status !== "ok") {
-			return {}
-		}
+		if (!this.hasContractAccount(resp)) return {}
 
 		const balances: { [k: string]: number } = {}
 		resp.data.forEach(item => {
-			addToBalanceMap(balances, item.symbol.toUpperCase(), item.margin_balance || 0)
+			addToBalanceMap(balances, item.symbol.toUpperCase(), this.readNumber(item.margin_balance))
 		})
 
+		return balances
+	}
+
+	private async fetchCoinDeliveryBalance(): Promise<{ [k: string]: number }> {
+		const resp = await this.fetchFutures<CoinDeliveryAccountInfoResp>("POST", "/api/v1/contract_account_info")
+		if (!this.hasContractAccount(resp)) return {}
+		const balances: { [k: string]: number } = {}
+		resp.data.forEach(item => {
+			addToBalanceMap(balances, item.symbol, this.readNumber(item.margin_balance))
+		})
 		return balances
 	}
 
