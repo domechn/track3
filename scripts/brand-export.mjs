@@ -44,13 +44,27 @@ for (const theme of ["light", "dark"]) {
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1024, height: 1024 }, deviceScaleFactor: 1 });
-const render = async (sourcePath, size, outputPath) => {
+const render = async (sourcePath, size, outputPath, rgba = false) => {
   const source = readFileSync(target(sourcePath), "utf8");
   const data = Buffer.from(source).toString("base64");
   await page.setViewportSize({ width: size, height: size });
   await page.setContent(`<html><body style="margin:0"><img width="${size}" height="${size}" src="data:image/svg+xml;base64,${data}"></body></html>`);
   await page.locator("img").evaluate((image) => image.decode());
-  const png = await page.screenshot({ omitBackground: true });
+  let png = await page.screenshot({ omitBackground: true });
+  if (rgba && png[25] !== 6) {
+    const base64 = await page.evaluate(async (encoded) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${encoded}`;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      canvas.getContext("2d").drawImage(image, 0, 0);
+      return canvas.toDataURL("image/png").split(",")[1];
+    }, png.toString("base64"));
+    png = Buffer.from(base64, "base64");
+  }
+  if (rgba && (png[24] !== 8 || png[25] !== 6)) throw new Error("Tauri PNG must be RGBA 8-bit");
   if (outputPath) write(outputPath, png);
   return png;
 };
@@ -79,9 +93,9 @@ const sharpenIco = async () => {
 
 const temporary = mkdtempSync(join(tmpdir(), "track3-brand-export-"));
 try {
-  await render("docs/brand/app-icon-dark.svg", 1024, "src-tauri/icons/icon.png");
+  await render("docs/brand/app-icon-dark.svg", 1024, "src-tauri/icons/icon.png", true);
   await render("docs/brand/app-icon-dark.svg", 512, "images/app-icon.png");
-  await render("docs/brand/app-icon-ios.svg", 1024, "src-tauri/app-icon.png");
+  await render("docs/brand/app-icon-ios.svg", 1024, "src-tauri/app-icon.png", true);
 
   execFileSync("corepack", ["yarn", "tauri", "icon", target("src-tauri/icons/icon.png"), "--output", temporary], {
     cwd: root, stdio: "pipe", timeout: 600_000,
@@ -91,11 +105,11 @@ try {
     copyFileSync(join(temporary, name), target(`src-tauri/icons/${name}`));
     if (name.endsWith(".png") && name !== "icon.png") {
       const png = readFileSync(target(`src-tauri/icons/${name}`));
-      await render("docs/brand/app-icon-dark.svg", png.readUInt32BE(16), `src-tauri/icons/${name}`);
+      await render("docs/brand/app-icon-dark.svg", png.readUInt32BE(16), `src-tauri/icons/${name}`, true);
     }
   }
   // Tauri's default icon.png is 512px; retain the requested 1024px master.
-  await render("docs/brand/app-icon-dark.svg", 1024, "src-tauri/icons/icon.png");
+  await render("docs/brand/app-icon-dark.svg", 1024, "src-tauri/icons/icon.png", true);
   await sharpenIco();
 
   const catalogDir = "src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset";

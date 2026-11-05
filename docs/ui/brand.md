@@ -14,7 +14,7 @@ timeout 600 node scripts/brand-export.mjs
 timeout 600 node --test scripts/brand-export.test.mjs
 ```
 
-The export uses the installed Playwright browser and Tauri CLI without network access or new dependencies. It redraws the small Windows PNGs and the 16–32px ICO entries at their native sizes to keep the peaks crisp. `logo-mark.svg` follows the browser color scheme and allows `--peak-primary` / `--peak-tint` overrides. `logo-mono.svg` uses only `currentColor`. Desktop OS icons always use the dark tile. The README picture switches between the dark and light SVG tiles. The iOS catalog is the existing legacy per-size format; it has no iOS 18 appearance entries.
+The export uses the installed Playwright browser and Tauri CLI without network access or new dependencies. It redraws the small Windows PNGs and the 16–32px ICO entries at their native sizes to keep the peaks crisp. PNGs embedded by Tauri, including `src-tauri/app-icon.png`, are RGBA 8-bit even when every pixel is opaque; `generate_context!` rejects RGB PNGs. `logo-mark.svg` follows the browser color scheme and allows `--peak-primary` / `--peak-tint` overrides. `logo-mono.svg` uses only `currentColor`. Desktop OS icons always use the dark tile. The README picture switches between the dark and light SVG tiles. The iOS catalog is the existing legacy per-size format; it has no iOS 18 appearance entries. Its PNGs have opaque alpha and match the Tauri CLI output byte for byte.
 
 The UI refactor guard denies required brand files outside its allowed paths, including `README.md`, `docs/brand/`, `images/app-icon.png`, `scripts/brand-export*.mjs`, and native icons. The PR needs the owner-applied `format-exception-approved` label to pass that guard.
 
