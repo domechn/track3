@@ -13,6 +13,19 @@ const pngSize = (name) => {
   assert.equal(data.subarray(1, 4).toString(), "PNG");
   return [data.readUInt32BE(16), data.readUInt32BE(20)];
 };
+const pngColor = (name) => {
+  const data = file(name);
+  assert.equal(data.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", name);
+  assert.equal(data.subarray(12, 16).toString(), "IHDR", name);
+  return [data[24], data[25]];
+};
+
+test("Tauri PNGs are RGBA 8-bit", () => {
+  for (const name of ["src-tauri/app-icon.png", ...readdirSync(new URL("src-tauri/icons/", root))
+    .filter((name) => name.endsWith(".png")).map((name) => `src-tauri/icons/${name}`)]) {
+    assert.deepEqual(pngColor(name), [8, 6], name);
+  }
+});
 
 test("exported desktop, README, and iOS PNGs have their requested dimensions", () => {
   for (const [name, size] of [
@@ -39,6 +52,16 @@ test("iOS catalog matches the PNGs produced by the CI icon command", () => {
     execFileSync("corepack", ["yarn", "tauri", "icon", new URL("src-tauri/app-icon.png", root).pathname, "--output", output], {
       cwd: root, stdio: "pipe", timeout: 600_000,
     });
+    for (const name of readdirSync(output).filter((name) => name.endsWith(".png"))) {
+      const data = readFileSync(join(output, name));
+      assert.deepEqual([data[24], data[25]], [8, 6], name);
+    }
+    for (const density of readdirSync(join(output, "android"))) {
+      for (const name of readdirSync(join(output, "android", density)).filter((name) => name.endsWith(".png"))) {
+        const data = readFileSync(join(output, "android", density, name));
+        assert.deepEqual([data[24], data[25]], [8, 6], `android/${density}/${name}`);
+      }
+    }
     const catalogPath = "src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/";
     const catalog = JSON.parse(file(`${catalogPath}Contents.json`));
     const names = catalog.images.map((entry) => entry.filename).sort();
