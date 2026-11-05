@@ -1,6 +1,6 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { chromium } from "playwright";
 
 const pageUrl = new URL("index.html", import.meta.url).href;
@@ -297,24 +297,26 @@ test("device brands retain their casing in kickers on every page", async () => {
   }
 });
 
-test("dark-only feature captures fade into a dark frame in light scheme", async () => {
-  const page = await open(1440, "light");
-  for (const name of ["Cost basis", "Rebalance"]) {
-    const frame = page.getByRole("group", { name: `Track3 ${name} screenshot` });
-    const screenshot = await frame.screenshot();
-    const rgb = await page.evaluate(async (data) => {
-      const image = new Image();
-      image.src = `data:image/png;base64,${data}`;
-      await image.decode();
-      const canvas = document.createElement("canvas");
-      canvas.width = canvas.height = 1;
-      const context = canvas.getContext("2d");
-      context.drawImage(image, -Math.floor(image.width / 2), -(image.height - 4));
-      return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3);
-    }, screenshot.toString("base64"));
-    assert.ok(rgb.every((channel) => channel <= 35), `${name}: bottom pixel ${rgb}`);
+test("feature captures fade into frames that follow the system theme", async () => {
+  for (const colorScheme of ["light", "dark"]) {
+    const page = await open(1440, colorScheme);
+    for (const name of ["Cost basis", "Rebalance"]) {
+      const frame = page.getByRole("group", { name: `Track3 ${name} screenshot` });
+      const screenshot = await frame.screenshot();
+      const rgb = await page.evaluate(async (data) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${data}`;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 1;
+        const context = canvas.getContext("2d");
+        context.drawImage(image, -Math.floor(image.width / 2), -(image.height - 4));
+        return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3);
+      }, screenshot.toString("base64"));
+      assert.ok(rgb.every((channel) => colorScheme === "light" ? channel >= 225 : channel <= 35), `${colorScheme} ${name}: bottom pixel ${rgb}`);
+    }
+    await page.close();
   }
-  await page.close();
 });
 
 test("wordmark tiles show each name once", async () => {
@@ -334,12 +336,12 @@ test("privacy disclosure has one marker", async () => {
   await page.close();
 });
 
-test("core views use distinct captures while the hero swaps Overview by scheme", async () => {
+test("core views use distinct captures in each system scheme", async () => {
   for (const colorScheme of ["dark", "light"]) {
     const page = await open(1440, colorScheme);
     const images = await page.evaluate(() => {
-      const hero = document.querySelector(".shot img");
-      const [summary, cost, rebalance] = document.querySelectorAll("#features .feature img");
+      const visible = (shot) => [...shot.querySelectorAll("img")].find((image) => getComputedStyle(image).display !== "none");
+      const [hero, summary, cost, rebalance] = [...document.querySelectorAll(".desktop-preview .theme-shot")].map(visible);
       return {
         hero: hero.currentSrc,
         summary: summary.currentSrc,
@@ -348,12 +350,35 @@ test("core views use distinct captures while the hero swaps Overview by scheme",
         summaryAlt: summary.alt,
       };
     });
-    assert.match(images.hero, new RegExp(`overview${colorScheme === "dark" ? "-dark" : ""}\\.webp$`));
-    assert.match(images.summary, /profit\.webp$/);
-    assert.match(images.cost, /cost-basis\.webp$/);
-    assert.match(images.rebalance, /rebalance\.webp$/);
+    assert.match(images.hero, new RegExp(`overview-${colorScheme}\\.webp$`));
+    assert.match(images.summary, new RegExp(`profit-${colorScheme}\\.webp$`));
+    assert.match(images.cost, new RegExp(`cost-basis-${colorScheme}\\.webp$`));
+    assert.match(images.rebalance, new RegExp(`rebalance-${colorScheme}\\.webp$`));
     assert.equal(new Set([images.hero, images.summary, images.cost, images.rebalance]).size, 4);
     assert.match(images.summaryAlt, /Summary.*profit/i);
     await page.close();
   }
+});
+
+test("light desktop captures have light navigation rails and matching content density", async () => {
+  const page = await browser.newPage();
+  for (const name of ["overview", "profit", "cost-basis", "rebalance"]) {
+    const light = readFileSync(new URL(`images/desktop/${name}-light.webp`, import.meta.url));
+    const rail = await page.evaluate(async (data) => {
+      const image = new Image();
+      image.src = `data:image/webp;base64,${data}`;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+      return [...context.getImageData(24, 200, 1, 1).data].slice(0, 3);
+    }, light.toString("base64"));
+    assert.ok(rail.every((channel) => channel >= 220), `${name}: dark rail ${rail}`);
+    const darkSize = statSync(new URL(`images/desktop/${name}-dark.webp`, import.meta.url)).size;
+    assert.ok(light.length / darkSize >= 0.75 && light.length / darkSize <= 1.25,
+      `${name}: light/dark size ratio ${(light.length / darkSize).toFixed(2)}`);
+  }
+  await page.close();
 });

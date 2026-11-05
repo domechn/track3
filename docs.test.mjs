@@ -55,7 +55,7 @@ test("docs skip link text has AA contrast in light and dark themes", () => {
     return Object.fromEntries([...match[1].matchAll(/(--[\w-]+)\s*:\s*([^;}]+)/g)].map(([, key, value]) => [key, value.trim()]));
   };
   const dark = tokens(/:root\s*\{([^}]+)\}/);
-  const light = tokens(/@media\s*\(prefers-color-scheme:\s*light\)\s*\{\s*:root\s*\{([^}]+)\}/);
+  const light = tokens(/:root\[data-theme="light"\]\s*\{([^}]+)\}/);
   const skip = css.match(/\.skip-link\s*\{([^}]+)\}/)?.[1];
   assert.match(skip, /background:\s*hsl\(var\(--accent-data\)\)/);
   assert.match(skip, /color:\s*hsl\(var\(--accent-ink\)\)/);

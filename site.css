@@ -48,7 +48,7 @@
   --space-7: 96px;
 }
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme]) {
     color-scheme: light;
     --background: 240 7% 97%;
     --foreground: 240 9% 10%;
@@ -65,6 +65,23 @@
     --accent-action: 213 63% 40%;
     --on-accent-action: 0 0% 100%;
   }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: 240 7% 97%;
+  --foreground: 240 9% 10%;
+  --card: 0 0% 100%;
+  --raised: 240 5% 93%;
+  --sunken: 240 7% 96%;
+  --border: 240 5% 84%;
+  --border-strong: 240 5% 72%;
+  --surface-2: 240 5% 93%;
+  --muted-foreground: 240 4% 34%;
+  --faint: 240 4% 38%;
+  --accent-data: 213 63% 43%;
+  --accent-ink: 0 0% 100%;
+  --accent-action: 213 63% 40%;
+  --on-accent-action: 0 0% 100%;
 }
 * {
   box-sizing: border-box;
@@ -93,9 +110,6 @@ img {
   display: block;
   max-width: 100%;
   height: auto;
-}
-picture {
-  display: block;
 }
 a {
   color: inherit;
@@ -225,10 +239,47 @@ header .wrap {
   font-weight: 600;
   letter-spacing: -0.04em;
 }
-.brand img {
+.brand-mark {
   width: 30px;
   height: 30px;
+  color: hsl(var(--accent-data));
+}
+.footer-mark {
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  color: hsl(var(--accent-data));
+  vertical-align: -3px;
+}
+.theme-control {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  cursor: pointer;
+}
+.theme-control:hover {
+  background: hsl(var(--raised));
+}
+.theme-icon {
+  display: none;
+}
+.theme-icon--auto {
+  display: initial;
+}
+:root[data-theme="light"] .theme-icon--auto,
+:root[data-theme="dark"] .theme-icon--auto {
+  display: none;
+}
+:root[data-theme="light"] .theme-icon--light,
+:root[data-theme="dark"] .theme-icon--dark {
+  display: initial;
 }
 nav {
   display: flex;
@@ -398,11 +449,28 @@ header .btn {
   mask-image: linear-gradient(to bottom, #000 calc(100% - 80px), transparent);
 }
 .feature:not(:first-of-type) .screen {
-  background: hsl(240 5% 4%);
+  background: hsl(var(--surface-2));
 }
 .shot img,
 .screen img {
   width: 100%;
+}
+.theme-shot .theme-image--light {
+  display: none;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .theme-shot .theme-image--dark {
+    display: none;
+  }
+  :root:not([data-theme]) .theme-shot .theme-image--light {
+    display: block;
+  }
+}
+:root[data-theme="light"] .theme-shot .theme-image--dark {
+  display: none;
+}
+:root[data-theme="light"] .theme-shot .theme-image--light {
+  display: block;
 }
 .statement {
   border-block: 1px solid hsl(var(--border));
@@ -512,25 +580,31 @@ header .btn {
   font-weight: 600;
 }
 @media (prefers-color-scheme: light) {
-  .source-grid img {
+  :root:not([data-theme]) .source-grid img {
     filter: grayscale(1) brightness(0) invert(0.25);
   }
-  .source-grid img.detailed-logo {
+  :root:not([data-theme]) .source-grid img.detailed-logo {
     filter: grayscale(1) invert(1) brightness(0.43) contrast(0.75);
   }
-  .source-grid img[src$="bitget-logo.svg"] {
+  :root:not([data-theme]) .source-grid img[src$="bitget-logo.svg"] {
     filter: grayscale(1) brightness(0.25) contrast(0.75);
   }
-  .source-grid img[src$="backpack-logo.svg"] {
+  :root:not([data-theme]) .source-grid img[src$="backpack-logo.svg"] {
     filter: grayscale(1) invert(1) brightness(0.34) contrast(0.75);
   }
-  .source-grid img[src$="doge-logo.webp"] {
+  :root:not([data-theme]) .source-grid img[src$="doge-logo.webp"] {
     filter: grayscale(1) invert(1) brightness(0.23) contrast(0.75);
   }
-  .source-grid img[src$="tron-logo.svg"] {
+  :root:not([data-theme]) .source-grid img[src$="tron-logo.svg"] {
     filter: grayscale(1) invert(1) brightness(0.17) contrast(0.76);
   }
 }
+:root[data-theme="light"] .source-grid img { filter: grayscale(1) brightness(0) invert(0.25); }
+:root[data-theme="light"] .source-grid img.detailed-logo { filter: grayscale(1) invert(1) brightness(0.43) contrast(0.75); }
+:root[data-theme="light"] .source-grid img[src$="bitget-logo.svg"] { filter: grayscale(1) brightness(0.25) contrast(0.75); }
+:root[data-theme="light"] .source-grid img[src$="backpack-logo.svg"] { filter: grayscale(1) invert(1) brightness(0.34) contrast(0.75); }
+:root[data-theme="light"] .source-grid img[src$="doge-logo.webp"] { filter: grayscale(1) invert(1) brightness(0.23) contrast(0.75); }
+:root[data-theme="light"] .source-grid img[src$="tron-logo.svg"] { filter: grayscale(1) invert(1) brightness(0.17) contrast(0.76); }
 .facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1010,7 +1084,7 @@ main:has(.notice) > .page-section {
   .brand {
     font-size: 16px;
   }
-  .brand img {
+  .brand-mark {
     width: 26px;
     height: 26px;
   }
@@ -1144,7 +1218,7 @@ main:has(.notice) > .page-section {
   .brand {
     font-size: 14px;
   }
-  .brand img {
+  .brand-mark {
     width: 20px;
     height: 20px;
   }
