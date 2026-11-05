@@ -3,6 +3,7 @@ import { sendHttpRequest } from "../../utils/http";
 import { HttpRequestError } from "../../utils/http";
 import { takeOptionalSourceFailures, takeSourceFailure } from "../../utils/source-failure";
 import { BitgetExchange } from "./bitget";
+import { HtxExchange } from "./htx";
 import { CoinbaseExchange } from "./coinbase";
 import { getMemoryCacheInstance } from "../../utils/cache";
 import { CexAnalyzer } from "./cex";
@@ -161,6 +162,38 @@ it("reports a Coinbase INTX unsupported response because its retirement is unver
   expect(await analyzer.loadPortfolio()).toEqual([expect.objectContaining({ symbol: "BTC", amount: 2 })]);
   expect(takeOptionalSourceFailures(analyzer)).toEqual({ category: "other", endpoints: ["Portfolio INTX"] });
   vi.restoreAllMocks();
+});
+
+it("transfers an HTX delivery failure to source status while keeping spot holdings", async () => {
+  vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+    if (url.includes("/market/tickers")) return { status: "ok", data: [{ symbol: "btcusdt", close: 60000 }] } as never;
+    if (url.includes("/v1/account/accounts?")) return { status: "ok", data: [
+      { id: 1, type: "spot", state: "working", subtype: "" },
+    ] } as never;
+    if (url.includes("/accounts/1/balance")) return { status: "ok", data: {
+      id: 1, type: "spot", state: "working",
+      list: [{ currency: "btc", type: "trade", balance: "1" }],
+    } } as never;
+    if (url.includes("/api/v1/contract_account_info")) return { status: "error", err_code: 1030, data: [] } as never;
+    return { status: "ok", data: [] } as never;
+  });
+  const analyzer = new CexAnalyzer({ exchanges: [{ name: "htx", initParams: { apiKey: "key", secret: "secret" } }] });
+  expect(await analyzer.loadPortfolio()).toEqual([expect.objectContaining({ symbol: "BTC", amount: 1 })]);
+  expect(takeOptionalSourceFailures(analyzer)).toEqual({ category: "other", endpoints: ["Coin delivery"] });
+});
+
+it("marks net negative HTX swap equity partial when refresh cannot save the debt", async () => {
+  vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+    if (url.includes("/market/tickers")) return { status: "ok", data: [] } as never;
+    if (url.includes("/v1/account/accounts?")) return { status: "ok", data: [] } as never;
+    if (url.includes("/linear-swap-api/v1/swap_account_info")) return { status: "ok", data: [
+      { symbol: "BTC", contract_code: "BTC-USDT", margin_balance: -12, margin_static: -12, profit_unreal: 0 },
+    ] } as never;
+    return { status: "ok", data: [] } as never;
+  });
+  const analyzer = new CexAnalyzer({ exchanges: [{ name: "htx", initParams: { apiKey: "key", secret: "secret" } }] });
+  expect(await analyzer.loadPortfolio()).toEqual([]);
+  expect(takeOptionalSourceFailures(analyzer)).toEqual({ category: "other", endpoints: ["Some assets"] });
 });
 
 it("rejects Coinbase when its default portfolio returns 401", async () => {

@@ -252,6 +252,7 @@
   "refresh.endpoint.usdtIsolatedSwap": "USDT isolated swap",
   "refresh.endpoint.usdtCrossSwap": "USDT cross swap",
   "refresh.endpoint.coinSwap": "Coin swap",
+  "refresh.endpoint.coinDelivery": "Coin delivery",
   "refresh.endpoint.flexibleSaving": "Flexible saving",
   "refresh.endpoint.onChainEarn": "On-chain Earn",
   "refresh.endpoint.advancedEarn": "Advanced Earn",

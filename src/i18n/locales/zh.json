@@ -244,6 +244,7 @@
   "refresh.endpoint.usdtIsolatedSwap": "USDT 逐仓永续",
   "refresh.endpoint.usdtCrossSwap": "USDT 全仓永续",
   "refresh.endpoint.coinSwap": "币本位永续",
+  "refresh.endpoint.coinDelivery": "币本位交割合约",
   "refresh.endpoint.flexibleSaving": "活期理财",
   "refresh.endpoint.onChainEarn": "链上理财",
   "refresh.endpoint.advancedEarn": "高级理财",
