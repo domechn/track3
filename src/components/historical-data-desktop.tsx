@@ -17,12 +17,15 @@ import type { HistoricalPageRow, SnapshotEdit } from "@/middlelayers/charts-hist
 import type { CurrencyRateDetail, HistoricalData, QuoteColor } from "@/middlelayers/types";
 import type { AssetModel } from "@/middlelayers/types";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
+import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { addToBlacklist } from "@/middlelayers/configuration";
 import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
 import { useOptimisticDelete } from "./common/use-optimistic-delete";
 import { HistoryPartialDetails } from "./history-partial";
 import SyncStatusIndicator from "./sync-status-indicator";
 import { FidelityDateInput } from "./fidelity-date-input";
+import { sourceDisplayNames } from "./source-display-name";
+import { useLatestWalletOrdinals } from "./source-name-order";
 import { toast } from "./ui/use-toast";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -40,6 +43,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   const { t, locale } = useTranslation();
   const navigate = useNavigate();
   const version = useDataChangedVersion();
+  const walletOrdinals = useLatestWalletOrdinals();
   const [rows, setRows] = useState<HistoricalPageRow[]>([]);
   const [count, setCount] = useState(0);
   const [statusCounts, setStatusCounts] = useState({ partial: 0, edited: 0 });
@@ -49,6 +53,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   const [edits, setEdits] = useState<SnapshotEdit[] | null>(null);
   const [editLogError, setEditLogError] = useState(false);
   const [sourceAssets, setSourceAssets] = useState<AssetModel[]>([]);
+  const [sourceIdentities, setSourceIdentities] = useState<Awaited<ReturnType<WalletAnalyzer["listWalletAliases"]>>>({});
   const [stablecoins, setStablecoins] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -117,7 +122,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   }, [dates, page, filter, version, reload]);
 
   useEffect(() => {
-    if (!selectedId) { setDetail(null); setEdits(null); setSourceAssets([]); return; }
+    if (!selectedId) { setDetail(null); setEdits(null); setSourceAssets([]); setSourceIdentities({}); return; }
     setDetailPage(0);
     let active = true;
     if (detailRef.current?.id !== selectedId) {
@@ -127,8 +132,10 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
     }
     setDetailError(false);
     setEditLogError(false);
-    void Promise.all([queryHistoricalDetail(selectedId), ASSET_HANDLER.listAssetsByUUIDs([selectedId])]).then(([record, raw]) => {
-      if (active) { setDetail(record); setSourceAssets(raw); setDetailLoading(false); }
+    void Promise.all([queryHistoricalDetail(selectedId), ASSET_HANDLER.listAssetsByUUIDs([selectedId])]).then(async ([record, raw]) => {
+      const ids = [...new Set(raw.map((asset) => asset.wallet).filter((id): id is string => !!id))];
+      const identities = ids.length ? await new WalletAnalyzer(async () => []).listWalletAliases(ids).catch(() => ({})) : {};
+      if (active) { setDetail(record); setSourceAssets(raw); setSourceIdentities(identities); setDetailLoading(false); }
     }).catch(() => {
       if (active) { setDetailError(true); setDetailLoading(false); }
     });
@@ -196,8 +203,10 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
       const name = asset.wallet ?? t("history.fidelity.unknownSource");
       grouped.set(name, (grouped.get(name) ?? 0) + asset.value);
     }
-    return [...grouped].sort((a, b) => b[1] - a[1]);
+    return [...grouped].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }, [sourceAssets, t]);
+  const sourceLabels = useMemo(() => sourceDisplayNames(sources.map(([id]) => ({ id, ...sourceIdentities[id] })),
+    (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals), [sources, sourceIdentities, t, walletOrdinals]);
   const valueTotal = detail?.total ?? selected?.total ?? 0;
   const pages = Math.ceil(count / PAGE_SIZE);
   const issueCount = statusCounts.partial;
@@ -479,8 +488,8 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
           </section>}
           <div className="fidelity-history-section"><div className="fidelity-card-head"><h3>{t("history.fidelity.sources")}</h3>
             <span>{t("history.fidelity.sourceDetail").replace("{count}", String(sources.length))}</span></div>
-            {sources.map(([wallet, value]) => <div className="fidelity-history-section-row fidelity-history-source-row" key={wallet}>
-              <span><i />{wallet.length > 24 ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : wallet}</span>
+            {sources.map(([wallet, value], index) => <div className="fidelity-history-section-row fidelity-history-source-row" key={wallet}>
+              <span title={wallet}><i />{sourceLabels[index]}</span>
               <span>{money(value)}</span>
             </div>)}</div>
         </>}

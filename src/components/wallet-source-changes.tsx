@@ -9,6 +9,7 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { positiveNegativeTextClass } from "@/utils/color";
 import { Card } from "./ui/card";
 import { deriveSourceChanges } from "./wallet-snapshot-matrix";
+import { useLatestWalletOrdinals } from "./source-name-order";
 
 type MatrixData = {
   baselineAt: string;
@@ -24,6 +25,7 @@ export default function WalletSourceChanges({ currency, dateRange, quoteColor, s
 }) {
   const { t, locale } = useTranslation();
   const version = useDataChangedVersion();
+  const walletOrdinals = useLatestWalletOrdinals();
   const [data, setData] = useState<MatrixData | null>(null);
   const [ready, setReady] = useState(false);
   const endTime = dateRange.end.getTime();
@@ -43,16 +45,15 @@ export default function WalletSourceChanges({ currency, dateRange, quoteColor, s
       const aliases: Record<string, { wallet: string; alias: string; type: string } | undefined> =
         await new WalletAnalyzer(async () => []).listWalletAliases(wallets).catch(() => ({}));
       const identities = Object.fromEntries(wallets.map((wallet) => [wallet, aliases[wallet]?.wallet ?? wallet]));
-      const labels = Object.fromEntries(wallets.map((wallet) => {
-        const alias = aliases[wallet];
-        return [wallet, alias?.alias ?? alias?.wallet ?? wallet];
-      }));
+      const labels = Object.fromEntries(wallets.map((wallet) => [wallet, aliases[wallet] ?? { id: wallet }]));
       return {
         baselineAt: baseline.createdAt,
         changes: deriveSourceChanges(
           assets.filter((asset) => asset.uuid === baseline.id),
           assets.filter((asset) => asset.uuid === latest.id),
           labels,
+          (index) => t("wallets.fallbackName").replace("{number}", String(index)),
+          walletOrdinals,
         ),
         identities,
       };
@@ -65,7 +66,7 @@ export default function WalletSourceChanges({ currency, dateRange, quoteColor, s
       if (active) setReady(true);
     });
     return () => { active = false; };
-  }, [endTime, version]);
+  }, [endTime, version, t, walletOrdinals]);
 
   const sourceId = selectedSource
     ? Object.keys(data?.identities ?? {}).find((id) => id === selectedSource || data?.identities[id] === selectedSource)
@@ -93,7 +94,7 @@ export default function WalletSourceChanges({ currency, dateRange, quoteColor, s
         : !data ? <p className="text-muted-foreground text-sm">{t("wallets.changeUnavailable")}</p>
         : <div className="wallet-source-change-list">
           {sources.map((source) => <div key={source.id}>
-            <strong>{source.label}</strong>
+            <strong title={source.id}>{source.label}</strong>
             <span>{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(source.value))}</span>
             <span className={tone(source.change)}>{money(source.change)}</span>
             <span className={tone(source.change)}>{source.percentage === null ? "—" : `${source.percentage > 0 ? "+" : ""}${source.percentage.toFixed(2)}%`}</span>
@@ -110,7 +111,7 @@ export default function WalletSourceChanges({ currency, dateRange, quoteColor, s
       </div>
       <div className="wallet-asset-change-scroll" tabIndex={0} aria-label={t("wallets.assetChangesBySource")}>
         <table>
-          <thead><tr><th>{t("cost.asset")}</th>{sources.map((source) => <th key={source.id}>{source.label}</th>)}<th>{t("wallets.allSources")}</th></tr></thead>
+          <thead><tr><th>{t("cost.asset")}</th>{sources.map((source) => <th key={source.id} title={source.id} aria-label={source.label}><span>{source.label}</span></th>)}<th>{t("wallets.allSources")}</th></tr></thead>
           <tbody>{assets.map((asset) => <tr key={asset.key}>
             <th>{asset.symbol}</th>
             {sources.map((source) => {

@@ -67,6 +67,7 @@ import { ChartResizeContext } from "@/App";
 import { useTranslation } from "@/i18n";
 import { useDarkTheme } from "@/components/common/theme";
 import { DataChangedContext } from "@/contexts/data-changed";
+import { LatestSourceNamesProvider } from "@/components/source-name-order";
 import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
@@ -1018,6 +1019,7 @@ const App = () => {
     <div className="t3-desktop-app">
       <AutoBackupIndicator status={autoBackupStatus} />
       <DataChangedContext.Provider value={dataChangedVersion}>
+        <LatestSourceNamesProvider ready={!initializing}>
         <HashRouter>
           <FirstRunOnboarding variant="desktop" ready={!initializing} />
           <DesktopErrorBoundary><AppRoutes
@@ -1040,6 +1042,7 @@ const App = () => {
           handleConfigurationSave={handleConfigurationSave}
         /></DesktopErrorBoundary>
         </HashRouter>
+        </LatestSourceNamesProvider>
       </DataChangedContext.Provider>
     </div>
   );

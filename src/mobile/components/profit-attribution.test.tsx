@@ -42,7 +42,11 @@ describe("profit attribution", () => {
     const [contributors, detractors] = within(figure).getAllByRole("list");
     expect(within(contributors).getAllByRole("listitem")).toHaveLength(5);
     expect(within(detractors).getAllByRole("listitem")).toHaveLength(5);
-    expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(13);
+    expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(11);
+    expect(screen.getByText("Showing 1-10 of 12")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(within(screen.getByRole("table")).getAllByRole("row")).toHaveLength(3);
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
   });
   it("expands grouped attribution fields beneath the phone rank", async () => {
     const previousMatchMedia = window.matchMedia;
@@ -55,12 +59,49 @@ describe("profit attribution", () => {
       vi.mocked(queryAttribution).mockResolvedValue(filled);
       render(view());
       expect(await screen.findByText("Top contributors")).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: /BTC/ }));
-      const row = screen.getByRole("button", { name: /BTC/ }).closest("li")!;
+      const figure = screen.getByRole("figure", { name: "Top attribution contributors and detractors" });
+      fireEvent.click(within(figure).getByRole("button", { name: /BTC/ }));
+      const row = within(figure).getByRole("button", { name: /BTC/ }).closest("li")!;
       expect(row.querySelector("img")).toBeInTheDocument();
       expect(within(row).getByText("Quantity change")).toBeInTheDocument();
       expect(within(row).getByText("+€200.00")).toBeInTheDocument();
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = previousMatchMedia;
+    }
+  });
+
+  it("keeps every phone gain and loss bar visible while detail pages change", async () => {
+    const previousMatchMedia = window.matchMedia;
+    window.matchMedia = (query: string) => ({
+      matches: query.includes("pointer: coarse"), media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    });
+    try {
+      vi.mocked(queryAttribution).mockResolvedValue({
+        attribution: {
+          entries: Array.from({ length: 12 }, (_, index) => ({
+            symbol: `COIN${index}`, assetType: "crypto" as const, wallet: "w",
+            priceEffect: index < 10 ? 12 - index : -(index - 9),
+            flowEffect: 0, residual: 0, totalChange: index < 10 ? 12 - index : -(index - 9),
+          })),
+          totals: { priceEffect: 0, flowEffect: 0, residual: 0, totalChange: 0 },
+          startValue: 100, endValue: 100,
+        },
+        aliases: {},
+      });
+      render(view());
+      const figure = await screen.findByRole("figure", { name: "Top attribution contributors and detractors" });
+      const [gains, losses] = within(figure).getAllByRole("list");
+      expect(within(gains).getAllByRole("listitem")).toHaveLength(10);
+      expect(within(losses).getAllByRole("listitem")).toHaveLength(2);
+      const detail = screen.getByRole("region", { name: "Attribution details" });
+      expect(within(detail).getAllByRole("listitem")).toHaveLength(10);
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      expect(within(gains).getAllByRole("listitem")).toHaveLength(10);
+      expect(within(losses).getAllByRole("listitem")).toHaveLength(2);
+      expect(within(detail).getAllByRole("listitem")).toHaveLength(2);
     } finally {
       window.matchMedia = previousMatchMedia;
     }
@@ -88,7 +129,7 @@ describe("profit attribution", () => {
     expect(screen.getAllByText("Binance").length).toBeGreaterThan(0);
     expect(screen.getAllByText("ERC20").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("radio", { name: "Wallet" }));
-    expect(screen.getAllByText("Main (Binance)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Main").length).toBeGreaterThan(0);
   });
 
   it("ranks market gains and losses without treating an internal trade as profit", async () => {
@@ -196,10 +237,56 @@ describe("profit attribution", () => {
         })) },
       });
       render(view());
-      expect(await screen.findByRole("button", { name: /COIN5/ })).toBeInTheDocument();
+      const figure = await screen.findByRole("figure");
+      expect(within(figure).getByRole("button", { name: /COIN5/ })).toBeInTheDocument();
     } finally {
       window.matchMedia = previousMatchMedia;
     }
+  });
+
+  it("pages 47 phone Profit detail ranks ten at a time", async () => {
+    const previousMatchMedia = window.matchMedia;
+    window.matchMedia = (query: string) => ({
+      matches: query.includes("pointer: coarse"), media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {},
+      addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    });
+    try {
+      vi.mocked(queryAttribution).mockResolvedValue({
+        ...filled,
+        attribution: { ...filled.attribution, entries: Array.from({ length: 47 }, (_, index) => ({
+          symbol: `COIN${index + 1}`, assetType: "crypto" as const, wallet: "w",
+          priceEffect: index + 1, flowEffect: 0, residual: 0, totalChange: index + 1,
+        })) },
+      });
+      render(view());
+      const figure = await screen.findByRole("figure");
+      const detail = screen.getByRole("region", { name: "Attribution details" });
+      expect(within(figure).getAllByRole("listitem")).toHaveLength(47);
+      expect(within(detail).getAllByRole("listitem")).toHaveLength(10);
+      expect(screen.getByText("Showing 1-10 of 47")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      expect(within(figure).getAllByRole("listitem")).toHaveLength(47);
+      expect(within(detail).getAllByRole("listitem")).toHaveLength(10);
+      expect(screen.getByText("Showing 11-20 of 47")).toBeInTheDocument();
+      expect(within(detail).queryByText("COIN47")).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = previousMatchMedia;
+    }
+  });
+
+  it("shortens an unaliased wallet address in phone attribution groups", async () => {
+    const address = "HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH";
+    vi.mocked(queryAttribution).mockResolvedValue({
+      ...filled,
+      attribution: { ...filled.attribution, entries: [{ ...filled.attribution.entries[0], wallet: "abcdef0123456789abcdef0123456789" }] },
+      aliases: { abcdef0123456789abcdef0123456789: { alias: address, type: "SOL" } },
+    });
+    render(view());
+    await screen.findByText("Top contributors");
+    fireEvent.click(screen.getByRole("radio", { name: "Wallet" }));
+    expect(screen.getAllByText("HN7cAB…YWrH").length).toBeGreaterThan(0);
+    expect(screen.queryByText(new RegExp(address))).not.toBeInTheDocument();
   });
 
   it("renders stock attribution with the selected Chinese label", async () => {

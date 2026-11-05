@@ -413,6 +413,15 @@ const secondTransaction: Transaction = {
   txnCreatedAt: "2024-04-16T00:00:00.000Z",
 };
 
+it("shortens an unaliased SOL address in the legacy transaction table", async () => {
+  const address = "HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH";
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([{ ...transaction, wallet: "sol-id" }]);
+  mocks.listWalletAliases.mockResolvedValue({ "sol-id": { wallet: address, alias: address, type: "SOL" } });
+  renderCoinAnalysis();
+  const table = (await screen.findByText("HN7cAB…YWrH")).closest("table") as HTMLElement;
+  expect(table).not.toHaveTextContent(address);
+});
+
 const hkdCurrency = {
   currency: "HKD",
   symbol: "HK$",

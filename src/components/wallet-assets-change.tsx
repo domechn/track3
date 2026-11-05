@@ -5,7 +5,8 @@ import {
   WalletAssetsChangeData,
 } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
-import { insertEllipsis } from "@/utils/string";
+import { sourceDisplayNames } from "./source-display-name";
+import { useLatestWalletOrdinals } from "./source-name-order";
 import MoneyBankIcon from "@/assets/icons/money-bank-icon.png";
 import AirdropIcon from "@/assets/icons/airdrop-icon.png";
 import {
@@ -84,6 +85,7 @@ const App = ({
 }) => {
   const loadGenRef = useRef(0);
   const { t } = useTranslation();
+  const walletOrdinals = useLatestWalletOrdinals();
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const [walletAssetsChange, setWalletAssetsChange] =
     useState<WalletAssetsChangeData>([]);
@@ -128,23 +130,22 @@ const App = ({
   }, [deferredSearch, pageSize, sortMode]);
 
   const rows = useMemo(
-    () =>
-      walletAssetsChange.map((item) => ({
+    () => {
+      const names = sourceDisplayNames(walletAssetsChange.map((item) => ({
+        id: item.wallet, wallet: item.wallet, alias: item.walletAlias, type: item.walletType,
+      })), (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals);
+      return walletAssetsChange.map((item, index) => ({
         ...item,
         walletTypeText:
           !item.walletType || item.walletType === "null"
             ? t("common.unknown")
             : item.walletType,
-        walletAliasText:
-          item.walletAlias ??
-          insertEllipsis(
-            !item.wallet || item.wallet === "null"
-              ? t("common.unknown")
-              : item.wallet,
-            32,
-          ),
-      })),
-    [walletAssetsChange],
+        walletAliasText: !item.wallet || item.wallet === "null"
+          ? t("common.unknown")
+          : names[index],
+      }));
+    },
+    [walletAssetsChange, t, walletOrdinals],
   );
 
   const filteredRows = useMemo(() => {

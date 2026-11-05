@@ -13,6 +13,9 @@ import { currencyWrapper } from "@/utils/currency";
 import { useTranslation } from "@/mobile/i18n";
 import { rangeLabel } from "@/mobile/components/fidelity-range";
 import { requestRefreshSource } from "@/mobile/components/refresh-progress-event";
+import { sourceDisplayNames } from "@/components/source-display-name";
+import { useLatestWalletOrdinals } from "@/components/source-name-order";
+import { matchSourceStatus } from "@/components/source-status-match";
 import "@/mobile/components/mobile/fidelity.css";
 
 const WalletAssetsPercentage = lazy(() => import("@/mobile/components/wallet-assets-percentage"));
@@ -57,6 +60,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
 }) {
   const { t, locale } = useTranslation();
   const version = useDataChangedVersion();
+  const walletOrdinals = useLatestWalletOrdinals();
   const retry = useSyncExternalStore(refreshRetryScheduler.subscribe, refreshRetryScheduler.status);
   const [statuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const [range, setRange] = useState(() => rangeLabel(dateRange));
@@ -86,14 +90,19 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
       const assets = await ASSET_HANDLER.listAssetsByUUIDs([latest.id, ...(base ? [base.id] : [])]);
       const current = assets.filter((asset) => asset.uuid === latest.id);
       const prior = assets.filter((asset) => asset.uuid === base?.id);
-      const ids = [...new Set(current.map((asset) => asset.wallet).filter((wallet): wallet is string => !!wallet))];
+      const totals = new Map<string, number>();
+      current.forEach((asset) => { if (asset.wallet) totals.set(asset.wallet, (totals.get(asset.wallet) ?? 0) + asset.value); });
+      const ids = [...totals.keys()].sort((a, b) => totals.get(b)! - totals.get(a)! || a.localeCompare(b));
       const aliases: Record<string, { wallet: string; alias: string; type: string } | undefined> =
         await new WalletAnalyzer(async () => []).listWalletAliases(ids).catch(() => ({}));
-      const sources = ids.map((id) => {
+      const labels = sourceDisplayNames(ids.map((id) => ({ id, ...aliases[id] })),
+        (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals);
+      const sourceLabels = ids.map((id, index) => ({ id, label: labels[index] }));
+      const sources = ids.map((id, index) => {
         const rows = groupRows(current, id);
         const baseRows = groupRows(prior, id);
-        const label = aliases[id]?.alias ?? id;
-        const status = statuses.find((item) => item.label === label || item.label === id || item.sourceId === id);
+        const label = labels[index];
+        const status = matchSourceStatus(sourceLabels[index], aliases, sourceLabels, statuses);
         const kind = status?.kind ?? (rows.every((row) => row.assetType === "stock") ? "broker" : "wallet");
         return { id, label, kind, rows, baseRows, value: sum(rows), baseValue: sum(baseRows), status };
       }).sort((a, b) => b.value - a.value);
@@ -108,7 +117,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
       .catch(() => { if (active) setView(null); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [dateRange.start.getTime(), dateRange.end.getTime(), range, version, statuses]);
+  }, [dateRange.start.getTime(), dateRange.end.getTime(), range, version, statuses, t, walletOrdinals]);
 
   const sources = view?.sources ?? [];
   const chosen = sources.find((source) => source.id === selected) ?? null;
@@ -128,7 +137,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
       const diff = assetDiff(row, source.baseRows);
       const item = assets.get(key) ?? { symbol: row.symbol, value: 0, details: [] };
       item.value += diff;
-      item.details.push({ source: source.label.split(" ")[0], change: diff });
+      item.details.push({ source: source.label, change: diff });
       assets.set(key, item);
     }
     const currentValue = (symbol: string) => sources.reduce((value, source) =>
@@ -180,7 +189,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
       : !view ? <div className="fd-card fd-empty">{t("common.noData")}</div> : <>
       <div className="fd-wallet-chips">{[{ id: null, label: t("fidelity.wallets.allSources") }, ...sources].map((source) =>
         <button key={source.id ?? "all"} type="button" className={selected === source.id ? "selected" : ""}
-          onClick={() => setSelected(source.id)}>{source.id !== null && source.status?.status === "failed" && <i />}{source.label}</button>)}</div>
+          onClick={() => setSelected(source.id)} title={source.id ?? undefined} aria-label={source.label}>{source.id !== null && source.status?.status === "failed" && <i />}<span>{source.label}</span></button>)}</div>
       {selectedFailed && chosen && <div className="fd-wallet-failure" role="alert"><ExclamationTriangleIcon aria-hidden="true" /><div><b>{t("fidelity.wallets.failedTitle").replace("{source}", chosen.label)}</b>
         <p>{t(chosen.status?.category === "rateLimit" ? "fidelity.wallets.failedRateLimit" : "fidelity.wallets.failedDescription").replace("{attempt}", time(chosen.status?.finishedAt)).replace("{last}", time(lastGood))}
           {nextRetry && ` ${t("fidelity.wallets.nextRetry").replace("{time}", time(new Date(nextRetry).toISOString()))}`}</p></div>
@@ -199,7 +208,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
             </> : <>
               <div><span>{t("overview.design.sources")}</span><b>{sources.length}</b><small>{t("fidelity.wallets.kindCount").replace("{exchange}", String(sources.filter((item) => item.kind === "exchange").length)).replace("{wallet}", String(sources.filter((item) => item.kind === "wallet").length)).replace("{broker}", String(sources.filter((item) => item.kind === "broker").length))}</small></div>
               <div><span>{t("fidelity.wallets.largestSource")}</span><b>{sources[0] ? percent(share(sources[0])) : "—"}</b><small>{sources[0]?.label}</small></div>
-              <div><span>{t("fidelity.wallets.lastRefresh")}</span><b>{time(statuses.reduce<string | undefined>((current, status) => !current || (status.finishedAt ?? status.lastSuccessAt ?? "") > current ? status.finishedAt ?? status.lastSuccessAt : current, undefined))}</b><small>{t("fidelity.wallets.currentSources").replace("{ok}", String(statuses.filter((status) => status.status === "ok").length)).replace("{all}", String(statuses.length))}</small></div>
+              <div><span>{t("fidelity.wallets.lastRefresh")}</span><b>{time(statuses.reduce<string | undefined>((current, status) => !current || (status.finishedAt ?? status.lastSuccessAt ?? "") > current ? status.finishedAt ?? status.lastSuccessAt : current, undefined))}</b><small>{t("fidelity.wallets.currentSources").replace("{ok}", statuses.length ? String(sources.filter((source) => source.status?.status === "ok").length) : "—").replace("{all}", String(sources.length))}</small></div>
             </>}</div>
           <div className="fd-wallet-split">{shareItems.map((item, index) => <i key={item.label} style={{ width: `${item.fraction * 100}%`, background: colors[index % colors.length] }} />)}</div>
           <div className="fd-wallet-legend">{shareItems.map((item, index) => <span key={item.label}><i style={{ background: colors[index % colors.length] }} />{item.label} <b>{percent(item.fraction)}</b></span>)}</div>

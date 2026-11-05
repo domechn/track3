@@ -6,6 +6,7 @@ import { useAlertBadge } from "../use-alert-badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrackLogo } from "@/components/brand/track-logo";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
+import { settingsCog } from "@/components/settings-cog";
 
 const overview = { to: "/overview", labelKey: "nav.overview" };
 const analyze = [
@@ -34,7 +35,7 @@ const recordsIcons: Record<string, ReactNode> = {
   "/rebalance": <path d="M3 6h9M9 3l3 3-3 3M15 12H6M9 9l-3 3 3 3" />,
   "/goals": <><circle cx="9" cy="9" r="6.5" /><circle cx="9" cy="9" r="3" /></>,
   "/assistant": <path d="M3 4h12v8H8l-3.5 3v-3H3z" />,
-  "/settings": <><circle cx="9" cy="9" r="2.5" /><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4" /></>,
+  "/settings": settingsCog,
 };
 
 function NavItem({ item, collapsed, unread, fidelity }: { item: NavEntry; collapsed: boolean; unread?: number; fidelity?: boolean }) {

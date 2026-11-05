@@ -9,6 +9,9 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { positiveNegativeTone, positiveNegativeTextClass } from "@/utils/color";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
+import { AttributionPager, useAttributionPage } from "./attribution-pager";
+import { sourceDisplayNames } from "./source-display-name";
+import { useLatestWalletOrdinals } from "./source-name-order";
 
 type Data = Awaited<ReturnType<typeof queryAttribution>>;
 const dimensions: AttributionDimension[] = ["coin", "source", "wallet", "assetType"];
@@ -19,6 +22,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [dimension, setDimension] = useState<AttributionDimension>("coin");
   const dataChangedVersion = useDataChangedVersion();
+  const walletOrdinals = useLatestWalletOrdinals();
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   const data = loaded?.rangeKey === rangeKey ? loaded.result : null;
 
@@ -36,12 +40,22 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
   }, [rangeKey, dataChangedVersion]);
 
   const groups = useMemo(() => data ? groupAttribution(data.attribution.entries, dimension, data.aliases, t("profit.attribution.stock")) : [], [data, dimension, t]);
+  const walletLabels = useMemo(() => {
+    if (!data || dimension !== "wallet") return {};
+    const names = sourceDisplayNames(groups.map((group) => ({
+      id: group.key, alias: data.aliases[group.key]?.alias, wallet: data.aliases[group.key]?.alias,
+      type: data.aliases[group.key]?.type,
+    })), (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals);
+    return Object.fromEntries(groups.map((group, index) => [group.key, names[index]]));
+  }, [data, dimension, groups, t, walletOrdinals]);
+  const paging = useAttributionPage(groups, `${rangeKey}:${dimension}`);
   const format = (value: number) => `${value > 0 ? "+" : value < 0 ? "-" : ""}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(value)))}`;
   const tone = (value: number) => positiveNegativeTextClass(value, quoteColor, 500);
   const barTone = (value: number) => positiveNegativeTone(value, quoteColor) === "green" ? "bg-positive" : "bg-negative";
   const label = (key: string) => t(`profit.attribution.${key}`);
   const displayGroup = (group: { key: string; label: string }) =>
-    (dimension === "source" || dimension === "wallet") && group.label === "unknown" ? t("common.unknown") : group.label;
+    dimension === "wallet" ? walletLabels[group.key] ?? t("common.unknown")
+      : dimension === "source" && group.label === "unknown" ? t("common.unknown") : group.label;
   const error = <div role="alert" className="py-8 text-center text-sm text-muted-foreground">{label("error")}</div>;
 
   if (status === "loading" && !data) return <div role="status" aria-live="polite" className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</div>;
@@ -93,11 +107,12 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
           <TableHead className="text-right">{label("residual")}</TableHead>
           <TableHead className="text-right">{label("totalChange")}</TableHead>
         </TableRow></TableHeader>
-        <TableBody>{groups.map((group) => <TableRow key={group.key}>
+        <TableBody>{paging.rows.map((group) => <TableRow key={group.key}>
           <TableCell className="max-w-[130px] truncate py-2 font-medium" title={displayGroup(group)}>{displayGroup(group)}</TableCell>
           {(["priceEffect", "flowEffect", "residual", "totalChange"] as const).map((key) => <TableCell key={key} className={`py-2 text-right tabular-nums ${tone(group[key])}`}>{format(group[key])}</TableCell>)}
         </TableRow>)}</TableBody>
       </Table>
     </div>
+    <AttributionPager count={groups.length} {...paging} t={t} />
   </div>;
 }

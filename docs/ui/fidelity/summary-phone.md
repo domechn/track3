@@ -301,5 +301,6 @@ The chart and month cards request profit for each calendar month, and year cards
 
 ## Remaining differences
 
+- Fresh 5 Nov 2026 source HTML and app viewport captures differ by **1.15%** at 390 × 844, with a maximum RGB-channel threshold of 20. The source and app heading and first card bounds match. The 47-group fixture displays a ten-row pager; the source page illustrates eight groups and has no equivalent large-data capture.
 - The source manually lists non-stablecoin tickers in a chosen sequence in the month-note copy. Stored snapshots have no display-order field, so the app lists the profit engine's symbols in its stable order.
 - The Analytics tab has a small upward chevron when Summary is open. It cues the existing tap-again menu for Wallets, Comparison, and Cost basis; the static source gives no hint that these destinations are available.

@@ -445,6 +445,24 @@ const secondTransaction: Transaction = {
   txnCreatedAt: "2024-04-16T00:00:00.000Z",
 };
 
+it("shortens an unaliased SOL address in the phone transaction list", async () => {
+  vi.spyOn(window, "innerWidth", "get").mockReturnValue(800);
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  const address = "HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH";
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([{ ...transaction, wallet: "sol-id" }]);
+  mocks.listWalletAliases.mockResolvedValue({ "sol-id": { wallet: address, alias: address, type: "SOL" } });
+  renderCoinAnalysis();
+  await screen.findByText("Apr 15");
+  const records = document.querySelector(".coin-mobile-transactions") as HTMLElement;
+  await waitFor(() => expect(records).toHaveTextContent("Apr 15"));
+  fireEvent.click(records.querySelector(".mobile-list-row")!);
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog).toHaveTextContent("HN7cAB…YWrH");
+  expect(dialog).not.toHaveTextContent(address);
+});
+
 it("shows a compact phone identity, 24h price change, and an unbroken transaction date", async () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),

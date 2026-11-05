@@ -26,6 +26,19 @@ it("shows stored source balances and shares without adding fields to status reco
   expect(requested).toBe(1);
 });
 
+it("matches an unaliased wallet status by its address hint", () => {
+  const address = "HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH";
+  render(<SourceStatusCard variant="card" desktopFidelity
+    currency={{ currency: "USD", rate: 1, alias: "US Dollar", symbol: "$" }}
+    statuses={[{ sourceId: "sol:0", label: "SOL wallet 1", status: "ok", kind: "wallet",
+      provider: "SOL", hint: "HN7cAB…YWrH", finishedAt: "2026-10-31T09:41:00Z" }]}
+    sources={[{ wallet: address, walletAlias: address, walletType: "SOL",
+      amount: 1, value: 42, percentage: 100, chartColor: "" }]} />);
+  const row = screen.getByText("HN7cAB…YWrH").closest(".t3-source-row") as HTMLElement;
+  expect(row).toHaveTextContent("Updated");
+  expect(row).toHaveTextContent("09:41");
+});
+
 it("shows the stored last good value and offers retry for a failed source", () => {
   render(<SourceStatusCard variant="card" desktopFidelity
     currency={{ currency: "USD", rate: 1, alias: "US Dollar", symbol: "$" }}

@@ -92,6 +92,7 @@ import {
 import { useTranslation } from "@/i18n";
 import CoinCustomPrice from "./coin-custom-price";
 import CoinFidelityView from "./coin-fidelity-view";
+import { transactionSourceName } from "./source-display-name";
 
 function formatEditablePrice(value: number): string {
   if (!Number.isFinite(value)) {
@@ -409,7 +410,7 @@ const App = ({
     ).then((res) => {
       const wam: { [k: string]: string | undefined } = {};
       for (const [v, k] of Object.entries(res)) {
-        wam[v] = k?.alias ? `${k.alias} (${k.type})` : k?.wallet;
+        wam[v] = transactionSourceName(v, k);
       }
       setWalletAliasMap(wam);
     });

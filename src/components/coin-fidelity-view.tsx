@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { format } from "date-fns";
+import md5 from "md5";
 import type { Asset, CurrencyRateDetail, TDateRange, Transaction, TransactionType, WalletAssetsPercentageData, CoinsAmountAndValueChangeData } from "@/middlelayers/types";
 import type { AssetType } from "@/middlelayers/datafetch/types";
 import type { OtherPrice } from "@/middlelayers/datafetch/types";
@@ -17,6 +18,8 @@ import { Input } from "./ui/input";
 import { toast } from "./ui/use-toast";
 import { downsampleIndices } from "@/middlelayers/chart-downsample";
 import { changeFromDaysAgo, coinAxisForValues, coinChartY, compactMoney, isExchangeSource, tickIndices } from "./fidelity-data";
+import { sourceDisplayNames } from "./source-display-name";
+import { useLatestWalletOrdinals } from "./source-name-order";
 
 type Props = {
   symbol: string;
@@ -47,6 +50,7 @@ function line(values: number[], indices: number[], total: number, lower: number,
 }
 
 export default function CoinFidelityView({ symbol, assetType, currency, dateRange, lastAsset, transactions, walletAliasMap, quoteColor, onEdit }: Props) {
+  const walletOrdinals = useLatestWalletOrdinals();
   const { t, locale } = useTranslation();
   const money = (value: number | undefined, sign = false, digits = 2) => value === undefined || !Number.isFinite(value) ? "–" : `${sign && value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${num(Math.abs(value * currency.rate), digits)}`;
   const navigate = useNavigate();
@@ -103,7 +107,25 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
     return () => { active = false; };
   }, [symbol, assetType, changed]);
 
-  const sourceName = (wallet: string) => (walletAliasMap[wallet]?.replace(/\s+\([^)]*\)$/, "") ?? sources.find((row) => row.wallet === wallet)?.walletAlias ?? sources.find((row) => row.wallet === wallet)?.walletType ?? wallet.slice(0, 10)).replaceAll("...", "…");
+  const sourceLabels = useMemo(() => {
+    const ordered = [...sources].sort((a, b) => b.value - a.value || a.wallet.localeCompare(b.wallet));
+    const currentFor = (id: string) => ordered.find((row) => row.wallet === id ||
+      md5(row.wallet) === id || /^[a-f\d]{32}$/i.test(id) && row.wallet.endsWith(id.slice(0, 8)));
+    const extra = [...new Set(transactions.map((row) => row.wallet).filter((wallet): wallet is string => !!wallet))]
+      .filter((id) => !currentFor(id));
+    const ids = [...ordered.map((row) => row.wallet), ...extra];
+    const labels = sourceDisplayNames(ids.map((id) => {
+      const row = sources.find((source) => source.wallet === id);
+      return { id, wallet: id, alias: walletAliasMap[id]?.replace(/\s+\([^)]*\)$/, "") ?? row?.walletAlias, type: row?.walletType };
+    }), (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals);
+    const names = Object.fromEntries(ids.map((id, index) => [id, labels[index]]));
+    for (const transaction of transactions) if (transaction.wallet) {
+      const current = currentFor(transaction.wallet);
+      if (current) names[transaction.wallet] = names[current.wallet];
+    }
+    return names;
+  }, [sources, transactions, walletAliasMap, t, walletOrdinals]);
+  const sourceName = (wallet: string) => sourceLabels[wallet] ?? "—";
   const amount = lastAsset?.amount ?? 0;
   const custom = !!customPrice;
   const value = lastAsset?.value ?? 0;
@@ -155,7 +177,7 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const coinName = symbol;
   const sourceCount = sources.length === 1 ? t("coin.fidelity.sourceOne") : t("coin.fidelity.sourcesCount").replace("{count}", String(sources.length));
   const sourceNames = new Intl.ListFormat(locale === "zh" ? "zh-CN" : "en", { style: "long", type: "conjunction" })
-    .format(sources.map((source) => source.walletAlias ?? source.walletType ?? source.wallet.slice(0, 10)));
+    .format(sources.map((source) => sourceName(source.wallet)));
   const subtitle = custom ? t("coin.fidelity.customSubtitle").replace("{source}", sourceNames)
     : t(assetType === "stock" ? "coin.fidelity.heldAtBrokerStandalone" : "coin.fidelity.held").replace("{sources}", sources.length === 2 && sources.some((source) => !isExchangeSource(source.walletType)) && locale !== "zh"
       ? sourceNames.replace(" and ", " and a ") : sourceNames);
@@ -234,7 +256,7 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
       <section className="coin-fidelity-card coin-fidelity-sources" tabIndex={0}>
         <div className="coin-fidelity-section-head"><h2>{t("coin.fidelity.holdingsSource")}</h2><small>{sourceCount}</small></div>
         <table><thead><tr><th>{t("coin.fidelity.source")}</th><th>{t("coin.fidelity.quantity")}</th><th>{t("coin.fidelity.value")}</th><th>{t("coin.fidelity.share")}</th></tr></thead>
-          <tbody>{sources.map(row => <tr key={row.wallet}><td>{(row.walletAlias ?? row.walletType ?? row.wallet.slice(0, 10)).replaceAll("...", "…")} <small>{assetType === "stock" ? t("coin.fidelity.broker") : isExchangeSource(row.walletType) ? t("coin.fidelity.exchange") : t("coin.fidelity.wallet")}</small></td><td>{num(row.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td>{money(row.value)}</td><td>{num(row.percentage,1)}%</td></tr>)}<tr className="total"><td>{t("coin.fidelity.total")}</td><td>{num(amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td>{money(value)}</td><td>100.0%</td></tr></tbody></table>
+          <tbody>{sources.map(row => <tr key={row.wallet}><td title={row.wallet}>{sourceName(row.wallet)} <small>{assetType === "stock" ? t("coin.fidelity.broker") : isExchangeSource(row.walletType) ? t("coin.fidelity.exchange") : t("coin.fidelity.wallet")}</small></td><td>{num(row.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td>{money(row.value)}</td><td>{num(row.percentage,1)}%</td></tr>)}<tr className="total"><td>{t("coin.fidelity.total")}</td><td>{num(amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td>{money(value)}</td><td>100.0%</td></tr></tbody></table>
         <div className="coin-fidelity-lots-head"><h2>{t("coin.fidelity.openLots")}</h2><small>{t("coin.fidelity.lotsCount").replace("{count}", String(lots.length + unpricedDeposits.length))}</small></div>
         <table><thead><tr><th>{t("coin.fidelity.acquired")}</th><th>{t("coin.fidelity.quantity")}</th><th>{t("coin.fidelity.costPrice")}</th><th>{t("coin.fidelity.unrealizedShort")}</th></tr></thead>
           <tbody>{lots.map((lot, i) => { const valued = valuedLots.find((row) => row.id === lot.id); return <tr key={`${lot.id}-${i}`}><td>{date(lot.acquiredAt)}</td><td>{num(lot.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td className={valued ? "" : "zero"}>{valued ? money(lot.costBasis / lot.amount, false, custom ? 4 : 2) : "–"}</td><td className={valued ? signedTone(valued.gainLoss) : "zero"}>{valued ? money(roundedCents(valued.gainLoss), true) : "–"}</td></tr>; })}

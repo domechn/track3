@@ -1623,11 +1623,14 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
 .d2-wallets .wallet-source-change-list > div { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: 12px; border-top: 1px solid hsl(var(--border)); padding: 12px 0; font-size: 13px; }
 .d2-wallets .wallet-source-change-list > div > :not(:first-child) { text-align: right; }
 .d2-wallets .wallet-source-change-list > div > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.d2-wallets .wallet-asset-change-scroll { max-width: 100%; overflow-x: auto; }
-.d2-wallets .wallet-asset-change-scroll table { min-width: 100%; border-collapse: collapse; font-size: 13px; }
-.d2-wallets .wallet-asset-change-scroll :is(th, td) { border-top: 1px solid hsl(var(--border)); padding: 12px; text-align: right; white-space: nowrap; }
-.d2-wallets .wallet-asset-change-scroll :is(th, td):first-child { position: sticky; left: 0; background: hsl(var(--card)); text-align: left; }
+.d2-wallets .wallet-asset-change-scroll { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
+.d2-wallets .wallet-asset-change-scroll:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.d2-wallets .wallet-asset-change-scroll table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.d2-wallets .wallet-asset-change-scroll :is(th, td) { min-width: 104px; max-width: 160px; border-top: 1px solid hsl(var(--border)); padding: 12px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.d2-wallets .wallet-asset-change-scroll :is(th, td):first-child { position: sticky; left: 0; z-index: 1; min-width: 88px; background: hsl(var(--card)); text-align: left; border-right: 1px solid hsl(var(--border)); }
+.d2-wallets .wallet-asset-change-scroll :is(th, td):last-child { position: sticky; right: 0; z-index: 1; min-width: 118px; background: hsl(var(--card)); border-left: 1px solid hsl(var(--border)); }
 .d2-wallets .wallet-asset-change-scroll thead th { color: hsl(var(--muted-foreground)); font-weight: 500; }
+.d2-wallets .wallet-asset-change-scroll thead th span { display: block; overflow: hidden; text-overflow: ellipsis; }
 .d2-wallets .wallet-asset-change-mobile { display: none; }
 .d2-comparison .comparison-movers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .d2-comparison .comparison-movers > section { min-width: 0; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); padding: 16px; }
@@ -1652,8 +1655,8 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
   .d2-wallets .wallet-source-change-list > div > :nth-child(2) { grid-column: 2; }
   .d2-wallets .wallet-source-change-list > div > :nth-child(3) { grid-column: 1; text-align: left; }
   .d2-wallets .wallet-source-change-list > div > :nth-child(4) { grid-column: 2; }
-  .d2-wallets .wallet-asset-change-scroll { display: none; }
-  .d2-wallets .wallet-asset-change-mobile { display: grid; }
+  .d2-wallets .wallet-asset-change-scroll { display: block; }
+  .d2-wallets .wallet-asset-change-mobile { display: none; }
   .d2-wallets .wallet-asset-change-mobile > div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid hsl(var(--border)); padding: 12px 0; font-size: 13px; }
 }
 

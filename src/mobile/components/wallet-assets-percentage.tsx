@@ -26,7 +26,8 @@ import {
   prettyNumberToLocaleString,
 } from "@/utils/currency";
 import { useDataChangedVersion } from "@/contexts/data-changed";
-import { insertEllipsis } from "@/utils/string";
+import { sourceDisplayNames } from "@/components/source-display-name";
+import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
 import { WALLET_ANALYZER } from "@/middlelayers/charts-refresh";
 import { ChartResizeContext } from "@/mobile/App";
@@ -53,13 +54,12 @@ export function getWalletDisplayName(item: {
   wallet: string;
   walletType?: string;
   walletAlias?: string;
-}, compact = false) {
-  if (item.walletAlias) {
-    return item.walletType && !compact
-      ? `${item.walletType}-${item.walletAlias}`
-      : item.walletAlias;
-  }
-  return insertEllipsis(item.wallet, 16);
+}, compact = false, labels?: Record<string, string>) {
+  const name = labels?.[item.wallet] ?? sourceDisplayNames([{
+    id: item.wallet, wallet: item.wallet, alias: item.walletAlias, type: item.walletType,
+  }])[0];
+  return item.walletAlias && name === item.walletAlias && item.walletType && !compact
+    ? `${item.walletType}-${name}` : name;
 }
 
 type LayoutItem = {
@@ -82,6 +82,7 @@ const MAX_TILES = 5;
 type PopoverContentProps = {
   item: LayoutItem;
   name: string;
+  displayName: (wallet: WalletAssetsPercentageData[number]) => string;
   aggregatedWallets: WalletAssetsPercentageData | null;
   currency: CurrencyRateDetail;
   displayAmount: boolean | undefined;
@@ -93,6 +94,7 @@ type PopoverContentProps = {
 const PopoverContent = ({
   item,
   name,
+  displayName,
   aggregatedWallets,
   currency,
   displayAmount,
@@ -129,7 +131,7 @@ const PopoverContent = ({
               .slice()
               .sort((a, b) => b.value - a.value)
               .map((w) => {
-                const wName = getWalletDisplayName(w);
+                const wName = displayName(w);
                 const wCategory = classifyWalletType(w.walletType);
                 return (
                   <div
@@ -322,9 +324,16 @@ const App = ({
   }, [dateRange, reportLoaded, symbol, assetType, dataChangedVersion]);
 
   const sortedWallets = useMemo(
-    () => [...walletAssetsPercentage].sort((a, b) => b.value - a.value),
+    () => [...walletAssetsPercentage].sort((a, b) => b.value - a.value || a.wallet.localeCompare(b.wallet)),
     [walletAssetsPercentage],
   );
+  const walletOrdinals = useLatestWalletOrdinals();
+  const sourceLabels = useMemo(() => {
+    const labels = sourceDisplayNames(sortedWallets.map((item) => ({
+      id: item.wallet, wallet: item.wallet, alias: item.walletAlias, type: item.walletType,
+    })), (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals);
+    return Object.fromEntries(sortedWallets.map((item, index) => [item.wallet, labels[index]]));
+  }, [sortedWallets, t, walletOrdinals]);
   const showTreemap = !symbol && !onSelectSource;
 
   // Wallets ≥1% get their own tile; the <1% tail is grouped into "Others".
@@ -397,6 +406,8 @@ const App = ({
   }, [sortedWallets, showTreemap]);
 
   const isMobile = (size.width ?? 0) < MOBILE_BREAKPOINT;
+  const displayName = (item: WalletAssetsPercentageData[number], compact = isMobile) =>
+    getWalletDisplayName(item, compact, sourceLabels);
 
   const layoutItems: LayoutItem[] = useMemo(() => {
     if (groupedWallets.length === 0) {
@@ -532,7 +543,7 @@ const App = ({
       {!symbol && onSelectSource && <nav className="analyze-source-picker" aria-label={t("wallets.h1")}>
         <button type="button" aria-pressed={selectedSource === null} onClick={() => onSelectSource(null)}>{t("wallets.allSources")}</button>
         {sortedWallets.map((wallet) => <button type="button" key={wallet.wallet} aria-pressed={selectedSource === wallet.wallet}
-          onClick={() => onSelectSource(wallet.wallet)}>{getWalletDisplayName(wallet, isMobile)}</button>)}
+          onClick={() => onSelectSource(wallet.wallet)} title={wallet.wallet}>{displayName(wallet)}</button>)}
       </nav>}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-3">
         <CardTitle className="flex flex-wrap items-center gap-1 text-sm font-medium text-muted-foreground">
@@ -581,14 +592,14 @@ const App = ({
           wallets={sortedWallets}
           selectedSource={selectedSource ?? null}
           currency={currency}
-          name={(wallet) => getWalletDisplayName(wallet, isMobile)}
+          name={displayName}
           title={t("wallets.sourceAllocation")}
         />}
         {symbol && <div className="analyze-coin-source-list"><SourceAllocationList
           wallets={sortedWallets}
           selectedSource={null}
           currency={currency}
-          name={(wallet) => getWalletDisplayName(wallet, isMobile)}
+          name={displayName}
           title={t("wallets.sourceAllocation")}
           showQuantity
         /></div>}
@@ -624,7 +635,7 @@ const App = ({
                     item.wallet.wallet === OTHERS_AGGREGATED_KEY;
                   const name = isAggregatedTile
                     ? `${t("walletAllocation.type.aggregated")} ${item.wallet.walletAlias ?? ""}`
-                    : getWalletDisplayName(item.wallet, isMobile);
+                    : displayName(item.wallet);
                   const detailUrlFn = item.wallet.walletType
                     ? WALLET_DETAIL_URLS[item.wallet.walletType]
                     : undefined;
@@ -740,9 +751,10 @@ const App = ({
                     name={
                       selectedItem.wallet.wallet === OTHERS_AGGREGATED_KEY
                         ? `${t("walletAllocation.type.aggregated")} ${selectedItem.wallet.walletAlias ?? ""}`
-                        : getWalletDisplayName(selectedItem.wallet)
+                        : displayName(selectedItem.wallet)
                     }
                     aggregatedWallets={aggregatedWallets}
+                    displayName={displayName}
                     currency={currency}
                     displayAmount={displayAmount}
                     onPointerLeave={() => {
@@ -778,7 +790,7 @@ const App = ({
             const detailUrl = wallet.walletType ? WALLET_DETAIL_URLS[wallet.walletType]?.(wallet.wallet) : undefined;
             return {
               id: `${wallet.wallet}-${wallet.walletType ?? "none"}`,
-              title: getWalletDisplayName(wallet, true),
+              title: displayName(wallet, true),
               subtitle: `${wallet.percentage.toFixed(2)}%`,
               fields: [
                 { label: t("walletValueChanges.col.type"), value: t(WALLET_CATEGORY_BASE_COLORS[classifyWalletType(wallet.walletType)].labelKey) },
