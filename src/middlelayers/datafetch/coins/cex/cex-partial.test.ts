@@ -89,17 +89,19 @@ it("rejects Gate when its primary spot request fails", async () => {
   await expect(analyzer.loadPortfolio()).rejects.toMatchObject({ status: 401 });
 });
 
-it("keeps Bitget spot holdings when optional products return permission errors", async () => {
+it("keeps Bitget spot holdings and reports optional permission errors", async () => {
   const errors = vi.spyOn(console, "error").mockImplementation(() => {});
   try {
     vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
-      if (url.includes("/spot/account/assets")) return { data: [{ coin: "BTC", available: "2", frozen: "0", locked: "0" }] } as never;
+      if (url.includes("/spot/account/assets")) return { code: "00000", data: [{ coin: "BTC", available: "2", frozen: "0", locked: "0" }] } as never;
       throw new HttpRequestError("permission denied", 403);
     });
     const exchange = new BitgetExchange("key", "secret", "passphrase");
     expect(await exchange.fetchTotalBalance()).toEqual({ BTC: 2 });
     expect(takeSourceFailure(exchange)).toBeUndefined();
-    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "auth", endpoints: [
+      "USDT-FUTURES", "COIN-FUTURES", "USDC-FUTURES", "Earn", "Margin",
+    ] });
   } finally { errors.mockRestore(); }
 });
 
@@ -107,13 +109,39 @@ it("labels Bitget optional server errors without discarding spot holdings", asyn
   const errors = vi.spyOn(console, "error").mockImplementation(() => {});
   try {
     vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
-      if (url.includes("/spot/account/assets")) return { data: [{ coin: "BTC", available: "2", frozen: "0", locked: "0" }] } as never;
+      if (url.includes("/spot/account/assets")) return { code: "00000", data: [{ coin: "BTC", available: "2", frozen: "0", locked: "0" }] } as never;
       throw new HttpRequestError("service not available", 503);
     });
     const exchange = new BitgetExchange("key", "secret", "passphrase");
     expect(await exchange.fetchTotalBalance()).toEqual({ BTC: 2 });
-    expect(takeOptionalSourceFailures(exchange)).toMatchObject({ category: "network", endpoints: expect.arrayContaining(["Earn", "Margin", "Futures"]) });
+    expect(takeOptionalSourceFailures(exchange)).toMatchObject({ category: "network", endpoints: expect.arrayContaining([
+      "Earn", "Margin", "USDT-FUTURES", "COIN-FUTURES", "USDC-FUTURES",
+    ]) });
   } finally { errors.mockRestore(); }
+});
+
+it("keeps Bitget futures when spot returns an API error and marks Spot unreadable", async () => {
+  vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+    if (url.includes("/spot/account/assets")) return { code: "700011", msg: "Spot unavailable", data: [] } as never;
+    if (url.includes("productType=USDT-FUTURES")) return { code: "00000", data: [
+      { marginCoin: "USDT", accountEquity: "5", usdtEquity: "5", available: "4", locked: "0", unrealizedPL: "1" },
+    ] } as never;
+    return { code: "00000", data: [] } as never;
+  });
+  const analyzer = new CexAnalyzer({ exchanges: [{ name: "bitget",
+    initParams: { apiKey: "key", secret: "secret", passphrase: "pass" } }] });
+  expect(await analyzer.fetchTotalBalance(new BitgetExchange("key", "secret", "pass"))).toEqual({ USDT: 5 });
+  expect(takeOptionalSourceFailures(analyzer)).toEqual({ category: "other", endpoints: ["Spot"] });
+});
+
+it("fails Bitget when spot fails and every other account is empty", async () => {
+  vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) =>
+    url.includes("/spot/account/assets")
+      ? { code: "700011", msg: "Spot unavailable", data: [] } as never
+      : { code: "00000", data: [] } as never);
+  const analyzer = new CexAnalyzer({ exchanges: [{ name: "bitget",
+    initParams: { apiKey: "key", secret: "secret", passphrase: "pass" } }] });
+  await expect(analyzer.fetchTotalBalance(new BitgetExchange("key", "secret", "pass"))).rejects.toThrow();
 });
 
 it("keeps Coinbase default holdings when an INTX portfolio returns 401", async () => {

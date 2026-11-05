@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendHttpRequest } from "../../utils/http";
+import { takeOptionalSourceFailures } from "../../utils/source-failure";
 import { BitgetExchange } from "./bitget";
 
 vi.mock("../../utils/http", () => ({
@@ -18,7 +19,7 @@ afterEach(() => {
 
 describe("BitgetExchange", () => {
   it("signs the credential-validation request with deterministic headers", async () => {
-    vi.mocked(sendHttpRequest).mockResolvedValue({ data: [] });
+    vi.mocked(sendHttpRequest).mockResolvedValue({ code: "00000", data: [] });
     const exchange = new BitgetExchange(
       "test-key",
       "test-secret",
@@ -45,49 +46,154 @@ describe("BitgetExchange", () => {
     await expect(exchange.verifyConfig()).resolves.toBe(false);
   });
 
-  it("keeps spot and earn balances when futures fail, normalizing and filtering rows", async () => {
-    vi.mocked(sendHttpRequest)
-      .mockResolvedValueOnce({
-        data: [
-          { coin: "btc", available: "1", locked: "0.5", frozen: "0.5" },
-          { coin: "eth", available: "0", locked: "0", frozen: "0" },
-        ],
-      })
-      .mockRejectedValueOnce(new Error("futures disabled"))
-      .mockResolvedValueOnce({
-        data: [
-          { coin: "btc", amount: "2" },
-          { coin: "sol", amount: "0" },
-        ],
-      })
-      .mockResolvedValueOnce({
-        data: [
-          {
-            coin: "usdt",
-            totalAmount: "3",
-            available: "3",
-            frozen: "0",
-            borrow: "0",
-            interest: "0",
-            net: "3",
-          },
-        ],
-      });
-    const exchange = new BitgetExchange("test-key", "test-secret", "pass");
-
-    await expect(exchange.fetchTotalBalance()).resolves.toEqual({
-      BTC: 4,
-      USDT: 3,
+  it("reads all classic futures product types using per-coin accountEquity including PnL", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("/spot/account/assets")) return { code: "00000", data: [
+        { coin: "USDT", available: "2", locked: "0", frozen: "0" },
+      ] } as never;
+      if (url.includes("productType=USDT-FUTURES")) return { code: "00000", data: [
+        { marginCoin: "USDT", accountEquity: "7", usdtEquity: "7", available: "4", locked: "1", unrealizedPL: "2" },
+        { marginCoin: "USDC", accountEquity: "-1", usdtEquity: "-1", available: "0", locked: "0", unrealizedPL: "-1" },
+      ] } as never;
+      if (url.includes("productType=COIN-FUTURES")) return { code: "00000", data: [
+        { marginCoin: "btc", accountEquity: "0.25", usdtEquity: "15000", available: "0.2", locked: "0", unrealizedPL: "0.05" },
+      ] } as never;
+      if (url.includes("productType=USDC-FUTURES")) return { code: "00000", data: [
+        { marginCoin: "USDC", accountEquity: "5", usdtEquity: "5", available: "4", locked: "0", unrealizedPL: "1" },
+      ] } as never;
+      return { code: "00000", data: [] } as never;
     });
-    expect(sendHttpRequest).toHaveBeenNthCalledWith(
-      2,
+    const exchange = new BitgetExchange("test-key", "test-secret", "test-passphrase");
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDT: 9, USDC: 4, BTC: 0.25 });
+    expect(vi.mocked(sendHttpRequest).mock.calls.map((call) => call[1]).filter((url) => url.includes("/mix/account/accounts")))
+      .toEqual([
+        "https://api.bitget.com/api/v2/mix/account/accounts?productType=USDT-FUTURES",
+        "https://api.bitget.com/api/v2/mix/account/accounts?productType=COIN-FUTURES",
+        "https://api.bitget.com/api/v2/mix/account/accounts?productType=USDC-FUTURES",
+      ]);
+    expect(sendHttpRequest).toHaveBeenCalledWith(
       "GET",
-      "https://api.bitget.com/api/v2/mix/account/account?marginCoin=usdt&productType=USDT-FUTURES",
+      "https://api.bitget.com/api/v2/mix/account/accounts?productType=USDT-FUTURES",
       5000,
       expect.objectContaining({
-        "ACCESS-SIGN": "CI/BapdoDGyBOD6QRqkX0YZ8tq4LWBjLZLDCtP0R4vU=",
+        "ACCESS-SIGN": "YiJ3Wso7FSx6X2nhdXmBPzAycHS4+IqTSxNQNXfTG8E=",
       }),
     );
+    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+  });
+
+  it("accepts empty futures account lists", async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValue({ code: "00000", data: [] });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+  });
+
+  it("keeps spot, existing Earn, and cross-margin net assets with debt", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("/spot/account/assets")) return { code: "00000", data: [
+        { coin: "BTC", available: "1", locked: "0", frozen: "0" },
+      ] } as never;
+      if (url.includes("/earn/account/assets")) return { code: "00000", data: [
+        { coin: "BTC", amount: "2" },
+      ] } as never;
+      if (url.includes("/margin/crossed/account/assets")) return { code: "00000", data: [
+        { coin: "USDT", totalAmount: "7", available: "7", frozen: "0", borrow: "4", interest: "0", net: "3" },
+      ] } as never;
+      return { code: "00000", data: [] } as never;
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+    expect(await exchange.fetchTotalBalance()).toEqual({ BTC: 3, USDT: 3 });
+    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+  });
+
+  it("keeps other products and reports the specific failed futures account", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("productType=COIN-FUTURES")) return { code: "700011", msg: "No account", data: [] } as never;
+      if (url.includes("productType=USDC-FUTURES")) return { code: "00000", data: [
+        { marginCoin: "USDC", accountEquity: "3", usdtEquity: "3", available: "2", locked: "0", unrealizedPL: "1" },
+      ] } as never;
+      return { code: "00000", data: [] } as never;
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDC: 3 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["COIN-FUTURES"] });
+  });
+
+  it("marks a union-margin assetList unreadable instead of adding its account equity twice", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("productType=USDT-FUTURES")) return { code: "00000", data: [
+        { marginCoin: "USDT", accountEquity: "10", assetList: [{}] },
+      ] } as never;
+      return { code: "00000", data: [] } as never;
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["USDT-FUTURES"] });
+  });
+
+  it("reports missing futures equity instead of valuing that account at zero", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) =>
+      url.includes("productType=COIN-FUTURES")
+        ? { code: "00000", data: [{ marginCoin: "BTC", available: "1", locked: "0", unrealizedPL: "1" }] } as never
+        : { code: "00000", data: [] } as never);
+    const exchange = new BitgetExchange("key", "secret", "pass");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["COIN-FUTURES"] });
+  });
+
+  it("reports empty futures equity instead of parsing it as zero", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) =>
+      url.includes("productType=COIN-FUTURES")
+        ? { code: "00000", data: [{ marginCoin: "BTC", accountEquity: "", available: "0", unrealizedPL: "0" }] } as never
+        : { code: "00000", data: [] } as never);
+    const exchange = new BitgetExchange("key", "secret", "pass");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["COIN-FUTURES"] });
+  });
+
+  it("reports Bitget Earn and cross margin API error codes without losing futures", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("/earn/account/assets")) return { code: "700011", msg: "Earn unavailable", data: [] } as never;
+      if (url.includes("/margin/crossed/account/assets")) return { code: "700011", msg: "Margin unavailable", data: [] } as never;
+      if (url.includes("productType=USDT-FUTURES")) return { code: "00000", data: [
+        { marginCoin: "USDT", accountEquity: "3", usdtEquity: "3", available: "2", locked: "0", unrealizedPL: "1" },
+      ] } as never;
+      return { code: "00000", data: [] } as never;
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDT: 3 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["Earn", "Margin"] });
+  });
+
+  it("marks a negative-only futures balance as incomplete because the portfolio drops signed holdings", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) =>
+      url.includes("productType=USDC-FUTURES")
+        ? { code: "00000", data: [
+          { marginCoin: "USDC", accountEquity: "-2", usdtEquity: "-2", available: "0", locked: "0", unrealizedPL: "-2" },
+        ] } as never
+        : { code: "00000", data: [] } as never);
+    const exchange = new BitgetExchange("key", "secret", "pass");
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDC: -2 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["Some assets"] });
+  });
+
+  it("does not report signed assets when positive and negative balances cancel within floating-point precision", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.includes("/spot/account/assets")) return { code: "00000", data: [
+        { coin: "USDT", available: "0.3", locked: "0", frozen: "0" },
+      ] } as never;
+      if (url.includes("productType=USDT-FUTURES")) return { code: "00000", data: [
+        { marginCoin: "USDT", accountEquity: "-0.1" },
+      ] } as never;
+      if (url.includes("/margin/crossed/account/assets")) return { code: "00000", data: [
+        { coin: "USDT", net: "-0.2" },
+      ] } as never;
+      return { code: "00000", data: [] } as never;
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+    expect((await exchange.fetchTotalBalance()).USDT).toBeCloseTo(0, 12);
+    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
   });
 
   it("maps only positive USDT ticker prices", async () => {

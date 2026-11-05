@@ -484,6 +484,7 @@ test("real Overview exposes idle, pull, and source progress on phone", async ({ 
   await captureLong(page, "/tmp/fidelity/flows/refresh-ptrrun-phone-long.png");
   await page.reload();
   await expect(page.getByText("$763,809.27").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".fd-overview-refresh, .fd-partial-refresh")).toBeVisible();
   await page.evaluate(() => {
     const original = (window as any).__e2eInvoke;
     (window as any).__e2eInvoke = (cmd: string, args: unknown, ...rest: unknown[]) =>

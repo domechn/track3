@@ -15,8 +15,8 @@ type SpotAccountResp = {
 
 type FutureAccountResp = {
 	marginCoin: string
-	available: string
-	locked: string
+	accountEquity: string
+	assetList?: unknown[]
 }[]
 
 type SavingAccountResp = {
@@ -77,15 +77,28 @@ export class BitgetExchange implements Exchanger {
 	}
 
 	async fetchTotalBalance(): Promise<{ [k: string]: number }> {
-		const resp = await bluebird.map([
-			this.fetchSpotBalance(),
+		let spotFailure: unknown
+		const resp: { [k: string]: number }[] = await bluebird.map([
+			this.fetchSpotBalance().catch((e) => {
+				spotFailure = e
+				recordOptionalSourceFailure(this, e, "Spot", true, true)
+				return {}
+			}),
 			// this.fetchSavingBalance(),
-			this.fetchFutureBalance(),
+			...(["USDT-FUTURES", "COIN-FUTURES", "USDC-FUTURES"] as const).map((productType) =>
+				this.fetchFutureBalance(productType)),
 			this.fetchEarnBalance(),
 			this.fetchCrossMarginBalance()
 		], (v) => v)
 
-		return mergeBalances(resp)
+		const balances = mergeBalances(resp)
+		if (spotFailure && Object.values(balances).every((amount) => amount === 0)) throw spotFailure
+		if (Object.entries(balances).some(([symbol, amount]) =>
+			amount < -resp.length * Number.EPSILON * resp.reduce(
+				(sum, account) => sum + Math.abs(account[symbol] ?? 0), 0))) {
+			recordOptionalSourceFailure(this, new Error("Signed holdings are not displayed"), "Some assets", true, true)
+		}
+		return balances
 	}
 
 	async fetchCoinsPrice(): Promise<{ [k: string]: number }> {
@@ -104,10 +117,10 @@ export class BitgetExchange implements Exchanger {
 
 	private async fetchSpotBalance(): Promise<{ [k: string]: number }> {
 		const path = "/api/v2/spot/account/assets"
-		const resp = await this.fetch<{ data: SpotAccountResp }>("GET", path)
+		const assets = await this.fetchBalanceData<SpotAccountResp>(path)
 
 		const balances: { [k: string]: number } = {}
-		resp.data.forEach((v) => {
+		assets.forEach((v) => {
 			addToBalanceMap(
 				balances,
 				v.coin,
@@ -117,30 +130,28 @@ export class BitgetExchange implements Exchanger {
 		return balances
 	}
 
-	private async fetchFutureBalance(): Promise<{ [k: string]: number }> {
+	private async fetchFutureBalance(productType: "USDT-FUTURES" | "COIN-FUTURES" | "USDC-FUTURES"): Promise<{ [k: string]: number }> {
 		try {
-			const path = "/api/v2/mix/account/account"
-			const productType = 'USDT-FUTURES'
-			const marginCoin = 'usdt'
-			const resp = await this.fetch<{ data: FutureAccountResp }>(
-				"GET",
-				path,
-				{ productType, marginCoin }
-			)
+			const assets = await this.fetchBalanceData<FutureAccountResp>(
+				"/api/v2/mix/account/accounts", { productType })
 
 			const balances: { [k: string]: number } = {}
-			resp.data.forEach((v) => {
-				addToBalanceMap(
-					balances,
-					v.marginCoin,
-					this.parseFloat(v.locked) + this.parseFloat(v.available),
-				)
+			assets.forEach((v) => {
+				if (v.assetList && (!Array.isArray(v.assetList) || v.assetList.length > 0)) {
+					recordOptionalSourceFailure(this, new Error("Union margin asset list is not valued"), productType, true, true)
+					return
+				}
+				const amount = Number(v.accountEquity)
+				if (!v.marginCoin?.trim() || !v.accountEquity?.trim() || !Number.isFinite(amount)) {
+					throw new Error("Invalid Bitget futures equity")
+				}
+				addToBalanceMap(balances, v.marginCoin, amount)
 			})
 			return balances
 
 		} catch (e) {
 			console.error("Fetch future balance failed")
-			recordOptionalSourceFailure(this, e, "Futures")
+			recordOptionalSourceFailure(this, e, productType, true, true)
 			return {}
 		}
 	}
@@ -158,15 +169,15 @@ export class BitgetExchange implements Exchanger {
 	private async fetchEarnBalance(): Promise<{ [k: string]: number }> {
 		const path = "/api/v2/earn/account/assets"
 		try {
-			const resp = await this.fetch<{ data: EarnAccountResp }>("GET", path)
+			const assets = await this.fetchBalanceData<EarnAccountResp>(path)
 			const balances: { [k: string]: number } = {}
-			resp.data.forEach((v) => {
+			assets.forEach((v) => {
 				addToBalanceMap(balances, v.coin, this.parseFloat(v.amount))
 			})
 			return balances
 		} catch (e) {
 			console.error("Fetch earn balance failed")
-			recordOptionalSourceFailure(this, e, "Earn")
+			recordOptionalSourceFailure(this, e, "Earn", true, true)
 			return {}
 		}
 	}
@@ -174,9 +185,9 @@ export class BitgetExchange implements Exchanger {
 	private async fetchCrossMarginBalance(): Promise<{ [k: string]: number }> {
 		const path = "/api/v2/margin/crossed/account/assets"
 		try {
-			const resp = await this.fetch<{ data: CrossMarginAssetResp }>("GET", path)
+			const assets = await this.fetchBalanceData<CrossMarginAssetResp>(path)
 			const balances: { [k: string]: number } = {}
-			resp.data.forEach(asset => {
+			assets.forEach(asset => {
 				const amount = netAssetFromBalanceFields({
 					net: asset.net,
 					available: asset.available,
@@ -189,13 +200,21 @@ export class BitgetExchange implements Exchanger {
 			return balances
 		} catch (e) {
 			console.error("Fetch cross margin balance failed")
-			recordOptionalSourceFailure(this, e, "Margin")
+			recordOptionalSourceFailure(this, e, "Margin", true, true)
 			return {}
 		}
 	}
 
 	private parseFloat(v: string): number {
 		return parseFloat(v) || 0
+	}
+
+	private async fetchBalanceData<T extends unknown[]>(path: string, params?: Record<string, any>): Promise<T> {
+		const resp = await this.fetch<{ code: string; data: T }>("GET", path, params)
+		if (resp.code !== "00000" || !Array.isArray(resp.data)) {
+			throw new Error(`Bitget API error: ${resp.code}`)
+		}
+		return resp.data
 	}
 
 	private async fetch<T>(
