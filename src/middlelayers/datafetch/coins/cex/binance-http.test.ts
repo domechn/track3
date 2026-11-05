@@ -23,6 +23,8 @@ it("retries a real HTTP -1021 response after syncing spot server time", async ()
       return new Response('{"balances":[]}');
     }
     if (url.pathname === "/sapi/v1/margin/account") return new Response('{"userAssets":[]}');
+    if (url.pathname === "/sapi/v1/margin/isolated/account") return new Response('{"assets":[]}');
+    if (url.pathname === "/sapi/v1/dci/product/positions") return new Response('{"total":0,"list":[]}');
     if (url.pathname.includes("/simple-earn/")) return new Response('{"rows":[],"total":0}');
     return new Response("[]");
   });
@@ -34,7 +36,7 @@ it("retries a real HTTP -1021 response after syncing spot server time", async ()
     .toEqual(["1700000000000", "1700000010000"]);
 });
 
-it("ignores disabled margin and futures accounts through the HTTP wrapper", async () => {
+it("keeps unopened margin and futures accounts quiet through the HTTP wrapper", async () => {
   vi.mocked(fetch).mockImplementation(async (input) => {
     const path = new URL(String(input)).pathname;
     if (path === "/api/v3/account") return new Response('{"balances":[{"asset":"BTC","free":"2","locked":"0"}]}');
@@ -44,6 +46,8 @@ it("ignores disabled margin and futures accounts through the HTTP wrapper", asyn
     if (path === "/fapi/v2/balance") {
       return new Response('{"code":-2015,"msg":"Invalid API-key, IP, or permissions for action."}', { status: 401 });
     }
+    if (path === "/sapi/v1/margin/isolated/account") return new Response('{"assets":[]}');
+    if (path === "/sapi/v1/dci/product/positions") return new Response('{"total":0,"list":[]}');
     if (path.includes("/simple-earn/")) return new Response('{"rows":[],"total":0}');
     return new Response("[]");
   });

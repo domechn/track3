@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sendHttpRequest, HttpRequestError } from "../../utils/http";
 import { classifySourceError, takeOptionalSourceFailures } from "../../utils/source-failure";
+import { getMemoryCacheInstance } from "../../utils/cache";
 import locked from "../../../../../src-tauri/tests/fixtures/binance-locked.json";
 import flexible from "../../../../../src-tauri/tests/fixtures/binance-flexible.json";
 import { BinanceExchange, signBinanceQuery } from "./binance";
@@ -18,7 +19,11 @@ const emptyAccounts = async (_method: string, url: string): Promise<never> => {
     case "/sapi/v1/simple-earn/locked/position":
     case "/sapi/v1/simple-earn/flexible/position": return { rows: [], total: 0 } as never;
     case "/sapi/v1/margin/account": return { userAssets: [] } as never;
+    case "/sapi/v1/margin/isolated/account": return { assets: [] } as never;
     case "/fapi/v2/balance": return [] as never;
+    case "/fapi/v2/positionRisk": return [] as never;
+    case "/dapi/v1/balance": return [] as never;
+    case "/sapi/v1/dci/product/positions": return { total: 0, list: [] } as never;
     default: throw new Error(`Unexpected Binance path ${path(url)}`);
   }
 };
@@ -26,6 +31,7 @@ const emptyAccounts = async (_method: string, url: string): Promise<never> => {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  getMemoryCacheInstance("binance-futures-exchange-info").clearCache();
   vi.mocked(sendHttpRequest).mockImplementation(emptyAccounts);
 });
 
@@ -78,7 +84,7 @@ describe("BinanceExchange", () => {
         case "/sapi/v1/simple-earn/locked/position": return locked as never;
         case "/sapi/v1/simple-earn/flexible/position": return flexible as never;
         case "/sapi/v1/margin/account": return { userAssets: [{ asset: "BTC", netAsset: "-0.5" }] } as never;
-        case "/fapi/v2/balance": return [{ asset: "BTC", balance: "0.5" }] as never;
+        case "/fapi/v2/balance": return [{ asset: "BTC", balance: "0.5", crossUnPnl: "0" }] as never;
         default: throw new Error(`Unexpected Binance path ${path(url)}`);
       }
     });
@@ -99,6 +105,196 @@ describe("BinanceExchange", () => {
     expect(await new BinanceExchange("key", "secret").fetchTotalBalance()).toEqual({ BTC: 102 });
     const lockedCalls = vi.mocked(sendHttpRequest).mock.calls.filter(([, url]) => path(url) === "/sapi/v1/simple-earn/locked/position");
     expect(lockedCalls.map(([, url]) => [new URL(url).searchParams.get("current"), new URL(url).searchParams.get("size")])).toEqual([["1", "100"], ["2", "100"]]);
+  });
+
+  it("adds USD-M cross PnL to wallet balance and isolated PnL only from isolated positions", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/fapi/v2/balance") return [
+        { asset: "USDT", balance: "10", crossUnPnl: "-2" },
+        { asset: "USDC", balance: "4", crossUnPnl: "0" },
+      ] as never;
+      if (path(url) === "/fapi/v2/positionRisk") return [
+        { symbol: "BTCUSDT", marginType: "isolated", unRealizedProfit: "3", positionSide: "LONG" },
+        { symbol: "BTCUSDT", marginType: "isolated", unRealizedProfit: "-1", positionSide: "SHORT" },
+        { symbol: "ETHUSDC", marginType: "isolated", unRealizedProfit: "-5", positionSide: "BOTH" },
+        { symbol: "ETHUSDT", marginType: "cross", unRealizedProfit: "7", positionSide: "BOTH" },
+      ] as never;
+      if (path(url) === "/fapi/v1/exchangeInfo") return { symbols: [
+        { symbol: "BTCUSDT", marginAsset: "USDT" },
+        { symbol: "ETHUSDC", marginAsset: "USDC" },
+      ] } as never;
+      return emptyAccounts(method, url);
+    });
+    expect(await new BinanceExchange("key", "secret").fetchTotalBalance()).toEqual({ USDT: 10, USDC: -1 });
+  });
+
+  it("reads COIN-M wallet balance plus cross PnL from its separate host", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/dapi/v1/balance") return [
+        { asset: "BTC", balance: "2", crossUnPnl: "-0.5" },
+        { asset: "ETH", balance: "1", crossUnPnl: "0.25" },
+      ] as never;
+      return emptyAccounts(method, url);
+    });
+    expect(await new BinanceExchange("key", "secret").fetchTotalBalance()).toEqual({ BTC: 1.5, ETH: 1.25 });
+    const url = vi.mocked(sendHttpRequest).mock.calls.map(([, value]) => value).find((value) => path(value) === "/dapi/v1/balance");
+    expect(url).toMatch(/^https:\/\/dapi\.binance\.com\/dapi\/v1\/balance\?/);
+  });
+
+  it("reports missing margin metadata instead of assigning isolated PnL to a guessed coin", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/fapi/v2/positionRisk") return [
+        { symbol: "BTCUSDC", marginType: "isolated", unRealizedProfit: "3", positionSide: "BOTH" },
+      ] as never;
+      if (path(url) === "/fapi/v1/exchangeInfo") return { symbols: [{ symbol: "BTCUSDC" }] } as never;
+      return emptyAccounts(method, url);
+    });
+    const exchange = new BinanceExchange("key", "secret");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["USD-M isolated positions"] });
+  });
+
+  it("reports futures market metadata failures while retaining wallet equity", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/fapi/v2/balance") return [{ asset: "USDC", balance: "4", crossUnPnl: "0" }] as never;
+      if (path(url) === "/fapi/v2/positionRisk") return [
+        { symbol: "BTCUSDC", marginType: "isolated", unRealizedProfit: "3", positionSide: "BOTH" },
+      ] as never;
+      if (path(url) === "/fapi/v1/exchangeInfo") throw new HttpRequestError("service unavailable", 503);
+      return emptyAccounts(method, url);
+    });
+    const exchange = new BinanceExchange("key", "secret");
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDC: 4 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "network", endpoints: ["USD-M isolated positions"] });
+  });
+
+  it("ignores zero-PnL isolated rows with no symbol metadata", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/fapi/v2/positionRisk") return [
+        { symbol: "DELISTEDUSDT", marginType: "isolated", unRealizedProfit: "0", positionSide: "BOTH" },
+      ] as never;
+      return emptyAccounts(method, url);
+    });
+    const exchange = new BinanceExchange("key", "secret");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+    expect(vi.mocked(sendHttpRequest).mock.calls.map(([, url]) => path(url))).not.toContain("/fapi/v1/exchangeInfo");
+  });
+
+  it("reuses public futures symbol metadata across refreshes", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/fapi/v2/positionRisk") return [
+        { symbol: "BTCUSDT", marginType: "isolated", unRealizedProfit: "2", positionSide: "BOTH" },
+      ] as never;
+      if (path(url) === "/fapi/v1/exchangeInfo") return { symbols: [{ symbol: "BTCUSDT", marginAsset: "USDT" }] } as never;
+      return emptyAccounts(method, url);
+    });
+    const exchange = new BinanceExchange("key", "secret");
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDT: 2 });
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDT: 2 });
+    expect(vi.mocked(sendHttpRequest).mock.calls.map(([, url]) => path(url)).filter((url) => url === "/fapi/v1/exchangeInfo")).toHaveLength(1);
+  });
+
+  it("does not report isolated positions again when the futures balance is unreadable", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/fapi/v2/balance") throw new HttpRequestError("service unavailable", 503);
+      if (path(url) === "/fapi/v2/positionRisk") throw new HttpRequestError("service unavailable", 503);
+      return emptyAccounts(method, url);
+    });
+    const exchange = new BinanceExchange("key", "secret");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "network", endpoints: ["USD-M Futures"] });
+    expect(vi.mocked(sendHttpRequest).mock.calls.map(([, url]) => path(url))).not.toContain("/fapi/v2/positionRisk");
+  });
+
+  it("reads isolated margin net assets per pair, including debt, once", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/sapi/v1/margin/isolated/account") return { assets: [
+        { symbol: "BTCUSDT", baseAsset: { asset: "BTC", free: "1", locked: "0.5", borrowed: "2", interest: "0.1", netAsset: "-0.6" },
+          quoteAsset: { asset: "USDT", free: "10", locked: "2", borrowed: "3", interest: "1", netAsset: "8" } },
+        { symbol: "ETHBTC", baseAsset: { asset: "ETH", free: "2", locked: "0", borrowed: "0", interest: "0", netAsset: "2" },
+          quoteAsset: { asset: "BTC", free: "0.1", locked: "0", borrowed: "0", interest: "0", netAsset: "0.1" } },
+      ] } as never;
+      return emptyAccounts(method, url);
+    });
+    expect(await new BinanceExchange("key", "secret").fetchTotalBalance()).toEqual({ BTC: -0.5, USDT: 8, ETH: 2 });
+  });
+
+  it("reads only active Dual Investment principal across pages", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/sapi/v1/dci/product/positions") {
+        const page = Number(new URL(url).searchParams.get("pageIndex"));
+        return page === 1
+          ? { total: 101, list: Array.from({ length: 100 }, (_, id) => ({
+            id: String(id), investCoin: "BTC", exercisedCoin: "USDT", subscriptionAmount: "0.01", purchaseStatus: "PURCHASE_SUCCESS",
+          })) } as never
+          : { total: 101, list: [{ id: "100", investCoin: "ETH", exercisedCoin: "USDT", subscriptionAmount: "2", purchaseStatus: "PURCHASE_SUCCESS" }] } as never;
+      }
+      return emptyAccounts(method, url);
+    });
+    const balances = await new BinanceExchange("key", "secret").fetchTotalBalance();
+    expect(balances.BTC).toBeCloseTo(1);
+    expect(balances.ETH).toBe(2);
+    const pages = vi.mocked(sendHttpRequest).mock.calls.filter(([, url]) => path(url) === "/sapi/v1/dci/product/positions")
+      .map(([, url]) => [new URL(url).searchParams.get("pageIndex"), new URL(url).searchParams.get("pageSize"), new URL(url).searchParams.get("status")]);
+    expect(pages).toEqual([["1", "100", "PURCHASE_SUCCESS"], ["2", "100", "PURCHASE_SUCCESS"]]);
+  });
+
+  it("reports an incomplete Dual Investment page instead of showing zero", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/sapi/v1/dci/product/positions") return { total: 2, list: [] } as never;
+      return emptyAccounts(method, url);
+    });
+    const exchange = new BinanceExchange("key", "secret");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["Dual investment"] });
+  });
+
+  it("discards earlier Dual Investment pages when a later page fails", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/sapi/v1/dci/product/positions") {
+        if (new URL(url).searchParams.get("pageIndex") === "2") throw new HttpRequestError("code -1003", 429);
+        return { total: 101, list: Array.from({ length: 100 }, (_, id) => ({
+          id: String(id), investCoin: "BTC", exercisedCoin: "USDT", subscriptionAmount: "1", purchaseStatus: "PURCHASE_SUCCESS",
+        })) } as never;
+      }
+      return emptyAccounts(method, url);
+    });
+    const exchange = new BinanceExchange("key", "secret");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "rateLimit", endpoints: ["Dual investment"] });
+  });
+
+  it.each([
+    ["/sapi/v1/margin/isolated/account", { status: "error" }, "Isolated margin"],
+    ["/fapi/v2/positionRisk", { code: -2015 }, "USD-M isolated positions"],
+    ["/dapi/v1/balance", { code: -2015 }, "COIN-M Futures"],
+    ["/sapi/v1/dci/product/positions", { code: -2015 }, "Dual investment"],
+    ["/fapi/v2/balance", [{ asset: "USDT", balance: "1" }], "USD-M Futures"],
+  ] as const)("reports malformed documented %s responses", async (badPath, response, label) => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === badPath) return response as never;
+      return emptyAccounts(method, url);
+    });
+    const exchange = new BinanceExchange("key", "secret");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: [label] });
+  });
+
+  it.each([
+    ["/fapi/v2/positionRisk", "USD-M isolated positions"],
+    ["/dapi/v1/balance", "COIN-M Futures"],
+    ["/sapi/v1/margin/isolated/account", "Isolated margin"],
+    ["/sapi/v1/dci/product/positions", "Dual investment"],
+  ])("keeps spot and reports unavailable %s as %s", async (badPath, label) => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/api/v3/account") return { balances: [{ asset: "BTC", free: "2", locked: "0" }] } as never;
+      if (path(url) === badPath) throw new HttpRequestError("code -2015", 401);
+      return emptyAccounts(method, url);
+    });
+    const exchange = new BinanceExchange("key", "secret");
+    expect(await exchange.fetchTotalBalance()).toEqual({ BTC: 2 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "auth", endpoints: [label] });
   });
 
   it("stops Earn pagination when total is reached after two full pages", async () => {
@@ -181,7 +377,7 @@ describe("BinanceExchange", () => {
   it.each([
     new HttpRequestError("Invalid API-key, IP, or permissions for action., code -2015", 400),
     new HttpRequestError("Futures permission missing", 401),
-  ])("keeps spot holdings without warnings when margin and futures are not enabled (%s)", async (futuresError) => {
+  ])("keeps spot holdings without a partial status for unopened margin and futures accounts (%s)", async (futuresError) => {
     vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
       if (path(url) === "/api/v3/account") return { balances: [{ asset: "BTC", free: "2", locked: "0" }] } as never;
       if (path(url) === "/sapi/v1/margin/account") throw new HttpRequestError("Margin account does not exist., code -3003", 400);
@@ -193,11 +389,23 @@ describe("BinanceExchange", () => {
     expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
   });
 
+  it("treats an unopened isolated margin account as an empty account", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
+      if (path(url) === "/sapi/v1/margin/isolated/account") {
+        throw new HttpRequestError("Margin account does not exist., code -3003", 400);
+      }
+      return emptyAccounts(method, url);
+    });
+    const exchange = new BinanceExchange("key", "secret");
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+  });
+
   it.each([
-    ["/sapi/v1/margin/account", new HttpRequestError("code -2015", 400)],
-    ["/sapi/v1/margin/account", new HttpRequestError("permission missing", 401)],
-    ["/fapi/v2/balance", new HttpRequestError("permission missing", 401)],
-  ])("keeps %s permission failures silent", async (badPath, failure) => {
+    ["/sapi/v1/margin/account", new HttpRequestError("code -2015", 400), "Cross margin"],
+    ["/sapi/v1/margin/account", new HttpRequestError("permission missing", 401), "Cross margin"],
+    ["/fapi/v2/balance", new HttpRequestError("permission missing", 401), "USD-M Futures"],
+  ])("keeps prior silent handling for %s permission failures", async (badPath, failure) => {
     vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
       if (path(url) === badPath) throw failure;
       return emptyAccounts(method, url);
@@ -236,7 +444,7 @@ describe("BinanceExchange", () => {
     });
     const exchange = new BinanceExchange("key", "secret");
     expect(await exchange.fetchTotalBalance()).toEqual({});
-    expect(takeOptionalSourceFailures(exchange)).toEqual({ category, endpoints: ["Futures"] });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category, endpoints: ["USD-M Futures"] });
   });
 
   it.each([
@@ -244,8 +452,8 @@ describe("BinanceExchange", () => {
     ["/sapi/v1/asset/get-funding-asset", { balances: [] }, "Funding"],
     ["/sapi/v1/simple-earn/locked/position", { rows: [{ asset: "BTC", amount: "x" }], total: 1 }, "Fixed-term Earn"],
     ["/sapi/v1/margin/account", { userAssets: [{ asset: "BTC", netAsset: "x" }] }, "Cross margin"],
-    ["/fapi/v2/balance", [{ asset: "BTC", balance: "x" }], "Futures"],
-    ["/fapi/v2/balance", { balances: [] }, "Futures"],
+    ["/fapi/v2/balance", [{ asset: "BTC", balance: "x", crossUnPnl: "0" }], "USD-M Futures"],
+    ["/fapi/v2/balance", { balances: [] }, "USD-M Futures"],
   ] as const)("keeps spot and reports malformed optional data from %s", async (badPath, response, label) => {
     vi.mocked(sendHttpRequest).mockImplementation(async (method, url) => {
       if (path(url) === "/api/v3/account") return { balances: [{ asset: "BTC", free: "2", locked: "0" }] } as never;

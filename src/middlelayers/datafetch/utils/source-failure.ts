@@ -71,6 +71,8 @@ export const partialEndpointKeys: Record<string, string> = {
   "ETH staking": "ethStaking", "DeFi staking": "defiStaking", Lending: "lending",
   "Solana Earn": "solanaEarn", "SUI DeFi": "suiDefi",
   "Portfolio INTX": "portfolioIntx", "Some assets": "assets",
+  "USD-M Futures": "usdMFutures", "USD-M isolated positions": "usdMIsolatedPositions",
+  "COIN-M Futures": "coinMFutures",
 };
 
 export function safePartialEndpoint(label: string): string | undefined {
