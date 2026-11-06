@@ -18,9 +18,10 @@ vi.mock("@/middlelayers/datafetch/coins/stable", () => ({
 beforeEach(() => vi.clearAllMocks());
 
 it.each([
-  [26_010.84, "+$26,010.84", false],
-  [999_999_999.99, "+$999,999,999.99", true],
-])("marks only genuinely long Summary P&L totals to wrap", async (total, label, wraps) => {
+  [26_010.84, "+$26,010.84", "+$26,010.84", false],
+  [999_999_999.99, "+$1B", "+$999,999,999.99", true],
+  [-999_999_999.99, "−$1B", "−$999,999,999.99", true],
+])("keeps the full Summary P&L total available when its cell is narrow", async (total, display, full, longAmount) => {
   vi.mocked(calculateTotalProfit).mockResolvedValue({
     total, percentage: 0, coins: [], knownTotal: total, unknownCoins: [],
   } as never);
@@ -29,6 +30,7 @@ it.each([
     currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
     quoteColor="green-up-red-down"
   />);
-  const value = await screen.findByText(label);
-  expect(value.classList.contains("fidelity-long-money")).toBe(wraps);
+  const value = (await screen.findByText(display)).closest("strong")!;
+  expect(value.classList.contains("fidelity-long-money")).toBe(longAmount);
+  expect(value).toHaveAttribute("title", full);
 });

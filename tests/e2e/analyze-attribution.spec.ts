@@ -28,7 +28,8 @@ test("Summary explains unmatched attribution and exposes grouping choices", asyn
   const btc = attribution.getByRole("row", { name: /BTC/ });
   await expect(btc.getByRole("cell")).toHaveCount(5);
   await expect(btc.getByRole("cell").nth(3)).not.toHaveText("$0");
-  await expect(btc.getByRole("cell").nth(3)).toHaveText(/\.\d{2}$/);
+  await expect(btc.getByRole("cell").nth(3)).toHaveText("+$5,736");
+  await expect(btc.getByRole("cell").nth(3)).toHaveAttribute("title", "+$5,735.85");
   const options = page.locator(".fidelity-attribution-options");
   await expect(options.locator("summary")).toContainText("Group by");
   await expect(options.locator("summary")).toHaveAttribute("title", "Group attribution by");

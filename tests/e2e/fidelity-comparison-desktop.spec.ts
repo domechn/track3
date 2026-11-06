@@ -41,6 +41,32 @@ async function openComparison(page: Page) {
 }
 
 test.describe("Comparison desktop fidelity", () => {
+  test("1001px CNY legacy table keeps each amount on one line", async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop");
+    const context = await browser.newContext({ viewport: { width: 1001, height: 900 }, timezoneId: "UTC" });
+    try {
+      const page = await context.newPage();
+      await installTauriBridge(page, { fidelitySample: "full" });
+      await page.evaluate(async () => {
+        const run = (query: string) => (window as any).__e2eInvoke("plugin:sql|execute", { query, values: [] });
+        await run("INSERT INTO currency_rates (currency, alias, symbol, rate, priority, updatedAt) VALUES ('CNY', 'Chinese yuan', '¥', 7.124, 1, '2099-01-01T00:00:00.000Z')");
+        await run("INSERT INTO configuration (id, data) VALUES (7, 'CNY')");
+      });
+      await page.goto("/#/comparison");
+      const cells = page.locator(".comparison-assets-table tbody td");
+      await expect(cells.first()).toBeVisible({ timeout: 40_000 });
+      const measures = await cells.evaluateAll((elements) => elements.map((element) => {
+        const range = document.createRange();
+        range.selectNode(element.firstChild ?? element);
+        const style = getComputedStyle(element);
+        return { text: element.textContent ?? "", lines: range.getBoundingClientRect().height / parseFloat(style.lineHeight) };
+      }));
+      expect(measures.some(({ text }) => text.includes("¥"))).toBe(true);
+      for (const cell of measures) expect(cell.text).not.toMatch(/[+−-]?¥\s/);
+      for (const cell of measures) expect(cell.lines, cell.text).toBeLessThanOrEqual(1.2);
+    } finally { await context.close(); }
+  });
+
   test("shows the sync unlock prompt from the visible page indicator", async ({ browser }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop");
     const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });

@@ -132,9 +132,10 @@ test("summary full state follows the approved card order and captures at 390px",
     await expect(page.locator(".fd-top-row").filter({ hasText: "SOL" }).locator("strong")).toHaveText("−$9,300");
     await expect(page.locator(".fd-top-coins .fd-top-row").nth(6).locator("b")).toHaveText("USDT");
     await expect(page.locator(".fd-attribution .fd-attr-row").first()).toContainText("Quantity +$38,000");
-    await expect(page.locator(".fd-attr-total")).toContainText("$310,000 → $763,809");
-    await expect(page.locator(".fd-axis")).toContainText("$50k");
-    await expect(page.locator(".fd-axis")).toContainText("$150k");
+    const totalRange = page.locator(".fd-attr-total > span").first();
+    await expect(totalRange).toHaveText("$310K → $764K");
+    await expect(totalRange).toHaveAttribute("title", "$310,000.00 → $763,809.27");
+    await expect(page.locator(".fd-axis span[data-axis-tick]:visible")).toHaveText(["$0", "$50k", "$150k"]);
     const pnlHint = page.locator(".fd-profit-summary").getByRole("button", { name: "How P&L % is calculated" });
     await pnlHint.click();
     await expect(page.getByRole("tooltip")).toContainText("BTC");
@@ -154,7 +155,7 @@ test("summary full state follows the approved card order and captures at 390px",
       .evaluate((node) => parseFloat((node as HTMLElement).style.width))).toBeCloseTo(50, 0);
     await expect(page.locator(".fd-month").filter({ hasText: "Feb" }).locator(".fd-month-foot span").first()).toHaveCSS("color", "rgb(155, 157, 163)");
     await page.locator("#app-main-content").evaluate((node) => { node.scrollTop = 0; });
-    expect(Math.round((await page.locator(".fd-top-coins").boundingBox())!.y)).toBe(2995);
+    expect(Math.round((await page.locator(".fd-top-coins").boundingBox())!.y)).toBe(3147);
     await expect(page.locator(".fd-month").last()).toContainText("Oct");
     await expect(page.locator(".fd-month").last()).toContainText("up");
     await expect(page.locator(".fd-month").last()).toContainText("down");

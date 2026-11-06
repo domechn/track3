@@ -103,11 +103,16 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
     ? quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"
     : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive";
   const missing = "–";
+  const netPnlFull = data?.total == null ? null : money(data.total, currency);
+  const netPnlLong = netPnlFull !== null && netPnlFull.length > 12;
+  const netPnlText = oneSnapshot || netPnlFull === null ? missing : netPnlLong
+    ? `${data!.total! > 0 ? "+" : ""}${compactMoney(currencyWrapper(currency)(data!.total!), currency.symbol)}`
+    : netPnlFull;
 
   return <section className="fidelity-card fidelity-summary-pnl">
     <div className="fidelity-card-head"><h2>{t("summary.fidelity.profitLoss")}</h2><span>{t("summary.fidelity.netPnlUsd").replace("{currency}", currency.currency)}</span></div>
     <div className="fidelity-kpis fidelity-summary-pnl-kpis">
-      <div><span>{t("summary.fidelity.netPnlAll")}</span><strong className={cn("big", tone, data?.total != null && money(data.total, currency).length > 12 && "fidelity-long-money")}>{oneSnapshot || data?.total == null ? missing : money(data.total, currency)}</strong><small>{oneSnapshot || data?.total == null ? t("summary.fidelity.needsSecond") : t("summary.fidelity.since").replace("{date}", date(dateRange.start))}</small></div>
+      <div><span>{t("summary.fidelity.netPnlAll")}</span><strong className={cn("big", tone, netPnlLong && "fidelity-long-money")} title={oneSnapshot ? undefined : netPnlFull ?? undefined}>{netPnlLong ? <span className="whitespace-nowrap">{netPnlText}</span> : netPnlText}</strong><small>{oneSnapshot || data?.total == null ? t("summary.fidelity.needsSecond") : t("summary.fidelity.since").replace("{date}", date(dateRange.start))}</small></div>
       <div><span>{t("summary.fidelity.pnlPercent")}</span><strong className={tone}>{oneSnapshot || data?.total == null || data.percentage === null ? missing : data.percentage === undefined ? "∞" : `${data.percentage >= 0 ? "+" : "−"}${number(Math.abs(data.percentage))}%`}</strong><small>{oneSnapshot || data?.total == null ? t("summary.fidelity.investedCapital") : t("summary.fidelity.onInvested").replace("{amount}", money(data.currentValue - data.total, currency, 0).replace(/^[+−]/, ""))}</small></div>
       <div><span>{t("summary.fidelity.breakeven")}</span><strong className={oneSnapshot || data?.total == null ? "fidelity-faint" : undefined}>{oneSnapshot || data?.total == null ? missing : money(data.currentValue - data.total, currency, 0).replace(/^[+−]/, "")}</strong><small>{t("summary.fidelity.breakevenNote").replace("{symbol}", currency.symbol)}</small></div>
       <div><span>{t("summary.fidelity.positions")}</span><strong>{data?.positions ?? missing}</strong><small>{oneSnapshot || data?.total == null ? t("summary.fidelity.oneSnapshot") : <><span className={data.up === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"}>{data.up} {t("summary.fidelity.up")}</span> · <span className={data.down === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive"}>{data.down} {t("summary.fidelity.down")}</span> · {Math.max(0, data.positions - data.up - data.down)} {t("summary.fidelity.flat")}</>}</small></div>

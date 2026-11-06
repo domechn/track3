@@ -24,6 +24,22 @@ beforeEach(() => vi.clearAllMocks());
 function view() { return <ProfitAttribution currency={currency} dateRange={range} quoteColor="red-up-green-down" />; }
 
 describe("profit attribution", () => {
+  it("renders a sub-unit rank amount as neutral zero", async () => {
+    vi.mocked(queryAttribution).mockResolvedValue({
+      attribution: {
+        entries: [{ symbol: "BTC", assetType: "crypto", wallet: "w",
+          priceEffect: 0.185, flowEffect: 0, residual: 0, totalChange: 0.185 }],
+        totals: { priceEffect: 0.185, flowEffect: 0, residual: 0, totalChange: 0.185 },
+        startValue: 100, endValue: 100.185,
+      },
+      aliases: {},
+    });
+    render(view());
+    const figure = await screen.findByRole("figure", { name: "Top attribution contributors and detractors" });
+    const amount = within(figure).getByText("€0");
+    expect(amount).toHaveClass("text-muted-foreground");
+    expect(amount).toHaveAttribute("title", "+€0.37");
+  });
   it("keeps desktop contributor and detractor previews to five groups", async () => {
     vi.mocked(queryAttribution).mockResolvedValue({
       attribution: {
@@ -64,7 +80,7 @@ describe("profit attribution", () => {
       const row = within(figure).getByRole("button", { name: /BTC/ }).closest("li")!;
       expect(row.querySelector("img")).toBeInTheDocument();
       expect(within(row).getByText("Quantity change")).toBeInTheDocument();
-      expect(within(row).getByText("+€200.00")).toBeInTheDocument();
+      expect(within(row).getByText("+€200")).toBeInTheDocument();
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     } finally {
       window.matchMedia = previousMatchMedia;
@@ -121,7 +137,7 @@ describe("profit attribution", () => {
     render(view());
     expect(await screen.findByText("Top contributors")).toBeInTheDocument();
     expect(screen.getByText("Top detractors")).toBeInTheDocument();
-    expect(screen.getAllByText("+€240.00")[0]).toHaveClass("text-gain");
+    expect(screen.getAllByText("+€240")[0]).toHaveClass("text-gain");
     expect(screen.getByRole("figure", { name: "Top attribution contributors and detractors" })).toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getAllByText("BTC").length).toBeGreaterThan(0);
@@ -151,11 +167,11 @@ describe("profit attribution", () => {
     const [contributors, detractors] = within(figure).getAllByRole("list");
     expect(within(contributors).getAllByRole("listitem")).toHaveLength(1);
     expect(within(contributors).getByText("ETH")).toBeInTheDocument();
-    expect(within(contributors).getByText("+€200.00")).toBeInTheDocument();
+    expect(within(contributors).getByText("+€200")).toBeInTheDocument();
     expect(within(contributors).getByText("ETH").closest("li")?.querySelector("[style]")).toHaveStyle({ width: "100%" });
     expect(within(detractors).getAllByRole("listitem")).toHaveLength(1);
     expect(within(detractors).getByText("SOL")).toBeInTheDocument();
-    expect(within(detractors).getByText("-€80.00")).toBeInTheDocument();
+    expect(within(detractors).getByText("−€80")).toBeInTheDocument();
   });
 
   it("shows an alert when attribution cannot be loaded", async () => {

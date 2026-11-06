@@ -1158,7 +1158,6 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-summary-pnl-kpis { min-height: 76px; margin-bottom: 18px; }
 .fidelity-summary-pnl-kpis { grid-auto-columns: 1fr; }
 .fidelity-summary-pnl-kpis > div:first-child { min-width: auto; }
-.fidelity-summary-pnl-kpis strong.fidelity-long-money { white-space: normal; overflow-wrap: anywhere; }
 .fidelity-summary-chart { display: block; width: 100%; height: 215px; overflow: visible; }
 .fidelity-summary-pnl .fidelity-caption { margin: 0 0 6px; line-height: 18px; }
 :where(.fidelity-summary) .fidelity-empty, :where(.coin-fidelity) .fidelity-empty { display: grid; place-items: center; align-content: center; gap: 10px; min-height: 150px; padding: 24px; border: 1px dashed #3a3a3e; border-radius: 6px; color: #b4b6bc; text-align: center; }
@@ -1214,6 +1213,7 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-year-percent { color: #b4b6bc; font-size: 12px; }
 .fidelity-year-deposits { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 9px 0; color: #b4b6bc; }
 .fidelity-year-deposits span:last-child { color: #fff; }
+.fidelity-summary :is(.fidelity-kpis strong, .fidelity-month-value, .fidelity-year-card strong, .fidelity-year-deposits span:last-child) { white-space: nowrap; }
 .fidelity-year-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; padding-top: 4px; color: #9b9da3; font-size: 12px; }
 .fidelity-year-deposits span, .fidelity-year-foot span { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fidelity-pnl-hint { align-self: flex-start; }
@@ -1222,20 +1222,24 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-attribution-key span { display: flex; align-items: center; gap: 6px; }
 .fidelity-attribution-key i { width: 10px; height: 8px; background: #4a8ad6; }
 .fidelity-attribution-key span:nth-child(2) i { background: #7c7e86; }
-.fidelity-attribution-row { display: grid; grid-template-columns: 48px minmax(0,1fr) 96px 96px 104px; gap: 14px; align-items: center; min-height: 48px; border-top: 1px solid #1b1a1f; }
-.fidelity-attribution-table.has-residual .fidelity-attribution-row, .fidelity-attribution-table.has-residual .fidelity-attribution-axis { grid-template-columns: 48px minmax(0,1fr) 90px 90px 90px 104px; }
-.fidelity-attribution-row.head { min-height: 26px; margin-top: 12px; align-items: start; border: 0; color: #9b9da3; font-size: 12px; }
+.fidelity-attribution-table { max-width: 100%; overflow-x: auto; }
+.fidelity-attribution-row, .fidelity-attribution-axis { grid-template-columns: minmax(96px,.75fr) minmax(185px,1fr) repeat(3,minmax(max-content,1fr)); gap: 16px; min-width: 820px; }
+.fidelity-attribution-table.has-residual .fidelity-attribution-row, .fidelity-attribution-table.has-residual .fidelity-attribution-axis { grid-template-columns: minmax(96px,.75fr) minmax(185px,1fr) repeat(4,minmax(max-content,1fr)); }
+.fidelity-attribution-row { display: grid; align-items: center; height: 52px; border-top: 1px solid #1b1a1f; }
+.fidelity-attribution-row.head { height: 28px; margin-top: 12px; border: 0; color: #9b9da3; font-size: 12px; }
 .fidelity-attribution-row b, .fidelity-leader-row b { font-weight: 600; }
-.fidelity-attribution-row > span:nth-child(n+3) { text-align: right; }
+.fidelity-attribution-row > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fidelity-attribution-row > span:nth-child(n+3) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fidelity-attribution-row.head > span { white-space: nowrap; }
 .fidelity-attribution-row.total { border-color: #3a3a3e; margin-top: 2px; font-weight: 600; }
-.fidelity-attribution-row.total > span:nth-child(2) { color: #b4b6bc; font-size: 12px; font-weight: 400; font-family: "Fidelity Public Sans", system-ui, sans-serif; }
+.fidelity-attribution-row.total > span:nth-child(2) { color: #b4b6bc; font-size: 12px; font-weight: 400; font-family: "Fidelity Public Sans", system-ui, sans-serif; white-space: nowrap; }
 .fidelity-attribution-row.total > span:nth-child(n+3) { font-weight: 500; }
-.fidelity-attribution-track { position: relative; height: 12px; }
-.fidelity-attribution-track b { position: absolute; top: -8px; bottom: -8px; width: 1px; background: #3a3a3e; }
-.fidelity-attribution-track i { position: absolute; top: 2px; height: 8px; }
+.fidelity-attribution-track { position: relative; height: 16px; }
+.fidelity-attribution-track b { position: absolute; top: -6px; bottom: -6px; width: 1px; background: #3a3a3e; }
+.fidelity-attribution-track i { position: absolute; top: 0; height: 16px; }
 .fidelity-attribution-track i.market { background: #4a8ad6; }
 .fidelity-attribution-track i.quantity { background: #7c7e86; }
-.fidelity-attribution-axis { display: grid; grid-template-columns: 48px minmax(0,1fr) 96px 96px 104px; gap: 14px; height: 20px; margin-top: 2px; color: #9b9da3; font-size: 12px; white-space: nowrap; }
+.fidelity-attribution-axis { display: grid; height: 20px; margin-top: 2px; color: #9b9da3; font-size: 12px; white-space: nowrap; }
 .fidelity-attribution-axis > span:nth-child(2) { position: relative; }
 .fidelity-attribution-axis > span:nth-child(2) > span { position: absolute; top: 4px; transform: translateX(-50%); }
 .fidelity-attribution-options { position: relative; margin-left: auto; color: #9b9da3; font-size: 12px; }
@@ -1252,8 +1256,8 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-group-label { margin: 14px 0 6px; color: #9b9da3; font-size: 12px; }
 .fidelity-leaders .fidelity-card-head + [role="table"] > .fidelity-group-label:nth-child(2) { margin-top: 28px; }
 .fidelity-leaders .fidelity-leader-row + .fidelity-group-label { margin-top: 18px; }
-.fidelity-leader-row { display: grid; grid-template-columns: 48px minmax(0,1fr) 92px 68px; gap: 12px; align-items: center; height: 42px; border-top: 1px solid #1b1a1f; }
-.fidelity-leader-row .number { text-align: right; }
+.fidelity-leader-row { display: grid; grid-template-columns: 48px minmax(0,1fr) max-content 68px; gap: 12px; align-items: center; height: 42px; border-top: 1px solid #1b1a1f; }
+.fidelity-leader-row .number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fidelity-leader-track { position: relative; height: 12px; }
 .fidelity-leader-track b { position: absolute; top: -5px; bottom: -5px; width: 1px; background: #3a3a3e; }
 .fidelity-leader-track i { position: absolute; top: 2px; height: 8px; }
@@ -1390,6 +1394,8 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .t3-history-records [role="combobox"] { border-radius: var(--radius-pill); }
   .t3-history-table { border: 0; border-radius: 0; background: transparent; }
   .t3-history-table table { font-variant-numeric: tabular-nums; }
+  .t3-history-table :is(th,td):nth-child(2), .t3-history-table :is(th,td):nth-child(3),
+  .t3-history-detail :is(th,td):nth-child(n+3):nth-child(-n+5) { white-space: nowrap; }
   .t3-history-table th { height: 34px; color: hsl(var(--faint)); font-size: 12px; font-weight: 400; text-transform: none; }
   .t3-history-table td { height: 49px; border-top: 1px solid hsl(var(--rule)); }
   .t3-history-table tbody tr:hover { background: hsl(var(--hover)); }
@@ -3138,6 +3144,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 
 /* Desktop comparison follows the approved terminal layout. */
 .t3-cmp-fidelity { display: none; }
+.comparison-assets-table :is(th,td) { white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (min-width: 1400px) {
   .t3-route-comparison .glass-subtle { display: none; }
   .t3-route-comparison #app-main-content { padding-top: 20px; padding-bottom: 40px; }
@@ -3671,14 +3678,17 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .light .fidelity-summary :is(.negative, .text-negative) { color: hsl(var(--loss)); }
 .light :where(.fidelity-summary) .fidelity-empty button { color: hsl(var(--primary-foreground)); }
 .light .fidelity-attribution-row.total > span:nth-child(2) { color: hsl(var(--muted-foreground)); }
+.light .fidelity-attribution-row { border-top-color: hsl(var(--rule)); }
+.light .fidelity-attribution-row.total { border-top-color: hsl(var(--control)); }
 @media (max-width: 1000px) {
   .fidelity-summary-grid > :nth-child(n) { grid-column: 1 / -1; }
   .fidelity-kpis { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .fidelity-kpis > div:nth-child(odd) { border-left: 0; padding-left: 0; }
   .fidelity-month-grid, .fidelity-skeleton-months { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto; }
   .fidelity-period-card, .fidelity-summary-pnl { min-height: 0; }
-  .fidelity-attribution { overflow-x: auto; }
-  .fidelity-attribution-row, .fidelity-attribution-axis { min-width: 430px; }
+  .fidelity-attribution-row, .fidelity-attribution-axis { min-width: 820px; }
+  .fidelity-attribution-row > :first-child { position: sticky; left: 0; z-index: 1; background: #131217; }
+  .light .fidelity-attribution-row > :first-child { background: hsl(var(--card)); }
   .coin-fidelity-heading { gap: 12px; flex-wrap: wrap; }
   .coin-fidelity-heading > div { flex-basis: 100%; }
   .coin-fidelity-hero, .coin-fidelity-custom .coin-fidelity-hero { height: auto; }
@@ -3858,6 +3868,8 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-chart-track i.pos { background: var(--f-positive); }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-chart-track i.neg { background: var(--f-negative); }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost table { width: 100%; border-collapse: collapse; }
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-table .fidelity-table-scroll, :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-gaps { overflow-x: auto; }
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-cost :is(th,td):not(:first-child) { white-space: nowrap; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost table th { padding: 0 0 8px 16px; color: var(--f-faint); font-size: 12px; line-height: 16px; font-weight: 400; text-align: left; white-space: nowrap; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost td { height: 42px; padding: 0 0 0 16px; border-top: 1px solid var(--f-rule); }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost th:first-child, :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost td:first-child { padding-left: 0; }
@@ -3922,6 +3934,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history th { height: 31px; padding: 6px 0 8px 16px; color: var(--f-faint); font-size: 12px; line-height: 16px; font-weight: 400; text-align: left; white-space: nowrap; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-list th { height: 30px; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history td { height: 46px; padding: 0 0 0 16px; border-top: 1px solid var(--f-rule); }
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-history-list td:nth-child(2), :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-list td:nth-child(3) { white-space: nowrap; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history th:first-child, :where(body:has(.t3-records-fidelity-shell)) .fidelity-history td:first-child { padding-left: 20px; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-list th:nth-child(n+2):nth-child(-n+4), :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-list td:nth-child(n+2):nth-child(-n+4) { text-align: right; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-list th:last-child, :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-list td:last-child { padding-left: 28px; padding-right: 20px; }

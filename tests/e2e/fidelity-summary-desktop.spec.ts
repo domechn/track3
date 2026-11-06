@@ -240,8 +240,8 @@ test("Summary leaders and attribution footer follow the source spacing", async (
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
   expect((await page.locator(".fidelity-group-label").first().boundingBox())!.y).toBeCloseTo(1143, 0);
-  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1575, 0);
-  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1593, 0);
+  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1609, 0);
+  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1627, 0);
   const totalRange = page.locator(".fidelity-attribution-row.total > span:nth-child(2)");
   await expect(totalRange).toHaveText("$310,000 → $763,809");
   const arrow = await totalRange.evaluate((node) => {
@@ -258,7 +258,7 @@ test("Summary leaders and attribution footer follow the source spacing", async (
     }
     throw new Error("Missing attribution arrow");
   });
-  expect(arrow.x).toBeCloseTo(230, 0);
+  expect(arrow.x).toBeCloseTo(321.5, 0);
   expect(arrow.width).toBeCloseTo(10.1, 0);
 });
 
@@ -421,6 +421,6 @@ test("Summary attribution header and leaders footnote match source vertical rhyt
     const range = document.createRange();
     range.selectNodeContents(node);
     return range.getBoundingClientRect().y;
-  })).toBe(1161);
+  })).toBe(1166);
   expect(await page.locator(".fidelity-leaders .fidelity-caption").evaluate((node) => getComputedStyle(node).lineHeight)).toBe("18px");
 });

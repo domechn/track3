@@ -63,7 +63,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-month-top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; width:100%; }
 .fd-month-top b { font-size:15px; font-weight:600; }
 .fd-month-top>span { color:var(--fd-faint); font-size:12px; white-space:nowrap; }
-.fd-month strong { margin-top:6px; font:500 17px/24px "Public Sans Variable","Public Sans",sans-serif; }
+.fd-month strong { min-width:0; margin-top:6px; font:500 17px/24px "Public Sans Variable","Public Sans",sans-serif; }
 .fd-month small,.fd-year small { color:var(--fd-muted); font-size:12px; }
 .fd-month small[data-tone],.fd-year small[data-tone] { color:var(--fd-muted); }
 .fd-zero-bar { position:relative; display:block; width:100%; height:4px; margin-top:8px; }
@@ -340,7 +340,8 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
   .app-layout[data-header-collapsed="true"]:has(.fd-overview-rank[data-expanded="true"]) #app-top-bar { display:none; }
 }
 .fd-top-coins .fd-list-heading:not(:first-of-type) { margin-top:14px; }
-.fd-top-coins .fd-top-row { grid-template-columns:44px minmax(0,1fr) 84px 60px; gap:8px; }
+.fd-top-coins .fd-top-row { grid-template-columns:44px minmax(0,1fr) max-content 60px; gap:8px; }
+.fd-top-coins .fd-top-row>strong { white-space:nowrap; font-variant-numeric:tabular-nums; }
 .fd-summary[data-empty="false"][data-state="ready"] .fd-top-coins { padding-bottom:64px; }
 .fd-coin:not(:has(.fd-coin-changes.manual)) .fd-sheet.edit { height:528px; min-height:0; }
 .fd-coin:not(:has(.fd-coin-changes.manual)) .fd-edit-label[for="fd-edit-price"] { margin-top:14px; }
@@ -366,22 +367,23 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-top-row { grid-template-columns:44px minmax(0,1fr) 76px 47px; gap:6px; }
 .fd-top-row>small { text-align:right; font-size:12px; }
 .fd-top-coins .fd-list-heading:not(:first-of-type) { margin-top:18px; }
-.fd-attribution .fd-attr-track { position:relative; height:12px; }
+.fd-attribution .fd-attr-track { position:relative; height:16px; }
 .fd-attribution .fd-attr-track:before { position:absolute; top:-8px; bottom:-8px; left:var(--fd-zero); width:1px; background:var(--fd-control); content:""; }
-.fd-attribution .fd-attr-track i { position:absolute; top:2px; height:8px; max-width:none; }
+.fd-attribution .fd-attr-track i { position:absolute; top:0; height:16px; max-width:none; }
 .fd-attribution .fd-attr-track .fd-attr-market { background:var(--fd-accent); }
 .fd-attribution .fd-attr-track .fd-attr-flow { background:var(--fd-faint); }
-.fd-attribution .fd-attr-row { grid-template-columns:44px minmax(0,1fr) 88px; gap:2px 14px; padding:10px 0; }
+.fd-attribution .fd-attr-row { grid-template-columns:68px minmax(0,1fr) 110px; gap:14px; height:56px; min-height:56px; padding:0; }
 .fd-attribution .fd-attr-row>small { grid-column:1/-1; margin:0; display:flex; justify-content:space-between; }
-.fd-axis { position:relative; height:20px; margin-left:58px; margin-right:102px; color:var(--fd-faint); font-size:12px; }
+.fd-axis { position:relative; height:20px; margin-left:82px; margin-right:124px; color:var(--fd-faint); font-size:12px; }
 .fd-axis span:not(:first-child) { position:absolute; top:4px; transform:translateX(-50%); white-space:nowrap; }
 .fd-attribution .fd-attr-total { border-top-color:var(--fd-control); }
 .fd-ath { padding-bottom:24px; }
-.fd-attribution .fd-attr-row { min-height:39px; padding:10px 0; }
+.fd-attribution .fd-attr-row>b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fd-attribution .fd-attr-row>strong { min-width:0; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.fd-attribution .fd-attr-row>span:not(.fd-attr-track) { white-space:nowrap; font-variant-numeric:tabular-nums; }
 .fd-attribution .fd-attr-row>small { display:none; }
 .fd-attribution .fd-attr-row { position:relative; }
 .fd-attribution .fd-attr-row>small { display:block; position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
-.fd-attribution .fd-attr-row>strong { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .fd-attribution { padding-bottom:20px; }
 .fd-top-coins { padding-bottom:36px; }
 .fd-sheet.detail { padding-top:24px; }
@@ -410,6 +412,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-summary[data-empty="false"][data-state="ready"] .fd-top-coins>.fd-card-heading+div~div { margin-top:18px; }
 .fd-summary[data-empty="false"][data-state="ready"] .fd-top-coins>.fd-footnote { margin-top:12px; }
 .fd-summary .fd-attr-total>span { color:var(--fd-muted); font-weight:400; }
+.fd-summary :is(.fd-year>strong,.fd-year-deposit>span:last-child) { white-space:nowrap; }
 .fd-summary[data-empty="true"] .fd-profit-loss .fd-empty { position:relative; top:9px; }
 .fd-summary .fd-empty .fd-primary-pill { display:inline-flex; align-items:center; justify-content:center; gap:8px; }
 .fd-summary[data-empty="true"] .fd-profit-loss .fd-primary-pill { min-height:40px; padding-inline:10px; }
@@ -929,7 +932,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-year-deposit { margin-top:18px; }
 .fd-year-foot { transform:translateY(-2px); }
 .fd-axis { height:20px; }
-.fd-attribution .fd-attr-total { min-height:39px; }
+.fd-attribution .fd-attr-total { min-height:56px; }
 .app-layout:has(.fd-coin)[data-header-collapsed="true"] #app-top-bar { display:block; position:fixed; inset:0 0 auto; z-index:30; }
 @media (max-width:699px) {
   #app-main-content:has(.fd-summary) .mobile-analytics-hub { height:0; margin:0; }
@@ -950,6 +953,14 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-summary[data-empty="false"][data-state="ready"] .fd-attr-total { margin-top:2px; }
 .fd-summary[data-empty="false"][data-state="ready"] .fd-attribution { padding-bottom:15px; }
 .fd-total-arrow { font-size:14px; letter-spacing:-.04em; }
+@media (max-width:379px) {
+  .fd-attribution .fd-attr-row:not(.fd-attr-total) { grid-template-columns:52px minmax(0,1fr) 84px; gap:10px; }
+  .fd-attribution .fd-axis { margin-left:62px; margin-right:94px; }
+  .fd-attribution .fd-attr-total { grid-template-columns:48px minmax(max-content,1fr) max-content; gap:8px; font-size:12px; }
+}
+@media (max-width:359px) {
+  .fd-attribution .fd-attr-total { grid-template-columns:34px minmax(0,1fr) 90px; gap:6px; font-size:12px; }
+}
 .fd-coin-trend:has(.fd-chart-controls>div:first-child button:nth-child(2)[aria-pressed="true"]) .fd-card-heading h3 { position:relative; top:5px; }
 .fd-coin-trend:has(.fd-chart-controls>div:first-child button:nth-child(2)[aria-pressed="true"])>.fd-sub { position:relative; top:2px; }
 .fd-coin-metric .fd-info-tooltip { position:absolute; z-index:5; max-width:180px; box-shadow:0 8px 20px #0008; }

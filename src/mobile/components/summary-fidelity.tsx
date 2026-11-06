@@ -14,6 +14,9 @@ import { currencyWrapper } from "@/utils/currency";
 import { listAllFirstAndLastDays } from "@/utils/date";
 import { AttributionPager, useAttributionPage } from "@/components/attribution-pager";
 import { PartialProfitHint, PnlPercentHint } from "@/components/profit-summary-hints";
+import { attributionAmount, attributionCompactAmount, attributionRange } from "@/components/attribution-amount";
+import { FittingAttributionAmount } from "@/components/fitting-attribution-amount";
+import { useFittingAttributionTicks } from "@/components/use-fitting-attribution-ticks";
 import "@/mobile/components/mobile/fidelity.css";
 
 type Profit = Awaited<ReturnType<typeof calculateTotalProfit>>;
@@ -103,6 +106,7 @@ function LineChart({ values, dates, label, symbol, formatMonth, bestMonthText, f
 
 export default function SummaryFidelity({ currency, dateRange, quoteColor, checking = false }: { currency: CurrencyRateDetail; dateRange: TDateRange; quoteColor: QuoteColor; checking?: boolean }) {
   const { t, locale } = useTranslation();
+  const axisRef = useFittingAttributionTicks();
   const cash = (value: number, digits = 2, signed = false) =>
     money(currencyWrapper(currency)(value), currency.symbol, digits, signed);
   const dateLabel = (value: Date) => formatDate(value, { day: "numeric", month: "short", year: "numeric" }, locale);
@@ -255,6 +259,7 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
     return [...map.entries()].sort((a, b) => b[1].total - a[1].total);
   }, [full]);
   const attributionPaging = useAttributionPage(grouped, `${dateRange.start.getTime()}-${dateRange.end.getTime()}:${range}`);
+  const attrRange = attributionRange(first?.totalValue ?? 0, last?.totalValue ?? 0, currency, locale);
   const attrEndpoints = grouped.flatMap(([, row]) => [0, row.market, row.market + row.flow]);
   const attrMin = Math.min(0, ...attrEndpoints);
   const attrMax = Math.max(0, ...attrEndpoints);
@@ -321,6 +326,7 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
       : empty ? placeholder(title("monthsNeedSecond"),150)
       : <><div className="fd-month-grid">{selectedMonths.map((m) => {
         const amount = profitText(m.profit, m.knownTotal, m.unknownCoins);
+        const amountValue = m.profit ?? (m.unknownCoins.length ? m.knownTotal : null);
         const partial = m.hasData && m.profit === null && m.unknownCoins.length > 0;
         const period = m.gapDate ? t("profitSummary.since").replace("{date}", dateLabel(m.gapDate))
           : m.date.getMonth() === lastDate.getMonth() && m.date.getFullYear() === lastDate.getFullYear()
@@ -332,7 +338,9 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
           onClick={() => { setFocusedMonth(m.date); document.querySelector(".fd-summary-chart")?.scrollIntoView({ block: "center" }); }}
           aria-label={`${monthLabel(m.date)} ${m.hasData ? amount : t("profitSummary.noSnapshot")}`}>
           <span className="fd-month-top"><b>{monthLabel(m.date)}</b><span>{period}</span></span>
-          <strong data-tone={tone(m.profit ?? m.knownTotal)}>{m.hasData ? amount : "—"}</strong>
+          <strong data-tone={tone(m.profit ?? m.knownTotal)} title={m.hasData ? amount : undefined}>{m.hasData && amountValue !== null
+            ? <FittingAttributionAmount full={amount} compact={attributionCompactAmount(amountValue, currency, locale)} />
+            : m.hasData ? amount : "—"}</strong>
           <small data-tone={tone(m.profit)}>{m.hasData && m.percentage != null ? percent(m.percentage / 100) : dash}</small>
           <span className="fd-zero-bar"><i data-tone={tone(m.profit ?? m.knownTotal)} style={{width:`${Math.min(50, Math.abs((m.percentage ?? 0) / 100)/monthPercentMax*50)}%`}} /></span>
           <span className="fd-month-foot">{!m.hasData ? t("profitSummary.noSnapshot") : <><span data-tone={m.up ? "gain" : "neutral"}>{title("upCount").replace("{n}", String(m.up))}</span> · <span data-tone={m.down ? "loss" : "neutral"}>{title("downCount").replace("{n}", String(m.down))}</span>{m.flat > 0 && <span> · {title("flatCount").replace("{n}", String(m.flat))}</span>}</>}</span>
@@ -360,7 +368,7 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
         </div>;
       })}</div>}
     </>,"fd-years")}
-    {card(<><Heading title={title("attribution")} right={empty?title("attributionDateOnly").replace("{date}",dateLabel(lastDate)).replace("{currency}",currency.currency):title("attributionDateRange").replace("{start}",dateLabel(firstDate)).replace("{end}",dateLabel(lastDate)).replace("{currency}",currency.currency)} />{loading ? <div className="fd-row-skeleton">{Array.from({length:8},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="55%" height={8}/></div>)}</div> : empty ? placeholder(title("attributionNeedsSecond"),260) : <><div className="fd-key"><span><i />{title("marketMove")}</span><span><i />{title("quantityChange")}</span></div>{attributionPaging.rows.map(([symbol,row])=><div className="fd-attr-row" key={symbol}><b>{symbol}</b><span className="fd-attr-track" style={{ "--fd-zero": `${attrScale(0)}%` } as React.CSSProperties}><i className="fd-attr-market" style={{left:`${attrScale(Math.min(0,row.market))}%`,width:`${attrScale(Math.max(0,row.market))-attrScale(Math.min(0,row.market))}%`}} /><i className="fd-attr-flow" style={{left:`${attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`,width:`${attrScale(Math.max(flowStart(row),flowStart(row)+row.flow))-attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`}} /></span><strong className="sr-only" data-tone={tone(row.total)}>{cash(row.total,0,true)}</strong><small className="sr-only"><span>{title("market")} <span data-tone={tone(row.market)}>{cash(row.market,0,true)}</span></span><span>{title("quantity")} {cash(row.flow,0,true)}</span></small></div>)}<div className="fd-axis"><span />{attrTicks.map(tick=><span key={tick} style={{left:`${attrScale(tick)}%`}}>{tick<0?"−":""}{currency.symbol}{new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Math.abs(currencyWrapper(currency)(tick))).replace("K","k")}</span>)}</div><div className="fd-attr-row fd-attr-total"><b>{title("total")}</b><span>{cash(first?.totalValue??0,0)}<span className="fd-total-arrow"> → </span>{cash(last?.totalValue??0,0)}</span><strong className="sr-only">{cash(gain,0,true)}</strong><small className="sr-only"><span>{title("market")} {cash(full?.totals.priceEffect??0,0,true)}</span><span>{title("quantity")} {cash((full?.totals.flowEffect??0)+(full?.totals.residual??0),0,true)}</span></small></div><AttributionPager count={grouped.length} {...attributionPaging} t={t} /></>}</>,"fd-attribution")}
+    {card(<><Heading title={title("attribution")} right={empty?title("attributionDateOnly").replace("{date}",dateLabel(lastDate)).replace("{currency}",currency.currency):title("attributionDateRange").replace("{start}",dateLabel(firstDate)).replace("{end}",dateLabel(lastDate)).replace("{currency}",currency.currency)} />{loading ? <div className="fd-row-skeleton">{Array.from({length:8},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="55%" height={8}/></div>)}</div> : empty ? placeholder(title("attributionNeedsSecond"),260) : <><div className="fd-key"><span><i />{title("marketMove")}</span><span><i />{title("quantityChange")}</span></div>{attributionPaging.rows.map(([symbol,row])=><div className="fd-attr-row" key={symbol}><b>{symbol}</b><span className="fd-attr-track" style={{ "--fd-zero": `${attrScale(0)}%` } as React.CSSProperties}><i className="fd-attr-market" style={{left:`${attrScale(Math.min(0,row.market))}%`,width:`${attrScale(Math.max(0,row.market))-attrScale(Math.min(0,row.market))}%`}} /><i className="fd-attr-flow" style={{left:`${attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`,width:`${attrScale(Math.max(flowStart(row),flowStart(row)+row.flow))-attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`}} /></span><strong data-tone={tone(row.total)} title={attributionAmount(row.total, currency, true)}><FittingAttributionAmount full={attributionAmount(row.total, currency)} compact={attributionCompactAmount(row.total, currency, locale)} /></strong><small className="sr-only"><span>{title("market")} <span data-tone={tone(row.market)}>{cash(row.market,0,true)}</span></span><span>{title("quantity")} {cash(row.flow,0,true)}</span></small></div>)}<div ref={axisRef} className="fd-axis"><span />{attrTicks.map(tick=><span key={tick} data-axis-tick="" data-value={tick} style={{left:`${attrScale(tick)}%`}}>{tick<0?"−":""}{currency.symbol}{new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Math.abs(currencyWrapper(currency)(tick))).replace("K","k")}</span>)}</div><div className="fd-attr-row fd-attr-total"><b>{title("total")}</b><span title={attrRange.full}><FittingAttributionAmount full={attrRange.text} compact={attrRange.compact} /></span><strong title={attributionAmount(gain, currency, true)}><FittingAttributionAmount full={attributionAmount(gain, currency)} compact={attributionCompactAmount(gain, currency, locale)} /></strong><small className="sr-only"><span>{title("market")} {cash(full?.totals.priceEffect??0,0,true)}</span><span>{title("quantity")} {cash((full?.totals.flowEffect??0)+(full?.totals.residual??0),0,true)}</span></small></div><AttributionPager count={grouped.length} {...attributionPaging} t={t} /></>}</>,"fd-attribution")}
     {card(<><div className="fd-card-heading"><button className="fd-top-dialog-trigger" type="button" disabled={checking} onClick={() => setRankOpen(true)}>{title("topCoins")}</button><span>{title("allTime")}</span></div>{loading ? <div className="fd-row-skeleton">{Array.from({length:6},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="50%" height={8}/></div>)}</div> : empty ? placeholder(title("topNeedsSecond"),260) : <>{([
       [title("topProfit"), moving.filter((coin)=>coin.value !== null && coin.value > 0).sort((a,b)=>(b.value??0)-(a.value??0))],
       [title("topLoss"), moving.filter((coin)=>coin.value !== null && coin.value < 0).sort((a,b)=>(a.value??0)-(b.value??0))],
