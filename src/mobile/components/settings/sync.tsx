@@ -10,6 +10,7 @@ import { ConfigConflictChoices } from "@/components/sync-conflict-choices";
 import { isIOS } from "@/utils/platform";
 import { SyncActionButton } from "@/components/settings/sync-action-button";
 import { SyncRecoveryUnlock } from "@/components/settings/sync-recovery";
+import { SyncStatusCard } from "@/components/settings/sync-status-card";
 import { useSyncFeedback, waitForSyncResult } from "@/components/settings/use-sync-feedback";
 import { useTranslation } from "@/mobile/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
@@ -178,7 +179,7 @@ export default function SyncSettingsPage() {
 
   const phone = isIOS();
   return (
-    <div className={`sync-settings-page space-y-5 ${phone ? "ios-d3-sync-settings fidelity-b fidelity-b-sync" : ""}`}>
+    <div className={`sync-settings-page space-y-5 ${phone ? "ios-d3-sync-settings fidelity-b fidelity-b-sync" : ""}`} data-mode={status.mode}>
       {phone && <><p className="fidelity-b-subtitle">{t("fidelity.b.sync.subtitle")}</p>
         <button type="button" className="fidelity-b-sync-status"
           onClick={() => document.querySelector<HTMLButtonElement>(".ios-d3-sync-indicator button")?.click()}>
@@ -283,6 +284,8 @@ export default function SyncSettingsPage() {
         </CardContent>
       </Card>
 
+      <SyncStatusCard status={status} busy={busy} onSyncNow={() => { void syncNow(); }} t={t} locale={locale} />
+
       <Card className="t3-sync-categories">
         <CardHeader>
           <CardTitle>{t(phone ? "fidelity.b.sync.categories" : "sync.categories.title")}</CardTitle>
@@ -359,8 +362,6 @@ export default function SyncSettingsPage() {
             ))}
             <div className="sync-device-actions flex flex-wrap gap-2 pt-2">
               {status.mode !== "disabled" && <>
-                <SyncActionButton disabled={!!busy || status.mode !== "ready"} pending={busy === "now"}
-                  pendingLabel={t("sync.pending.now")} onClick={() => void syncNow()}>{t("sync.now")}</SyncActionButton>
                 {phone ? <ConfirmDeleteDialog
                   trigger={<SyncActionButton variant="outline" disabled={!!busy}
                     pending={busy === "disable"} pendingLabel={t("sync.pending.disable")}>{t("sync.disable")}</SyncActionButton>}

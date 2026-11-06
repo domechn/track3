@@ -3955,10 +3955,26 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   }
   .fidelity-b-sync > .t3-sync-connection { order: 2; }
   .fidelity-b-sync > .t3-sync-passphrase { order: 3; }
-  .fidelity-b-sync > .t3-sync-devices { order: 4; }
-  .fidelity-b-sync > .t3-sync-categories { order: 5; }
-  .fidelity-b-sync > .t3-sync-conflicts { order: 6; }
-  .fidelity-b-sync > [role="status"] { order: 7; }
+  .fidelity-b-sync > .t3-sync-status { order: 4; }
+  .fidelity-b-sync > .t3-sync-devices { order: 5; }
+  .fidelity-b-sync > .t3-sync-categories { order: 6; }
+  .fidelity-b-sync > .t3-sync-conflicts { order: 7; }
+  .fidelity-b-sync > [role="status"] { order: 8; }
+  .fidelity-b-sync[data-mode="locked"] > .t3-sync-passphrase { order: 2; }
+  .fidelity-b-sync[data-mode="locked"] > .t3-sync-connection { order: 3; }
+  #app-main-content .fidelity-b-sync > [data-ui-card] { color: #fff; }
+  #app-main-content .fidelity-b-sync > .t3-sync-status {
+    min-width: 0; border-color: #222224; background: #131217; box-shadow: 0 12px 28px rgba(0,0,0,.2);
+  }
+  #app-main-content .fidelity-b-sync > .t3-sync-status h3 { color: #fff; }
+  #app-main-content .fidelity-b-sync .t3-sync-status-rows > div { border-top-color: #222224; }
+  #app-main-content .fidelity-b-sync .t3-sync-status button:disabled {
+    background: #35353a; color: #b4b6bc; opacity: 1;
+  }
+  #app-main-content .fidelity-b-sync label,
+  #app-main-content .fidelity-b-sync .t3-sync-status-rows dd { color: #fff; }
+  #app-main-content .fidelity-b-sync .text-muted-foreground,
+  #app-main-content .fidelity-b-sync .t3-sync-status-rows dt { color: #b4b6bc; }
   #app-main-content .fidelity-b-sync > .glass > div:first-child {
     position: relative; display: block; min-width: 0; margin: 0 0 14px; padding: 0;
   }
@@ -4010,6 +4026,15 @@ body:has(.fidelity-history, .fidelity-history-detail) {
 
 @media (min-width: 700px) {
   #app-main-content .fidelity-b-sync-status { display: none; }
+  .ios-d3-settings .fidelity-b-sync > .fidelity-b-subtitle { order: 0; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-connection { order: 1; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-passphrase { order: 2; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-status { order: 3; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-devices { order: 4; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-categories { order: 5; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-conflicts { order: 6; }
+  .ios-d3-settings .fidelity-b-sync[data-mode="locked"] > .t3-sync-passphrase { order: 1; }
+  .ios-d3-settings .fidelity-b-sync[data-mode="locked"] > .t3-sync-connection { order: 2; }
   #app-main-content :is(.fidelity-source-avatar-action, .fidelity-b-input-end > button, .fidelity-b-head-actions button) {
     min-width: 44px;
     min-height: 44px;
