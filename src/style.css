@@ -3425,8 +3425,13 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .coin-fidelity-transactions .coin-fidelity-section-head { align-items: center; margin-bottom: 12px; }
 .coin-fidelity-transactions .coin-fidelity-section-head h2 { transform: translateY(-1px); }
 .coin-fidelity-transactions table { font-variant-numeric: tabular-nums; }
+.coin-fidelity-transaction-scroll { overflow: auto; }
+.coin-fidelity-transactions thead { position: sticky; top: 0; z-index: 1; background: #131217; }
+.coin-fidelity-card nav { margin-top: 12px; }
 .coin-fidelity-transactions th { height: 24.5px; padding: 0 0 6px; }
 .coin-fidelity-transactions td { height: 52px; padding: 0; }
+.coin-fidelity-transactions td { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.coin-fidelity-row-skeleton { display: block; width: 70%; height: 12px; border-radius: 4px; background: hsl(var(--muted)); }
 .coin-fidelity-transactions th, .coin-fidelity-transactions td { border-bottom: 1px solid #1b1a1f; }
 .coin-fidelity-transactions th:not(:first-child), .coin-fidelity-transactions td:not(:first-child) { padding-left: 16px; }
 .coin-fidelity-transactions th:nth-child(1) { width: 140px; }
@@ -3434,12 +3439,14 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .coin-fidelity-transactions th:nth-child(3) { width: 160px; }
 .coin-fidelity-transactions th:nth-child(4) { width: 170px; }
 .coin-fidelity-transactions th:nth-child(5) { width: 180px; }
-.coin-fidelity-transactions th:nth-child(7) { width: 56px; }
+.coin-fidelity-transactions th:nth-child(7) { width: 80px; }
+.coin-fidelity-transactions th:nth-child(8) { width: 56px; }
 .coin-fidelity-transactions tr > :is(th,td):nth-child(3),
 .coin-fidelity-transactions tr > :is(th,td):nth-child(4),
 .coin-fidelity-transactions tr > :is(th,td):nth-child(5),
-.coin-fidelity-transactions tr > :is(th,td):nth-child(7) { text-align: right; }
+.coin-fidelity-transactions tr > :is(th,td):nth-child(8) { text-align: right; }
 .coin-fidelity-transactions tr > :is(th,td):nth-child(6) { padding-left: 40px; }
+.light .coin-fidelity-transactions thead { background: hsl(var(--card)); }
 .coin-fidelity-detail-link { text-align: left; line-height: 18px; }
 .coin-fidelity-detail-link small { display: block; color: #9b9da3; font-size: 12px; }
 .coin-fidelity-pill { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 20px; background: #212023; color: #bdbdc0; font-size: 12px; font-weight: 500; }
@@ -3542,7 +3549,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .light :is(.fidelity-month-card, .fidelity-year-card, .coin-fidelity-position-header select, .coin-fidelity-imported) { background: hsl(var(--sunken)); border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
 .light :is(.fidelity-attribution-options > div, .coin-fidelity-controls, .t3-fidelity-ranges) { background: hsl(var(--raised)); border-color: hsl(var(--border)); }
 .light :is(.fidelity-attribution-options button[aria-pressed="true"], .coin-fidelity-controls button.active, .t3-fidelity-ranges button[aria-pressed="true"]) { background: hsl(var(--card)); color: hsl(var(--foreground)); }
-.light :is(.fidelity-empty, .coin-fidelity-sources td, .coin-fidelity-transactions td, .coin-fidelity-sheet-row) { border-color: hsl(var(--border)); }
+.light :is(.fidelity-empty, .coin-fidelity-sources td, .coin-fidelity-transactions th, .coin-fidelity-transactions td, .coin-fidelity-sheet-row) { border-color: hsl(var(--border)); }
 .light :is(.coin-fidelity-dialog, .coin-fidelity-sheet) { background: hsl(var(--card)) !important; color: hsl(var(--foreground)); border-color: hsl(var(--border)) !important; }
 .light .coin-fidelity-price-input, .light .coin-fidelity-custom-settings output { background: hsl(var(--sunken)); }
 .light .coin-fidelity-custom-settings output { border-color: hsl(var(--border)); }

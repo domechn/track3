@@ -44,8 +44,6 @@ import { timeToDateStr } from "@/utils/date";
 import {
   CaretSortIcon,
   CheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   Pencil2Icon,
 } from "@radix-ui/react-icons";
 import { Input } from "@/components/ui/input";
@@ -94,6 +92,7 @@ import CoinCustomPrice from "@/components/coin-custom-price";
 import { BottomSheet, DeltaPill, MobileRecordList, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
 import CoinFidelity from "@/mobile/components/coin-fidelity";
 import { transactionSourceName } from "@/components/source-display-name";
+import { Pager, usePager } from "@/components/ui/pager";
 
 function formatEditablePrice(value: number): string {
   if (!Number.isFinite(value)) {
@@ -222,7 +221,6 @@ const App = ({
   const navigate = useNavigate();
   const { t, locale } = useTranslation();
   const isMobile = useIsMobile();
-  const pageSize = 20;
   const LOAD_COUNT = 3; // loadSymbolData, CoinsAmountAndValueChange, WalletAssetsPercentage
   const assetType = parseAssetTypeSearchParam(searchParams.get("assetType"));
 
@@ -243,9 +241,16 @@ const App = ({
     }
   }, []);
 
-  const [dataPage, setDataPage] = useState<number>(0);
-
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const transactionsQueryKey = useRef(queryKey);
+  const orderedTransactions = useMemo(() => transactions.slice()
+    .sort((a, b) => b.txnCreatedAt.localeCompare(a.txnCreatedAt) || b.id - a.id), [transactions]);
+  const transactionScrollArea = useRef<HTMLDivElement>(null);
+  const transactionPaging = usePager(orderedTransactions, queryKey, 25,
+    () => {
+      if (transactionScrollArea.current) transactionScrollArea.current.scrollTop = 0;
+      document.querySelector(".coin-ipad-transactions")?.scrollIntoView?.({ block: "start" });
+    }, "coin-transactions-ipad");
   const [lastAsset, setLastAsset] = useState<Asset | undefined>();
   const [previousPrice, setPreviousPrice] = useState<number>();
 
@@ -373,8 +378,11 @@ const App = ({
   }, [queryKey, dataChangedVersion]);
 
   useEffect(() => {
+    if (transactionsQueryKey.current !== queryKey) {
+      setTransactions([]);
+      transactionsQueryKey.current = queryKey;
+    }
     loadSymbolData(symbol, dateRange, assetType);
-    setDataPage(0);
 
     const timer = setTimeout(() => setPageLoading(false), 8000);
     return () => clearTimeout(timer);
@@ -745,18 +753,7 @@ const App = ({
 
   function HistoryTable() {
     const isMobile = useIsMobile();
-    const historicalData = useMemo(() => transactions, [transactions]);
-
-    const maxDataPage = useMemo(() => {
-      // - 0.000000000001 is for float number precision
-      const mp = Math.floor(historicalData.length / pageSize - 0.000000000001);
-      return mp >= 0 ? mp : 0;
-    }, [historicalData]);
-
-    const tableHasData = useMemo(
-      () => Object.keys(historicalData).length > 0,
-      [historicalData],
-    );
+    const tableHasData = orderedTransactions.length > 0;
 
     const getAmountStr = (act: Transaction) => {
       const raw = prettyPriceNumberToLocaleString(act.amount);
@@ -783,38 +780,16 @@ const App = ({
     };
 
     return (
-      <Card>
+      <Card className="coin-ipad-transactions">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("coin.history")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {maxDataPage > 0 && <div className="flex space-x-2 py-1 items-center">
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label={t("history.prevPage")}
-              onClick={() => setDataPage(Math.max(dataPage - 1, 0))}
-              disabled={dataPage <= 0}
-            >
-              <ChevronLeftIcon />
-            </Button>
-            <div className="text-muted-foreground text-sm">
-              {dataPage + 1} {"/"} {maxDataPage + 1}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label={t("history.nextPage")}
-              onClick={() => setDataPage(Math.min(dataPage + 1, maxDataPage))}
-              disabled={dataPage >= maxDataPage}
-            >
-              <ChevronRightIcon />
-            </Button>
-          </div>}
-          {isMobile && <MobileRecordList className="coin-mobile-transactions"
-            records={historicalData.slice(dataPage * pageSize, (dataPage + 1) * pageSize).map((act) => ({
+          {isMobile && <div style={orderedTransactions.length > transactionPaging.pageSize ? { minHeight: transactionPaging.pageSize * 64 } : undefined}>
+            {pageLoading && !tableHasData ? Array.from({ length: transactionPaging.pageSize }, (_, index) => <div className="mobile-list-row" key={index}><span className="block h-3 w-2/3 rounded bg-muted" /></div>) : <MobileRecordList className="coin-mobile-transactions"
+            records={transactionPaging.rows.map((act) => ({
               id: String(act.id), title: new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US",
                 { month: "short", day: "numeric" }).format(new Date(act.txnCreatedAt)),
               subtitle: getValueStr(act),
@@ -825,87 +800,40 @@ const App = ({
                 { label: t("coin.col.value"), value: getValueStr(act) },
                 { label: t("coin.col.time"), value: timeToDateStr(new Date(act.txnCreatedAt).getTime(), true) },
                 { label: t("coin.col.wallet"), value: act.wallet ? walletAliasMap[act.wallet] || "" : "" },
+                { label: t("fidelity.coin.note"), value: "–" },
               ],
               actions: [
                 { label: t("coin.updatePrice"), onClick: () => openUpdatePriceDialog(act) },
                 { label: t("coin.updateTxnType"), onClick: () => openUpdateTxnTypeDialog(act) },
               ],
-            }))} />}
-          {!isMobile && <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("coin.col.amount")}</TableHead>
-                <TableHead className="w-[120px]">{t("coin.col.type")}</TableHead>
-                <TableHead className="w-[300px]">{t("coin.col.price")}</TableHead>
-                <TableHead>{t("coin.col.value")}</TableHead>
-                <TableHead>{t("coin.col.time")}</TableHead>
-                <TableHead className="text-right">{t("coin.col.wallet")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {historicalData
-                .slice(dataPage * pageSize, (dataPage + 1) * pageSize)
-                .map((act, i) => (
-                  <TableRow key={i} className="h-[42px] group">
-                    <TableCell className="py-1.5">
-                      <div className="flex flex-row items-center">
-                        <div
-                          className="mr-1 font-medium text-sm"
-                          title={"" + act.amount}
-                        >
-                          {getAmountStr(act)}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <div className="flex space-x-2">
-                        <div className="text-muted-foreground text-sm">
-                          {act.txnType}
-                        </div>
-                        <Pencil2Icon
-                          className="h-4 w-4 cursor-pointer hidden group-hover:inline-block touch:inline-block text-muted-foreground"
-                          onClick={() => openUpdateTxnTypeDialog(act)}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <div className="flex space-x-2">
-                        <div className="text-muted-foreground text-sm">
-                          {currency.symbol}
-                          {prettyPriceNumberToLocaleString(
-                            currencyWrapper(currency)(act.price),
-                          )}
-                        </div>
-                        <Pencil2Icon
-                          className="h-4 w-4 cursor-pointer hidden group-hover:inline-block touch:inline-block text-muted-foreground"
-                          onClick={() => openUpdatePriceDialog(act)}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <div className="text-muted-foreground text-sm">
-                        {getValueStr(act)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <div className="text-muted-foreground text-sm">
-                        {timeToDateStr(
-                          new Date(act.txnCreatedAt).getTime(),
-                          true,
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right py-1.5">
-                      <div className="text-sm">
-                        {act.wallet ? walletAliasMap[act.wallet] || "" : ""}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-            </TableBody>
-          </Table>}
+            }))} />}</div>}
+          {!isMobile && <div ref={transactionScrollArea} className="overflow-auto" role="region" tabIndex={0} aria-label={t("coin.history")} style={orderedTransactions.length > transactionPaging.pageSize
+            ? { height: Math.min(640, 42 + transactionPaging.pageSize * 56) } : undefined}><Table className="min-w-[840px] tabular-nums">
+            <TableHeader className="sticky top-0 z-10 bg-card"><TableRow>
+              <TableHead>{t("coin.col.time")}</TableHead>
+              <TableHead>{t("coin.col.type")}</TableHead>
+              <TableHead className="text-right">{t("coin.col.amount")}</TableHead>
+              <TableHead className="text-right">{t("coin.col.price")}</TableHead>
+              <TableHead className="text-right">{t("coin.col.value")}</TableHead>
+              <TableHead>{t("coin.col.wallet")}</TableHead>
+              <TableHead>{t("fidelity.coin.note")}</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>{pageLoading && !tableHasData
+              ? Array.from({ length: transactionPaging.pageSize }, (_, index) => <TableRow key={index} className="h-[56px]"><TableCell colSpan={7}><span className="block h-3 w-2/3 rounded bg-muted" /></TableCell></TableRow>)
+              : transactionPaging.rows.map((act) => <TableRow key={act.id} className="h-[56px]">
+              <TableCell className="whitespace-nowrap py-1.5">{timeToDateStr(new Date(act.txnCreatedAt).getTime(), true)}</TableCell>
+              <TableCell className="whitespace-nowrap py-1.5">{t(`coin.txnType.${act.txnType}`)}<button type="button" className="ml-2 inline-flex min-h-11 min-w-11 items-center justify-center align-middle" aria-label={t("coin.updateTxnType")} onClick={() => openUpdateTxnTypeDialog(act)}><Pencil2Icon /></button></TableCell>
+              <TableCell className="whitespace-nowrap py-1.5 text-right">{getAmountStr(act)}</TableCell>
+              <TableCell className="whitespace-nowrap py-1.5 text-right">{act.txnType === "deposit" || act.txnType === "withdraw" ? "–" : `${currency.symbol}${prettyPriceNumberToLocaleString(currencyWrapper(currency)(act.price))}`}<button type="button" className="ml-2 inline-flex min-h-11 min-w-11 items-center justify-center align-middle" aria-label={t("coin.updatePrice")} onClick={() => openUpdatePriceDialog(act)}><Pencil2Icon /></button></TableCell>
+              <TableCell className="whitespace-nowrap py-1.5 text-right">{act.txnType === "deposit" || act.txnType === "withdraw" ? "–" : getValueStr(act)}</TableCell>
+              <TableCell className="max-w-[160px] truncate py-1.5" title={act.wallet ? walletAliasMap[act.wallet] || "" : ""}>{act.wallet ? walletAliasMap[act.wallet] || "" : ""}</TableCell>
+              <TableCell className="py-1.5 text-muted-foreground">–</TableCell>
+            </TableRow>)}</TableBody>
+          </Table></div>}
+          <Pager count={orderedTransactions.length} {...transactionPaging} pageSizes={[25, 50, 100]}
+            t={t} labelPrefix="fidelity.coin.pager" ariaLabel={t("coin.history")} />
 
-          {!tableHasData && (
+          {!pageLoading && !tableHasData && (
             <div className="flex items-center justify-center">
               <div className="text-lg text-muted-foreground m-auto">
                 {t("coin.noData")}

@@ -149,19 +149,7 @@ vi.mock("@radix-ui/react-icons", async (importOriginal) => {
     await importOriginal<typeof import("@radix-ui/react-icons")>();
   return {
     ...actual,
-    Pencil2Icon: ({
-      onClick,
-    }: {
-      onClick?: React.MouseEventHandler<HTMLButtonElement>;
-    }) => (
-      <button
-        type="button"
-        data-testid="transaction-edit"
-        onClick={onClick}
-      >
-        edit
-      </button>
-    ),
+    Pencil2Icon: () => <svg data-testid="transaction-edit" />,
   };
 });
 
@@ -220,13 +208,15 @@ function CoinAnalysisTestTree({
   initialEntries = ["/coins/BTC"],
   currency = usdCurrency,
   onDataChanged,
+  dataVersion = 0,
 }: {
   initialEntries?: string[];
   currency?: CurrencyRateDetail;
   onDataChanged?: () => void;
+  dataVersion?: number;
 }) {
   return (
-    <DataChangedContext.Provider value={0}>
+    <DataChangedContext.Provider value={dataVersion}>
       <ChartResizeContext.Provider
         value={{
           needResize: 0,
@@ -444,6 +434,39 @@ const secondTransaction: Transaction = {
   txnType: "deposit",
   txnCreatedAt: "2024-04-16T00:00:00.000Z",
 };
+
+it("keeps loading placeholders out of the coin transaction row selector", () => {
+  vi.spyOn(window, "innerWidth", "get").mockReturnValue(390);
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  mocks.queryTransactionsBySymbolAndDateRange.mockReturnValue(new Promise(() => {}));
+  renderCoinAnalysis();
+  expect(document.querySelector(".fd-coin-loading-transactions")).toBeInTheDocument();
+  expect(document.querySelector(".fd-coin-transactions .fd-tx-row")).not.toBeInTheDocument();
+});
+
+it("keeps the iPad transaction page while refreshed rows load and clamps after a deletion", async () => {
+  const rows = Array.from({ length: 51 }, (_, index) => ({
+    ...transaction, id: index + 1, txnCreatedAt: new Date(Date.UTC(2024, 3, 30) - index * 60000).toISOString(),
+  }));
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue(rows);
+  const mounted = render(<CoinAnalysisTestTree />);
+  await screen.findByText("Showing 1-25 of 51");
+  const scrollArea = document.querySelector(".coin-ipad-transactions .overflow-auto") as HTMLElement;
+  expect(scrollArea).toHaveAttribute("role", "region");
+  scrollArea.scrollTop = 300;
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  expect(scrollArea.scrollTop).toBe(0);
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  expect(screen.getByText("Showing 51-51 of 51")).toBeInTheDocument();
+  const pending = deferred<Transaction[]>();
+  mocks.queryTransactionsBySymbolAndDateRange.mockReturnValue(pending.promise);
+  mounted.rerender(<CoinAnalysisTestTree dataVersion={1} />);
+  expect(screen.getByText("Showing 51-51 of 51")).toBeInTheDocument();
+  pending.resolve(rows.slice(0, 50));
+  await screen.findByText("Showing 26-50 of 50");
+}, 30_000);
 
 it("shortens an unaliased SOL address in the phone transaction list", async () => {
   vi.spyOn(window, "innerWidth", "get").mockReturnValue(800);
