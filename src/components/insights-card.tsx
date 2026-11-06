@@ -257,7 +257,7 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
 
   return (
     <Card className="t3-insights-card min-h-[104px]" role="region" aria-label={t("insights.title")}>
-      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-4 pb-2 pt-4 sm:px-6">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-[var(--card-pad)] pb-2 pt-[var(--card-pad)]">
         <CardTitle className="text-base">{t("insights.title")}</CardTitle>
         <Button size="sm" variant="ghost" onClick={() => void regenerate()} disabled={regenerating}
           aria-label={t("insights.regenerate")} className="h-8 gap-1.5 px-2 text-xs">
@@ -265,7 +265,7 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
           {t("insights.regenerate")}
         </Button>
       </CardHeader>
-      <CardContent className="space-y-2 px-4 pb-4 sm:px-6">
+      <CardContent className="space-y-2 px-[var(--card-pad)] pb-[var(--card-pad)]">
         {error && <p role="alert" className="text-sm text-destructive">{t("insights.error")}</p>}
         {summaryError && <p role="alert" className="text-sm text-destructive">{t("insights.summaryError")}</p>}
         {loading && !card && <p aria-live="polite" className="text-sm text-muted-foreground">{t("insights.loading")}</p>}
