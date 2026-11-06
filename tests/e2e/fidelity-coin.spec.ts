@@ -66,11 +66,11 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
       }
       mkdirSync(`/tmp/fidelity/coin-${symbol.toLowerCase()}`, { recursive: true });
       writeFileSync(`/tmp/fidelity/coin-${symbol.toLowerCase()}/geometry.json`, JSON.stringify(await page.evaluate(() => ({
-        cards: [...document.querySelectorAll(".fd-coin>.fd-card")].map((element) => {
+        cards: [...document.querySelectorAll(".fd-coin>.fd-card,.fd-coin-detail-grid .fd-card")].map((element) => {
           const rect = element.getBoundingClientRect();
           return { y: rect.y, height: rect.height, width: rect.width };
         }),
-        inner: [...document.querySelectorAll(".fd-coin-primary,.fd-coin-changes,.fd-position,.fd-position-grid,.fd-coin-trend .fd-empty,.fd-coin-trend .fd-card-heading,.fd-coin-chart,.fd-open-lots,.fd-lot-row,.fd-tx-list")].map((element) => {
+        inner: [...document.querySelectorAll(".fd-coin-primary,.fd-coin-changes,.fd-position,.fd-position-grid,.fd-coin-trend .fd-empty,.fd-coin-trend .fd-card-heading,.fd-coin-chart,.fd-coin-lots,.fd-lot-row,.fd-tx-list")].map((element) => {
           const rect = element.getBoundingClientRect();
           return { className: element.className, y: rect.y, height: rect.height };
         }),
@@ -84,8 +84,9 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
       await page.screenshot({ path: `/tmp/fidelity/coin-${symbol.toLowerCase()}/coin-${symbol.toLowerCase()}-phone.png` });
       if (symbol === "BTC") {
         await expect(page.locator(".fd-coin-head h1")).toContainText("Bitcoin BTC");
+        await expect(page.locator(".fd-coin-head p")).toHaveText("Held on Binance and a Ledger cold wallet");
         await expect(page.locator(".fd-coin-primary .fd-label")).toHaveText("Bitcoin price");
-        await expect(page.locator(".fd-source-row").first()).toContainText("Exchange");
+        await expect(page.locator(".fd-source-row").first()).toContainText("Ledger cold wallet");
         await expect(page.locator(".fd-coin-changes")).toContainText("+7.32%");
         await expect(page.locator(".fd-coin-stats")).toContainText("Since 1 Oct");
         await expect(page.locator(".fd-position-grid .fd-coin-metric").nth(1)).toContainText("$53,647.29");
