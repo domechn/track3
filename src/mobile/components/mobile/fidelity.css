@@ -879,7 +879,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-comparison-mover.percent { grid-template-columns:48px minmax(0,1fr) 76px 92px; gap:8px; min-height:42px; }
 .fd-comparison-mover.percent small { color:var(--fd-faint); text-align:right; }
 .fd-comparison-movers p { margin:16px 0 0; padding-top:12px; border-top:1px solid var(--fd-rule); color:var(--fd-faint); font-size:12px; }
-.fd-comparison-picker.mobile-sheet { height:476px; max-height:100dvh; padding:8px 16px 20px; border:1px solid var(--fd-control); border-radius:16px 16px 0 0; background:var(--fd-surface); font-variant-numeric:tabular-nums; }
+.fd-comparison-picker.mobile-sheet { height:482px; max-height:100dvh; padding:var(--card-pad); border:1px solid var(--fd-control); border-radius:16px 16px 0 0; background:var(--fd-surface); font-variant-numeric:tabular-nums; }
 .fd-comparison-picker .mobile-sheet-handle-area { min-height:16px; }
 .fd-comparison-picker .mobile-sheet-handle { width:36px; height:4px; transform:translateY(-6px); background:#44454b; }
 .fd-comparison-picker .mobile-sheet-heading { height:27px; min-height:27px; margin-bottom:1px; padding:0; border:0; }

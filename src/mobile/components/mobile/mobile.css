@@ -538,12 +538,12 @@
   .app-layout :is(.ios-d3-goals, .ios-d3-rebalance) .glass { border: 0; border-radius: 16px; background: hsl(var(--card)); box-shadow: none; }
   .app-layout :is(.ios-d3-goals, .ios-d3-rebalance, .ios-d3-settings-page, .d2-summary, .d2-wallets, .d2-comparison, .d2-coin, .d2-cost) [data-ui-card] > div:first-child h3 { color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.3; font-weight: 500; letter-spacing: 0; }
   .app-layout [data-ai-setup-card] h2, .app-layout .assistant-insights-card > div:first-child h3 { color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.3; font-weight: 500; letter-spacing: 0; }
-  :is(.ios-d3-goals, .ios-d3-rebalance) .glass > div:first-child { padding: 18px 18px 10px; }
+  :is(.ios-d3-goals, .ios-d3-rebalance) .glass:where(:not([data-ai-setup-card])) > div:first-child { padding: 18px 18px 10px; }
   :is(.ios-d3-goals, .ios-d3-rebalance) .glass > div:nth-child(2) { padding: 0 18px 18px; }
   :is(.ios-d3-goals, .ios-d3-rebalance) button:not([role="switch"]) { min-height: 44px; border-radius: 11px; box-shadow: none; }
   :is(.ios-d3-goals, .ios-d3-rebalance) :is(input:not([type="checkbox"]):not([type="range"]), select) { min-height: 44px; border-color: transparent; border-radius: 10px; background: hsl(var(--secondary)); font-size: 16px; }
   :is(.ios-d3-goals, .ios-d3-rebalance) .text-xs { font-size: 13px; line-height: 1.3; }
-  :is(.ios-d3-goals, .ios-d3-rebalance) .ios-d3-ai-suggestions { flex-wrap: wrap; min-width: 0; overflow: hidden; margin: 0; padding: 0; }
+  :is(.ios-d3-goals, .ios-d3-rebalance) .ios-d3-ai-suggestions { flex-wrap: wrap; min-width: 0; overflow: visible; margin: 0; padding: 0; }
   :is(.ios-d3-goals, .ios-d3-rebalance) [data-ai-setup-suggestion] { flex: 0 1 auto; max-width: 100%; height: auto; min-height: 44px; border: 0; border-radius: 16px; background: hsl(var(--secondary)); padding: 8px 14px; font-size: 13px; line-height: 1.3; white-space: normal; text-align: left; overflow-wrap: anywhere; }
   .ios-d3-goals-heading > div { min-width: 0; }
   .ios-d3-goals .ios-d3-goals-add, .ios-d3-goals .ios-d3-goals-add:hover { position: fixed; top: calc(var(--mobile-safe-top) + 6px); right: max(16px, var(--mobile-safe-right)); z-index: 31; display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: transparent; padding: 0; color: hsl(var(--primary)); }
@@ -4022,4 +4022,13 @@ body:has(.fidelity-history, .fidelity-history-detail) {
     font-size: 13px;
     overflow-wrap: anywhere;
   }
+}
+
+@media (max-width: 760px) {
+  [data-ai-setup-card] > .ai-setup-content { padding: var(--card-pad); }
+  [data-ai-setup-card] .ai-setup-content .ai-setup-form input { height: 40px; min-height: 40px; }
+  [data-ai-setup-card] .ai-setup-content .ai-setup-send { position: relative; isolation: isolate; height: 44px; min-height: 44px; margin-block: -2px; border: 0; background: transparent; }
+  [data-ai-setup-card] .ai-setup-send::before { position: absolute; z-index: -1; top: 2px; right: 0; bottom: 2px; left: 0; border-radius: inherit; background: hsl(var(--primary)); content: ""; }
+  [data-ai-setup-card] .ai-setup-suggestions [data-ai-setup-suggestion] { display: flex; align-items: center; height: auto; min-height: 44px; margin-block: -8px; border: 0; background: transparent; padding: 8px 0; }
+  [data-ai-setup-card] .ai-setup-chip-label { display: flex; align-items: center; min-height: 28px; border-radius: 16px; background: hsl(var(--secondary)); padding: 4px 10px; line-height: 18px; }
 }
