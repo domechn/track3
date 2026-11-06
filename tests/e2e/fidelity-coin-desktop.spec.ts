@@ -54,21 +54,26 @@ for (const state of ["btc", "btc-edit", "btc-price", "btc-sheet", "nvda", "nova"
       const secondLabel = await secondMetric.locator("span").boundingBox();
       const secondValue = await secondMetric.locator("strong").boundingBox();
       const secondNote = await secondMetric.locator("small").boundingBox();
-      const chartCard = await page.locator(".coin-fidelity-grid > .coin-fidelity-card").first().boundingBox();
+      const chartCard = await page.locator(".coin-fidelity-chart").boundingBox();
+      const sourcesCard = await page.locator(".coin-fidelity-sources").boundingBox();
+      const lotsCard = await page.locator(".coin-fidelity-lots").boundingBox();
       const transactionCard = await page.locator(".coin-fidelity-transactions").boundingBox();
       expect(sourceHeader?.x).toBeCloseTo(973.58, 0);
       expect(await page.locator(".coin-fidelity-sources table").first().evaluate((node) => getComputedStyle(node).tableLayout)).toBe("auto");
       expect(sourceHeader?.width).toBeGreaterThan(223);
       expect(sourceHeader?.width).toBeLessThan(224);
       expect(sourceRow?.y).toBeCloseTo(517.5, 0);
-      expect(lotsHeading?.y).toBeCloseTo(669.5, 0);
+      expect(lotsHeading?.y).toBeCloseTo((lotsCard?.y ?? 0) + 21, 0);
+      expect(lotsCard?.x).toBeCloseTo(chartCard?.x ?? 0, 0);
+      expect(lotsCard?.y).toBeCloseTo((chartCard?.y ?? 0) + (chartCard?.height ?? 0) + 16, 0);
       expect(chartHeading?.y).toBeCloseTo(466, 0);
       expect(coinHeading?.y).toBeCloseTo(91, 0);
       expect(secondLabel?.x).toBeCloseTo(362.5, 0);
       expect(secondValue?.y).toBeCloseTo(200, 0);
       expect(secondNote?.y).toBeCloseTo(228, 0);
       expect(chartCard?.height).toBeCloseTo(554, 0);
-      expect(transactionCard?.y).toBeCloseTo(1010, 0);
+      expect(transactionCard?.y).toBeCloseTo(Math.max((sourcesCard?.y ?? 0) + (sourcesCard?.height ?? 0),
+        (lotsCard?.y ?? 0) + (lotsCard?.height ?? 0)) + 16, 0);
     }
     if (state === "btc-price") {
       await page.getByRole("button", { name: "Price" }).click();
@@ -243,7 +248,8 @@ test("Coin rail, chart ranges and transaction filter follow source positions", a
   expect((await page.locator(".coin-fidelity-transactions").boundingBox())!.height).toBe(556.5);
   expect((await page.locator(".coin-fidelity-position-header h2").boundingBox())!.y).toBe(299);
   expect((await page.locator(".coin-fidelity-metrics.bottom").boundingBox())!.y).toBe(337);
-  expect((await page.locator(".coin-fidelity-transactions tbody tr").first().boundingBox())!.y).toBe(1099.5);
+  expect((await page.locator(".coin-fidelity-transactions tbody tr").first().boundingBox())!.y -
+    (await page.locator(".coin-fidelity-transactions").boundingBox())!.y).toBe(89.5);
 });
 
 test("NOVA Position aligns with the common source strip", async ({ page }) => {
@@ -252,7 +258,9 @@ test("NOVA Position aligns with the common source strip", async ({ page }) => {
   await expect(page.locator(".coin-fidelity-custom")).toBeVisible({ timeout: 40_000 });
   expect((await page.locator(".coin-fidelity-position-header h2").boundingBox())!.y).toBe(299);
   expect((await page.locator(".coin-fidelity-metrics.bottom").boundingBox())!.y).toBe(337);
-  expect((await page.locator(".coin-fidelity-transactions tbody tr").first().boundingBox())!.y).toBe(925.5);
+  const lots = (await page.locator(".coin-fidelity-lots").boundingBox())!;
+  const transactions = (await page.locator(".coin-fidelity-transactions").boundingBox())!;
+  expect(transactions.y).toBeCloseTo(lots.y + lots.height + 16, 0);
 });
 
 test("Coin header separates the update stamp, range picker, and refresh control", async ({ page }) => {
@@ -295,7 +303,7 @@ test("Coin captions, table headings and transaction notes use the source faint c
   await expect(page.locator(".coin-fidelity-detail-link small").first()).toBeVisible({ timeout: 40_000 });
   const colours = await page.locator(".coin-fidelity").evaluate((root) =>
     [".coin-fidelity-sources th", ".coin-fidelity-sources .coin-fidelity-section-head small",
-      ".coin-fidelity-lots-head small", ".coin-fidelity-detail-link small", ".coin-fidelity-transactions > p",
+      ".coin-fidelity-lots .coin-fidelity-section-head small", ".coin-fidelity-detail-link small", ".coin-fidelity-transactions > p",
       ".coin-fidelity-position-header > div"].map((selector) => {
       const node = root.querySelector(selector);
       if (!node) throw new Error(`Missing ${selector}`);
@@ -303,7 +311,10 @@ test("Coin captions, table headings and transaction notes use the source faint c
     }));
   expect(colours).toEqual(["rgb(155, 157, 163)", "rgb(155, 157, 163)", "rgb(155, 157, 163)",
     "rgb(155, 157, 163)", "rgb(155, 157, 163)", "rgb(155, 157, 163)"]);
-  expect((await page.locator(".coin-fidelity-lots-head small").boundingBox())!.y).toBe(671.5);
+  const chart = (await page.locator(".coin-fidelity-chart").boundingBox())!;
+  const lots = (await page.locator(".coin-fidelity-lots").boundingBox())!;
+  expect(lots.x).toBeCloseTo(chart.x, 0);
+  expect(lots.y).toBeCloseTo(chart.y + chart.height + 16, 0);
   expect((await page.locator(".coin-fidelity-sources .coin-fidelity-section-head small").boundingBox())!.y).toBe(463);
 });
 
@@ -662,7 +673,10 @@ test("Coin chart, tables and transaction heading use the source geometry", async
   expect((await crumb.locator("svg").count())).toBe(2);
   expect(await page.locator(".coin-fidelity-transactions tbody tr").nth(5).locator("td").first().evaluate((node) =>
     getComputedStyle(node).fontVariantNumeric)).toBe("tabular-nums");
-  expect((await page.locator(".coin-fidelity-transactions h2").boundingBox())!.y).toBeCloseTo(1036, 0);
+  const lots = (await page.locator(".coin-fidelity-lots").boundingBox())!;
+  const chart = (await page.locator(".coin-fidelity-chart").boundingBox())!;
+  const transactions = (await page.locator(".coin-fidelity-transactions").boundingBox())!;
+  expect(transactions.y).toBeCloseTo(Math.max(chart.y + chart.height, lots.y + lots.height) + 16, 0);
   expect((await page.locator(".coin-fidelity-plot svg").boundingBox())!.x).toBeCloseTo(149.2, 0);
   expect(await page.locator(".coin-fidelity-plot svg path").evaluate((node) => node.getBoundingClientRect().width)).toBeCloseTo(696.6, 0);
   expect(await page.locator(".coin-fidelity-plot svg path").evaluate((node) => {
@@ -702,9 +716,9 @@ test("NOVA zero figures, final price row and price suffix match the source", asy
   }
   for (const node of [
     page.locator(".coin-fidelity-price-history-row").last().locator("span"),
-    page.locator(".coin-fidelity-sources table").last().locator("tbody tr").last().locator("td").last(),
     page.locator(".coin-fidelity-transactions tbody tr").last().locator("td").nth(3),
   ]) expect(await node.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(155, 157, 163)");
+  await expect(page.locator(".coin-fidelity-sources table tbody tr").last().locator("td").last()).toHaveText("100.0%");
   const priceRows = page.locator(".coin-fidelity-price-history-row");
   expect(await priceRows.first().evaluate((node) => getComputedStyle(node).borderTopWidth)).toBe("0px");
   expect(await priceRows.nth(1).evaluate((node) => {
@@ -735,7 +749,8 @@ test("Coin chart controls and source tags match source positioning", async ({ pa
     const css = getComputedStyle(node);
     return { background: css.backgroundColor, border: css.borderColor, radius: css.borderRadius, padding: css.padding };
   })).toEqual({ background: "rgb(10, 10, 11)", border: "rgb(58, 58, 62)", radius: "6px", padding: "0px 28px 0px 12px" });
-  expect((await page.locator(".coin-fidelity-sources td small").first().boundingBox())!.x).toBeCloseTo(1030.6, 0);
+  await expect(page.locator(".coin-fidelity-sources tbody tr").first()).toContainText("Ledger cold wallet");
+  await expect(page.locator(".coin-fidelity-sources td small").first()).toHaveCSS("margin-left", "5px");
 });
 
 test("NVDA chart reserves the smaller axis and end-label widths", async ({ page }) => {

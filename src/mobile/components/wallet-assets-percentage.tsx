@@ -602,6 +602,7 @@ const App = ({
           name={displayName}
           title={t("wallets.sourceAllocation")}
           showQuantity
+          emptyLabel={(count) => t("fidelity.coin.emptySources").replace("{count}", String(count))}
         /></div>}
 
         {showTreemap && <>

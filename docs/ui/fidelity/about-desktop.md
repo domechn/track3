@@ -15,6 +15,8 @@ The title is `About`; subtitle: `Version, updates and links.` At x 320/y 110, th
 
 ## Remaining differences
 
+At 1100px the live App Version and Getting started cards share an equal-height row, with Replay guide at the bottom. The regular guide card now includes the real Documentation link. The source has fuller app metadata, Website, and GitHub links in that row; the compact regular card leaves those links to the wide About design.
+
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.
 
 Settings toasts retain a visible 44px close × target for keyboard and pointer dismissal; the reference toasts omit it.
@@ -27,7 +29,7 @@ All nine source renders and captures were viewed side by side. Screenshots: `/tm
 
 | State | Differing pixels |
 | --- | ---: |
-| about | 2.05% |
+| about | 2.27% |
 | about-checking | 2.00% |
 | about-check-error | 2.13% |
 | about-update | 3.88% |

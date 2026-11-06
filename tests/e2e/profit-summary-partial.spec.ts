@@ -42,8 +42,10 @@ test("desktop shows partial months and year with an explanation", async ({ brows
       await expect(badge).toHaveAttribute("aria-expanded", "true");
       await badge.press("Enter");
       await feb.hover();
-      await expect(feb.getByText(/1 coin \(ETH\) has a withdrawal without a matching deposit/)).toBeVisible();
-      await summary.screenshot({ path: `${directory}/desktop-1440-${theme}-explanation.png` });
+      await expect(page.getByRole("tooltip")).toContainText("1 coin has a withdrawal without a matching deposit");
+      await expect(page.getByRole("tooltip")).toContainText("ETH");
+      await expect(page.getByRole("tooltip")).toContainText("Pair the withdrawal in History");
+      await page.screenshot({ path: `${directory}/desktop-1440-${theme}-explanation.png` });
       const years = page.locator(".fidelity-year-section");
       await expect(years.getByRole("button", { name: "Explain partial profit for 2026" })).toBeVisible();
       await expect(years).toContainText("Partial 1");

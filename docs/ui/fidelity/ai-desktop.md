@@ -15,6 +15,8 @@ The title is `AI assistant`; subtitle: `Connect an OpenAI-compatible endpoint an
 
 ## Remaining differences
 
+At 1100px the editable Assistant settings cards use one column. The source page keeps its two-column composition at that width, but its paired cards are different components from the editable settings form. A single column keeps every row bottom aligned without stretching a short API key or toggle card. At 1280px the editable form retains two columns with aligned row bottoms.
+
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.
 
 Settings toasts retain a visible 44px close × target for keyboard and pointer dismissal; the reference toasts omit it.
@@ -27,7 +29,7 @@ All six source renders and captures were viewed side by side at 1600px. The scre
 
 | State | Differing pixels |
 | --- | ---: |
-| ai | 3.02% |
+| ai | 3.05% |
 | ai-testing | 3.02% |
 | ai-fail | 3.10% |
 | ai-reveal | 3.28% |

@@ -231,6 +231,11 @@ test.describe("coarse pointer attribution", () => {
 test("expanded overview and asset charts expose text summaries", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 740 });
   await installTauriBridge(page);
+  await page.evaluate(() => (window as any).__e2eInvoke("plugin:sql|execute", {
+    query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('snapshot-third', '2024-01-03T00:00:00.000Z', 'wallet-1', 'crypto', 'BTC', 1, 43000, 43000)`,
+    values: [],
+  }));
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Show More" }).click();
   await expect(page.getByText("Coins Percentage Overview")).toBeVisible();
@@ -248,6 +253,12 @@ test("expanded overview and asset charts expose text summaries", async ({ page }
       canvases.filter((canvas) => canvas.getAttribute("role") !== "img" || !canvas.getAttribute("aria-label")?.trim()).length);
     expect(unnamed, route).toBe(0);
   }
+});
+
+test("a two-day coin history announces why no chart is plotted", async ({ page }) => {
+  await installTauriBridge(page);
+  await page.goto("/#/coins/BTC?assetType=crypto");
+  await expect(page.locator(".coin-fidelity-plot[role='status']")).toHaveText("Not enough history yet");
 });
 
 test("expanded Overview content passes axe with its percentage rows visible", async ({ page }) => {
@@ -386,6 +397,15 @@ test("remaining configuration editors have named controls", async ({ page }) => 
 
 test.describe("coarse pointer touch targets", () => {
 test.use({ isMobile: true, hasTouch: true });
+
+test("Full release notes has a 44px touch target", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await installTauriBridge(page);
+  await page.goto("/#/settings/systemInfo?section=about", { waitUntil: "domcontentloaded" });
+  const notes = page.getByRole("button", { name: "Full release notes" });
+  await expect(notes).toBeVisible({ timeout: 15_000 });
+  expect((await notes.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+});
 
 test("visible controls across routes have 44px targets or 44px labels", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });

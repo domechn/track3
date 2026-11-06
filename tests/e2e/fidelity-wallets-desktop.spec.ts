@@ -128,6 +128,8 @@ test.describe("Wallets desktop fidelity", () => {
             "Amounts did not change in this range, so every change is price movement.");
           expect(footnote!.height).toBeLessThan(35);
           expect(await page.locator(".t3-wallet-side > p").evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+          const side = await page.locator(".t3-wallet-side").boundingBox();
+          expect(side!.y + side!.height - (footnote!.y + footnote!.height)).toBeLessThan(25);
         }
       } finally {
         await context.close();

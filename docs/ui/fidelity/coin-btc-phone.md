@@ -5,6 +5,8 @@ Authoritative source: `source/ds/pages/records-coin-btc.html`. Measured with get
 
 State: Bitcoin: breadcrumbs, price/position, value chart, holdings and FIFO lots, transactions.
 
+The live phone Holdings list orders funded sources by value, so the BTC sample shows Ledger cold wallet before Binance. The header retains the approved “Held on Binance and a Ledger cold wallet” wording.
+
 ## Tokens and global geometry
 
 Public Sans, tabular numerals. Body 13px/18px regular. Main padding 14px top, 16px sides, 24px bottom. Card surface `--surface`, 1px `--border`, 6px radius, 16px padding, 12px vertical gap, 15px/20px semibold heading. Fixed bottom rail: 60px with Overview, History, Analytics, More icon labels and red count 2 on More.

@@ -5,6 +5,7 @@ import { installTauriBridge } from "./fidelity-scenes";
 import { createSyncHeader } from "../../src/middlelayers/sync/crypto";
 import { FakeS3, S3Error, type S3Store } from "../../src/middlelayers/sync/object-store";
 import { SyncEngine, type SyncRepository, type SyncState } from "../../src/middlelayers/sync/engine";
+import { expectSettingsCardsFitContent } from "./settings-card-layout-scenes";
 
 async function seedRemoteSyncDevice(s3: FakeS3, passphrase: string) {
   const prefix = "dom/";
@@ -329,6 +330,21 @@ for (const state of states) {
       await expect(page.locator(".t3-sync-conflicts")).toBeVisible();
       await expect(page.locator(".t3-sync-connection input").first()).toHaveCSS("background-color", "rgb(10, 10, 11)");
     }
+    if (["sync", "sync-locked", "sync-setup"].includes(state)) {
+      await expectSettingsCardsFitContent(page, ".fidelity-b-sync > [data-ui-card]");
+      const layout = await page.evaluate(() => ({
+        connection: document.querySelector(".fidelity-b-sync .t3-sync-connection")!.getBoundingClientRect().top,
+        passphrase: document.querySelector(".fidelity-b-sync .t3-sync-passphrase")!.getBoundingClientRect().top,
+        columns: getComputedStyle(document.querySelector(".fidelity-b-sync")!).gridTemplateColumns.split(" ").length,
+      }));
+      expect(layout.columns).toBe(1);
+      if (state === "sync-locked") expect(layout.passphrase).toBeLessThan(layout.connection);
+      if (state === "sync-setup") expect(layout.connection).toBeLessThan(layout.passphrase);
+      if (state === "sync" || state === "sync-locked") {
+        await page.locator(".fidelity-b-sync .t3-sync-status").screenshot({ path: `/tmp/track3-sync-390-${state}-status-dark.png` });
+        await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
+      }
+    }
     if (area === "ai") {
       await page.getByRole("button", { name: "Test connection" }).click();
       if (state === "ai-fail") {
@@ -432,5 +448,41 @@ for (const state of states) {
     await mkdir(output, { recursive: true });
     await page.screenshot({ path: `${output}/${state}.png`, animations: "disabled" });
     await page.screenshot({ path: `${output}/${state}-long.png`, fullPage: true, animations: "disabled" });
+  });
+}
+
+test("locked sync cards fit on a light phone", async ({ page }) => {
+  test.skip(test.info().project.name !== "mobile", "Phone layout");
+  await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "light"));
+  await seed(page, "sync-locked");
+  await page.goto("/#/settings/sync");
+  await page.getByRole("button", { name: "Continue without sync" }).click();
+  await expect(page.locator(".fidelity-b-sync .t3-sync-passphrase")).toBeVisible();
+  await expectSettingsCardsFitContent(page, ".fidelity-b-sync > [data-ui-card]");
+  await expect(page.locator('label[for="sync-passphrase"]')).toHaveCSS("color", "rgb(255, 255, 255)");
+  await expect(page.locator(".fidelity-b-sync .t3-sync-status")).toHaveCSS("background-color", "rgb(19, 18, 23)");
+  await expect(page.locator(".fidelity-b-sync .t3-sync-status-rows > div").first()).toHaveCSS("border-top-color", "rgb(34, 34, 36)");
+  await expect(page.locator(".fidelity-b-sync .t3-sync-status button")).toHaveCSS("color", "rgb(180, 182, 188)");
+  await page.locator(".fidelity-b-sync .t3-sync-status").screenshot({ path: "/tmp/track3-sync-390-locked-status-light.png" });
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
+  await page.screenshot({ path: "/tmp/track3-sync-390-locked-light.png", fullPage: true });
+});
+
+for (const state of ["sync-locked", "sync-setup"] as const) {
+  test(`${state} starts with the right card on iPad`, async ({ page }) => {
+    test.skip(test.info().project.name !== "mobile", "iPad layout");
+    await page.setViewportSize({ width: 820, height: 1080 });
+    await seed(page, state);
+    await page.goto("/#/settings/sync");
+    if (state === "sync-locked") await page.getByRole("button", { name: "Continue without sync" }).click();
+    await expect(page.locator(".sync-settings-page .t3-sync-connection")).toBeVisible();
+    const layout = await page.evaluate(() => ({
+      connection: document.querySelector(".sync-settings-page .t3-sync-connection")!.getBoundingClientRect().top,
+      passphrase: document.querySelector(".sync-settings-page .t3-sync-passphrase")!.getBoundingClientRect().top,
+      columns: getComputedStyle(document.querySelector(".sync-settings-page")!).gridTemplateColumns.split(" ").length,
+    }));
+    expect(layout.columns).toBe(1);
+    if (state === "sync-locked") expect(layout.passphrase).toBeLessThan(layout.connection);
+    else expect(layout.connection).toBeLessThan(layout.passphrase);
   });
 }
