@@ -34,6 +34,7 @@
     --ios-chart-5: hsl(var(--muted-foreground));
     --ios-chart-6: hsl(var(--foreground));
     --ios-motion: cubic-bezier(.2,.8,.2,1);
+    --card-pad: 14px;
     --background: 240 7% 97%;
     --foreground: 240 9% 10%;
     --card: 0 0% 100%;

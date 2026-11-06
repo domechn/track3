@@ -215,6 +215,8 @@ for (const state of ["default", "redup", "system"] as const) {
       const tile = await page.locator(".t3-fidelity-appearance .theme-choice").first().boundingBox();
       expect(tile?.x).toBeCloseTo(341, 0);
       expect(tile?.y).toBeCloseTo(163, 0);
+      const cards = await page.locator(".t3-fidelity-appearance").boundingBox();
+      expect(cards?.x! + cards?.width!).toBeCloseTo(1572, 0);
     }
     if (state === "redup") {
       const choice = await page.locator(".t3-fidelity-appearance .colour-choice").last().boundingBox();
