@@ -1,22 +1,27 @@
+import { useState } from "react";
 import type { CurrencyRateDetail, WalletAssetsPercentageData } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberKeepNDigitsAfterDecimalPoint, prettyNumberToLocaleString } from "@/utils/currency";
 import { useTranslation } from "@/i18n";
 import { WALLET_DETAIL_URLS } from "@/middlelayers/constants";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-export function SourceAllocationList({ wallets, selectedSource, currency, name, title, showQuantity = false }: {
+export function SourceAllocationList({ wallets, selectedSource, currency, name, title, showQuantity = false, emptyLabel }: {
   wallets: WalletAssetsPercentageData;
   selectedSource: string | null;
   currency: CurrencyRateDetail;
   name: (wallet: WalletAssetsPercentageData[number]) => string;
   title: string;
   showQuantity?: boolean;
+  emptyLabel?: (count: number) => string;
 }) {
   const { t } = useTranslation();
+  const [emptyExpanded, setEmptyExpanded] = useState(false);
+  const nonzero = emptyLabel ? wallets.filter((wallet) => wallet.amount !== 0 || wallet.value !== 0) : wallets;
+  const empty = emptyLabel ? wallets.filter((wallet) => wallet.amount === 0 && wallet.value === 0) : [];
   const visible = selectedSource
-    ? wallets.filter((wallet) => wallet.wallet === selectedSource)
-    : wallets.slice(0, 8);
-  const hidden = selectedSource ? [] : wallets.slice(8);
+    ? nonzero.filter((wallet) => wallet.wallet === selectedSource)
+    : nonzero.slice(0, 8);
+  const hidden = selectedSource ? [] : nonzero.slice(8);
   const hiddenValue = hidden.reduce((sum, wallet) => sum + wallet.value, 0);
   const hiddenPercentage = hidden.reduce((sum, wallet) => sum + wallet.percentage, 0);
   const hiddenAmount = hidden.reduce((sum, wallet) => sum + wallet.amount, 0);
@@ -50,6 +55,15 @@ export function SourceAllocationList({ wallets, selectedSource, currency, name, 
       <strong>{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(hiddenValue))}</strong>
       <small>{hiddenPercentage.toFixed(1)}%</small>
     </li>}
+    {empty.length > 0 && <li className="analyze-source-list-empty"><button type="button" aria-expanded={emptyExpanded}
+      onClick={() => setEmptyExpanded(!emptyExpanded)}>{emptyLabel?.(empty.length)} <span aria-hidden="true">{emptyExpanded ? "⌃" : "⌄"}</span></button></li>}
+    {emptyExpanded && empty.map((wallet) => <li key={`${wallet.wallet}-${wallet.walletType ?? ""}`}>
+      <span className="analyze-source-list-name">{name(wallet)}</span>
+      <span className="analyze-source-list-bar" aria-hidden="true" />
+      {showQuantity && <span className="analyze-source-list-amount"><span className="analyze-source-list-amount-label">{t("common.amountLabel")}: </span>{prettyNumberKeepNDigitsAfterDecimalPoint(wallet.amount, 4)}</span>}
+      <strong>{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(wallet.value))}</strong>
+      <small>0.0%</small>
+    </li>)}
     </ol>
   </>;
 }

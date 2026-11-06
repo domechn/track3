@@ -231,6 +231,11 @@ test.describe("coarse pointer attribution", () => {
 test("expanded overview and asset charts expose text summaries", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 740 });
   await installTauriBridge(page);
+  await page.evaluate(() => (window as any).__e2eInvoke("plugin:sql|execute", {
+    query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('snapshot-third', '2024-01-03T00:00:00.000Z', 'wallet-1', 'crypto', 'BTC', 1, 43000, 43000)`,
+    values: [],
+  }));
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Show More" }).click();
   await expect(page.getByText("Coins Percentage Overview")).toBeVisible();
@@ -248,6 +253,12 @@ test("expanded overview and asset charts expose text summaries", async ({ page }
       canvases.filter((canvas) => canvas.getAttribute("role") !== "img" || !canvas.getAttribute("aria-label")?.trim()).length);
     expect(unnamed, route).toBe(0);
   }
+});
+
+test("a two-day coin history announces why no chart is plotted", async ({ page }) => {
+  await installTauriBridge(page);
+  await page.goto("/#/coins/BTC?assetType=crypto");
+  await expect(page.locator(".coin-fidelity-plot[role='status']")).toHaveText("Not enough history yet");
 });
 
 test("expanded Overview content passes axe with its percentage rows visible", async ({ page }) => {

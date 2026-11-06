@@ -1034,6 +1034,7 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .analyze-source-list-bar > span { display: block; height: 100%; border-radius: inherit; background: hsl(var(--accent-data)); }
 .analyze-source-list strong, .analyze-source-list small { text-align: right; font-variant-numeric: tabular-nums; }
 .analyze-source-list small { color: hsl(var(--muted-foreground)); }
+.analyze-source-list-empty button { min-height: 44px; color: hsl(var(--muted-foreground)); text-align: left; }
 .analyze-comparison .grid { min-width: 0; }
 .analyze-comparison [data-ui-card] > div { min-width: 0; }
 .analyze-cost-basis > div:first-child h1 { font-size: 26px; line-height: 1.2; }
@@ -3304,6 +3305,11 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .t3-wallet-failure-banner button { height: 28px; padding: 0 11px; font-size: 12px; }
   .t3-wallet-fidelity:has(.t3-wallet-failure-banner) .t3-wallet-allocation { height: 211px; }
   .t3-wallet-fidelity:has(.t3-wallet-failure-banner) .t3-wallet-balances, .t3-wallet-fidelity:has(.t3-wallet-failure-banner) .t3-wallet-side { height: 326px; }
+  .t3-wallet-grid:has(.t3-wallet-balances tbody tr:only-child):not(:has(.t3-wallet-matrix)) { align-items: start; }
+  .t3-wallet-grid:has(.t3-wallet-balances tbody tr:only-child):not(:has(.t3-wallet-matrix)) :is(.t3-wallet-balances, .t3-wallet-side) { height: auto; }
+  .t3-wallet-grid:has(.t3-wallet-balances tbody tr:only-child):not(:has(.t3-wallet-matrix)) .t3-wallet-table-scroll { flex: none; }
+  .t3-wallet-grid:has(.t3-wallet-balances tbody tr:only-child):not(:has(.t3-wallet-matrix)) .t3-wallet-balances table { height: auto; }
+  .t3-wallet-grid:has(.t3-wallet-balances tbody tr:only-child):not(:has(.t3-wallet-matrix)) .t3-wallet-movers { flex: none; grid-auto-rows: auto; }
   .t3-wallet-empty { border: 1px dashed hsl(var(--control)); border-radius: 6px; padding: 28px; color: hsl(var(--muted-foreground)); text-align: center; }
 }
 @media (min-width: 1400px) {
@@ -3382,9 +3388,16 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .coin-fidelity-position-header > div { position: relative; color: #9b9da3; font-size: 12px; display: flex; align-items: center; gap: 10px; }
 .coin-fidelity-position-header > div::after { content: ""; position: absolute; right: 13px; top: calc(50% - 3.5px); width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg) translateY(-2px); pointer-events: none; }
 .coin-fidelity-position-header select { appearance: none; width: 131px; height: 30px; color: #fff; background: #0a0a0b; border: 1px solid #3a3a3e; border-radius: 6px; padding: 0 28px 0 12px; font-size: 12px; }
-.coin-fidelity-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
-.coin-fidelity-grid > .coin-fidelity-card { grid-column: span 7; min-height: 554px; padding: 20px; min-width: 0; }
-.coin-fidelity-grid > .coin-fidelity-card:nth-child(2) { grid-column: span 5; }
+.coin-fidelity-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: start; gap: 16px; margin-top: 16px; }
+.coin-fidelity-main-column { grid-column: span 7; display: grid; align-content: start; gap: 16px; min-width: 0; }
+.coin-fidelity-side-column { grid-column: span 5; display: grid; align-content: start; gap: 16px; min-width: 0; }
+@media (min-width: 1001px) {
+  .coin-fidelity-grid.sticky-chart .coin-fidelity-main-column,
+  .coin-fidelity-grid.sticky-chart .coin-fidelity-chart { position: sticky; top: 66px; }
+  .coin-fidelity-grid.sticky-side .coin-fidelity-side-column { position: sticky; top: 66px; }
+}
+.coin-fidelity-grid .coin-fidelity-card { min-width: 0; padding: 20px; }
+.coin-fidelity-chart { min-height: 320px; }
 .coin-fidelity-section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .coin-fidelity-chart:not(.coin-fidelity-manual-history) .coin-fidelity-section-head > div:first-child { transform: translateY(5px); }
 .coin-fidelity-section-head p { color: #b4b6bc; font-size: 12px; line-height: 17px; margin-top: 3px; }
@@ -3400,27 +3413,30 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .coin-fidelity-plot svg { width: calc(100% - var(--coin-end-pad)); height: calc(100% - 3px); overflow: visible; }
 .coin-fidelity-plot svg path { stroke: #4a8ad6; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; vector-effect: non-scaling-stroke; }
 .coin-fidelity-plot > b { position: absolute; right: 4px; top: 10%; transform: translateY(-9px); padding-left: 5px; background: #131217; font-size: 12px; font-weight: 600; }
+.coin-fidelity-short-history { display: grid; place-items: center; border: 1px dashed #3a3a3e; border-radius: 6px; background: none; color: #9b9da3; }
 .coin-fidelity-xlabels { position: relative; top: -3px; height: 18px; margin: 4px var(--coin-end-pad) 0 var(--coin-axis-pad); color: #9b9da3; font-size: 12px; }
 .coin-fidelity-xlabels span { position: absolute; white-space: nowrap; }
 .coin-fidelity-chart-stats { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 15px; padding-top: 14px; border-top: 1px solid #222224; }
 .coin-fidelity-chart-stats .coin-fidelity-metric > strong { font-size: 17px; line-height: 22px; font-weight: 500; }
 .coin-fidelity-chart-stats .coin-fidelity-metric > strong { color: #9b9da3; }
-.coin-fidelity-sources table, .coin-fidelity-transactions table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.coin-fidelity-sources table, .coin-fidelity-lots table, .coin-fidelity-transactions table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .coin-fidelity-sources table { table-layout: auto; }
-.coin-fidelity-sources th, .coin-fidelity-transactions th { text-align: left; color: #9b9da3; font-size: 12px; font-weight: 400; }
-.coin-fidelity-sources th:not(:first-child), .coin-fidelity-sources td:not(:first-child) { text-align: right; }
-.coin-fidelity-sources table { margin-top: 12px; }
-.coin-fidelity-sources th { padding: 0 0 8px; line-height: 16px; }
-.coin-fidelity-sources td { height: 42px; padding: 0; }
-.coin-fidelity-sources th:not(:first-child), .coin-fidelity-sources td:not(:first-child) { padding-left: 16px; }
-.coin-fidelity-sources td { border-top: 1px solid #1b1a1f; }
+.coin-fidelity-sources th, .coin-fidelity-lots th, .coin-fidelity-transactions th { text-align: left; color: #9b9da3; font-size: 12px; font-weight: 400; }
+.coin-fidelity-sources th:not(:first-child), .coin-fidelity-sources td:not(:first-child), .coin-fidelity-lots th:not(:first-child), .coin-fidelity-lots td:not(:first-child) { text-align: right; }
+.coin-fidelity-sources table, .coin-fidelity-lots table { margin-top: 12px; }
+.coin-fidelity-sources th, .coin-fidelity-lots th { padding: 0 0 8px; line-height: 16px; }
+.coin-fidelity-sources td, .coin-fidelity-lots td { height: 42px; padding: 0; border-top: 1px solid #1b1a1f; }
+.coin-fidelity-sources th:not(:first-child), .coin-fidelity-sources td:not(:first-child), .coin-fidelity-lots th:not(:first-child), .coin-fidelity-lots td:not(:first-child) { padding-left: 16px; }
 .coin-fidelity-sources td:first-child { font-weight: 500; }
-.coin-fidelity-sources table:last-of-type td:first-child { font-weight: 400; }
 .coin-fidelity-sources td small { color: #9b9da3; margin-left: 5px; font-size: 12px; font-weight: 400; }
 .coin-fidelity-sources .total td { height: 46px; font-weight: 600; border-bottom: 0; border-top: 1px solid #343338; }
-.coin-fidelity-lots-head { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; }
-.coin-fidelity-lots-head + table { margin-top: 6px; }
-.coin-fidelity-lots-head small { color: #9b9da3; font-size: 12px; line-height: 18px; transform: translateY(1px); }
+.coin-fidelity-table-scroll, .coin-fidelity-lots-scroll { overflow-x: auto; }
+.coin-fidelity-lots-scroll.expanded { max-height: 390px; overflow-y: auto; }
+.coin-fidelity-lots-scroll.expanded th { position: sticky; top: 0; background: #131217; }
+.coin-fidelity-empty-sources button { width: 100%; color: #9b9da3; text-align: left; }
+.coin-fidelity-empty-sources button:focus-visible, .coin-fidelity-show-lots:focus-visible { outline: 2px solid #4a8ad6; outline-offset: 2px; }
+.coin-fidelity-zero-source { color: #9b9da3; }
+.coin-fidelity-show-lots { display: block; margin: 12px auto 0; color: #4a8ad6; font-size: 12px; }
 .coin-fidelity-transactions { margin-top: 16px; padding: 20px 20px 19.5px; }
 .coin-fidelity-transactions .coin-fidelity-section-head { align-items: center; margin-bottom: 12px; }
 .coin-fidelity-transactions .coin-fidelity-section-head h2 { transform: translateY(-1px); }
@@ -3513,14 +3529,12 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .fidelity-summary-single .fidelity-attribution .fidelity-empty-message { max-width: 335px; }
 .fidelity-summary-single .fidelity-leaders .fidelity-empty-message { max-width: 310px; }
 .fidelity-summary-single .fidelity-ath-meter b { display: none; }
-.coin-fidelity-stock .coin-fidelity-grid > .coin-fidelity-card { min-height: 386px; }
 .coin-fidelity-stock .coin-fidelity-plot { height: 169px; }
 .coin-fidelity-custom .coin-fidelity-hero { height: 283px; }
 .coin-fidelity-custom .coin-fidelity-position-header > * { transform: translateY(3px); }
 .coin-fidelity-custom .coin-fidelity-position-header > div { transform: translateY(2px); }
 .coin-fidelity-custom .coin-fidelity-metrics.bottom { transform: translateY(1px); }
 .coin-fidelity-custom .coin-fidelity-metrics.top { grid-template-columns: repeat(4, minmax(0, 1fr)); height: 96px; }
-.coin-fidelity-custom .coin-fidelity-grid > .coin-fidelity-card { min-height: 362px; }
 .coin-fidelity-custom .coin-fidelity-transactions { min-height: 245px; }
 .coin-fidelity-custom { padding-bottom: 37px; }
 .coin-fidelity-manual-history > .fidelity-empty { height: 76px; min-height: 76px; margin-top: 12px; margin-bottom: 14px; }
@@ -3537,10 +3551,19 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .fidelity-kpis strong.big { font-size: clamp(24px, 2.1vw, 34px); }
 }
 @media (max-width: 1300px) {
-  .fidelity-summary-grid > :nth-child(n), .coin-fidelity-grid > .coin-fidelity-card:nth-child(n) { grid-column: 1 / -1; }
+  .fidelity-summary-grid > :nth-child(n) { grid-column: 1 / -1; }
   .coin-fidelity-sources, .coin-fidelity-transactions { overflow-x: auto; }
   .coin-fidelity-transactions table { min-width: 900px; }
   .coin-fidelity-metrics { min-width: 0; }
+}
+@media (min-width: 1001px) and (max-width: 1300px) {
+  .coin-fidelity-hero { height: auto; min-height: 265px; }
+  .coin-fidelity-metrics.top { height: auto; min-height: 98px; }
+  .coin-fidelity-metrics.bottom { height: auto; min-height: 67px; }
+  .coin-fidelity-metric { padding-inline: 12px; }
+  .coin-fidelity-metric > strong:not(.primary) { font-size: clamp(18px, 1.75vw, 22px); }
+  .coin-fidelity-metric > strong.primary { font-size: clamp(24px, 2.45vw, 30px); line-height: 34px; }
+  .coin-fidelity-metric > small { max-width: 100%; white-space: normal; }
 }
 .light .coin-fidelity { color: hsl(var(--foreground)); }
 .light :is(.fidelity-page-head strong, .fidelity-card-head h2, .fidelity-card-head h3, .fidelity-month-head b, .fidelity-year-head b, .fidelity-ath-value) { color: hsl(var(--foreground)); }
@@ -3556,6 +3579,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .light .fidelity-kpis strong.fidelity-faint { color: hsl(var(--muted-foreground)); }
 .light .coin-fidelity-plot { background-image: repeating-linear-gradient(to bottom, hsl(var(--border)) 0 1px, transparent 1px 84px); }
 .light .coin-fidelity-plot > b { background: hsl(var(--card)); }
+.light .coin-fidelity-lots-scroll.expanded th { background: hsl(var(--card)); }
 .light .coin-fidelity-heading > button { color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
 .light .coin-fidelity-dialog-actions > button:last-child, .light .coin-fidelity-sheet-action.primary { color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }
 .light :is(.fidelity-skeleton i, .fidelity-skeleton-box, .fidelity-skeleton-months > div, .fidelity-skeleton-years > div) { background: hsl(var(--raised)); border-color: hsl(var(--border)); }
@@ -3571,7 +3595,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .light :where(.fidelity-summary) .fidelity-empty button { color: hsl(var(--primary-foreground)); }
 .light .fidelity-attribution-row.total > span:nth-child(2) { color: hsl(var(--muted-foreground)); }
 @media (max-width: 1000px) {
-  .fidelity-summary-grid > :nth-child(n), .coin-fidelity-grid > .coin-fidelity-card:nth-child(n) { grid-column: 1 / -1; }
+  .fidelity-summary-grid > :nth-child(n) { grid-column: 1 / -1; }
   .fidelity-kpis { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .fidelity-kpis > div:nth-child(odd) { border-left: 0; padding-left: 0; }
   .fidelity-month-grid, .fidelity-skeleton-months { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto; }
@@ -3583,7 +3607,12 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .coin-fidelity-hero, .coin-fidelity-custom .coin-fidelity-hero { height: auto; }
   .coin-fidelity-metrics, .coin-fidelity-metrics.top, .coin-fidelity-metrics.bottom, .coin-fidelity-custom .coin-fidelity-metrics.top { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; gap: 16px 0; }
   .coin-fidelity-metric:nth-child(odd) { border-left: 0; padding-left: 0; }
-  .coin-fidelity-grid > .coin-fidelity-card { min-height: 0; }
+  .coin-fidelity-grid { display: flex; flex-direction: column; }
+  .coin-fidelity-main-column { display: contents; }
+  .coin-fidelity-side-column { display: contents; }
+  .coin-fidelity-chart { order: 1; }
+  .coin-fidelity-sources { order: 2; }
+  .coin-fidelity-lots { order: 3; }
   .coin-fidelity-section-head { flex-wrap: wrap; }
 }
 @media (max-width: 1100px) {
@@ -3797,7 +3826,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-filters .fidelity-filter-group:first-child .fidelity-segment button { letter-spacing: .12px; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-show { gap: 8px; margin-left: auto; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-show .fidelity-segment button { letter-spacing: .17px; }
-:where(body:has(.t3-records-fidelity-shell)) .fidelity-history-grid { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); align-items: stretch; gap: 16px; margin-top: 12px; }
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-history-grid { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); align-items: start; gap: 16px; margin-top: 12px; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-list { grid-column: span 7; display: flex; flex-direction: column; padding: 0; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-detail { grid-column: span 5; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-list > .fidelity-card-head { flex: none; margin: 0; padding: 18px 20px 12px; }
