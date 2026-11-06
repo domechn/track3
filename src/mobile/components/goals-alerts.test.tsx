@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { beforeEach, expect, it, vi } from "vitest";
 import GoalsAlerts from "@/mobile/components/goals-alerts";
-import { listAlertRules, listAlertHistory, countUnreadAlerts, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertRule } from "@/middlelayers/alerts";
+import { listAlertRules, listAlertHistory, countUnreadAlerts, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertHistory, type AlertRule } from "@/middlelayers/alerts";
 import { enableSystemNotifications, systemNotificationsEnabled } from "@/middlelayers/alert-notifications";
 import { queryPNLChartValue } from "@/middlelayers/charts-timeseries";
 import { isIOS } from "@/utils/platform";
@@ -51,6 +51,22 @@ beforeEach(() => {
   vi.mocked(loadAlertEvaluationData).mockResolvedValue({ snapshots: [], prices: {}, excludedSymbols: [] });
   vi.mocked(systemNotificationsEnabled).mockResolvedValue(false);
   vi.mocked(queryPNLChartValue).mockResolvedValue([]);
+});
+
+it("renders a stored rule with an unfamiliar kind on iPhone", async () => {
+  vi.mocked(isIOS).mockReturnValue(true);
+  vi.mocked(listAlertRules).mockResolvedValue([{ ...savedRule, kind: "price" as AlertRule["kind"] }]);
+  render(<GoalsAlerts />);
+  await waitFor(() => expect(document.querySelector(".t3-goals-rules .flex.min-w-0 > svg")).toBeInTheDocument());
+});
+
+it("renders stored alert history with an unfamiliar kind", async () => {
+  vi.mocked(listAlertHistory).mockResolvedValue([{
+    id: 1, ruleId: null, kind: "price" as AlertHistory["kind"], title: "Price alert",
+    message: "Saved alert", value: 1, triggeredAt: "2026-10-31T09:41:00.000Z", acknowledgedAt: null,
+  }]);
+  render(<GoalsAlerts />);
+  await waitFor(() => expect(document.querySelector(".t3-goals-history li svg")).toBeInTheDocument());
 });
 
 it("opens rule editing as a full-screen page on iPhone", async () => {
