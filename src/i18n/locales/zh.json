@@ -2208,6 +2208,7 @@
   "refresh.fidelity.finishedQuotaSummary": "{total} 个中已刷新 {count} 个 · {quota} 个需要更换套餐",
   "refresh.fidelity.finishedMixedSummary": "{total} 个中已刷新 {count} 个 · {failed} 个失败 · {quota} 个需要更换套餐",
   "update.fidelity.manualOpenFailed": "无法打开下载页面。请在浏览器中打开 Track3 发布页面。",
+  "update.fidelity.releaseLinkOpenFailed": "无法打开发布说明链接。",
   "refresh.fidelity.partialHeading": "{time} 已刷新 · {total} 个来源中 {count} 个成功",
   "startup.fidelity.errorTitle": "出了点问题",
   "startup.fidelity.errorBody": "Track3 遇到意外错误，已停止显示此页面。你的数据单独存储，不受影响。",

@@ -2208,6 +2208,7 @@
   "refresh.fidelity.finishedQuotaSummary": "{count} of {total} refreshed · {quota} needs a plan change",
   "refresh.fidelity.finishedMixedSummary": "{count} of {total} refreshed · {failed} failed · {quota} needs a plan change",
   "update.fidelity.manualOpenFailed": "Could not open the download page. Open the Track3 releases page in your browser.",
+  "update.fidelity.releaseLinkOpenFailed": "Could not open the release link.",
   "refresh.fidelity.partialHeading": "Refreshed {time} · {count} of {total} sources",
   "startup.fidelity.errorTitle": "Something went wrong",
   "startup.fidelity.errorBody": "Track3 hit an unexpected error and stopped this screen. Your data is stored separately and is not affected.",
