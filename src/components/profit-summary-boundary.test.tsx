@@ -78,7 +78,7 @@ it.each([
   expect(feb).toHaveTextContent("—");
   expect(feb).toHaveAttribute("aria-label", expect.stringContaining("No snapshot in this month"));
   fireEvent.click(feb);
-  expect(feb).toHaveTextContent("No snapshot in this month");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("No snapshot in this month");
 });
 
 it.each([
@@ -100,7 +100,7 @@ it.each([
   expect(oct).not.toHaveAttribute("aria-label", expect.stringContaining("No snapshot"));
   await waitFor(() => expect(calculateTotalProfit).toHaveBeenCalled());
   finishLoad({ total: 0, knownTotal: null, unknownCoins: [], coins: [] });
-  await waitFor(() => expect(oct).toHaveAttribute("aria-label", expect.stringContaining("No snapshot")));
+  await waitFor(() => expect(screen.getByText("Oct").closest("button")).toHaveAttribute("aria-label", expect.stringContaining("No snapshot")));
   expect(jan).not.toHaveAttribute("aria-label", expect.stringContaining("No snapshot"));
   expect(jan).toBeDisabled();
   expect(jan).not.toHaveTextContent("No snapshot in this month");
@@ -132,12 +132,14 @@ it.each([
   expect(feb.parentElement).toHaveAttribute("data-partial", "true");
   expect(screen.getByText("Jan").closest("button")).toHaveTextContent("—");
   fireEvent.click(screen.getByRole("button", { name: "Explain partial profit for Jan" }));
-  expect(screen.getByText("Jan").closest("button")!.parentElement).toHaveTextContent(
-    /2 coins \(BTC, ETH\) have withdrawals without a matching deposit/,
-  );
+  expect(screen.getByRole("tooltip")).toHaveTextContent("These coins have withdrawals without matching deposits.");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("BTC, ETH");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Pair the withdrawals in History");
   const febInfo = screen.getByRole("button", { name: "Explain partial profit for Feb" });
   fireEvent.click(febInfo);
-  expect(feb.parentElement).toHaveTextContent(/2 coins \(BTC, ETH\) have withdrawals without a matching deposit/);
+  expect(screen.getAllByRole("tooltip")).toHaveLength(1);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("BTC, ETH");
+  expect(febInfo).toHaveAttribute("aria-expanded", "true");
   fireEvent.click(feb);
   expect(screen.getByText(/Daily P(?:nL|&L) in Feb 2024/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /Back|All months/ }));
@@ -145,17 +147,17 @@ it.each([
   await waitFor(() => expect(screen.getByText("Partial 1")).toBeInTheDocument());
   expect(screen.getByText("2024").closest(".grid > div")).toHaveTextContent("+$4.2k");
   fireEvent.click(screen.getByRole("button", { name: "Explain partial profit for 2024" }));
-  expect(screen.getByText("2024").closest(".grid > div")).toHaveTextContent(/2 coins \(BTC, ETH\) have withdrawals without a matching deposit/);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("BTC, ETH");
 });
 
 it.each([
   ["desktop", DesktopSummary],
   ["mobile", MobileSummary],
-])("%s limits a partial explanation to five coin names", async (_platform, Summary) => {
+])("%s previews eight partial coin names and expands the rest", async (_platform, Summary) => {
   vi.mocked(calculateTotalProfit).mockResolvedValue({
     total: null,
     knownTotal: -25,
-    unknownCoins: ["A", "B", "C", "D", "E", "F", "G"]
+    unknownCoins: ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
       .map((symbol) => ({ symbol, assetType: "crypto" })),
     coins: [],
     lastRecordDate: new Date(2024, 1, 15),
@@ -169,8 +171,10 @@ it.each([
   expect(screen.getByText("Feb").closest("button")).toHaveTextContent("-$25");
   const info = screen.getByRole("button", { name: "Explain partial profit for Feb" });
   fireEvent.click(info);
-  expect(info.parentElement).toHaveTextContent("A, B, C, D, E +2 more");
-  expect(info.parentElement).not.toHaveTextContent("F, G");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("A, B, C, D, E, F, G, H and 1 more");
+  expect(screen.queryByText("A, B, C, D, E, F, G, H, I")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+  expect(screen.getByText("A, B, C, D, E, F, G, H, I")).toBeInTheDocument();
 });
 
 it.each([
@@ -204,7 +208,7 @@ it.each([
           quoteColor === "green-up-red-down" ? "bg-negative/10" : "bg-positive/10"],
         ["Mar", _platform === "desktop" ? "+$0" : "$0", "text-muted-foreground", "bg-muted/40"],
       ]) {
-        const card = screen.getByText(label).closest(".group")!;
+        const card = screen.getByText(label).closest("[data-partial]")!;
         expect(card).toHaveAttribute("data-partial", isPartial ? "true" : "false");
         expect(card).toHaveClass(surfaceClass);
         expect(card.querySelector("button > div:nth-child(2)")).toHaveClass(toneClass);
@@ -282,7 +286,7 @@ it.each([
     quoteColor="green-up-red-down"
   />);
   await waitFor(() => expect(screen.getByText("Periods 1")).toBeInTheDocument());
-  const card = screen.getByText("Feb").closest(".group")!;
+  const card = screen.getByText("Feb").closest("[data-partial]")!;
   expect(card).toHaveTextContent("—");
   expect(card).not.toHaveTextContent("$4.2k");
   expect(card).toHaveAttribute("data-partial", "false");

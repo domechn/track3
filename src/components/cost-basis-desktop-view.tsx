@@ -8,7 +8,8 @@ import { formatGapAmount, prepareCostBasisGaps } from "./cost-basis-gaps";
 import { summarizeCostBasisPrices } from "./cost-basis-prices";
 import { withdrawnLotDetails } from "./cost-basis-withdrawal";
 import { costBasisDisplayRows } from "./cost-basis-panels";
-import { ExclamationTriangleIcon, InfoCircledIcon } from "@radix-ui/react-icons";
+import { ArchiveIcon, BarChartIcon, ExclamationTriangleIcon, InfoCircledIcon } from "@radix-ui/react-icons";
+import EmptyState from "./empty-state";
 
 const pageSize = 50;
 
@@ -193,11 +194,12 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
                 ? `${chartSpan ? row.gainLoss / chartSpan * 92 : 0}%`
                 : `${Math.abs(row.gainLoss) / chartSpan * 92}%` }} /></span>
           <span className={tone(row.gainLoss, quoteColor)}>{row.gainLoss === null ? "–" : `${row.gainLoss > 0 ? "+" : "−"}${money(Math.round(Math.abs(row.gainLoss))) .slice(0, -3)}`}</span>
-        </li>)}</ol> : <div className="fidelity-empty">{t("cost.fidelity.emptyChart")}</div>}
+        </li>)}</ol> : <EmptyState icon={BarChartIcon} className="fidelity-empty"
+          title={t("cost.fidelity.emptyChart")} hint={t("cost.chart.empty.hint")} />}
       </section>
       <section className="fidelity-card fidelity-cost-averages" tabIndex={0}>
         <div className="fidelity-card-head"><h2>{t("cost.fidelity.averageTitle")}</h2></div>
-        <table><thead><tr>{["asset", "bought", "avgBuy", "sold", "avgSell"].map((key) => <th key={key}>{t(`cost.fidelity.${key}`)}</th>)}</tr></thead>
+        {buySellRows.length ? <table><thead><tr>{["asset", "bought", "avgBuy", "sold", "avgSell"].map((key) => <th key={key}>{t(`cost.fidelity.${key}`)}</th>)}</tr></thead>
           <tbody>{buySellRows.map((key) => {
             const price = prices.get(key);
             const soldQty = price?.sold ?? 0;
@@ -208,7 +210,8 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
               <td>{boughtQty ? money(price!.averageBuy) : <span className="zero">–</span>}</td>
               <td>{soldQty ? assetQuantity(assetType, soldQty) : <span className="zero">–</span>}</td>
               <td>{soldQty ? money(price!.averageSell) : <span className="zero">–</span>}</td></tr>;
-          })}</tbody></table>
+          })}</tbody></table> : <EmptyState icon={BarChartIcon} className="fidelity-empty"
+            title={t("cost.prices.empty.title")} hint={t("cost.prices.empty.hint")} />}
       </section>
       <section className="fidelity-card fidelity-cost-table" data-testid={pending ? undefined : "cost-desktop-table"}>
         <div className="fidelity-card-head">
@@ -266,12 +269,12 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
             <td>{money(tab === "open" ? openCost : report.totals.costBasis)}</td>
             <td>{money(tab === "open" ? openValue : report.totals.proceeds)}</td>
             <td className={tone(tab === "open" ? unrealized : report.totals.gainLoss, quoteColor)}>{signed(tab === "open" ? unrealized : report.totals.gainLoss)}</td><td /></tr>
-        </tbody></table></div> : <div className="fidelity-empty fidelity-cost-empty">
-          <b>{t("cost.fidelity.noSalesIn").replace("{year}", year || t("cost.fidelity.selectedRange"))}</b>
-          <span>{t("cost.fidelity.noSalesExplain").replace("{count}", String(open.length))}</span>
-          <div><button type="button" onClick={() => setTab("open")}>{t("cost.fidelity.showOpen")}</button>
-            <button type="button" onClick={onChooseYear}>{t("cost.fidelity.chooseYear")}</button></div>
-        </div>}
+        </tbody></table></div> : <EmptyState icon={ArchiveIcon} className="fidelity-empty fidelity-cost-empty"
+          title={tab === "open" ? t("cost.lots.empty.title") : t("cost.fidelity.noSalesIn").replace("{year}", year || t("cost.fidelity.selectedRange"))}
+          hint={tab === "open" ? t("cost.lots.empty.hint") : t("cost.fidelity.noSalesExplain").replace("{count}", String(open.length))}>
+          {tab !== "open" && <div><button type="button" onClick={() => setTab("open")}>{t("cost.fidelity.showOpen")}</button>
+            <button type="button" onClick={onChooseYear}>{t("cost.fidelity.chooseYear")}</button></div>}
+        </EmptyState>}
         {pager(tablePage, flatRows.length, setTablePage, tab === "open" ? t("cost.unrealized") : t("cost.realized"))}
       </section>
     </div>

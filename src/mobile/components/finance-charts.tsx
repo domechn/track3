@@ -14,6 +14,8 @@ import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/mobile/components/mobile";
 import { getChartPalette, phoneChartFontFamily } from "@/mobile/chart-theme";
 import { chartThemeColor } from "@/utils/chart-theme";
+import { BarChartIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 
 const chartPalette = (theme: "light" | "dark") => getChartPalette(true, theme).map((color) => color.main);
 const tone = (positive: boolean, quoteColor: QuoteColor, theme: "light" | "dark", opacity?: number) => {
@@ -46,7 +48,7 @@ function ChartPanel({ title, children, empty, height }: { title: string; childre
   return <Card className="min-w-0">
     <CardHeader className="px-4 pb-1 pt-3"><CardTitle className="text-sm font-medium">{title}</CardTitle></CardHeader>
     <CardContent className="px-4 pb-4">
-      {empty ? <p className="flex h-40 items-center justify-center text-sm text-muted-foreground">{t("finance.noChartData")}</p>
+      {empty ? <EmptyState icon={BarChartIcon} title={t("finance.noChartData")} hint={t("finance.chart.empty.hint")} />
         : <div className="relative h-44 mobile-chart-touch" style={height ? { height } : undefined}
           onTouchStartCapture={() => {
             window.clearTimeout(press.current);

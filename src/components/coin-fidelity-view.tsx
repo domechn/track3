@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { format } from "date-fns";
 import md5 from "md5";
 import type { Asset, CurrencyRateDetail, TDateRange, Transaction, TransactionType, WalletAssetsPercentageData, CoinsAmountAndValueChangeData } from "@/middlelayers/types";
@@ -21,6 +21,10 @@ import { changeFromDaysAgo, coinAxisForValues, coinChartY, compactMoney, isExcha
 import { sourceDisplayNames } from "./source-display-name";
 import { CoinSourceSummary } from "./coin-source-summary";
 import { useLatestWalletOrdinals } from "./source-name-order";
+import { Pager, usePager } from "./ui/pager";
+import { CoinLotsTable, CoinSourcesTable, useStickyCoinChart, type CoinLotRow } from "./coin-detail-sections";
+import { ArchiveIcon, BackpackIcon, ClockIcon } from "@radix-ui/react-icons";
+import EmptyState from "./empty-state";
 
 type Props = {
   symbol: string;
@@ -29,6 +33,7 @@ type Props = {
   dateRange: TDateRange;
   lastAsset?: Asset;
   transactions: Transaction[];
+  transactionsLoading?: boolean;
   walletAliasMap: Record<string, string | undefined>;
   quoteColor: "green-up-red-down" | "red-up-green-down";
   onEdit: (transaction: Transaction, type: TransactionType, quotePrice: number | undefined) => Promise<boolean>;
@@ -50,7 +55,7 @@ function line(values: number[], indices: number[], total: number, lower: number,
   return values.map((value, index) => `${index ? "L" : "M"}${(indices[index] / Math.max(1, total - 1) * width).toFixed(2)} ${coinChartY(value, lower, upper, height).toFixed(2)}`).join(" ");
 }
 
-export default function CoinFidelityView({ symbol, assetType, currency, dateRange, lastAsset, transactions, walletAliasMap, quoteColor, onEdit }: Props) {
+export default function CoinFidelityView({ symbol, assetType, currency, dateRange, lastAsset, transactions, transactionsLoading = false, walletAliasMap, quoteColor, onEdit }: Props) {
   const walletOrdinals = useLatestWalletOrdinals();
   const { t, locale } = useTranslation();
   const money = (value: number | undefined, sign = false, digits = 2) => value === undefined || !Number.isFinite(value) ? "–" : `${sign && value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${num(Math.abs(value * currency.rate), digits)}`;
@@ -66,6 +71,9 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const [windowDays, setWindowDays] = useState<7 | 30>(30);
   const [range, setRange] = useState<"all" | "30d" | "1y">("all");
   const [filter, setFilter] = useState<"all" | TransactionType>("all");
+  const transactionScrollArea = useRef<HTMLDivElement>(null);
+  const { mainRef, sideRef, sideColumnRef, chartRef, sticky, stickySide } = useStickyCoinChart();
+  const [lotsExpanded, setLotsExpanded] = useState(false);
   const [edit, setEdit] = useState<Transaction>();
   const [sheet, setSheet] = useState<Transaction>();
   const [editType, setEditType] = useState<TransactionType>("buy");
@@ -131,7 +139,13 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const custom = !!customPrice;
   const value = lastAsset?.value ?? 0;
   const price = lastAsset?.price ?? 0;
-  const rows = transactions.filter((row) => filter === "all" || row.txnType === filter);
+  const rows = useMemo(() => transactions.filter((row) => filter === "all" || row.txnType === filter)
+    .sort((a, b) => b.txnCreatedAt.localeCompare(a.txnCreatedAt) || b.id - a.id), [transactions, filter]);
+  const paging = usePager(rows, `${symbol}:${assetType}:${filter}:${dateRange.start.getTime()}:${dateRange.end.getTime()}`, 25,
+    () => {
+      if (transactionScrollArea.current) transactionScrollArea.current.scrollTop = 0;
+      document.querySelector(".coin-fidelity-transactions")?.scrollIntoView?.({ block: "start" });
+    }, "coin-transactions-desktop");
   const rangeStart = range === "all" ? 0 : dateRange.end.getTime() - (range === "30d" ? 30 : 365) * 86400000;
   const rangeTransactions = transactions.filter((row) => new Date(row.txnCreatedAt).getTime() >= rangeStart);
   const buys = rangeTransactions.filter((row) => row.txnType === "buy");
@@ -146,10 +160,18 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const lots = report?.openLots.filter((row) => row.symbol === symbol && row.assetType === assetType) ?? [];
   const valuedLots = report?.unrealized.filter((row) => row.symbol === symbol && row.assetType === assetType) ?? [];
   const unpricedDeposits = custom && !transactions.some((row) => row.txnType === "sell") ? transactions.filter((row) => row.txnType === "deposit" && row.price === 0) : [];
+  const lotRows = [...lots.map((lot, index) => ({ kind: "lot" as const, lot, index })), ...unpricedDeposits.map((row) => ({ kind: "deposit" as const, row }))];
   const allDisposals = report?.disposals.filter((row) => row.symbol === symbol && row.assetType === assetType) ?? [];
   const disposals = allDisposals.filter((row) => new Date(row.disposedAt).getTime() >= rangeStart);
   const realized = disposals.reduce((total, row) => total + row.gainLoss, 0);
   const unrealized = valuedLots.reduce((total, row) => total + roundedCents(row.gainLoss), 0);
+  const manualPriceRows = [
+    ...(customPrice?.kind === "manual" ? [{ kind: "manual" as const, at: customPrice.setAt, price: customPrice.usd, amount: 0, id: "manual" }] : []),
+    ...buys.map((row) => ({ kind: "buy" as const, at: row.txnCreatedAt, price: row.price, amount: row.amount, id: String(row.id) })),
+    ...transactions.filter((row) => row.txnType === "deposit" && row.price === 0)
+      .map((row) => ({ kind: "deposit" as const, at: row.txnCreatedAt, price: 0, amount: row.amount, id: String(row.id) })),
+  ].sort((a, b) => b.at.localeCompare(a.at));
+  const manualPricePaging = usePager(manualPriceRows, `${symbol}:${assetType}:manual:${range}`, 25, undefined, "coin-manual-prices-desktop");
   const values = useMemo(() => series?.values.map((value, index) => mode === "value" ? value : value / (series.amounts[index] || 1)) ?? [], [series, mode]);
   const plotIndices = useMemo(() => downsampleIndices([values], 100), [values]);
   const plotValues = plotIndices.map((index) => values[index]);
@@ -177,7 +199,29 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const tickDate = (timestamp: number | undefined) => timestamp ? format(new Date(timestamp), "d MMM") : "–";
   const coinName = symbol;
   const sourceCount = sources.length === 1 ? t("coin.fidelity.sourceOne") : t("coin.fidelity.sourcesCount").replace("{count}", String(sources.length));
-  const sourceNames = sources.map((source) => sourceName(source.wallet));
+  const tableLabels = {
+    holdings: t("coin.fidelity.holdingsSource"), source: t("coin.fidelity.source"),
+    quantity: t("coin.fidelity.quantity"), value: t("coin.fidelity.value"), share: t("coin.fidelity.share"),
+    total: t("coin.fidelity.total"), sourceCount: (count: number) => count === 1 ? t("coin.fidelity.sourceOne") : t("coin.fidelity.sourcesCount").replace("{count}", String(count)),
+    empty: (count: number) => t("coin.fidelity.emptySources").replace("{count}", String(count)),
+    others: t("coin.fidelity.others"), openLots: t("coin.fidelity.openLots"),
+    acquired: t("coin.fidelity.acquired"), costPrice: t("coin.fidelity.costPrice"),
+    unrealized: t("coin.fidelity.unrealizedShort"),
+    showAll: (count: number) => t("coin.fidelity.showAllLots").replace("{count}", String(count)),
+    showLess: t("coin.fidelity.showFewerLots"),
+  };
+  const displayLots: CoinLotRow[] = lotRows.map((item) => {
+    if (item.kind === "deposit") return { id: `unpriced-${item.row.id}`, acquired: date(item.row.txnCreatedAt),
+      amount: num(item.row.amount, 2), cost: "–", unrealized: "–", tone: "zero" };
+    const valued = valuedLots.find((row) => row.id === item.lot.id);
+    return { id: `${item.lot.id}-${item.index}`, acquired: date(item.lot.acquiredAt),
+      amount: num(item.lot.amount, custom ? 2 : assetType === "stock" ? 0 : 4),
+      cost: valued ? money(item.lot.costBasis / item.lot.amount, false, custom ? 4 : 2) : "–",
+      unrealized: valued ? money(roundedCents(valued.gainLoss), true) : "–",
+      tone: valued ? signedTone(valued.gainLoss) : "zero" };
+  });
+  const sourceNames = sources.filter((source) => source.amount !== 0 || source.value !== 0)
+    .map((source) => sourceName(source.wallet));
   const sourceTemplate = t(custom ? "coin.fidelity.customSubtitle" : assetType === "stock" ? "coin.fidelity.heldAtBrokerStandalone" : "coin.fidelity.held");
   const lastSourcePrefix = sources.length === 2 && sources.some((source) => !isExchangeSource(source.walletType)) && locale !== "zh" ? "a " : "";
   const saleRange = disposals.length === 0 ? t("coin.fidelity.noSalesRange") : disposals.length === 1 ? t("coin.fidelity.saleRangeOne") : t("coin.fidelity.salesRange").replace("{count}", String(disposals.length));
@@ -203,7 +247,7 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const sheetGain = sheetDisposals.reduce((total, disposal) => total + disposal.gainLoss, 0);
   return <div className={`analyze-coin coin-fidelity${assetType === "stock" ? " coin-fidelity-stock" : ""}${custom ? " coin-fidelity-custom" : ""}${quoteColor === "red-up-green-down" ? " fidelity-reverse" : ""}`}>
     <div className="coin-fidelity-heading">
-      <div><div className="coin-fidelity-crumb"><span>{t("coin.fidelity.overview")}</span><CoinChevron /><span>{t("coin.fidelity.coins")}</span><CoinChevron /><span>{symbol}</span></div><h1>{coinName} <b>{custom ? t("coin.fidelity.customAsset") : assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")}</b></h1><CoinSourceSummary names={sourceNames} template={sourceTemplate} locale={locale} moreLabel={t("coin.sourcesMore")} allLabel={t("coin.sourcesAll")} lastPrefix={lastSourcePrefix} /></div>
+      <div><div className="coin-fidelity-crumb"><span>{t("coin.fidelity.overview")}</span><CoinChevron /><span>{t("coin.fidelity.coins")}</span><CoinChevron /><span>{symbol}</span></div><h1>{coinName} <b>{custom ? t("coin.fidelity.customAsset") : assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")}</b></h1>{sourceNames.length > 0 && <CoinSourceSummary names={sourceNames} template={sourceTemplate} locale={locale} moreLabel={t("coin.sourcesMore")} allLabel={t("coin.sourcesAll")} lastPrefix={lastSourcePrefix} />}</div>
       <Button variant="outline" onClick={() => navigate("/cost-basis")}><svg aria-hidden="true" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2.5v13M12 5.5c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 2.2 3 1 3 2.3-1.3 2-3 2-3-.8-3-2" /></svg> {t("coin.openCostBasis")}</Button>
     </div>
     {loadError && <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => setRetry((value) => value + 1)}>{t("summary.fidelity.retry")}</button></div>}
@@ -231,44 +275,50 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
         {metric(t("coin.fidelity.unrealized"), custom && buyQty < amount ? "–" : money(unrealized, true), custom && buyQty < amount ? t("coin.fidelity.missingFirst") : t("coin.fidelity.openToday"), custom && buyQty < amount ? "" : signedTone(unrealized))}
       </div>
     </section>
-    <div className="coin-fidelity-grid">
-      {custom ? <section className="coin-fidelity-card coin-fidelity-chart coin-fidelity-manual-history">
+    <div className={`coin-fidelity-grid${sticky ? " sticky-chart" : ""}${stickySide ? " sticky-side" : ""}`}>
+      <div ref={mainRef} className="coin-fidelity-main-column">
+      {custom ? <section ref={chartRef} className="coin-fidelity-card coin-fidelity-chart coin-fidelity-manual-history">
         <div className="coin-fidelity-section-head"><h2>{t("coin.fidelity.price")}</h2><small>{t("coin.fidelity.manual")}</small></div>
         <div className="fidelity-empty">{t("coin.fidelity.noMarketHistory").replace("{symbol}", symbol)}</div>
-        {customPrice.kind === "manual" && <div className="coin-fidelity-price-history-row"><div>{date(customPrice.setAt)}<small>{t("coin.fidelity.manualPrice")}</small></div><span>{money(customPrice.usd, false, 4)}</span></div>}
-        {buys.map(row => <div key={row.id} className="coin-fidelity-price-history-row"><div>{date(row.txnCreatedAt)}<small>{t("coin.fidelity.fromBuy").replace("{amount}", num(row.amount, 0)).replace("{symbol}", symbol)}</small></div><span>{money(row.price, false, 4)}</span></div>)}
-        {transactions.filter(row => row.txnType === "deposit" && row.price === 0).map(row => <div key={row.id} className="coin-fidelity-price-history-row"><div>{date(row.txnCreatedAt)}<small>{t("coin.fidelity.depositNoPrice")}</small></div><span className="zero">–</span></div>)}
+        {manualPricePaging.rows.map((row) => <div key={row.id} className="coin-fidelity-price-history-row"><div>{date(row.at)}<small>{row.kind === "manual" ? t("coin.fidelity.manualPrice") : row.kind === "buy" ? t("coin.fidelity.fromBuy").replace("{amount}", num(row.amount, 0)).replace("{symbol}", symbol) : t("coin.fidelity.depositNoPrice")}</small></div><span className={row.kind === "deposit" ? "zero" : ""}>{row.kind === "deposit" ? "–" : money(row.price, false, 4)}</span></div>)}
+        <Pager count={manualPriceRows.length} {...manualPricePaging} pageSizes={[25, 50, 100]} t={t} labelPrefix="coin.fidelity" ariaLabel={t("coin.fidelity.price")} />
         <button className="coin-fidelity-set-price" onClick={() => navigate("/settings/configuration")}><FidelityPencil />{t("coin.fidelity.setCurrentPrice")}</button>
-      </section> : <section className="coin-fidelity-card coin-fidelity-chart" style={plotStyle}>
+      </section> : <section ref={chartRef} className="coin-fidelity-card coin-fidelity-chart" style={plotStyle}>
         <div className="coin-fidelity-section-head"><div><h2>{t(mode === "value" ? "coin.fidelity.valueHoldings" : "coin.fidelity.price")}</h2><p>{mode === "value" ? t("coin.fidelity.currentHoldings").replace("{amount}", num(amount, assetType === "stock" ? 0 : 4)).replace("{symbol}", symbol) : t("coin.fidelity.inUsd").replace("{symbol}", symbol).replace("{currency}", currency.currency)}</p></div><div className="coin-fidelity-chart-controls">
           <div className="coin-fidelity-controls" role="group" aria-label={t("coin.fidelity.valueHoldings")}><button type="button" aria-pressed={mode === "value"} className={mode === "value" ? "active" : ""} onClick={() => setMode("value")}>{t("coin.fidelity.value")}</button><button type="button" aria-pressed={mode === "price"} className={mode === "price" ? "active" : ""} onClick={() => setMode("price")}>{t("coin.fidelity.price")}</button></div>
           <div className="coin-fidelity-controls" role="group" aria-label={t("datePicker.predefined")}><button type="button" aria-pressed={windowDays === 7} className={windowDays === 7 ? "active" : ""} onClick={() => setWindowDays(7)}>7D</button><button type="button" aria-pressed={windowDays === 30} className={windowDays === 30 ? "active" : ""} onClick={() => setWindowDays(30)}>30D</button></div>
         </div></div>
-        <div className="coin-fidelity-plot"><div className="coin-fidelity-ylabels">{axisLabels.map((label, index) => <span key={index}>{label}</span>)}</div><svg viewBox="0 0 720 315" preserveAspectRatio="none" role="img" aria-label={t(mode === "value" ? "coin.fidelity.valueHoldings" : "coin.fidelity.price")}><path d={line(plotValues, plotIndices, values.length, axisLow, axisHigh)} />{plotIndices.map((sourceIndex) => {
+        {values.length < 3 ? <div className="coin-fidelity-plot coin-fidelity-short-history" role="status">{t("coin.fidelity.notEnoughHistory")}</div> : <div className="coin-fidelity-plot"><div className="coin-fidelity-ylabels">{axisLabels.map((label, index) => <span key={index}>{label}</span>)}</div><svg viewBox="0 0 720 315" preserveAspectRatio="none" role="img" aria-label={t(mode === "value" ? "coin.fidelity.valueHoldings" : "coin.fidelity.price")}><path d={line(plotValues, plotIndices, values.length, axisLow, axisHigh)} />{plotIndices.map((sourceIndex) => {
           const point = values[sourceIndex];
           const label = `${date(series?.timestamps[sourceIndex] ?? 0)}: ${money(point)}`;
           return <circle key={sourceIndex} data-point cx={sourceIndex / Math.max(1, values.length - 1) * 720} cy={coinChartY(point, axisLow, axisHigh, 315)} r="6" fill="transparent" role="img" tabIndex={0} aria-label={label}><title>{label}</title></circle>;
-        })}</svg>{values.length > 0 && <b style={{ top: `${Math.max(0, Math.min(90, (1 - ((endValue ?? axisLow) - axisLow) / (axisHigh - axisLow)) * 100))}%` }}>{endLabel}</b>}</div>
+        })}</svg>{values.length > 0 && <b style={{ top: `${Math.max(0, Math.min(90, (1 - ((endValue ?? axisLow) - axisLow) / (axisHigh - axisLow)) * 100))}%` }}>{endLabel}</b>}</div>}
         <div className="coin-fidelity-xlabels">{xDates.map(({ timestamp, index }, tick) => <span key={index} style={{ left: `${index / Math.max(1, (series?.timestamps.length ?? 1) - 1) * 100}%`, transform: tick === 0 ? "none" : tick === xDates.length - 1 ? "translateX(-100%)" : "translateX(-50%)" }}>{tickDate(timestamp)}</span>)}</div>
         <div className="coin-fidelity-chart-stats">{metric(t("coin.fidelity.high"), money(high), values.length ? tickDate(series!.timestamps[values.indexOf(high)]) : "–")}{metric(t("coin.fidelity.low"), money(low), values.length ? tickDate(series!.timestamps[values.indexOf(low)]) : "–")}{metric(t("coin.fidelity.since").replace("{date}", tickDate(series?.timestamps[0])), startValue && endValue ? money(endValue-startValue, true) : "–", startValue && endValue ? `${endValue >= startValue ? "+" : "−"}${num(Math.abs((endValue/startValue-1)*100),2)}%` : "–")}</div>
       </section>}
-      <section className="coin-fidelity-card coin-fidelity-sources" tabIndex={0}>
-        <div className="coin-fidelity-section-head"><h2>{t("coin.fidelity.holdingsSource")}</h2><small>{sourceCount}</small></div>
-        <table><thead><tr><th>{t("coin.fidelity.source")}</th><th>{t("coin.fidelity.quantity")}</th><th>{t("coin.fidelity.value")}</th><th>{t("coin.fidelity.share")}</th></tr></thead>
-          <tbody>{sources.map(row => <tr key={row.wallet}><td title={sourceName(row.wallet)}>{sourceName(row.wallet)} <small>{assetType === "stock" ? t("coin.fidelity.broker") : isExchangeSource(row.walletType) ? t("coin.fidelity.exchange") : t("coin.fidelity.wallet")}</small></td><td>{num(row.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td>{money(row.value)}</td><td>{num(row.percentage,1)}%</td></tr>)}<tr className="total"><td>{t("coin.fidelity.total")}</td><td>{num(amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td>{money(value)}</td><td>100.0%</td></tr></tbody></table>
-        <div className="coin-fidelity-lots-head"><h2>{t("coin.fidelity.openLots")}</h2><small>{t("coin.fidelity.lotsCount").replace("{count}", String(lots.length + unpricedDeposits.length))}</small></div>
-        <table><thead><tr><th>{t("coin.fidelity.acquired")}</th><th>{t("coin.fidelity.quantity")}</th><th>{t("coin.fidelity.costPrice")}</th><th>{t("coin.fidelity.unrealizedShort")}</th></tr></thead>
-          <tbody>{lots.map((lot, i) => { const valued = valuedLots.find((row) => row.id === lot.id); return <tr key={`${lot.id}-${i}`}><td>{date(lot.acquiredAt)}</td><td>{num(lot.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td className={valued ? "" : "zero"}>{valued ? money(lot.costBasis / lot.amount, false, custom ? 4 : 2) : "–"}</td><td className={valued ? signedTone(valued.gainLoss) : "zero"}>{valued ? money(roundedCents(valued.gainLoss), true) : "–"}</td></tr>; })}
-            {unpricedDeposits.map((row) => <tr key={`unpriced-${row.id}`}><td>{date(row.txnCreatedAt)}</td><td>{num(row.amount, 2)}</td><td className="zero">–</td><td className="zero">–</td></tr>)}</tbody></table>
-      </section>
+      <CoinLotsTable rows={displayLots} labels={tableLabels} lotCount={t("coin.fidelity.lotsCount").replace("{count}", String(lotRows.length))} expanded={lotsExpanded} onExpandedChange={setLotsExpanded}
+        emptyState={<EmptyState icon={ArchiveIcon} title={t("coin.lots.empty.title")} hint={t("coin.lots.empty.hint")} />} />
+      </div>
+      <div ref={sideColumnRef} className="coin-fidelity-side-column">
+      <CoinSourcesTable sources={sources.map((row) => ({ id: row.wallet, label: sourceName(row.wallet),
+        kind: assetType === "stock" ? t("coin.fidelity.broker") : isExchangeSource(row.walletType) ? t("coin.fidelity.exchange") : t("coin.fidelity.wallet"),
+        amount: row.amount, value: row.value }))} labels={tableLabels} money={(value) => money(value)}
+        quantity={(value) => num(value, custom ? 2 : assetType === "stock" ? 0 : 4)} sectionRef={sideRef}
+        emptyState={<EmptyState icon={BackpackIcon} title={t("coin.sources.empty.title")} hint={t("coin.sources.empty.hint")} />} />
+      </div>
     </div>
     <section className="coin-fidelity-card coin-fidelity-transactions">
       <div className="coin-fidelity-section-head"><h2>{t("coin.fidelity.transactions")}</h2><div className="coin-fidelity-controls" role="group" aria-label={t("coin.fidelity.transactions")}>{(["all","buy","sell","deposit","withdraw"] as const).filter((key) => key === "all" || transactions.some((row) => row.txnType === key)).map((key) => {
         const count = key === "all" ? transactions.length : transactions.filter((row) => row.txnType === key).length;
         return <button type="button" key={key} aria-pressed={filter === key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{t(`coin.fidelity.${key}`)} {count}</button>;
       })}</div></div>
-      <table><thead><tr><th>{t("coin.fidelity.date")}</th><th>{t("coin.fidelity.type")}</th><th>{t("coin.fidelity.quantity")}</th><th>{t("coin.fidelity.price")}</th><th>{t("coin.fidelity.value")}</th><th>{t("coin.fidelity.source")}</th><th /></tr></thead>
-        <tbody>{rows.map((row) => <tr key={row.id}><td><button className="coin-fidelity-detail-link" onClick={() => setSheet(row)}><span className="sr-only">{t("coin.fidelity.detail").replace("{date}", date(row.txnCreatedAt)).replace("{type}", t(`coin.fidelity.${row.txnType}`))}</span>{date(row.txnCreatedAt)}<small>{format(new Date(row.txnCreatedAt), "HH:mm")}</small></button></td><td><span className="coin-fidelity-pill">{t(`coin.fidelity.${row.txnType}`)}</span></td><td>{num(row.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td className={row.txnType === "deposit" || row.txnType === "withdraw" ? "zero" : ""}>{row.txnType === "deposit" || row.txnType === "withdraw" ? "–" : money(row.price, false, custom ? 4 : 2)}</td><td className={row.txnType === "deposit" || row.txnType === "withdraw" ? "zero" : ""}>{row.txnType === "deposit" || row.txnType === "withdraw" ? "–" : money(row.price * row.amount)}</td><td>{sourceName(row.wallet ?? "")}</td><td><button className="coin-fidelity-edit-button" aria-label={t("coin.fidelity.editFor").replace("{date}", date(row.txnCreatedAt))} onClick={() => openEdit(row)}><FidelityPencil /></button></td></tr>)}</tbody></table>
+      <div ref={transactionScrollArea} className="coin-fidelity-transaction-scroll" role="region" tabIndex={0} aria-label={t("coin.fidelity.transactions")} aria-busy={transactionsLoading} style={rows.length > paging.pageSize ? { height: Math.min(640, 24.5 + paging.pageSize * 52) } : undefined}>
+        {!transactionsLoading && rows.length === 0 ? <EmptyState icon={ClockIcon} title={t("coin.transactions.empty.title")} hint={t("coin.transactions.empty.hint")} />
+          : <table><thead><tr><th>{t("coin.fidelity.date")}</th><th>{t("coin.fidelity.type")}</th><th>{t("coin.fidelity.quantity")}</th><th>{t("coin.fidelity.price")}</th><th>{t("coin.fidelity.value")}</th><th>{t("coin.fidelity.source")}</th><th>{t("coin.fidelity.note")}</th><th /></tr></thead>
+        <tbody>{transactionsLoading ? Array.from({ length: paging.pageSize }, (_, index) => <tr key={index}><td colSpan={8}><span className="coin-fidelity-row-skeleton" /></td></tr>)
+          : paging.rows.map((row) => <tr key={row.id}><td><button className="coin-fidelity-detail-link" onClick={() => setSheet(row)}><span className="sr-only">{t("coin.fidelity.detail").replace("{date}", date(row.txnCreatedAt)).replace("{type}", t(`coin.fidelity.${row.txnType}`))}</span>{date(row.txnCreatedAt)}<small>{format(new Date(row.txnCreatedAt), "HH:mm")}</small></button></td><td><span className="coin-fidelity-pill">{t(`coin.fidelity.${row.txnType}`)}</span></td><td>{num(row.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td className={row.txnType === "deposit" || row.txnType === "withdraw" ? "zero" : ""}>{row.txnType === "deposit" || row.txnType === "withdraw" ? "–" : money(row.price, false, custom ? 4 : 2)}</td><td className={row.txnType === "deposit" || row.txnType === "withdraw" ? "zero" : ""}>{row.txnType === "deposit" || row.txnType === "withdraw" ? "–" : money(row.price * row.amount)}</td><td>{sourceName(row.wallet ?? "")}</td><td className="zero">–</td><td><button className="coin-fidelity-edit-button" aria-label={t("coin.fidelity.editFor").replace("{date}", date(row.txnCreatedAt))} onClick={() => openEdit(row)}><FidelityPencil /></button></td></tr>)}</tbody></table>}
+      </div>
+      <Pager count={rows.length} {...paging} pageSizes={[25, 50, 100]} t={t} labelPrefix="coin.fidelity" />
       <p>{t("coin.fidelity.editNote")}</p>
     </section>
     <Dialog open={!!edit} onOpenChange={(open) => { if (!open) setEdit(undefined); }}><DialogContent className={`coin-fidelity-dialog${custom ? " custom" : ""}`} closeIcon={<FidelityClose />} onOpenAutoFocus={(event) => { event.preventDefault(); document.getElementById("fidelity-edit-price")?.focus(); }}>

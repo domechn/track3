@@ -49,6 +49,7 @@
     "src/middlelayers/insights-service.ts:INSIGHT_QUESTION_STORAGE_KEY": "track3-insight-question",
     "src/middlelayers/onboarding-storage.ts:ONBOARDING_STORAGE_KEY": "track3-onboarding-v1",
     "src/middlelayers/refresh-retry-scheduler.ts:RETRY_ENABLED_KEY": "track3-auto-retry-failed-sources",
+    "src/middlelayers/ui-state/assistant-panes.ts:assistantPanesStorageKey": "track3.ui.assistant.panes",
     "src/utils/app.ts:APTABASE_APP_KEY": "A-EU-6972874637",
     "src/utils/wallet-treemap.ts:OTHERS_AGGREGATED_KEY": "__others_aggregated__"
   },

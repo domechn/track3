@@ -179,6 +179,8 @@ The phone reads existing SQLite snapshots, transactions, configuration, and wall
 
 ## Remaining differences
 
+- An empty chart panel now uses the shared centred icon, title, and refresh hint with a 200px minimum. The source predates the shared empty state.
+
 - The source empty state labels attribution with a start date of 1 Jul 2025, although its only snapshot is 31 Oct 2026. The app reports the stored snapshot date.
 - The source HTML compresses six disabled range labels into an unreadable cluster. The app keeps each label readable within the segmented control for accessibility.
 - The Analytics tab has a small upward chevron to reveal the existing tap-again destinations. The static source has no navigation hint.

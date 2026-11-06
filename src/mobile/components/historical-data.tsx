@@ -1,5 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
+import { ClockIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 import {
   deleteHistoricalDataByUUID,
   deleteHistoricalDataDetailById,
@@ -1159,13 +1161,10 @@ const App = ({
         {!emptyState && <span>{pageLoading ? t("common.loading") : t("fidelity.history.newest")}</span>}</div>
       {pageLoading && data.length === 0 ? <div className="fidelity-history-skeletons">{Array.from({ length: 8 }, (_, index) =>
         <div className="fidelity-history-skeleton" key={index}><i /><i /><i /><i /></div>)}</div> :
-        emptyState ? <div className="fidelity-history-empty">
-          <div><strong>{t("fidelity.history.noSnapshots")}</strong>
-            <p>{t("fidelity.history.emptyBody")}</p>
-            <button type="button" onClick={() => { void refreshEmptyHistory(); }}>
-              <HistoryPhoneIcon kind="refresh" />{t("fidelity.history.refresh")}</button>
-          </div>
-        </div> :
+        emptyState ? <EmptyState icon={ClockIcon} className="fidelity-history-empty"
+          title={t("fidelity.history.noSnapshots")} hint={t("fidelity.history.emptyBody")}
+          action={<button type="button" onClick={() => { void refreshEmptyHistory(); }}>
+            <HistoryPhoneIcon kind="refresh" />{t("fidelity.history.refresh")}</button>} /> :
         <div className="history-mobile-list fidelity-history-list">
           {data.map((row) => <SwipeableRow key={row.id} className="history-mobile-snapshot"
             actions={[{ label: t("common.delete"), icon: <HistoryPhoneIcon kind="trash" />, destructive: true, disabled: deleting,

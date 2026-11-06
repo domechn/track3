@@ -20,8 +20,11 @@ import AISetupCard from "./common/ai-setup-card";
 import { FinanceChartSkeleton, GoalChart } from "./finance-charts";
 import { alertSentence, goalEtaDays } from "./finance-visuals";
 import { queryPNLChartValue } from "@/middlelayers/charts-timeseries";
-import { BarChartIcon, ClockIcon, DashboardIcon, MagicWandIcon, MixIcon, PieChartIcon } from "@radix-ui/react-icons";
+import { BarChartIcon, BellIcon, CheckIcon, ClockIcon, DashboardIcon, MagicWandIcon, MixIcon, PieChartIcon, TargetIcon } from "@radix-ui/react-icons";
 import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
+import EmptyState from "./empty-state";
+import { AttributionPager, useAttributionPage } from "./attribution-pager";
+import { alertTemplateDraft, alertTemplates } from "./goals-alert-templates";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
 import { Progress } from "./ui/progress";
@@ -78,6 +81,8 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
   const manualInitialized = useRef(false);
   const newRuleButton = useRef<HTMLButtonElement>(null);
   const editorTrigger = useRef<HTMLButtonElement | null>(null);
+  const rulePaging = useAttributionPage(rules, rules.map((rule) => rule.id).join(","), 20);
+  const historyPaging = useAttributionPage(history, history.map((alert) => alert.id).join(","), 20);
 
   async function reload() {
     try {
@@ -248,7 +253,7 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
     targets={targets} loading={loading} error={error} status={status} draft={draft} currencySymbol={currency?.symbol}
     editorOpen={desktopEditorOpen} onDraft={setDraft} onEditorOpen={setDesktopEditorOpen}
     onEditorCloseFocus={() => editorTrigger.current?.focus()}
-    onEdit={edit} onAdd={(trigger) => openEditor({ ...emptyDraft, cooldownMinutes: "1440" }, trigger)}
+    onEdit={edit} onAdd={(trigger, templateDraft) => openEditor(templateDraft ?? { ...emptyDraft, cooldownMinutes: "1440" }, trigger)}
     onSave={() => void save()}
     onToggle={(rule, enabled) => void mutate(() => setAlertRuleEnabled(rule.id, enabled))}
     onDelete={(rule) => void mutate(() => removeRule(rule.id))}
@@ -285,11 +290,11 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.notifications")}</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-2xl text-sm text-muted-foreground">{t("goals.notificationExplanation")}</p>
-          <Button variant="outline" onClick={async () => {
+          {notificationsEnabled ? <span className="t3-goals-notification-status"><CheckIcon aria-hidden />{t("goals.notificationEnabled")}</span> : <Button variant="outline" onClick={async () => {
             const allowed = await enableSystemNotifications();
             setNotificationsEnabled(allowed);
             setStatus(t(allowed ? "goals.notificationEnabled" : "goals.notificationFallback"));
-          }}>{notificationsEnabled ? t("goals.notificationEnabled") : t("goals.enableNotifications")}</Button>
+          }}>{t("goals.enableNotifications")}</Button>}
         </CardContent>
       </Card>
       {rules.length === 0
@@ -307,14 +312,20 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
             {editor}
           </DialogContent>
         </Dialog>}
-      {loading ? <FinanceChartSkeleton /> : <GoalChart rules={rules} snapshots={snapshots} portfolioValues={portfolioValues} />}
+      <div className="t3-goals-chart">{loading ? <FinanceChartSkeleton /> : <GoalChart rules={rules} snapshots={snapshots} portfolioValues={portfolioValues} />}</div>
       <Card className="t3-goals-rules">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.rules")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {loading ? <p className="text-sm text-muted-foreground">{t("goals.loading")}</p>
-            : rules.length === 0 ? <p className="text-sm text-muted-foreground">{t("goals.empty")}</p>
-              : rules.map((rule) => {
-                const RuleIcon = ruleIcons[rule.kind] ?? ClockIcon;
+            : rules.length === 0 ? <EmptyState icon={TargetIcon} title={<><span aria-hidden="true" className="t3-empty-state-kicker">{t("goals.empty")}</span>{t("goals.empty.title")}</>} hint={t("goals.empty.hint")} className="t3-goals-empty"
+              action={<Button onClick={(event) => openEditor(emptyDraft, event.currentTarget)}>{t("goals.newRule")}</Button>}>
+              <div className="t3-empty-state-chips" role="group" aria-label={t("goals.templates")}>
+                {alertTemplates.map((template) => <Button key={template} size="sm" variant="outline"
+                  onClick={(event) => openEditor(alertTemplateDraft(template, snapshots[0]), event.currentTarget)}>{t(`goals.template.${template}`)}</Button>)}
+              </div>
+            </EmptyState>
+              : rulePaging.rows.map((rule) => {
+                 const RuleIcon = ruleIcons[rule.kind] ?? ClockIcon;
                 const measurement = measureRule(rule, snapshots, prices, targets);
                 const isGoal = rule.kind === "total_value_target" || rule.kind === "asset_value_target";
                 const progress = isGoal && measurement.value !== undefined
@@ -323,7 +334,7 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
                     : measurement.value <= rule.threshold ? 100 : rule.threshold / measurement.value * 100)) : 0;
                 const eta = rule.kind === "total_value_target" && rule.comparator === "gte"
                   ? goalEtaDays(portfolioValues, rule.threshold) : null;
-                return <div key={rule.id} className="rounded-md border p-3 space-y-2">
+                return <div key={rule.id} className="t3-goals-rule-row rounded-md border p-3 space-y-2">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex min-w-0 items-start gap-2">
                       <RuleIcon aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -370,6 +381,7 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
                   </div>}
                 </div>;
               })}
+          <AttributionPager count={rules.length} {...rulePaging} t={t} ariaLabel={t("goals.rules")} />
         </CardContent>
       </Card>
       <Card className="t3-goals-history">
@@ -392,9 +404,9 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
               </AlertDialogContent>
             </AlertDialog>
           </div>
-          {!loading && !history.length && <p className="text-sm text-muted-foreground">{t("goals.noHistory")}</p>}
+          {!loading && !history.length && <EmptyState icon={BellIcon} title={t("goals.noHistory")} hint={t("goals.history.empty.hint")} />}
           <ol className="space-y-2">
-            {history.map((alert) => {
+            {historyPaging.rows.map((alert) => {
               const severity = historySeverity(alert.kind);
               const HistoryIcon = ruleIcons[alert.kind] ?? ClockIcon;
               return <li key={alert.id} data-severity={severity} className={`flex flex-wrap items-center justify-between gap-2 rounded-md border border-l-4 p-3 ${
@@ -411,6 +423,7 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
             </li>;
             })}
           </ol>
+          <AttributionPager count={history.length} {...historyPaging} t={t} ariaLabel={t("goals.history")} />
         </CardContent>
       </Card>
     </div>

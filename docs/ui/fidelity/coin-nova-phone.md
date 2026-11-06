@@ -181,10 +181,10 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 ## Captured comparison
 
-- App capture: `/tmp/fidelity/coin-nova/coin-nova-phone-long.png`.
-- Reference render: `/tmp/rev-fa3/design/records-coin-nova-long.png`.
-- Fresh 390 × 844 first-screen pixel difference: **1.87%** (RGB difference >20/255 in any channel).
-- Full-page overlap pixel difference: **4.85%** (source 1,929px; app 1,877px high).
+- App capture: `/tmp/wui18-final-screens/coin-nova-phone.png`.
+- Reference render: `/tmp/wui18-source/nova-phone-viewport.png`.
+- Fresh 390 × 844 first-screen difference at DPR 2: **3.910%** (any RGB channel differs by more than 20). At a 40-channel threshold the ratio is **2.722%**. The product's 0.7% real portfolio share replaces the source's unavailable placeholder share; the app's native scrolling layer also rasterizes text differently from the standalone HTML render.
+- A full-page PNG comparison is not equivalent: the app scrolls inside its main landmark, whereas the source scrolls the document. The first-screen comparison uses identical viewport dimensions.
 
 ## Real-data limits
 
@@ -192,5 +192,8 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
+The source NOVA card has manual prices and a designed no-market-feed explanation. It keeps that compact explanation and dated rows; truly empty sources, lots, and transactions use the shared empty state, for which no NOVA zero-data source page exists.
+
 - The saved NOVA asset contributes $5,052 to the real portfolio total, so its share is 0.7%; the reference excludes its placeholder NOVA and prints an unavailable share.
 - The reference adds a sample-data disclaimer after the cards. A real saved custom asset has no sample-data footer, accounting for the remaining 52px page-height difference.
+- The source page scrolls the document; the product retains its main scroll container to preserve navigation scroll restoration. Chromium antialiases some small text differently in that layer.

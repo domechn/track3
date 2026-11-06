@@ -35,6 +35,10 @@ import { isIOS } from "@/utils/platform";
 import { ModalPage } from "@/mobile/components/mobile/overlays";
 import GoalsFidelity from "@/mobile/components/goals-fidelity";
 import { usePhoneWidth } from "@/mobile/components/mobile/size-class";
+import { BellIcon, CheckIcon, TargetIcon } from "@radix-ui/react-icons";
+import { alertTemplateDraft, alertTemplates } from "@/components/goals-alert-templates";
+import EmptyState from "@/components/empty-state";
+import { AttributionPager, useAttributionPage } from "@/components/attribution-pager";
 
 const emptyDraft: AlertDraft = {
   id: 0, kind: "total_value_target", assetType: "crypto", symbol: "",
@@ -73,6 +77,8 @@ export default function GoalsAlerts() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(!isIOS());
   const manualInitialized = useRef(false);
+  const rulePaging = useAttributionPage(rules, rules.map((rule) => rule.id).join(","), 20);
+  const historyPaging = useAttributionPage(history, history.map((alert) => alert.id).join(","), 20);
 
   async function reload() {
     try {
@@ -157,7 +163,7 @@ export default function GoalsAlerts() {
     rules={rules} history={history} unreadCount={unreadCount} snapshots={snapshots}
     prices={prices} targets={targets} loading={loading} error={error} status={status}
     draft={draft} editorOpen={manualOpen} onDraft={setDraft}
-    onOpenEditor={(rule) => { if (rule) edit(rule); else { setDraft(emptyDraft); setStatus(""); setManualOpen(true); } }}
+    onOpenEditor={(rule, templateDraft) => { if (rule) edit(rule); else { setDraft(templateDraft ?? emptyDraft); setStatus(""); setManualOpen(true); } }}
     onCloseEditor={() => { setManualOpen(false); setValidationField(null); setStatus(""); }}
     onSave={save}
     onToggle={(rule, enabled) => void mutate(() => setAlertRuleEnabled(rule.id, enabled))}
@@ -174,11 +180,11 @@ export default function GoalsAlerts() {
           <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.notifications")}</CardTitle></CardHeader>
           <CardContent className="flex flex-wrap items-center justify-between gap-3">
             <p className="max-w-2xl text-sm text-muted-foreground">{t("goals.notificationExplanation")}</p>
-            <Button variant="outline" onClick={async () => {
+            {notificationsEnabled ? <span className="t3-goals-notification-status"><CheckIcon aria-hidden />{t("goals.notificationEnabled")}</span> : <Button variant="outline" onClick={async () => {
               const allowed = await enableSystemNotifications();
               setNotificationsEnabled(allowed);
               setStatus(t(allowed ? "goals.notificationEnabled" : "goals.notificationFallback"));
-            }}>{notificationsEnabled ? t("goals.notificationEnabled") : t("goals.enableNotifications")}</Button>
+            }}>{t("goals.enableNotifications")}</Button>}
             {status && <p role="status">{status}</p>}
           </CardContent>
         </Card>
@@ -287,11 +293,11 @@ export default function GoalsAlerts() {
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.notifications")}</CardTitle></CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <p className="max-w-2xl text-sm text-muted-foreground">{t("goals.notificationExplanation")}</p>
-          <Button variant="outline" onClick={async () => {
+          {notificationsEnabled ? <span className="t3-goals-notification-status"><CheckIcon aria-hidden />{t("goals.notificationEnabled")}</span> : <Button variant="outline" onClick={async () => {
             const allowed = await enableSystemNotifications();
             setNotificationsEnabled(allowed);
             setStatus(t(allowed ? "goals.notificationEnabled" : "goals.notificationFallback"));
-          }}>{notificationsEnabled ? t("goals.notificationEnabled") : t("goals.enableNotifications")}</Button>
+          }}>{t("goals.enableNotifications")}</Button>}
         </CardContent>
       </Card>
       {isIOS() ? <>
@@ -308,14 +314,18 @@ export default function GoalsAlerts() {
         <summary className="flex min-h-11 cursor-pointer items-center px-4 py-2 text-sm font-medium">{t("aiSetup.manual")}</summary>
         {editor}
       </details>}
-      {loading ? <FinanceChartSkeleton /> : <GoalChart rules={rules} snapshots={snapshots} portfolioValues={portfolioValues} />}
+      <div className="t3-goals-chart">{loading ? <FinanceChartSkeleton /> : <GoalChart rules={rules} snapshots={snapshots} portfolioValues={portfolioValues} />}</div>
       <Card className="t3-goals-rules ios-d3-rules-card">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.rules")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {loading ? <p className="text-sm text-muted-foreground">{t("goals.loading")}</p>
-            : rules.length === 0 ? <p className="text-sm text-muted-foreground">{t("goals.empty")}</p>
-              : rules.map((rule) => {
-                const RuleIcon = ruleIcons[rule.kind] ?? ClockIcon;
+            : rules.length === 0 ? <EmptyState icon={TargetIcon} title={<><span aria-hidden="true" className="t3-empty-state-kicker">{t("goals.empty")}</span>{t("goals.empty.title")}</>} hint={t("goals.empty.hint")} className="t3-goals-empty">
+              <Button onClick={() => { setDraft(emptyDraft); setManualOpen(true); }}>{t("goals.newRule")}</Button>
+              <div className="t3-empty-state-chips">{alertTemplates.map((template) => <Button key={template} variant="outline" size="sm"
+                onClick={() => { setDraft(alertTemplateDraft(template, snapshots[0])); setManualOpen(true); }}>{t(`goals.template.${template}`)}</Button>)}</div>
+            </EmptyState>
+              : rulePaging.rows.map((rule) => {
+                 const RuleIcon = ruleIcons[rule.kind] ?? ClockIcon;
                 const measurement = measureRule(rule, snapshots, prices, targets);
                 const isGoal = rule.kind === "total_value_target" || rule.kind === "asset_value_target";
                 const progress = isGoal && measurement.value !== undefined
@@ -375,12 +385,13 @@ export default function GoalsAlerts() {
                   </div>}
                 </div>;
               })}
+          <AttributionPager count={rules.length} {...rulePaging} t={t} ariaLabel={t("goals.rules")} />
         </CardContent>
       </Card>
       <Card className="t3-goals-history">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.history")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          {(!isIOS() || history.length > 0) && <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" disabled={!history.some((alert) => !alert.acknowledgedAt)}
               onClick={() => void mutate(acknowledgeAllAlerts)}>{t("goals.ackAll")}</Button>
             <AlertDialog>
@@ -396,10 +407,10 @@ export default function GoalsAlerts() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </div>}
-          {!loading && !history.length && <p className="text-sm text-muted-foreground">{t("goals.noHistory")}</p>}
+          </div>
+          {!loading && !history.length && <EmptyState icon={BellIcon} title={t("goals.noHistory")} hint={t("goals.history.empty.hint")} />}
           <ol className="space-y-2">
-            {history.map((alert) => {
+            {historyPaging.rows.map((alert) => {
               const severity = historySeverity(alert.kind);
               const HistoryIcon = ruleIcons[alert.kind] ?? ClockIcon;
               return <li key={alert.id} data-severity={severity} className={`flex flex-wrap items-center justify-between gap-2 rounded-md border border-l-4 p-3 ${
@@ -416,6 +427,7 @@ export default function GoalsAlerts() {
             </li>;
             })}
           </ol>
+          <AttributionPager count={history.length} {...historyPaging} t={t} ariaLabel={t("goals.history")} />
         </CardContent>
       </Card>
     </div>

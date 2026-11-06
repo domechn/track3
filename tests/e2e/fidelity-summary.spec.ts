@@ -135,8 +135,12 @@ test("summary full state follows the approved card order and captures at 390px",
     await expect(page.locator(".fd-attr-total")).toContainText("$310,000 → $763,809");
     await expect(page.locator(".fd-axis")).toContainText("$50k");
     await expect(page.locator(".fd-axis")).toContainText("$150k");
-    await expect(page.locator(".fd-profit-summary .fd-footnote")).toContainText("BTC");
-    await expect(page.locator(".fd-profit-summary .fd-footnote")).not.toContainText(", and ");
+    const pnlHint = page.locator(".fd-profit-summary").getByRole("button", { name: "How P&L % is calculated" });
+    await pnlHint.click();
+    await expect(page.getByRole("tooltip")).toContainText("BTC");
+    await expect(page.getByRole("tooltip")).not.toContainText(", and ");
+    await expect(page.getByRole("tooltip")).toContainText("stablecoins are excluded.");
+    await pnlHint.click();
     expect(await page.locator(".fd-year-deposit span").first().evaluate((node) => parseFloat(getComputedStyle(node).fontSize))).toBe(13);
     const solBars = await page.locator(".fd-attribution .fd-attr-row").filter({ has: page.locator("b", { hasText: "SOL" }) }).evaluate((row) => {
       const zero = row.querySelector<HTMLElement>(".fd-attr-track")!.getBoundingClientRect();
@@ -149,8 +153,8 @@ test("summary full state follows the approved card order and captures at 390px",
     expect(await page.locator(".fd-month").filter({ hasText: "Mar" }).locator(".fd-zero-bar i")
       .evaluate((node) => parseFloat((node as HTMLElement).style.width))).toBeCloseTo(50, 0);
     await expect(page.locator(".fd-month").filter({ hasText: "Feb" }).locator(".fd-month-foot span").first()).toHaveCSS("color", "rgb(155, 157, 163)");
-    await expect(page.locator(".fd-profit-summary .fd-footnote")).toContainText("stablecoins are left out.");
-    expect(Math.round((await page.locator(".fd-top-coins").boundingBox())!.y)).toBe(2971);
+    await page.locator("#app-main-content").evaluate((node) => { node.scrollTop = 0; });
+    expect(Math.round((await page.locator(".fd-top-coins").boundingBox())!.y)).toBe(2995);
     await expect(page.locator(".fd-month").last()).toContainText("Oct");
     await expect(page.locator(".fd-month").last()).toContainText("up");
     await expect(page.locator(".fd-month").last()).toContainText("down");

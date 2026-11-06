@@ -25,10 +25,13 @@ for (const width of [900, 1100, 1280, 1920, 2560]) for (const locale of ["en", "
     await page.goto("/#/coins/BTC");
     const header = page.locator(".coin-fidelity-heading");
     await expect(header).toBeVisible();
-    await expect(page.locator(".coin-fidelity-sources > table").first().locator("tbody tr")).toHaveCount(17);
-    await expect(page.locator(".coin-fidelity-sources > table").first().locator("tbody td").first()).toHaveAttribute("title", locale === "en" ? "Wallet 1" : "钱包 1");
+    const sourceTable = page.locator(".coin-fidelity-sources table");
+    await expect(sourceTable.locator("tbody tr")).toHaveCount(11);
+    await expect(sourceTable.locator("tbody td").first()).toHaveAttribute("title", "Ledger cold wallet");
+    await expect(sourceTable.locator("tbody tr").nth(9)).toContainText(locale === "en" ? "Others" : "其他");
+    await expect(sourceTable.locator("tbody tr").last()).toContainText("100.0%");
     await expect(header.getByRole("button", { name: /\+13/ })).toBeVisible();
-    for (const label of await page.locator(".coin-source-summary, .coin-fidelity-sources > table:first-of-type tbody td:first-child").allTextContents())
+    for (const label of await page.locator(".coin-source-summary, .coin-fidelity-sources table tbody td:first-child").allTextContents())
       expect(label).not.toMatch(/[0-9a-f]{10,}/i);
     const description = header.locator("p").first();
     const controls = page.locator(".t3-fidelity-topbar-coin :is(button, fieldset, .t3-fidelity-stamp, .t3-fidelity-live-control, .t3-fidelity-date-control, .t3-fidelity-refresh-control), .coin-fidelity-heading > button").filter({ visible: true });

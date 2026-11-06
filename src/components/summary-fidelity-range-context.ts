@@ -9,4 +9,6 @@ export const SummaryFidelityRangeContext = createContext<{
 export const SummaryFidelityYearContext = createContext<{
   year: number;
   setYear: (year: number) => void;
-}>({ year: 0, setYear: () => {} });
+  moverNames: string[];
+  setMoverNames: (names: string[]) => void;
+}>({ year: 0, setYear: () => {}, moverNames: [], setMoverNames: () => {} });

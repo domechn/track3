@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { fidelitySyncSettings, seedSettingsB, settingsBSql, settingsBRoute, settingsBShot } from "./fidelity-settings-b-scenes";
 import { FakeS3 } from "../../src/middlelayers/sync/object-store";
+import { expectSettingsCardsFitContent } from "./settings-card-layout-scenes";
 
 test.use({ viewport: { width: 1600, height: 777 }, colorScheme: "dark", reducedMotion: "reduce", timezoneId: "UTC" });
 
@@ -145,15 +146,15 @@ for (const state of ["default", "setup", "locked", "loading", "testing", "test-f
       await expect(page.locator(".t3-sync-connection").getByRole("button", { name: "Save sync settings" })).toHaveCount(0);
       await expect(page.locator(".t3-sync-connection").getByRole("button", { name: "Show secret access key" })).toBeVisible();
       await expect(page.locator(".t3-sync-passphrase").getByText("You would have to forget remote data and upload again.", { exact: false })).toBeVisible();
-      expect((await page.locator(".t3-sync-passphrase").boundingBox())?.height).toBe(423);
-      expect((await page.locator(".t3-sync-devices").boundingBox())?.height).toBe(427);
-      await expect(page.locator(".t3-b-sync-device-kpis > div").first().locator("b")).toHaveText("09:41");
+      await expectSettingsCardsFitContent(page, ".sync-settings-page [data-ui-card]");
+      await expect(page.locator(".t3-sync-status")).toContainText("9:41");
       await expect(page.getByText("Path-style addressing", { exact: true })).toBeVisible();
       await expect(page.locator(".t3-b-sync-local-note b")).toHaveText("Goals and alerts stay on this device");
-      await expect(page.locator(".sync-device-actions").getByRole("button", { name: "Sync now" }).locator("svg:visible")).toHaveCount(1);
-      const action = page.locator(".sync-device-actions").getByRole("button", { name: "Sync now" });
-      const icon = await action.locator("svg:visible").boundingBox();
-      const labelX = await action.evaluate((button) => {
+      const syncAction = page.locator(".t3-sync-status").getByRole("button", { name: "Sync now" });
+      await expect(syncAction).toBeEnabled();
+      await expect(syncAction.locator("svg:visible")).toHaveCount(1);
+      const icon = await syncAction.locator("svg:visible").boundingBox();
+      const labelX = await syncAction.evaluate((button) => {
         const text = Array.from(button.querySelectorAll("span")).flatMap((span) =>
           Array.from(span.childNodes)).find((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim() === "Sync now");
         if (!text) return null;

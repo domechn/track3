@@ -1,14 +1,16 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { CopyIcon, EyeClosedIcon, EyeOpenIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import type { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { useTranslation } from "@/i18n";
 import { positiveNegativeTone } from "@/utils/color";
 import { currencyWrapper } from "@/utils/currency";
 import SyncStatusIndicator from "./sync-status-indicator";
+import { barGeometry, comparisonMoverFacts, divergingScale } from "./comparison-fidelity-movers";
 
 export type FidelityComparisonRow = {
   symbol: string;
   assetType: "crypto" | "stock";
+  isStable?: boolean;
   amount: { base: number; head: number };
   price: { base: number; head: number };
   value: { base: number; head: number; changePercent: number };
@@ -57,15 +59,12 @@ export default function ComparisonFidelity({
   });
   const pct = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(2)}%`;
   const tone = (value: number) => value === 0 ? "zero" : positiveNegativeTone(value, quoteColor) === "green" ? "pos" : "neg";
+  const [expanded, setExpanded] = useState({ value: false, percent: false });
   const diff = headTotal - baseTotal;
   const diffPct = baseTotal ? diff / baseTotal * 100 : 0;
-  const sorted = [...rows].sort((a, b) =>
-    Math.abs(b.value.head - b.value.base) - Math.abs(a.value.head - a.value.base));
-  const byValue = [...rows].sort((a, b) =>
-    (b.value.head - b.value.base) - (a.value.head - a.value.base));
-  const byPercent = [...rows].sort((a, b) => b.value.changePercent - a.value.changePercent);
-  const topShare = diff ? Math.round(((sorted[0]?.value.head ?? 0) - (sorted[0]?.value.base ?? 0)
-    + (sorted[1]?.value.head ?? 0) - (sorted[1]?.value.base ?? 0)) / diff * 100) : 0;
+  const facts = comparisonMoverFacts(rows);
+  const { byValue, byPercent, topShare } = facts;
+  const sorted = byValue;
   const sameAmounts = rows.length > 0 && rows.every((row) => Math.abs(row.amount.base - row.amount.head) < 1e-8);
   const days = baseOption?.createdAt && headOption?.createdAt
     ? Math.round((new Date(headOption.createdAt).getTime() - new Date(baseOption.createdAt).getTime()) / 86400000) : 0;
@@ -77,7 +76,7 @@ export default function ComparisonFidelity({
       .replace("{to}", shortDate(headOption?.createdAt))
       .replace("{first}", sorted[0]?.symbol ?? "")
       .replace("{second}", sorted[1]?.symbol ?? "")
-      .replace("{share}", String(topShare))
+      .replace("{share}", mask ? "***" : String(topShare))
     : t("comparison.fidelity.emptySubtitle");
   const changeText = signedMoney(diff);
   const changeAt = subtitle.indexOf(changeText);
@@ -87,30 +86,46 @@ export default function ComparisonFidelity({
   const moverRows = (items: FidelityComparisonRow[], by: "value" | "percent") => {
     const values = items.map((row) => by === "value"
       ? row.value.head - row.value.base : row.value.changePercent);
-    const positive = Math.max(0, ...values);
-    const negative = Math.max(0, ...values.map((value) => -value));
-    const zero = by === "value"
-      ? negative / (positive + negative || 1) * 92 + 4
-      : negative / (Math.max(positive, negative) || 1) * 26 + 2;
-    const unit = (100 - zero - (by === "value" ? 4 : 2)) / (positive || 1);
+    const scale = divergingScale(values);
     return <ol className="t3-cmp-movers">
-      {items.map((row) => {
+      {items.slice(0, expanded[by] ? undefined : 10).map((row) => {
         const delta = row.value.head - row.value.base;
         const metric = by === "value" ? delta : row.value.changePercent;
+        const bar = barGeometry(metric, scale);
         return <li key={`${row.assetType}:${row.symbol}`}>
           <strong>{row.symbol}</strong>
-          <span className="t3-cmp-mover-track" style={{ "--zero": `${zero}%` } as CSSProperties}><i className={tone(metric)}
-            style={{
-              width: `${Math.max(0.5, Math.abs(metric) * unit)}%`,
-              left: metric >= 0 ? `${zero}%` : undefined,
-              right: metric < 0 ? `${100 - zero}%` : undefined,
-            }} /></span>
+          <span className="t3-cmp-mover-track" style={{ "--zero": `${scale.zero}%` } as CSSProperties}>
+            {bar && <i className={tone(metric)} style={{
+              width: `min(${bar.side}%, max(${bar.minimumPixels}px, ${bar.width}%))`,
+              left: bar.left === undefined ? undefined : `${bar.left}%`,
+              right: bar.right === undefined ? undefined : `${bar.right}%`,
+            }} />}
+          </span>
           <span className={tone(metric)}>{by === "value" ? signedMoney(delta, 0) : pct(metric)}</span>
           {by === "percent" && <small>{signedMoney(delta, 0)}</small>}
         </li>;
       })}
     </ol>;
   };
+  const more = (by: "value" | "percent", count: number) => count > 10 &&
+    <button type="button" className="t3-cmp-movers-more" aria-expanded={expanded[by]}
+      onClick={() => setExpanded((current) => ({ ...current, [by]: !current[by] }))}>
+      {expanded[by] ? t("comparison.fidelity.showLess") : mask
+        ? t("common.showMore") : t("comparison.fidelity.andMore").replace("{count}", String(count - 10))}
+    </button>;
+  const stableNote = !facts.topRiser
+    ? facts.mostMovedStable
+      ? facts.stableWithinBasisPoint
+        ? t("comparison.fidelity.stableWithin")
+        : t("comparison.fidelity.stableMoved").replace("{stable}", facts.mostMovedStable.symbol)
+          .replace("{percent}", pct(facts.mostMovedStable.changePercent))
+      : ""
+    : facts.mostMovedStable
+    ? facts.stableWithinBasisPoint
+      ? t("comparison.fidelity.relativeFoot").replace("{symbol}", facts.topRiser)
+      : t("comparison.fidelity.relativeFootMoved").replace("{symbol}", facts.topRiser)
+        .replace("{stable}", facts.mostMovedStable.symbol).replace("{percent}", pct(facts.mostMovedStable.changePercent))
+    : t("comparison.fidelity.relativeFootNoStable").replace("{symbol}", facts.topRiser);
 
   return <div className="t3-cmp-fidelity">
     <header className="t3-cmp-heading">
@@ -197,15 +212,17 @@ export default function ComparisonFidelity({
       <section className="t3-cmp-card t3-cmp-movers-card">
         <div className="t3-cmp-card-head"><h2>{t("comparison.moversByValue")}</h2><span>{t("comparison.fidelity.absoluteUsd")}</span></div>
         {moverRows(byValue, "value")}
+        {more("value", byValue.length)}
         <p>{t("comparison.fidelity.topShare")
           .replace("{first}", sorted[0]?.symbol ?? "")
           .replace("{second}", sorted[1]?.symbol ?? "")
-          .replace("{share}", String(topShare))}</p>
+          .replace("{share}", mask ? "***" : String(topShare))}</p>
       </section>
       <section className="t3-cmp-card t3-cmp-movers-card">
         <div className="t3-cmp-card-head"><h2>{t("comparison.moversByPercent")}</h2><span>{t("comparison.fidelity.relativeToA")}</span></div>
         {moverRows(byPercent, "percent")}
-        <p>{t("comparison.fidelity.relativeFoot").replace("{symbol}", byPercent[0]?.symbol ?? "")}</p>
+        {more("percent", byPercent.length)}
+        {!mask && stableNote && <p>{stableNote}</p>}
       </section>
     </div>
   </div>;

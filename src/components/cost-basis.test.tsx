@@ -448,6 +448,15 @@ it("lets the empty custom range choose another tax year", async () => {
   await waitFor(() => expect(screen.getByLabelText("Tax year")).toHaveFocus());
 });
 
+it("does not offer to show open lots while the empty open-lots tab is selected", async () => {
+  vi.mocked(loadCostBasisReport).mockResolvedValue({ ...report, disposals: [], unrealized: [], warnings: [] } as never);
+  render(<CostBasisPage />);
+  await screen.findByText("No sales in 2026");
+  fireEvent.click(screen.getByRole("button", { name: /Open lots/ }));
+  expect(screen.getByText("No open lots yet")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Show open lots" })).not.toBeInTheDocument();
+});
+
 it("shows rows on page one when a new report has fewer rows than the previous page", async () => {
   const large = { ...report, disposals: Array.from({ length: 51 }, (_, index) => ({
     ...report.disposals[0], eventId: String(index), symbol: `SALE-${index}`,

@@ -4,15 +4,16 @@ import { installTauriBridge } from "./fidelity-scenes";
 
 const userAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
-export async function analyzePage(browser: Browser, route: "wallets" | "comparison") {
+export async function analyzePage(browser: Browser, route: "wallets" | "comparison",
+  theme: "dark" | "light" = "dark") {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 }, userAgent, isMobile: true, hasTouch: true,
-    colorScheme: "dark", reducedMotion: "reduce", timezoneId: "UTC",
+    colorScheme: theme, reducedMotion: "reduce", timezoneId: "UTC",
   });
   const page = await context.newPage();
   await page.clock.setFixedTime(new Date("2026-10-31T10:10:00Z"));
-  await page.addInitScript(() => {
-    localStorage.setItem("track3-ui-theme", "dark");
+  await page.addInitScript((selectedTheme) => {
+    localStorage.setItem("track3-ui-theme", selectedTheme);
     localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([
       { sourceId: "binance", label: "Binance", kind: "exchange", provider: "Binance", status: "ok", lastSuccessAt: "2026-10-31T09:41:00.000Z", detail: "API key, read-only" },
       { sourceId: "okx", label: "OKX", kind: "exchange", provider: "OKX", status: "failed", category: "rateLimit", detail: "Rate limit exceeded (HTTP 429)", lastSuccessAt: "2026-10-31T09:12:00.000Z", startedAt: "2026-10-31T09:40:00.000Z", finishedAt: "2026-10-31T09:41:00.000Z" },
@@ -21,7 +22,7 @@ export async function analyzePage(browser: Browser, route: "wallets" | "comparis
       { sourceId: "ibkr", label: "Interactive Brokers", kind: "broker", status: "ok", lastSuccessAt: "2026-10-31T09:41:00.000Z" },
     ]));
     localStorage.setItem("track3-assistant-comparison-dates", JSON.stringify({ base: "2026-10-01", head: "2026-10-31" }));
-  });
+  }, theme);
   await installTauriBridge(page, { fidelitySample: "full" });
   await page.evaluate(async () => (window as any).__e2eInvoke("plugin:sql|execute",
     { query: "DELETE FROM assets_v2 WHERE createdAt < '2026-10-01'", values: [] }));

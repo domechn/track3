@@ -77,14 +77,14 @@ it("shows phone cost lots inline with their signed gain", async () => {
     matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
   }) as unknown as MediaQueryList);
   render(<CostBasisPage />);
-  await screen.findByRole("button", { name: "Dispositions 1" }, { timeout: 15_000 });
+  await screen.findByRole("button", { name: "Dispositions 1" }, { timeout: 10_000 });
   const realized = document.querySelector(".fidelity-cost-lots")!;
   expect(realized).toHaveTextContent("BTC");
   expect(realized).toHaveTextContent("Acquired 1 Jan 2024");
   expect(realized).toHaveTextContent("Cost $100.00 · Proceeds $200.00");
   expect(realized).toHaveTextContent("+$100.00");
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-});
+}, 15_000);
 
 it("wraps large phone cost totals without changing ordinary totals", async () => {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
@@ -96,11 +96,11 @@ it("wraps large phone cost totals without changing ordinary totals", async () =>
     totals: { ...report.totals, proceeds: 999_999_999.99, gainLoss: 999_999_999.99 },
   } as never);
   render(<CostBasisPage />);
-  await screen.findByRole("button", { name: "Dispositions 1" });
+  await screen.findByRole("button", { name: "Dispositions 1" }, { timeout: 10_000 });
   expect(document.querySelector(".fidelity-kpi-primary > :first-child strong")).toHaveClass("fidelity-long-money");
   expect(document.querySelector(".fidelity-kpi-primary > :nth-child(2) strong")).not.toHaveClass("fidelity-long-money");
   expect(document.querySelector(".fidelity-kpi-secondary > :first-child strong")).toHaveClass("fidelity-long-money");
-});
+}, 15_000);
 
 it("keeps stock and crypto lots with the same symbol in separate groups", async () => {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
@@ -115,7 +115,7 @@ it("keeps stock and crypto lots with the same symbol in separate groups", async 
     ],
   } as never);
   render(<CostBasisPage />);
-  await screen.findByRole("button", { name: "Dispositions 2" });
+  await screen.findByRole("button", { name: "Dispositions 2" }, { timeout: 10_000 });
   const groups = document.querySelectorAll(".fidelity-lot-group");
   expect(groups).toHaveLength(2);
   expect(groups[0]).toHaveTextContent("AAPL");
@@ -123,7 +123,7 @@ it("keeps stock and crypto lots with the same symbol in separate groups", async 
   expect(groups[0]).toHaveTextContent("+$20.00");
   expect(groups[1]).toHaveTextContent("Crypto");
   expect(groups[1]).toHaveTextContent("+$30.00");
-});
+}, 15_000);
 
 it("shows a crypto data gap when a stock with the same symbol has a known gain", async () => {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });

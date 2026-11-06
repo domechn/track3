@@ -38,6 +38,17 @@ it("keeps the selected asset type when editing a stock rule", () => {
   expect(onDraft).toHaveBeenCalledWith(expect.objectContaining({ assetType: "stock", symbol: "AAPL" }));
 });
 
+it("opens a prefilled template from the empty Rules panel", () => {
+  const onAdd = vi.fn();
+  render(<GoalsDesktop {...props({ rules: [], history: [], onAdd })} />);
+  fireEvent.click(screen.getByRole("button", { name: "BTC above a price" }));
+  expect(onAdd).toHaveBeenCalledWith(expect.any(HTMLButtonElement), expect.objectContaining({
+    kind: "asset_price_target", symbol: "BTC", threshold: "70000",
+  }));
+  expect(screen.getByRole("button", { name: "Acknowledge all" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Clear" })).toBeDisabled();
+});
+
 it("lists only the two available comparators for move and allocation rules", () => {
   render(<GoalsKinds />);
   for (const title of ["Asset price move", "Allocation deviation"]) {

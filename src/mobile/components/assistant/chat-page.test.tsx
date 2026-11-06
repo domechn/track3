@@ -164,6 +164,27 @@ beforeEach(() => {
 });
 
 describe("ChatPage", () => {
+  it("opens Context as a dismissible sheet from the phone header", async () => {
+    const originalWidth = window.innerWidth;
+    try {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+      vi.mocked(isIOS).mockReturnValue(true);
+      vi.mocked(loadAIConfig).mockResolvedValue(config);
+      vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+      renderAt("/assistant", true);
+      const toggle = await screen.findByRole("button", { name: "Context" });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      await userEvent.click(toggle);
+      const sheet = screen.getByRole("dialog", { name: "Context" });
+      expect(sheet).toBeVisible();
+      expect(sheet).toHaveTextContent("Holdings");
+      await userEvent.click(screen.getByRole("button", { name: "Collapse context" }));
+      expect(screen.queryByRole("dialog", { name: "Context" })).not.toBeInTheDocument();
+      expect(toggle).toHaveFocus();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
+  });
   it("opens chat sessions as a full phone page", async () => {
     const originalWidth = window.innerWidth;
     try {

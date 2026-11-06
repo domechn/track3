@@ -27,7 +27,7 @@ test("Chinese coin and edit copy uses whole translated phrases", async ({ browse
 
 for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
   test(`coin ${symbol} shows the approved detail sections and captures at 390px`, async ({ browser }) => {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, userAgent: phone,
       isMobile: true, hasTouch: true, colorScheme: "dark", reducedMotion: "reduce", timezoneId: "UTC" });
     try {
       const page = await context.newPage();
@@ -66,11 +66,11 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
       }
       mkdirSync(`/tmp/fidelity/coin-${symbol.toLowerCase()}`, { recursive: true });
       writeFileSync(`/tmp/fidelity/coin-${symbol.toLowerCase()}/geometry.json`, JSON.stringify(await page.evaluate(() => ({
-        cards: [...document.querySelectorAll(".fd-coin>.fd-card")].map((element) => {
+        cards: [...document.querySelectorAll(".fd-coin>.fd-card,.fd-coin-detail-grid .fd-card")].map((element) => {
           const rect = element.getBoundingClientRect();
           return { y: rect.y, height: rect.height, width: rect.width };
         }),
-        inner: [...document.querySelectorAll(".fd-coin-primary,.fd-coin-changes,.fd-position,.fd-position-grid,.fd-coin-trend .fd-empty,.fd-coin-trend .fd-card-heading,.fd-coin-chart,.fd-open-lots,.fd-lot-row,.fd-tx-list")].map((element) => {
+        inner: [...document.querySelectorAll(".fd-coin-primary,.fd-coin-changes,.fd-position,.fd-position-grid,.fd-coin-trend .fd-empty,.fd-coin-trend .fd-card-heading,.fd-coin-chart,.fd-coin-lots,.fd-lot-row,.fd-tx-list")].map((element) => {
           const rect = element.getBoundingClientRect();
           return { className: element.className, y: rect.y, height: rect.height };
         }),
@@ -80,12 +80,16 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         }),
         height: document.getElementById("app-main-content")!.scrollHeight,
       })), null, 2));
-      await page.screenshot({ path: `/tmp/fidelity/coin-${symbol.toLowerCase()}/coin-${symbol.toLowerCase()}-phone-long.png`, fullPage: true });
-      await page.screenshot({ path: `/tmp/fidelity/coin-${symbol.toLowerCase()}/coin-${symbol.toLowerCase()}-phone.png` });
+      const captureOutput = process.env.WUI18_CAPTURE_DIR ?? `/tmp/fidelity/coin-${symbol.toLowerCase()}`;
+      mkdirSync(captureOutput, { recursive: true });
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: `${captureOutput}/coin-${symbol.toLowerCase()}-phone-long.png`, fullPage: true });
+      await page.screenshot({ path: `${captureOutput}/coin-${symbol.toLowerCase()}-phone.png` });
       if (symbol === "BTC") {
         await expect(page.locator(".fd-coin-head h1")).toContainText("Bitcoin BTC");
+        await expect(page.locator(".fd-coin-head p")).toHaveText("Held on Binance and a Ledger cold wallet");
         await expect(page.locator(".fd-coin-primary .fd-label")).toHaveText("Bitcoin price");
-        await expect(page.locator(".fd-source-row").first()).toContainText("Exchange");
+        await expect(page.locator(".fd-source-row").first()).toContainText("Ledger cold wallet");
         await expect(page.locator(".fd-coin-changes")).toContainText("+7.32%");
         await expect(page.locator(".fd-coin-stats")).toContainText("Since 1 Oct");
         await expect(page.locator(".fd-position-grid .fd-coin-metric").nth(1)).toContainText("$53,647.29");

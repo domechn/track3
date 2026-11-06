@@ -9,7 +9,7 @@ import HideIcon from "@/assets/icons/hide-icon.png";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ReloadIcon } from "@radix-ui/react-icons";
+import { ExternalLinkIcon, ReloadIcon } from "@radix-ui/react-icons";
 import {
   activateLicenseOnDevice,
   clearLicenseCache,
@@ -28,6 +28,7 @@ import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { getVersion } from "@/utils/app";
 import { trackCheckoutCompleted, trackCheckoutPhase, trackSubscribeClicked, trackCheckoutCancelled, trackOpenClicked } from "@/middlelayers/ui-state/telemetry";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { check } from "@tauri-apps/plugin-updater";
 import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { requestOnboardingReplay } from "@/middlelayers/onboarding";
@@ -58,6 +59,8 @@ const App = ({
   const [activationError, setActivationError] = useState<string>();
   const [inactiveLicenseLoading, setInactiveLicenseLoading] = useState(false);
   const [showLegacyInput, setShowLegacyInput] = useState(false);
+  const [checkingAbout, setCheckingAbout] = useState(false);
+  const [aboutUpdate, setAboutUpdate] = useState<string>();
 
   // subscription states
   const [subscriptionInfo, setSubscriptionInfo] =
@@ -269,6 +272,22 @@ const App = ({
     await openUrl("https://track3.dev/#pro");
   }
 
+  async function checkAboutUpdates() {
+    if (checkingAbout) return;
+    setCheckingAbout(true);
+    setAboutUpdate(undefined);
+    try {
+      const update = await check();
+      if (update) setAboutUpdate(update.version);
+      else toast({ title: t("fidelity.settingsB.about.upToDate"),
+        description: t("fidelity.settingsB.about.upToDateDetail").replace("{version}", version), tone: "success" });
+    } catch {
+      toast({ description: t("fidelity.settingsB.about.status.error"), variant: "destructive" });
+    } finally {
+      setCheckingAbout(false);
+    }
+  }
+
   function subscriptionStatusLabel(status: string | null): string {
     switch (status) {
       case "active":
@@ -465,7 +484,24 @@ const App = ({
       {showPro && activeLicense && licenseDevices && <ProLicenseDevices value={licenseDevices} locale={locale} t={t} />}
       {showAbout && <Card className="t3-about-version">
         <CardHeader className="pb-2"><CardTitle>{t("system.appVersion")}</CardTitle></CardHeader>
-        <CardContent><p className="text-xl font-semibold tabular-nums">Track3 {version}</p></CardContent>
+        <CardContent className="flex flex-1 flex-col">
+          <p className="text-xl font-semibold tabular-nums">Track3 {version}</p>
+          <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
+            <Button type="button" size="sm" variant="outline" disabled={checkingAbout} onClick={() => { void checkAboutUpdates(); }}>
+              {t(checkingAbout ? "fidelity.settingsB.about.checking" : "fidelity.settingsB.about.check")}
+            </Button>
+            {aboutUpdate && <Button type="button" size="sm" variant="outline" onClick={() => { void openUrl("https://github.com/domechn/track3/releases/latest"); }}>
+              {t("fidelity.settingsB.about.viewUpdate")}
+            </Button>}
+          </div>
+          {aboutUpdate && <p role="status" className="pt-2 text-xs text-muted-foreground">
+            {t("fidelity.settingsB.about.updateAvailable").replace("{version}", aboutUpdate)}
+          </p>}
+          <button type="button" className="mt-2 inline-flex min-h-11 w-fit items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
+            onClick={() => { void openUrl("https://github.com/domechn/track3/releases"); }}>
+            {t("fidelity.settingsB.about.fullNotes")} <ExternalLinkIcon aria-hidden="true" />
+          </button>
+        </CardContent>
       </Card>}
       {showAbout && <Card className="t3-about-guide">
         <CardHeader className="pb-2">
@@ -473,6 +509,10 @@ const App = ({
         </CardHeader>
         <CardContent className="space-y-2">
           <p className="text-xs text-muted-foreground">{t("onboarding.replay.description")}</p>
+          <button type="button" className="inline-flex min-h-11 w-fit items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
+            onClick={() => { void openUrl("https://docs.track3.dev"); }}>
+            {t("fidelity.settingsB.about.docs")} <ExternalLinkIcon aria-hidden="true" />
+          </button>
           <Button type="button" variant="outline" size="sm" data-testid="onboarding-replay" onClick={requestOnboardingReplay}>{t("onboarding.replay.action")}</Button>
         </CardContent>
       </Card>}

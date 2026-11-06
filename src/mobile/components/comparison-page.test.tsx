@@ -43,6 +43,9 @@ vi.mock("@/middlelayers/charts", () => ({
 }));
 
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
+import * as configuration from "@/middlelayers/configuration";
+import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
+import * as platform from "@/utils/platform";
 import { COMPARISON_DATES_KEY } from "@/middlelayers/ai/actions";
 
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
@@ -54,6 +57,32 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
+  it("uses the shared stablecoin list for the phone mover note", async () => {
+    const stableQuery = vi.spyOn(StableCoinsQuery.prototype, "listAllStableCoins").mockResolvedValue(["XUSD"]);
+    const savedStable = vi.spyOn(configuration, "getStableCoins").mockResolvedValue([]);
+    const ios = vi.spyOn(platform, "isIOS").mockReturnValue(true);
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    try {
+      vi.mocked(queryAllDataDates).mockResolvedValue([
+        { id: "head", date: "2024-04-16", createdAt: "2024-04-16T00:00:00Z" },
+        { id: "base", date: "2024-04-15", createdAt: "2024-04-15T00:00:00Z" },
+      ]);
+      vi.mocked(queryCoinDataByUUID).mockImplementation(async (uuid: string) => [
+        { symbol: "BTC", assetType: "crypto", amount: 1, value: uuid === "head" ? 120 : 100, price: uuid === "head" ? 120 : 100 },
+        { symbol: "XUSD", assetType: "crypto", amount: 1, value: uuid === "head" ? 98 : 100, price: uuid === "head" ? 98 : 100 },
+      ]);
+      render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+      await waitFor(() => expect(document.querySelector(".fd-comparison-movers.percent p"))
+        .toHaveTextContent("XUSD moved"));
+    } finally {
+      stableQuery.mockRestore();
+      savedStable.mockRestore();
+      ios.mockRestore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
+
   it("opens a snapshot selected from History as the comparison head", async () => {
     window.location.hash = "#/comparison?head=older";
     vi.mocked(queryAllDataDates).mockResolvedValue([

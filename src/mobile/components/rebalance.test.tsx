@@ -87,6 +87,15 @@ afterEach(() => {
 });
 
 describe("Rebalance page", () => {
+  it("shows the shared empty state in advanced phone setup", async () => {
+    setPhone();
+    render(<Rebalance currency={currency} />);
+    await screen.findByRole("button", { name: "Plan actions" });
+    fireEvent.click(screen.getByRole("button", { name: "Plan actions" }));
+    fireEvent.click(screen.getByRole("button", { name: "Advanced setup" }));
+    expect(document.querySelector(".t3-manage-rebalance [data-empty-state]")).toBeVisible();
+  });
+
   it("starts an unsaved phone plan at the established zero tolerance and restores it after deletion", async () => {
     setPhone();
     render(<Rebalance currency={currency} />);

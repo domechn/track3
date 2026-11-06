@@ -38,6 +38,7 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
   const [subtitle, setSubtitle] = useState("");
   const [subtitleEmphasis, setSubtitleEmphasis] = useState("");
   const [selectedYear, setSelectedYear] = useState(dateRange.end.getFullYear());
+  const [moverNames, setMoverNames] = useState<string[]>([]);
   const loaded = useRef(0);
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   const hasValidRange = dateRange.start.getTime() > new Date("1970-01-01").getTime() &&
@@ -82,7 +83,7 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
   const attributionCaption = `${new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(dateRange.start)} ${t("summary.fidelity.to")} ${new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(dateRange.end)}, ${currency.currency}`;
 
   return <OverviewLoadingContext.Provider value={context}>
-    <SummaryFidelityYearContext.Provider value={{ year: selectedYear, setYear: setSelectedYear }}>
+    <SummaryFidelityYearContext.Provider value={{ year: selectedYear, setYear: setSelectedYear, moverNames, setMoverNames }}>
     <div className={`analyze-summary fidelity-summary${oneSnapshot ? " fidelity-summary-single" : ""}${quoteColor === "red-up-green-down" ? " fidelity-reverse" : ""}`} aria-busy={loading}>
       <header className="fidelity-page-head">
         <h1>{t("summary.h1")}</h1>
