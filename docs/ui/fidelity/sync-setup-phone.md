@@ -101,4 +101,4 @@ Capture: `/tmp/fidelity/settings-b/sync-setup.png` (full page: `sync-setup-long.
 
 ## Pixel difference
 
-Viewport: **7.377%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).
+Viewport: **7.563%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).

@@ -385,6 +385,15 @@ test("remaining configuration editors have named controls", async ({ page }) => 
 test.describe("coarse pointer touch targets", () => {
 test.use({ isMobile: true, hasTouch: true });
 
+test("Full release notes has a 44px touch target", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await installTauriBridge(page);
+  await page.goto("/#/settings/systemInfo?section=about", { waitUntil: "domcontentloaded" });
+  const notes = page.getByRole("button", { name: "Full release notes" });
+  await expect(notes).toBeVisible({ timeout: 15_000 });
+  expect((await notes.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+});
+
 test("visible controls across routes have 44px targets or 44px labels", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.emulateMedia({ reducedMotion: "reduce" });

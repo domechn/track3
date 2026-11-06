@@ -16,6 +16,8 @@ Dialogs are centred on the dimmed page: `Use the other device’s value?`, `Disa
 
 ## Remaining differences
 
+The owner requested a content-sized passphrase card, a separate Sync status card using real runtime values, and a full-width What to sync row. The source places Passphrase in a stretched 423px row and What to sync beside Devices. The resulting card positions differ because the source layout leaves a large empty area in the passphrase card. The new status card omits remote object size and next scheduled sync because the runtime does not expose them.
+
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.
 
 Settings toasts retain a visible 44px close × target for keyboard and pointer dismissal; the reference toasts omit it.
@@ -34,7 +36,7 @@ All 17 authoritative source renders and app captures were viewed side by side. S
 | --- | ---: |
 | sync | 4.44% |
 | sync-setup | 4.69% |
-| sync-locked | 4.71% |
+| sync-locked | 5.25% |
 | sync-loading | 3.66% |
 | sync-testing | 4.39% |
 | sync-test-fail | 4.49% |

@@ -66,6 +66,16 @@ afterEach(() => {
 });
 
 describe("Sync settings page", () => {
+  it("uses mobile copy for the actual sync report", () => {
+    status.mode = "ready";
+    status.sync.report = { pulled: 5, pushed: 4 };
+    render(<SyncSettingsPage />);
+    const card = screen.getByText("Sync status").closest("[data-ui-card]")!;
+    expect(card).toHaveTextContent("StateConnected");
+    expect(card).toHaveTextContent("Uploaded4");
+    expect(card).toHaveTextContent("Downloaded5");
+  });
+
   it("formats remote upload dates with the selected Chinese locale", async () => {
     const timezone = process.env.TZ;
     process.env.TZ = "UTC";

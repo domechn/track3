@@ -8,6 +8,8 @@ Right card title “Gain and loss colours”, description “Pick which colour m
 
 ## Remaining differences
 
+At 1100px the app shows its editable summary, Theme, and Quote Color cards in one column. The static source has only its Theme and Gain and loss colours cards in two columns. The summary cards contain live settings, and stacking them keeps the short Language summary within the 60px empty-space limit.
+
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.
 
 Settings toasts retain a visible 44px close × target for keyboard and pointer dismissal; the reference toasts omit it.
@@ -22,6 +24,6 @@ The capture table records current ratios at a 24/255 maximum RGB channel thresho
 
 | State | Pixel difference | App capture |
 | --- | ---: | --- |
-| `appearance-default` | 2.75% | `/tmp/fidelity-desktop/appearance/appearance-default-desktop.png` |
+| `appearance-default` | 2.85% | `/tmp/fidelity-desktop/appearance/appearance-default-desktop.png` |
 | `appearance-redup` | 2.75% | `/tmp/fidelity-desktop/appearance/appearance-redup-desktop.png` |
 | `appearance-system` | 2.75% | `/tmp/fidelity-desktop/appearance/appearance-system-desktop.png` |

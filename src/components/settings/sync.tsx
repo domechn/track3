@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { DesktopIcon, EyeClosedIcon, EyeOpenIcon, LockClosedIcon, MobileIcon, Pencil1Icon, ReloadIcon } from "@radix-ui/react-icons";
+import { DesktopIcon, EyeClosedIcon, EyeOpenIcon, LockClosedIcon, MobileIcon, Pencil1Icon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
 import { ConfigConflictChoices } from "@/components/sync-conflict-choices";
 import { SyncActionButton } from "@/components/settings/sync-action-button";
 import { SyncRecoveryUnlock } from "@/components/settings/sync-recovery";
+import { SyncStatusCard } from "@/components/settings/sync-status-card";
 import { useSyncFeedback, waitForSyncResult } from "@/components/settings/use-sync-feedback";
 import { useTranslation } from "@/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
@@ -20,7 +21,7 @@ import {
 } from "@/middlelayers/sync/settings";
 
 export default function SyncSettingsPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const wide = useWideDesktop();
   const { toast } = useToast();
   const { busy, statusMessage, clearStatus, error, success, result, run } = useSyncFeedback(t, toast, true);
@@ -207,7 +208,7 @@ export default function SyncSettingsPage() {
   }
 
   return (
-    <div className="sync-settings-page space-y-5">
+    <div className="sync-settings-page space-y-5" data-mode={status.mode}>
       <div className="t3-settings-page-head">
         <h3>{t("settings.phase6.sync")}</h3>
         <p>{t("sync.intro")}</p>
@@ -264,6 +265,7 @@ export default function SyncSettingsPage() {
         </CardContent>
       </Card>
 
+      <div className="t3-sync-top-right">
       <Card className="t3-sync-passphrase">
         <CardHeader><CardTitle>{t(wide ? "fidelity.settingsB.sync.passphrase" : "sync.passphrase.title")}</CardTitle>
           {wide && status.mode === "ready" && <span className="t3-b-pill connected">{t("fidelity.settingsB.sync.unlocked")}</span>}
@@ -316,6 +318,8 @@ export default function SyncSettingsPage() {
           </>}
         </CardContent>
       </Card>
+      <SyncStatusCard status={status} busy={busy} onSyncNow={() => { void syncNow(); }} t={t} locale={locale} />
+      </div>
 
       <Card className="t3-sync-categories">
         <CardHeader>
@@ -323,16 +327,15 @@ export default function SyncSettingsPage() {
           <p className="text-sm text-muted-foreground">{t(wide ? "fidelity.settingsB.sync.categoriesDesc" : "sync.categories.deviceLocal")}</p>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="t3-sync-category-grid">
           {categories.map((category) => (
             <div key={category} className="flex items-center justify-between gap-4">
               <div>
                 <Label htmlFor={`sync-category-${category}`}>{t(wide && category === "history" ? "fidelity.settingsB.sync.history" : `sync.categories.${category}`)}</Label>
-                {wide
-                  ? <p className={`t3-b-sync-category-description${category === "secrets" ? " secret" : ""}`}>
+                <p className={`t3-b-sync-category-description${category === "secrets" ? " secret" : ""}`}>
                     {category === "secrets" && <LockClosedIcon aria-hidden="true" />}
                     {t(`fidelity.settingsB.sync.category.${category}.description`)}
                   </p>
-                  : category === "secrets" && <p className="text-xs text-muted-foreground">{t("sync.categories.secretsWarning")}</p>}
               </div>
               <Switch id={`sync-category-${category}`} checked={form.categories[category]} disabled={!!busy}
                 onCheckedChange={(checked) => {
@@ -341,6 +344,7 @@ export default function SyncSettingsPage() {
                 }} />
             </div>
           ))}
+          </div>
           {unsavedCategories && <p role="status" className="text-sm text-muted-foreground">{t("sync.categories.unsaved")}</p>}
           {status.mode === "ready" && (!wide || unsavedCategories) && <SyncActionButton variant="outline" disabled={!!busy}
             pending={busy === "save"} pendingLabel={t("sync.pending.save")}
@@ -384,12 +388,6 @@ export default function SyncSettingsPage() {
             <p className="text-sm text-muted-foreground">{t(wide ? "fidelity.settingsB.sync.devicesDesc" : "sync.devices.localNames")}</p>
           </CardHeader>
           <CardContent className="space-y-3">
-            {wide && <div className="t3-b-sync-device-kpis">
-              <div><small>{t("fidelity.settingsB.sync.lastUpload")}</small><b>{status.sync.lastSync ? new Date(status.sync.lastSync).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "—"}</b></div>
-              <div><small>{t("fidelity.settingsB.sync.uploaded")}</small><b>{status.sync.report?.pushed.toLocaleString() ?? "—"}</b></div>
-              <div><small>{t("fidelity.settingsB.sync.downloaded")}</small><b>{status.sync.report?.pulled.toLocaleString() ?? "—"}</b></div>
-              <div><small>{t("sync.devices.title")}</small><b>{devices.length}</b></div>
-            </div>}
             {wide && devices.length > 0 && <div className="t3-b-sync-device-head">
               <span>{t("fidelity.settingsB.sync.deviceColumn")}</span>
               <span>{t("fidelity.settingsB.sync.lastUpload")}</span>
@@ -436,8 +434,6 @@ export default function SyncSettingsPage() {
             ))}
             <div className="sync-device-actions flex flex-wrap gap-2 pt-2">
               {status.mode !== "disabled" && <>
-                <SyncActionButton disabled={!!busy || status.mode !== "ready"} pending={busy === "now"}
-                  pendingLabel={t("sync.pending.now")} onClick={() => void syncNow()}>{wide && <ReloadIcon aria-hidden="true" />}{t("sync.now")}</SyncActionButton>
                 {wide ? <ConfirmDeleteDialog
                   trigger={<SyncActionButton variant="outline" disabled={!!busy} pending={false}
                     pendingLabel={t("sync.pending.disable")}>{t("sync.disable")}</SyncActionButton>}

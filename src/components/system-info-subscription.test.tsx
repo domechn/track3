@@ -4,6 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import SystemInfo from "@/components/system-info";
 import { checkoutPendingKey } from "@/middlelayers/checkout";
 import { I18nProvider, useTranslation } from "@/i18n";
+import { check } from "@tauri-apps/plugin-updater";
+
+vi.mock("@tauri-apps/plugin-updater", () => ({ check: vi.fn() }));
 
 const exhaustedUsage = {
   erc20: { limit: 300, used: 300, remaining: 0, periodStart: "2026-10-03", periodEnd: "2026-11-03T00:00:00.000Z" },
@@ -75,6 +78,7 @@ beforeEach(() => {
   localStorage.clear();
   mocks.trackEventWithClientID.mockResolvedValue(undefined);
   mocks.getVersion.mockResolvedValue("0.6.1");
+  vi.mocked(check).mockResolvedValue(null);
   mocks.getLicenseIfIsPro.mockResolvedValue(undefined);
   mocks.createCheckoutSession.mockResolvedValue({
     sessionId: "cs_test_123",
@@ -126,6 +130,36 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
+  it("opens release notes from the regular About version card", async () => {
+    render(<SystemInfo onProStatusChange={() => {}} />);
+    const version = await screen.findByText("Track3 0.6.1");
+    fireEvent.click(within(version.closest("[data-ui-card]") as HTMLElement).getByRole("button", { name: "Full release notes" }));
+    expect(mocks.openUrl).toHaveBeenCalledWith("https://github.com/domechn/track3/releases");
+  });
+  it("opens documentation from the regular About guide card", async () => {
+    render(<SystemInfo onProStatusChange={() => {}} />);
+    const guide = await screen.findByText("Getting started");
+    fireEvent.click(within(guide.closest("[data-ui-card]") as HTMLElement).getByRole("button", { name: "Documentation" }));
+    expect(mocks.openUrl).toHaveBeenCalledWith("https://docs.track3.dev");
+  });
+  it("checks updates from the regular About version card", async () => {
+    render(<SystemInfo onProStatusChange={() => {}} />);
+    const version = await screen.findByText("Track3 0.6.1");
+    fireEvent.click(within(version.closest("[data-ui-card]") as HTMLElement).getByRole("button", { name: "Check for updates" }));
+    await waitFor(() => expect(check).toHaveBeenCalledOnce());
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
+      tone: "success", description: "You are on the latest version, 0.6.1.",
+    }));
+  });
+  it("offers the real release when an update is available", async () => {
+    vi.mocked(check).mockResolvedValueOnce({ version: "0.7.0" } as Awaited<ReturnType<typeof check>>);
+    render(<SystemInfo onProStatusChange={() => {}} />);
+    const version = await screen.findByText("Track3 0.6.1");
+    const card = within(version.closest("[data-ui-card]") as HTMLElement);
+    fireEvent.click(card.getByRole("button", { name: "Check for updates" }));
+    fireEvent.click(await card.findByRole("button", { name: "View update" }));
+    expect(mocks.openUrl).toHaveBeenCalledWith("https://github.com/domechn/track3/releases/latest");
+  });
   it("shows license devices only when the server supports the devices action", async () => {
     mocks.getLicenseIfIsPro.mockResolvedValue("stored-license");
     mocks.getLicenseDevices.mockResolvedValue({ limit: 3, devices: [

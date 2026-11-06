@@ -62,8 +62,7 @@ export function BackupDesign(p: Props) {
       <div className="t3-b-backup-stats"><div><small>{t("fidelity.settingsB.backup.lastBackup")}</small><b>{p.lastBackupAt && p.lastBackupAt.getTime() > 0 ? p.lastBackupAt.toLocaleDateString(p.locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}</b></div>
         <div><small>{t("fidelity.settingsB.backup.snapshots")}</small><b>{count(p.summary?.snapshots)}</b></div></div>
       <div className="t3-b-backup-restore"><h4>{t("fidelity.settingsB.backup.restoreList")}</h4><BackupRestoreList directory={p.directory} onPreview={p.onPreview} t={t} locale={p.locale} /></div>
-    </section>
-    <section className="t3-b-card t3-b-backup-device">
+      <section className="t3-b-backup-device">
       <div className="t3-b-card-head"><div><h3>{t("fidelity.settingsB.backup.onDevice")}</h3><p>{t("fidelity.settingsB.backup.onDeviceDesc")}</p></div></div>
       <dl className="t3-b-dl">
         <dt>{t("fidelity.settingsB.backup.database")}</dt><dd>SQLite</dd>
@@ -72,6 +71,7 @@ export function BackupDesign(p: Props) {
         <dt>{t("fidelity.settingsB.backup.transactions")}</dt><dd>{count(p.summary?.transactions)}</dd>
         <dt>{t("fidelity.settingsB.backup.backupFolder")}</dt><dd className="mono">{p.directory || "—"}</dd>
       </dl>
+      </section>
     </section>
   </div>;
 }

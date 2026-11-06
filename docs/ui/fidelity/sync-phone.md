@@ -126,6 +126,7 @@ State: **default**. Button actions, input validity, status, overlays, and toasts
 
 Capture: `/tmp/fidelity/settings-b/sync.png` (full page: `sync-long.png`). Design and app were compared side by side at 390 × 844 CSS px. Remaining differences are listed below.
 
+- The owner requested a separate Sync status card with real runtime values. The source places its sample sync values and Sync now action in Devices, so the two card sections differ in order and height.
 - The source shows a partly visible access-key ID and an eye control for the secret. The app masks both stored credential fields and has no secret reveal control.
 - The fake S3 fixture now contains a remote device manifest. Unlocked captures show the remote iPhone and this device. Remote item and size totals are not exposed by the runtime, and locked/setup captures cannot list remote devices before unlock.
 - The source Passphrase and What to sync sections show metadata and descriptions that the current runtime does not expose. The app retains the real unlock, category switches and recovery-file flow, leaving different card heights.
@@ -135,4 +136,4 @@ Capture: `/tmp/fidelity/settings-b/sync.png` (full page: `sync-long.png`). Desig
 
 ## Pixel difference
 
-Viewport: **8.558%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).
+Viewport: **8.675%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).
