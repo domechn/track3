@@ -32,7 +32,7 @@ function contrast(foreground, background) {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-test("source icons render at 20px and each group has equal tiles", async () => {
+test("source chips render at 32px and each group has equal tiles", async () => {
   for (const width of [1440, 390]) {
     const page = await open(width);
     await page.locator(".source-grid img").evaluateAll((images) => Promise.all(images.map((img) => {
@@ -51,7 +51,7 @@ test("source icons render at 20px and each group has equal tiles", async () => {
     })));
     assert.equal(groups.length, 2);
     for (const group of groups) {
-      assert.ok(group.logos.every(({ width, height }) => width === 20 && height === 20), `${width}: icon boxes ${JSON.stringify(group.logos)}`);
+      assert.ok(group.logos.every(({ width, height }) => width === 32 && height === 32), `${width}: icon boxes ${JSON.stringify(group.logos)}`);
       assert.ok(group.tileSizes.every(([w, h]) => w === group.tileSizes[0][0] && h === group.tileSizes[0][1]), `${width}: tile sizes ${JSON.stringify(group.tileSizes)}`);
     }
     await page.close();
@@ -282,10 +282,10 @@ test("feature captures fade into frames that follow the system theme", async () 
   }
 });
 
-test("OKX and Bybit symbol tiles show each name once", async () => {
+test("OKX and Bybit logo tiles show each name once", async () => {
   const page = await open(1440);
   for (const name of ["OKX", "Bybit"]) {
-    const tile = page.locator(".source-grid li").filter({ has: page.locator(`img[src$="${name === "OKX" ? "okx" : "bybit"}-symbol.svg"]`) });
+    const tile = page.locator(".source-grid li").filter({ has: page.locator(`img[src$="${name === "OKX" ? "okex" : "bybit"}-logo.svg"]`) });
     assert.equal(await tile.evaluate((el) => el.textContent.trim()), name);
     assert.equal(await tile.locator("img").getAttribute("alt"), "");
   }
