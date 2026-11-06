@@ -12,7 +12,8 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/mobile/i18n";
 import { toast } from "@/mobile/components/ui/use-toast";
 import { BottomSheet } from "@/mobile/components/mobile";
-import { ChevronRightIcon } from "@radix-ui/react-icons";
+import { ArchiveIcon, BackpackIcon, ChevronRightIcon, ClockIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 import { buildAssetDetailsPath, formatAssetLabel, getAssetLogoKey } from "@/utils/assets";
 import { currencyWrapper } from "@/utils/currency";
 import { sourceDisplayNames } from "@/components/source-display-name";
@@ -64,7 +65,10 @@ function importedEdits(transactions: Transaction[], logs: SnapshotEdit[]): Recor
 }
 
 function CoinChart({ points, mode, symbol, currency, shortDate, emptyText }: { points: Point[]; mode: "value" | "price"; symbol: string; currency: CurrencyRateDetail; shortDate: (value: string | Date) => string; emptyText: string }) {
+  const { t } = useTranslation();
   const values = points.map((point) => currencyWrapper(currency)(mode === "value" ? point.value : point.price));
+  if (values.length === 0) return <EmptyState icon={ClockIcon} className="fd-empty fd-coin-chart-empty"
+    title={t("coin.market.history.empty.title")} hint={emptyText} />;
   if (values.length < 3) return <div className="fd-empty fd-coin-chart-empty">{emptyText}</div>;
   const lowest = Math.min(...values), highest = Math.max(...values);
   const magnitude = 10 ** Math.floor(Math.log10(highest - lowest || Math.abs(highest) || 1));
@@ -346,7 +350,7 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
     {data?.manual ? card(<>{cardHeading(label("price"),label("manual"))}<div className="fd-empty">{label("manualNoHistory").replaceAll("{symbol}",symbol)}</div><div className="fd-manual-rows"><div>{date(data.manualSetAt??new Date())}<strong>{moneyInCurrency(price,false,4)}</strong><small>{label("manualPrice")}</small></div>{manualPricePaging.rows.map(tx=><div key={tx.id}>{date(tx.txnCreatedAt)}<strong>{tx.price>0?moneyInCurrency(tx.price,false,4):dash}</strong><small>{tx.price>0?label("fromBuy").replace("{amount}",fmt(tx.amount,0)).replace("{symbol}",symbol):label("depositNoPrice")}</small></div>)}</div><Pager count={manualPriceRows.length} {...manualPricePaging} pageSizes={[15,25,50,100]} t={t} labelPrefix="fidelity.coin.pager" ariaLabel={label("price")} /><button className="fd-outline-pill" type="button" onClick={()=>navigate(`/settings/configuration?edit=${encodeURIComponent(symbol)}`)}><svg aria-hidden="true" width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M3 15l.8-3.5L12.5 3l2.5 2.5-8.7 8.7L3 15Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>{label("setCurrentPrice")}</button></>,"fd-coin-trend") : card(<>{cardHeading(chartMode==="value"?label("valueHoldings"):label("price"))}<p className="fd-sub">{chartMode==="value"?label("currentHoldingsEachDay").replace("{amount}",quantity(held,assetType,false)).replace("{symbol}",symbol):label("quoteInCurrency").replace("{symbol}",symbol).replace("{currency}",currency.currency)}</p><div className="fd-chart-controls"><div role="group" aria-label={label("chartMode")}>{(["value","price"] as const).map(mode=><button type="button" aria-pressed={chartMode===mode} key={mode} onClick={()=>{setChartMode(mode);setChartRange(mode==="price"?"7D":"30D")}}>{label(mode)}</button>)}</div><div role="group" aria-label={label("chartRange")}>{(["7D","30D"] as const).map(r=><button type="button" aria-pressed={chartRange===r} key={r} onClick={()=>setChartRange(r)}>{r}</button>)}</div></div><CoinChart points={chartPoints} mode={chartMode} symbol={symbol} currency={currency} shortDate={shortDate} emptyText={chartPoints.length ? label("notEnoughHistory") : label("noPriceHistory").replace("{symbol}", symbol)}/><div className="fd-coin-stats"><Metric label={label("high")} value={high===null?dash:moneyInCurrency(high,false,chartMode==="price"?2:2)} detail={high===null?"":shortDate(chartPoints[chartValues.indexOf(high)].date)} /><Metric label={label("low")} value={low===null?dash:moneyInCurrency(low)} detail={low===null?"":shortDate(chartPoints[chartValues.indexOf(low)].date)} /><Metric label={label("sinceDate").replace("{date}",chartPoints.length?shortDate(chartPoints[0].date):dash)} value={delta===null?dash:moneyInCurrency(delta,true)} valueTone={tone(delta)} detail={delta===null||!chartValues[0]?dash:pct(delta/chartValues[0])} /></div></>,"fd-coin-trend")}
       {card(<>
         {cardHeading(label("holdingsSource"), sourceCount(data?.sources.length ?? 0))}
-        <div className="fd-source-list">
+        {data?.sources.length ? <div className="fd-source-list">
           {sourceGroups.visible.map((source) => <div className="fd-source-row" key={source.id}>
             <b>{source.label}</b><strong>{moneyInCurrency(source.value)}</strong>
             <small>{quantity(source.amount, assetType, Boolean(data?.manual))} {symbol} · {source.share.toFixed(1)}% · {source.kind}</small>
@@ -361,9 +365,10 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
             </div>)}
           </>}
           <div className="fd-source-row total"><b>{label("total")}</b><strong>{moneyInCurrency(value)}</strong><small>{quantity(held,assetType,Boolean(data?.manual))} {symbol}</small></div>
-        </div>
+        </div> : <EmptyState icon={BackpackIcon} title={t("coin.sources.empty.title")} hint={t("coin.sources.empty.hint")} />}
         <div className="fd-open-lots fd-coin-lots">
       {cardHeading(label("openLots"), lotCount(lotRows.length))}
+      {lotRows.length ? <>
       <div className="fd-lot-header"><span>{label("acquired")}</span><span>{label("quantity")}</span><span>{label("costPrice")}</span><span>{label("unrealized")}</span></div>
       <div className={lotsExpanded ? "fd-lots-scroll expanded" : "fd-lots-scroll"} role="region" aria-label={label("openLots")} tabIndex={0}>
         {(lotsExpanded ? lotRows : lotRows.slice(0, 8)).map(lot => <div className="fd-lot-row" key={lot.id}>
@@ -375,9 +380,10 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
       {lotRows.length > 8 && <button className="fd-lots-toggle" type="button" aria-expanded={lotsExpanded} onClick={() => setLotsExpanded(!lotsExpanded)}>
         {lotsExpanded ? label("showFewerLots") : label("showAllLots").replace("{count}", String(lotRows.length))}
       </button>}
+      </> : <EmptyState icon={ArchiveIcon} title={t("coin.lots.empty.title")} hint={t("coin.lots.empty.hint")} />}
             </div>
       </>, "fd-coin-holdings")}
-    {card(<>{cardHeading(label("transactions"))}<div className="fd-tx-filters" role="group" aria-label={label("filterTransactions")}>{["all","buy","sell","deposit","withdraw"].filter(x=>x==="all"||transactions.some(tx=>tx.txnType===x)).map(x=><button type="button" aria-pressed={filter===x} key={x} onClick={()=>setFilter(x)}>{x==="all"?label("all"):t(`coin.txnType.${x}`)} {x==="all"?transactions.length:transactions.filter(tx=>tx.txnType===x).length}</button>)}</div><div className="fd-tx-list" style={transactionRows.length > transactionPaging.pageSize ? { minHeight: transactionPaging.pageSize * 64 } : undefined}>{transactionPaging.rows.map(tx=><button type="button" className="fd-tx-row" key={tx.id} onClick={()=>openTransaction(tx)}><span className="fd-tx-main"><em>{transactionName(tx)}</em><b>{quantity(tx.amount,assetType,Boolean(data?.manual))} {symbol}</b><strong>{tx.price>0?moneyInCurrency(tx.amount*tx.price):dash}</strong></span><small>{data?.edits[tx.id] && <><span className="fd-edited">{label("edited")}</span> · </>}{date(tx.txnCreatedAt)} · {sourceName(tx.wallet??"")}{transferCounterpart(tx)}{tx.price>0?` · @ ${moneyInCurrency(tx.price,false,currentPriceDigits)}`:""}<span className="sr-only"> · {label("note")}: {dash}</span></small></button>)}</div><Pager count={transactionRows.length} {...transactionPaging} pageSizes={[15,25,50,100]} t={t} labelPrefix="fidelity.coin.pager" /><p className="fd-footnote">{label("editNote")}</p></>,"fd-coin-transactions")}
+    {card(<>{cardHeading(label("transactions"))}<div className="fd-tx-filters" role="group" aria-label={label("filterTransactions")}>{["all","buy","sell","deposit","withdraw"].filter(x=>x==="all"||transactions.some(tx=>tx.txnType===x)).map(x=><button type="button" aria-pressed={filter===x} key={x} onClick={()=>setFilter(x)}>{x==="all"?label("all"):t(`coin.txnType.${x}`)} {x==="all"?transactions.length:transactions.filter(tx=>tx.txnType===x).length}</button>)}</div>{transactionRows.length ? <><div className="fd-tx-list" style={transactionRows.length > transactionPaging.pageSize ? { minHeight: transactionPaging.pageSize * 64 } : undefined}>{transactionPaging.rows.map(tx=><button type="button" className="fd-tx-row" key={tx.id} onClick={()=>openTransaction(tx)}><span className="fd-tx-main"><em>{transactionName(tx)}</em><b>{quantity(tx.amount,assetType,Boolean(data?.manual))} {symbol}</b><strong>{tx.price>0?moneyInCurrency(tx.amount*tx.price):dash}</strong></span><small>{data?.edits[tx.id] && <><span className="fd-edited">{label("edited")}</span> · </>}{date(tx.txnCreatedAt)} · {sourceName(tx.wallet??"")}{transferCounterpart(tx)}{tx.price>0?` · @ ${moneyInCurrency(tx.price,false,currentPriceDigits)}`:""}<span className="sr-only"> · {label("note")}: {dash}</span></small></button>)}</div><Pager count={transactionRows.length} {...transactionPaging} pageSizes={[15,25,50,100]} t={t} labelPrefix="fidelity.coin.pager" /><p className="fd-footnote">{label("editNote")}</p></> : <EmptyState icon={ClockIcon} title={t("coin.transactions.empty.title")} hint={t("coin.transactions.empty.hint")} />}</>,"fd-coin-transactions")}
     <BottomSheet open={Boolean(selected)} onOpenChange={(open) => { if (!open) closeTransaction(); }}
       title={selected ? editing ? label("editTransaction") : label("transactionTitle").replace("{type}",transactionName(selected)).replace("{amount}",quantity(selected.amount,assetType,Boolean(data?.manual))).replace("{symbol}",symbol) : ""}
       className={`fd-sheet ${editing ? "edit" : "detail"} ${data?.manual ? "manual" : ""}`} detents={["medium"]}>

@@ -27,7 +27,7 @@ test("Chinese coin and edit copy uses whole translated phrases", async ({ browse
 
 for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
   test(`coin ${symbol} shows the approved detail sections and captures at 390px`, async ({ browser }) => {
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, userAgent: phone,
       isMobile: true, hasTouch: true, colorScheme: "dark", reducedMotion: "reduce", timezoneId: "UTC" });
     try {
       const page = await context.newPage();
@@ -80,8 +80,11 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         }),
         height: document.getElementById("app-main-content")!.scrollHeight,
       })), null, 2));
-      await page.screenshot({ path: `/tmp/fidelity/coin-${symbol.toLowerCase()}/coin-${symbol.toLowerCase()}-phone-long.png`, fullPage: true });
-      await page.screenshot({ path: `/tmp/fidelity/coin-${symbol.toLowerCase()}/coin-${symbol.toLowerCase()}-phone.png` });
+      const captureOutput = process.env.WUI18_CAPTURE_DIR ?? `/tmp/fidelity/coin-${symbol.toLowerCase()}`;
+      mkdirSync(captureOutput, { recursive: true });
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: `${captureOutput}/coin-${symbol.toLowerCase()}-phone-long.png`, fullPage: true });
+      await page.screenshot({ path: `${captureOutput}/coin-${symbol.toLowerCase()}-phone.png` });
       if (symbol === "BTC") {
         await expect(page.locator(".fd-coin-head h1")).toContainText("Bitcoin BTC");
         await expect(page.locator(".fd-coin-head p")).toHaveText("Held on Binance and a Ledger cold wallet");

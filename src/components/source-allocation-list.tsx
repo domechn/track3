@@ -4,6 +4,8 @@ import { currencyWrapper, prettyNumberKeepNDigitsAfterDecimalPoint, prettyNumber
 import { useTranslation } from "@/i18n";
 import { WALLET_DETAIL_URLS } from "@/middlelayers/constants";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { BackpackIcon } from "@radix-ui/react-icons";
+import EmptyState from "./empty-state";
 
 export function SourceAllocationList({ wallets, selectedSource, currency, name, title, showQuantity = false, emptyLabel }: {
   wallets: WalletAssetsPercentageData;
@@ -25,7 +27,8 @@ export function SourceAllocationList({ wallets, selectedSource, currency, name, 
   const hiddenValue = hidden.reduce((sum, wallet) => sum + wallet.value, 0);
   const hiddenPercentage = hidden.reduce((sum, wallet) => sum + wallet.percentage, 0);
   const hiddenAmount = hidden.reduce((sum, wallet) => sum + wallet.amount, 0);
-  if (wallets.length === 0) return <p className="py-8 text-center text-sm text-muted-foreground">{t("walletAllocation.noData")}</p>;
+  if (wallets.length === 0) return <EmptyState icon={BackpackIcon}
+    title={t("walletAllocation.noData")} hint={t("wallets.empty.hint")} />;
   return <>
     {showQuantity && <div className="analyze-source-list-head">
       <span>{t("overview.design.sources")}</span>

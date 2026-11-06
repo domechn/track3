@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
-import { ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { BackpackIcon, ExclamationTriangleIcon, ReloadIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 import { queryHistoricalPage } from "@/middlelayers/charts";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
@@ -186,7 +187,8 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
         <button type="button" className="fd-wallet-refresh" aria-label={t("common.refresh")} onClick={() => void onRefresh?.()}><ReloadIcon aria-hidden="true" /></button></div>
     </header>
     {busy ? <div className="fd-card fd-overview-loading"><span className="fd-skeleton" style={{ width: 130, height: 20 }} /><span className="fd-skeleton" style={{ width: 260, height: 36 }} /></div>
-      : !view ? <div className="fd-card fd-empty">{t("common.noData")}</div> : <>
+      : !view || !sources.length ? <div className="fd-card"><EmptyState icon={BackpackIcon}
+        title={t("common.noData")} hint={t("wallets.empty.hint")} /></div> : <>
       <div className="fd-wallet-chips">{[{ id: null, label: t("fidelity.wallets.allSources") }, ...sources].map((source) =>
         <button key={source.id ?? "all"} type="button" className={selected === source.id ? "selected" : ""}
           onClick={() => setSelected(source.id)} title={source.id ?? undefined} aria-label={source.label}>{source.id !== null && source.status?.status === "failed" && <i />}<span>{source.label}</span></button>)}</div>

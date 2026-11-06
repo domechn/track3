@@ -202,10 +202,10 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 ## Captured comparison
 
-- App capture: `/tmp/fidelity/coin-nvda/coin-nvda-phone-long.png`.
-- Reference render: `/tmp/rev-fa3/design/records-coin-nvda-long.png`.
-- Fresh 390 × 844 first-screen pixel difference: **1.07%** (RGB difference >20/255 in any channel).
-- Full-page overlap pixel difference: **3.89%** (source 1,964px; app 1,964px high).
+- App capture: `/tmp/wui18-final-screens/coin-nvda-phone.png`.
+- Reference render: `/tmp/wui18-source/coin-nvda-phone-viewport.png`.
+- 6 Nov 390 × 844 first-screen pixel difference at DPR 2: **3.564%** (any RGB channel differs by more than 20); **2.258%** at a 40-channel threshold.
+- A full-page PNG comparison is not equivalent because the app scrolls inside its main landmark and the source scrolls the document.
 
 ## Real-data limits
 
@@ -215,3 +215,4 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 - The saved alias is “NVIDIA”; no separate “NVIDIA Corporation” name is stored for the subtitle.
 - The saved stock record has no exchange or quote-delay fields, so it cannot substantiate the source’s “NASDAQ · delayed 15 min” price caption. The chart uses dated stored snapshots.
+- The product's scroll container preserves route scroll position; Chromium antialiases small text in that layer differently from the standalone source page.

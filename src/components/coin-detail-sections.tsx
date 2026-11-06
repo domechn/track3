@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type Ref } from "react";
+import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 
 export function useStickyCoinChart(active = true) {
   const mainRef = useRef<HTMLDivElement>(null);
@@ -70,40 +70,40 @@ type Labels = {
   costPrice: string; unrealized: string; showAll: (count: number) => string; showLess: string;
 };
 
-export function CoinSourcesTable({ sources, labels, money, quantity, sectionRef }: {
+export function CoinSourcesTable({ sources, labels, money, quantity, sectionRef, emptyState }: {
   sources: readonly CoinSource[]; labels: Labels; money: (value: number) => string;
-  quantity: (value: number) => string; sectionRef?: Ref<HTMLElement>;
+  quantity: (value: number) => string; sectionRef?: Ref<HTMLElement>; emptyState?: ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
   const { visible, empty, totalAmount, totalValue } = groupCoinSources(sources, labels.others);
   return <section ref={sectionRef} className="coin-fidelity-card coin-fidelity-sources">
     <div className="coin-fidelity-section-head"><h2>{labels.holdings}</h2><small>{labels.sourceCount(sources.length)}</small></div>
-    <div className="coin-fidelity-table-scroll" role="region" aria-label={labels.holdings} tabIndex={0}><table aria-label={labels.holdings}><thead><tr>
+    {sources.length === 0 && emptyState ? emptyState : <div className="coin-fidelity-table-scroll" role="region" aria-label={labels.holdings} tabIndex={0}><table aria-label={labels.holdings}><thead><tr>
       <th>{labels.source}</th><th>{labels.quantity}</th><th>{labels.value}</th><th>{labels.share}</th>
     </tr></thead><tbody>
       {visible.map((row) => <tr key={row.id}><td title={row.label}>{row.label} {row.kind && <small>{row.kind}</small>}</td><td>{quantity(row.amount)}</td><td>{money(row.value)}</td><td>{row.share.toFixed(1)}%</td></tr>)}
       {empty.length > 0 && <><tr className="coin-fidelity-empty-sources"><td colSpan={4}><button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{labels.empty(empty.length)} <span aria-hidden="true">{expanded ? "⌃" : "⌄"}</span></button></td></tr>
         {expanded && empty.map((row) => <tr key={row.id} className="coin-fidelity-zero-source"><td title={row.label}>{row.label} {row.kind && <small>{row.kind}</small>}</td><td>{quantity(row.amount)}</td><td>{money(row.value)}</td><td>0.0%</td></tr>)}</>}
       <tr className="total"><td>{labels.total}</td><td>{quantity(totalAmount)}</td><td>{money(totalValue)}</td><td>{visible.length && totalValue > 0 ? "100.0%" : "0.0%"}</td></tr>
-    </tbody></table></div>
+    </tbody></table></div>}
   </section>;
 }
 
 export type CoinLotRow = { id: string; acquired: string; amount: string; cost: string; unrealized: string; tone?: string };
 
-export function CoinLotsTable({ rows, labels, lotCount, expanded: controlledExpanded, onExpandedChange }: {
-  rows: readonly CoinLotRow[]; labels: Labels; lotCount: string; expanded?: boolean; onExpandedChange?: (expanded: boolean) => void;
+export function CoinLotsTable({ rows, labels, lotCount, expanded: controlledExpanded, onExpandedChange, emptyState }: {
+  rows: readonly CoinLotRow[]; labels: Labels; lotCount: string; expanded?: boolean; onExpandedChange?: (expanded: boolean) => void; emptyState?: ReactNode;
 }) {
   const [localExpanded, setLocalExpanded] = useState(false);
   const expanded = controlledExpanded ?? localExpanded;
   const setExpanded = onExpandedChange ?? setLocalExpanded;
   return <section className="coin-fidelity-card coin-fidelity-lots">
     <div className="coin-fidelity-section-head"><h2>{labels.openLots}</h2><small>{lotCount}</small></div>
-    <div className={`coin-fidelity-lots-scroll${expanded ? " expanded" : ""}`} role="region" aria-label={labels.openLots} tabIndex={0}><table aria-label={labels.openLots}><thead><tr>
+    {rows.length === 0 && emptyState ? emptyState : <div className={`coin-fidelity-lots-scroll${expanded ? " expanded" : ""}`} role="region" aria-label={labels.openLots} tabIndex={0}><table aria-label={labels.openLots}><thead><tr>
       <th>{labels.acquired}</th><th>{labels.quantity}</th><th>{labels.costPrice}</th><th>{labels.unrealized}</th>
     </tr></thead><tbody>{(expanded ? rows : rows.slice(0, 8)).map((row) => <tr key={row.id}>
       <td>{row.acquired}</td><td>{row.amount}</td><td>{row.cost}</td><td className={row.tone}>{row.unrealized}</td>
-    </tr>)}</tbody></table></div>
+    </tr>)}</tbody></table></div>}
     {rows.length > 8 && <button className="coin-fidelity-show-lots" type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
       {expanded ? labels.showLess : labels.showAll(rows.length)}
     </button>}

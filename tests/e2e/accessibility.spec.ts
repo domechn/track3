@@ -13,7 +13,7 @@ const routes = [
 test("desktop Goals drawer saves and restores focus to New rule", async ({ page }) => {
   await installTauriBridge(page);
   await page.goto("/#/goals");
-  await expect(page.getByText("No rules yet")).toBeVisible();
+  await expect(page.getByText("Create your first rule")).toBeVisible();
   await page.getByRole("spinbutton", { name: "Threshold" }).fill("100");
   await page.getByRole("button", { name: "Save rule" }).click();
   const trigger = page.getByRole("button", { name: "New rule" });
@@ -551,7 +551,7 @@ test.use({ isMobile: true, hasTouch: true });
 
 test("wide cost basis tables keep their first column visible while scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
-  await installTauriBridge(page);
+  await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/cost-basis");
   const table = page.locator(".fidelity-cost-averages table");
   await expect(table).toBeVisible();

@@ -36,6 +36,8 @@ At 1600 px in dark mode, target inputs update the actual validated profile; `+ S
 
 ## Remaining differences
 
+The zero-target trade area uses the shared centred icon and explanation; the source's empty panel predates this UI18 requirement. Target inputs, reserve calculation, and CSV content are unchanged.
+
 Current 1600 px captures are in `/tmp/fidelity-desktop/rebalance/`. Against freshly rendered authoritative HTML in `/tmp/uidc_r5/design/`, with a pixel counted when any RGB channel differs by more than 40, the current ratios are: plan **2.689%**, empty **0.272%**, invalid **1.206%**. For plan, the 1358 px app capture is compared with the top of the 1405 px design and the ratio uses the full design area.
 
 | State | Remaining visible difference and reason |

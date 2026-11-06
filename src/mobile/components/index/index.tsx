@@ -370,6 +370,7 @@ function Layout({
     };
     restore();
     const main = document.getElementById("app-main-content");
+    if (main) main.dataset.routeFocus = "true";
     main?.focus({ preventScroll: true });
     const observer = (target > 0 || containers.some((value) => value > 0)) && main && typeof ResizeObserver !== "undefined"
       ? new ResizeObserver(() => {
@@ -436,6 +437,7 @@ function Layout({
 
         {/* Main content */}
         <main id="app-main-content" tabIndex={0} className="p-5" data-route={location.pathname}
+          onBlur={(event) => { delete event.currentTarget.dataset.routeFocus; }}
           onContextMenuCapture={(event) => {
             if ((event.target as Element).closest("canvas")) event.preventDefault();
           }}

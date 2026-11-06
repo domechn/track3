@@ -7,6 +7,8 @@ import { queryTransactionsBySymbolAndDateRange } from "@/middlelayers/charts-pro
 import { queryLatestAssets } from "@/middlelayers/charts-assets";
 import { useTranslation } from "@/mobile/i18n";
 import { BottomSheet } from "@/mobile/components/mobile";
+import { ArchiveIcon, BarChartIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 
 const PAGE_SIZE = 50;
 const methods: CostBasisMethod[] = ["FIFO", "LIFO", "HIFO", "AVERAGE"];
@@ -348,14 +350,15 @@ export function PhoneCostBasis({
           <span className="cost-gain ios-money" data-tone={tone(row.gainLoss)}>
             {`${row.gainLoss > 0 ? "+" : row.gainLoss < 0 ? "−" : ""}$${Math.round(Math.abs(row.gainLoss)).toLocaleString("en-US")}`}
           </span>
-        </div>) : <div className="fidelity-chart-empty">{t("fidelity.cost.noChartSales")}</div>}
+        </div>) : <EmptyState icon={BarChartIcon} className="fidelity-chart-empty"
+          title={t("fidelity.cost.noChartSales")} hint={t("cost.chart.empty.hint")} />}
         {chartUnknown.map((row) => <div className="fidelity-asset-bar" key={`${row.assetType}:${row.symbol}:unknown`}>
           <strong>{row.symbol}</strong><span className="fidelity-bar-track" style={{ "--z": "0%" } as CSSProperties} /><span className="cost-gain" data-tone="neutral">–</span>
         </div>)}
       </section>
       <section className="fidelity-cost-card fidelity-cost-prices">
         <div className="fidelity-card-heading"><h2>{t("fidelity.cost.averagePrices")}</h2></div>
-        {averageRows.map(({ symbol, assetType }) => {
+        {averageRows.length ? averageRows.map(({ symbol, assetType }) => {
           const average = priceAverages[`${assetType}:${symbol}`];
           return <div className="fidelity-price-row" key={`${assetType}:${symbol}`}>
             <div><strong>{symbol}</strong><span>{average?.buyPrice == null
@@ -365,7 +368,7 @@ export function PhoneCostBasis({
             <small>{t("fidelity.cost.boughtSold").replace("{bought}", average?.bought ? lotAmount(average.bought, assetType) : "–")
               .replace("{sold}", average?.sold ? lotAmount(average.sold, assetType) : "–")}</small>
           </div>;
-        })}
+        }) : <EmptyState icon={BarChartIcon} title={t("cost.prices.empty.title")} hint={t("cost.prices.empty.hint")} />}
       </section>
       <section className="fidelity-cost-card fidelity-cost-lots">
         <div className="fidelity-segments" role="group" aria-label={t("cost.realized")}>
@@ -377,9 +380,9 @@ export function PhoneCostBasis({
             {t("fidelity.cost.openLotsTab").replace("{count}", String(openRows.length))}</button>
         </div>
         <p className="fidelity-lot-note" data-tab={lotTab}>{t(lotTab === "open" ? "fidelity.cost.valueNote" : "fidelity.cost.gainNote")}</p>
-        {!selectedLots.length && <div className="fidelity-no-lots">
-          <strong>{t("fidelity.cost.noSalesYear").replace("{year}", year)}</strong>
-          <p>{t("fidelity.cost.noSalesBody").replace("{count}", String(openRows.length))}</p>
+        {!selectedLots.length && <EmptyState icon={ArchiveIcon} className="fidelity-no-lots"
+          title={lotTab === "open" ? t("cost.lots.empty.title") : t("fidelity.cost.noSalesYear").replace("{year}", year)}
+          hint={lotTab === "open" ? t("cost.lots.empty.hint") : t("fidelity.cost.noSalesBody").replace("{count}", String(openRows.length))}>
           <div className="fidelity-no-lots-actions">
             <button type="button" className="fidelity-pill primary" onClick={() => { setLotTab("open"); setLotPage(0); }}>{t("fidelity.cost.showOpenLots")}</button>
             <button type="button" className="fidelity-pill" onClick={() => {
@@ -387,7 +390,7 @@ export function PhoneCostBasis({
               yearRef.current?.focus();
             }}>{t("fidelity.cost.chooseAnotherYear")}</button>
           </div>
-        </div>}
+        </EmptyState>}
         {sortedLotGroups.map(([key, rows]) => <div className="fidelity-lot-group" key={key}>
           <div className="fidelity-lot-group-head"><strong>{rows[0].row.symbol}
             {lotTypes.get(rows[0].row.symbol)!.size > 1 && <> · {t(`coin.assetType.${rows[0].row.assetType}`)}</>}

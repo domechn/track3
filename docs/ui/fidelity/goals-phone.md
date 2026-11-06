@@ -26,12 +26,14 @@ Loading/query errors continue to use existing alert semantics. The design's illu
 
 ## Remaining differences
 
-The design pages were rendered again from `source/ds/pages/plan-goals*.html` into `/tmp/fidelity/design-fresh/`; current app captures are in `/tmp/fidelity/goals/`. Both use a 390 × 844 viewport and DPR 2. The diff ratio counts a pixel when any RGB channel differs by more than 10, divided by the larger canvas with the design ground colour filling extra height. The second ratio uses the review's source render for a direct before/after comparison; an independent render of the same source changes a few antialiased text edges.
+The UI18 zero-rule requirement adds an icon, “Create your first rule,” and four working templates to the source's simpler empty card. The source HTML predates that required state. Larger rule and alert lists scroll inside their cards with a pager; the source only depicts seven rules and five alerts.
+
+On 6 Nov, the design pages were rendered again from `source/ds/pages/plan-goals*.html` into `/tmp/wui18-source/`; current app captures are in `/tmp/wui18-final-screens/` and `/tmp/wui18-evidence/`. Both use a 390 × 844 viewport and DPR 2. A pixel differs when any RGB channel differs by more than 20. The populated first screen is **2.502%** and the required new empty first screen is **5.678%**. The latter compares UI18's new icon, templates, and matched panels against source HTML that predates them. The older table below used a different >10 comparison and records the prior baseline for other states.
 
 | State | Fresh source full / first | Review source full / first | Remaining visible difference and reason |
 | --- | ---: | ---: | --- |
-| Goals & alerts | 0.108% / 0.065% | 0.068% / 0.013% | No visible difference in the captured state. A sync-status control appears when sync is enabled. |
-| Empty | 0.052% / 0.059% | 0.000% / 0.000% | None. |
+| Goals & alerts | 0.108% / 0.065% | 0.068% / 0.013% | Current viewport is 2.502% at >20. Residual glyph antialiasing and the product tab icons account for the visible pixels. A sync-status control appears when sync is enabled. |
+| Empty | 0.052% / 0.059% | 0.000% / 0.000% | Current viewport is 5.678% at >20 because UI18 requires the new template actions and taller panels. |
 | Rule kinds | 0.071% / 0.098% | 0.000% / 0.000% | None. |
 | Edit | 0.069% / 0.069% | 0.039% / 0.039% | Native selectors and an editable signed threshold live under the designed faces; residual pixels trace their chevrons. |
 | Edit error | 0.067% / 0.067% | 0.041% / 0.041% | Native controls live under the designed faces; residual pixels trace their chevrons. |

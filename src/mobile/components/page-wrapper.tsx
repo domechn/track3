@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
+import { BackpackIcon, OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import { TDateRange } from "@/middlelayers/types";
 import { parseISO } from "date-fns";
-import { Card, CardContent } from "@/mobile/components/ui/card";
 import { useTranslation } from "@/mobile/i18n";
-import { EmptyState, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
+import { useIsMobile, useSizeClass } from "@/mobile/components/mobile";
 import { isIOS } from "@/utils/platform";
+import EmptyState from "@/components/empty-state";
 
 const emptyDate = parseISO("1970-01-01");
 
@@ -30,25 +30,17 @@ const App = ({
   const useFidelityFirstRun = fidelityFirstRun && isIOS() && sizeClass.width === "compact";
 
   if (!hasData && !allowEmpty && !useFidelityFirstRun) {
-    if (isMobile) return <EmptyState title={t("overview.emptyTitle")} description={t("overview.emptyDescription")}
-      illustrationLabel={t("overview.emptyIllustration")}
-      action={t("overview.addFirstSource")} onAction={() => navigate("/settings/configuration")} />;
+    if (isMobile) return <EmptyState icon={BackpackIcon} title={t("overview.emptyTitle")}
+      hint={t("overview.emptyDescription")}
+      action={<Button onClick={() => navigate("/settings/configuration")}>{t("overview.addFirstSource")}</Button>} />;
     return (
       <div className="flex items-center justify-center h-[400px]">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-8 pb-7 px-6 text-center space-y-4">
-            <div className="text-lg text-muted-foreground">
-              {t("pageWrapper.noData")}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {t("pageWrapper.noDataHint")}
-            </div>
-            <Button variant="outline" onClick={() => navigate("/settings")}>
+        <EmptyState icon={BackpackIcon} className="max-w-md w-full"
+          title={t("pageWrapper.noData")} hint={t("pageWrapper.noDataHint")}
+          action={<Button variant="outline" onClick={() => navigate("/settings")}>
               <OpenInNewWindowIcon className="mr-2 h-4 w-4" />
               {t("pageWrapper.goToSettings")}
-            </Button>
-          </CardContent>
-        </Card>
+            </Button>} />
       </div>
     );
   }

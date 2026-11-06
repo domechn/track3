@@ -1056,6 +1056,7 @@
   flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: auto;
   overscroll-behavior: contain;
 }
+.app-layout #app-main-content[data-route-focus="true"]:focus { outline: none; }
 .mobile-rail-scroll { min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; }
 @media print {
   #root > .min-h-dvh, #root > .min-h-dvh > div:last-child, .t3-mobile-app,
@@ -3187,6 +3188,7 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .fidelity-source-empty strong, .fidelity-source-empty span { display: block; }
   .fidelity-source-empty span { color: #b4b6bc; }
   .fidelity-source-empty-inner > span { max-width: 240px; }
+  .fidelity-source-empty [data-empty-state] p, .fidelity-custom-empty p { color: #b4b6bc; }
   .fidelity-source-empty ol { display: grid; gap: 8px; margin-top: 16px; text-align: left; }
   .fidelity-source-empty li { display: flex; gap: 12px; align-items: center; border: 1px solid #222224; border-radius: 6px; padding: 10px; }
   .fidelity-source-empty li span { flex: none; color: #4a8ad6; }

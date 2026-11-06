@@ -32,6 +32,8 @@ The design invents 1,284 snapshots and source refresh names/counts. The existing
 
 ## Remaining differences
 
+The no-snapshot card now uses the shared centred icon, title, hint, and action. The supplied empty source page shows the earlier dashed treatment; the saved-data and refresh flows are the same.
+
 The HTML source pages are present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. The table compares fresh Chromium renders in `/tmp/fidelity/source-review/` with app captures in `/tmp/fidelity/history/` at 390 × 844. A pixel differs when its summed absolute RGB difference exceeds 48. The source long page is 3687 px and the app page is 3647 px; their common-height ratio is below, and the full-height ratio is 10.75%. Full-page captures hide the fixed tab bar so it does not cover a row.
 
 | State | Source vs app difference |
