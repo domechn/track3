@@ -37,6 +37,7 @@ for (const state of ["default", "free", "activating", "exhausted", "expired", "i
       await expect(state === "activating" ? page.getByRole("button", { name: /Activating/ }) : page.locator("#license[aria-invalid=true]")).toBeVisible();
     }
     if (state === "deactivate") {
+      await expect(page.locator(".t3-b-dev-row")).toHaveCount(2);
       await page.getByRole("button", { name: /Deactivate this device/i }).first().click();
       await expect(page.getByRole("alertdialog")).toContainText("ERC20 and TRON wallets keep their last balances and the assistant is paused.");
       await expect(page.getByRole("alertdialog").locator("li")).toHaveCount(3);

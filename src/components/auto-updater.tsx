@@ -6,6 +6,7 @@ import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { CopyIcon, ExternalLinkIcon } from "@radix-ui/react-icons";
+import ReleaseNotes from "@/components/release-notes";
 
 const App = () => {
   const { t, locale } = useTranslation();
@@ -64,7 +65,6 @@ const App = () => {
   const currentVersion = fidelityUpdate?.currentVersion ?? "";
   const percent = contentLength > 0 ? Math.min(100, Math.round(received / contentLength * 100)) : 0;
   const mb = (bytes: number) => (bytes / 1_000_000).toFixed(1);
-  const notes = fidelityUpdate?.body?.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) ?? [];
   const releaseDate = fidelityUpdate?.date
     ? new Date(fidelityUpdate.date).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB",
       locale === "zh" ? { year: "numeric", month: "long", day: "numeric" }
@@ -101,9 +101,7 @@ const App = () => {
           {phase === "notes" && <>
             <UpdateDialog.Title>{t("update.fidelity.availableTitle").replace("{version}", version)}</UpdateDialog.Title>
             <UpdateDialog.Description>{t("update.fidelity.availableMeta").replace("{version}", currentVersion).replace("{date}", releaseDate)}</UpdateDialog.Description>
-            <div className="t3-update-fidelity-notes">{notes.map((line, index) => line.startsWith("## ")
-              ? <h3 key={index}>{line.slice(3)}</h3>
-              : <p key={index}>{line.startsWith("- ") ? <><span aria-hidden="true">•</span>{line.slice(2)}</> : line}</p>)}</div>
+            <ReleaseNotes content={fidelityUpdate?.body ?? ""} />
             <div className="t3-update-fidelity-foot">
               <button type="button" onClick={() => setPhase("none")}>{t("settings.phase6.updateLater")}</button>
               <button type="button" className="primary" onClick={() => void download()}>{t("update.fidelity.downloadInstall")}</button>

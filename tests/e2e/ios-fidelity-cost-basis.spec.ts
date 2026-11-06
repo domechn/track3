@@ -420,6 +420,7 @@ test("empty year action focuses a real year list and selecting a year persists",
   await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
   await installFidelityRecords(page);
   await page.goto("/#/cost-basis");
+  await expect(page.locator(".fidelity-cost")).toHaveAttribute("aria-busy", "false", { timeout: 20_000 });
   const year = page.getByRole("combobox", { name: "Tax year" });
   await expect(year).toHaveValue("2026");
   await year.selectOption("2025");

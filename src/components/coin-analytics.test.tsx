@@ -49,6 +49,18 @@ vi.mock("@/middlelayers/charts", () => ({
   queryAssetMaxAmountBySymbol: mocks.queryAssetMaxAmountBySymbol,
   updateTransactionPrice: mocks.updateTransactionPrice,
   updateTransactionTxnType: mocks.updateTransactionTxnType,
+  queryCoinsAmountChange: () => Promise.resolve({ timestamps: [], values: [], amounts: [] }),
+  queryTotalValue: () => Promise.resolve({ totalValue: 0 }),
+  WALLET_ANALYZER: { queryWalletAssetsPercentage: () => Promise.resolve([]) },
+}));
+
+vi.mock("@/middlelayers/cost-basis-data", () => ({
+  loadCostBasisReport: () => Promise.resolve({ openLots: [], unrealized: [], disposals: [] }),
+}));
+
+vi.mock("@/middlelayers/configuration", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/middlelayers/configuration")>(),
+  getConfiguration: () => Promise.resolve({ others: [] }),
 }));
 
 vi.mock("@/middlelayers/data", () => ({
@@ -204,13 +216,17 @@ function CoinAnalysisTestTree({
   initialEntries = ["/coins/BTC"],
   currency = usdCurrency,
   onDataChanged,
+  dataVersion = 0,
+  fidelity = false,
 }: {
   initialEntries?: string[];
   currency?: CurrencyRateDetail;
   onDataChanged?: () => void;
+  dataVersion?: number;
+  fidelity?: boolean;
 }) {
   return (
-    <DataChangedContext.Provider value={0}>
+    <DataChangedContext.Provider value={dataVersion}>
       <ChartResizeContext.Provider
         value={{
           needResize: 0,
@@ -228,6 +244,7 @@ function CoinAnalysisTestTree({
                     currency={currency}
                     dateRange={dateRange}
                     onDataChanged={onDataChanged}
+                    fidelity={fidelity}
                   />
                 }
               />
@@ -309,6 +326,20 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+
+it("keeps loaded desktop transaction rows visible while a refresh is pending", async () => {
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([transaction]);
+  const mounted = render(<CoinAnalysisTestTree fidelity />);
+  await screen.findByRole("button", { name: /detail.*15 Apr 2024/i });
+  const scrollArea = document.querySelector(".coin-fidelity-transaction-scroll")!;
+  expect(scrollArea).toHaveAttribute("aria-busy", "false");
+  const pending = deferred<Transaction[]>();
+  mocks.queryTransactionsBySymbolAndDateRange.mockReturnValue(pending.promise);
+  mounted.rerender(<CoinAnalysisTestTree fidelity dataVersion={1} />);
+  expect(scrollArea).toHaveAttribute("aria-busy", "false");
+  expect(scrollArea.querySelector(".coin-fidelity-row-skeleton")).not.toBeInTheDocument();
+  pending.resolve([transaction]);
+});
 
 beforeEach(() => {
   mocks.listAllowedSymbols.mockReset();
