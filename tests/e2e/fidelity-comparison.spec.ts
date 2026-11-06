@@ -32,9 +32,12 @@ test("Comparison renders the October sample pair and ordered asset sections", as
     expect((await page.locator(".fd-comparison-info").boundingBox())?.height).toBe(80);
     expect((await page.locator(".fd-comparison-info > div").boundingBox())?.height).toBe(54);
     await expect(page.locator(".fd-comparison-info")).toHaveCSS("border-color", "rgb(31, 58, 92)");
-    expect((await page.locator(".fd-comparison-mover.percent").first().boundingBox())?.height).toBe(42);
-    expect(await page.locator(".fd-comparison-mover.percent").first().evaluate((row) => getComputedStyle(row).gridTemplateColumns)).toBe("48px 84px 76px 92px");
-    expect(Number((await page.locator(".fd-comparison-mover.percent").first().locator("span").first().getAttribute("style"))?.match(/--fd-zero: ([\d.]+)%/)?.[1])).toBeCloseTo(3.43, 1);
+    expect((await page.locator(".fd-comparison-mover.percent").first().boundingBox())?.height).toBe(44);
+    const columns = await page.locator(".fd-comparison-movers.percent .fd-comparison-mover-list").first().evaluate((list) => getComputedStyle(list).gridTemplateColumns);
+    expect(columns).toBe("64px 184px 64px");
+    await expect(page.locator(".fd-comparison-mover.percent").first()).toHaveCSS("grid-template-columns", /^subgrid/);
+    const zero = Number((await page.locator(".fd-comparison-mover.percent").first().locator("span").first().getAttribute("style"))?.match(/--fd-zero: ([\d.]+)%/)?.[1]);
+    expect(zero).toBe(15);
     await page.screenshot({ path: "/tmp/fidelity/comparison/comparison-phone.png" });
     writeFileSync("/tmp/fidelity/comparison/info-styles.json", JSON.stringify(await page.locator(".fd-comparison-info").evaluate((element) =>
       [element, ...element.querySelectorAll("*")].map((node) => {

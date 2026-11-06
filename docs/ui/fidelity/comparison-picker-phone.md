@@ -11,9 +11,9 @@ References viewed: `phone/analyze/comparison-picker-phone.jpg` and `source/ds/pa
 
 ## Original capture and pixel difference
 
-App: `/tmp/fidelity/comparison/comparison-picker-phone.png`. Source: `/tmp/fidelity/comparison/design-comparison-picker.png`. 390px dark, full page. Pixel difference: **5.40%** of pixels differ by more than 20 in at least one RGB channel; mean maximum-channel difference 6.15/255. Source/app heights 844/844px. Compared with `/tmp/fidelity/calc-ratios.mjs` using the authoritative Chromium HTML render. This numerical threshold does not waive any visible difference.
+Fresh app and authoritative source HTML captures at 390 × 844 px differ at **5.89%** of pixels with any RGB channel above 20, or **2.36%** above 60. The captures and `getBoundingClientRect`/`getComputedStyle` measurements are in `/tmp/ui14-current/`.
 
 ## Remaining differences
 
-- Current 390px viewport pixel diff: **4.97%** (any RGB channel differs by more than 20).
+- The underlying page has the required growing mover cards and absolute-change sort. Those move text and card edges behind the dimming layer compared with the source's fixed cards.
 - The date sheet geometry matches. Its focus-managed modal layer and 44px arrow targets rasterize text and circle outlines differently from the static reference. The mask control remains visible behind the sheet to preserve the existing hide-values action; only real stored snapshots can be selected.

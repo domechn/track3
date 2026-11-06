@@ -1633,17 +1633,22 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
 .d2-wallets .wallet-asset-change-scroll thead th span { display: block; overflow: hidden; text-overflow: ellipsis; }
 .d2-wallets .wallet-asset-change-mobile { display: none; }
 .d2-comparison .comparison-movers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.d2-comparison .comparison-movers > section { min-width: 0; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); padding: 16px; }
+.d2-comparison .comparison-movers > section { min-width: 0; isolation: isolate; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: var(--radius); background: hsl(var(--card)); padding: 16px; }
 .d2-comparison .comparison-movers h2 { margin-bottom: 12px; font-size: 15px; font-weight: 600; }
-.d2-comparison .comparison-movers li { display: grid; grid-template-columns: minmax(45px, .5fr) minmax(40px, 2fr) auto; align-items: center; gap: 12px; border-top: 1px solid hsl(var(--border)); padding: 12px 0; font-size: 13px; }
-.d2-comparison .comparison-movers li:has(small) { grid-template-columns: minmax(45px, .5fr) minmax(40px, 2fr) auto auto; }
+.d2-comparison .comparison-movers ol { grid-template-columns: 68px minmax(0, 1fr) minmax(86px, max-content); }
+.d2-comparison .comparison-movers ol.comparison-movers-percent { grid-template-columns: 68px minmax(0, 1fr) minmax(62px, max-content) minmax(80px, max-content); }
+.d2-comparison .comparison-movers li { height: 44px; gap: 8px; }
 .d2-comparison .comparison-movers li > :is(strong, span, small) { min-width: 0; white-space: nowrap; }
 .d2-comparison .comparison-movers li small { color: hsl(var(--muted-foreground)); text-align: right; }
-.d2-comparison .comparison-mover-track { display: block; height: 8px; background: hsl(var(--sunken)); }
-.d2-comparison .comparison-mover-track > span { display: block; height: 100%; }
+.d2-comparison .comparison-mover-track { height: 12px; }
+.d2-comparison .comparison-mover-track > span { height: 10px; }
+.d2-comparison .comparison-movers-more { min-height: 44px; }
+@supports not (grid-template-columns: subgrid) {
+  .d2-comparison .comparison-movers ol { grid-auto-rows: 44px; background-image: repeating-linear-gradient(to bottom, hsl(var(--border)) 0 1px, transparent 1px 44px); }
+}
 @media (max-width: 900px) {
   .d2-comparison .comparison-movers { grid-template-columns: minmax(0, 1fr); }
-  .d2-comparison .comparison-movers li:has(small) { grid-template-columns: minmax(45px, .5fr) minmax(40px, 2fr) auto; }
+  .d2-comparison .comparison-movers ol.comparison-movers-percent { grid-template-columns: 68px minmax(0, 1fr) minmax(68px, max-content); }
   .d2-comparison .comparison-movers li small { display: none; }
 }
 @media (max-width: 359px) {

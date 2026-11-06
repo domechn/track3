@@ -40,6 +40,8 @@ import { isSameDay } from "date-fns";
 import { useTranslation } from "@/mobile/i18n";
 import ComparisonMoversPanel from "@/components/comparison-movers-panel";
 import ComparisonFidelity from "@/mobile/components/comparison-fidelity";
+import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
+import { getStableCoins } from "@/middlelayers/configuration";
 import { useSizeClass } from "@/mobile/components/mobile";
 import { isIOS } from "@/utils/platform";
 
@@ -52,6 +54,7 @@ type MetricRow = {
 export type CoinComparison = {
   symbol: string;
   assetType: "crypto" | "stock";
+  isStable?: boolean;
   amount: MetricRow;
   price: MetricRow;
   value: MetricRow;
@@ -118,6 +121,13 @@ const App = ({
     useState<QuickCompareType | null>(null);
 
   const [baseData, setBaseData] = useState<Asset[]>([]);
+  const [stableSymbols, setStableSymbols] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    void getStableCoins().catch(() => []).then(async (symbols) => {
+      const chosen = symbols.length ? symbols : await new StableCoinsQuery().listAllStableCoins();
+      setStableSymbols(new Set(chosen.map((symbol) => symbol.toUpperCase())));
+    }).catch(() => {});
+  }, []);
   const [headData, setHeadData] = useState<Asset[]>([]);
 
   const [shouldMaskValue, setShouldMaskValue] = useState<boolean>(false);
@@ -283,12 +293,13 @@ const App = ({
       return {
         symbol: ref?.symbol ?? "",
         assetType: ref?.assetType ?? "crypto",
+        isStable: ref?.assetType === "crypto" && stableSymbols.has(ref.symbol.toUpperCase()),
         amount: makeRow(baseItem?.amount || 0, headItem?.amount || 0),
         price: makeRow(baseItem?.price || 0, headItem?.price || 0),
         value: makeRow(baseItem?.value || 0, headItem?.value || 0),
       };
     });
-  }, [baseData, headData]);
+  }, [baseData, headData, stableSymbols]);
 
   const totalValue = useMemo(() => {
     const baseTotal = baseData.reduce((sum, d) => sum + d.value, 0);
