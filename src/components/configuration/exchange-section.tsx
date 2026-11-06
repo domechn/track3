@@ -44,6 +44,8 @@ import { getWalletLogo } from "@/lib/utils";
 import { maskSensitive } from "@/utils/attach-to";
 import type { ExchangeSectionProps } from "./types";
 import { PublicIpInfo } from "./public-ip-info";
+import { BackpackIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 
 const CONFIG_LIST_PAGE_SIZE = 30;
 
@@ -268,9 +270,8 @@ const ExchangeSection = memo(function ExchangeSection({
       </CardHeader>
       <CardContent className="space-y-2">
         {exchanges.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No exchange found. Add your first CEX API key to start tracking.
-          </div>
+          <EmptyState icon={BackpackIcon} title={t("fidelity.source.empty").replace("{name}", t("config.exchanges").toLowerCase())}
+            hint={t("fidelity.source.emptyBody")} />
         ) : (
           <>
             <Table className="table-fixed">

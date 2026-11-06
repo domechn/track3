@@ -46,20 +46,24 @@ The approved images do not define loading/error/toast or sync-popover pixels for
 
 ## Pixel comparison
 
-Fresh 3 Nov 2026 Chromium renders of the source HTML are in `/tmp/fidelity-desktop/source-final/`; app captures are in `/tmp/fidelity-desktop/coin/`. Both use a 1600 px viewport. A pixel differs when its absolute RGB channel differences sum to more than 48; overlays compare their 1000 px viewport crop. The source SVG tick boxes, range select, and subtitle were remeasured with `getBoundingClientRect` and `getComputedStyle` in `source-final/measure.json`. Chart tick glyphs were aligned by rendered pixel rows; the rule below the axis now uses the source's y=849 and `#222224`.
+On 6 Nov, the design HTML was rendered again at 1600 × 1000 into `/tmp/wui18-source-fresh/`; the BTC source render is pixel-identical to `/tmp/wui18-source/`. The app captures are in `/tmp/wui18-current-coin/`. A pixel differs when any RGB channel differs by more than 20. The design's `getBoundingClientRect()` places its heading at y=42 and hero at y=110 with width 1488; the app's tested bounds are y=91 and y=159, with a 1473 px hero. The app reserves a solid 49 px toolbar above the scroll container and a 15 px scrollbar gutter. At 1440 × 1000, a scrolled BTC capture in `/tmp/wui18-evidence/coin-1440-scrolled.png` confirms the toolbar stays opaque and the hero scrolls beneath its own row.
 
-| State | Pixel difference | App capture |
+| State | Current viewport pixel difference |
 | --- | ---: | --- |
-| BTC | 0.680% | `/tmp/fidelity-desktop/coin/coin-btc-desktop.png` |
-| BTC edit | 1.097% | `/tmp/fidelity-desktop/coin/coin-btc-edit-desktop.png` |
-| BTC price | 0.722% | `/tmp/fidelity-desktop/coin/coin-btc-price-desktop.png` |
-| BTC sheet | 0.348% | `/tmp/fidelity-desktop/coin/coin-btc-sheet-desktop.png` |
-| NVDA | 0.744% | `/tmp/fidelity-desktop/coin/coin-nvda-desktop.png` |
-| NOVA | 0.816% | `/tmp/fidelity-desktop/coin/coin-nova-desktop.png` |
-| NOVA edit | 1.816% | `/tmp/fidelity-desktop/coin/coin-nova-edit-desktop.png` |
+| BTC | 7.546% |
+| BTC edit | 5.497% |
+| BTC price | 7.136% |
+| BTC sheet | 4.215% |
+| NVDA | 7.250% |
+| NOVA | 6.712% |
+| NOVA edit | 5.100% |
 
 ## Remaining differences
 
+- The product's live total, DatePicker, refresh and sync controls use a solid 49 px toolbar above the coin scroll area. Keeping that bar in normal flow prevents its controls from covering the hero when a user scrolls. The static design has no equivalent bar, so all seven current desktop captures shift downward and exceed 3%; the scroll container also reserves 15 px for its scrollbar. Matching the source y positions with an absolute toolbar caused the reviewed overlap.
+- When a real coin has no sources, open lots, or transactions, its section shows the shared centred empty state. The supplied BTC, NVDA, and NOVA source pages contain data, so there is no matching source screen for those zero-data sections.
+- The source's sample NOVA has a display name and is omitted from its portfolio total. A saved NOVA may only have its ticker, and its actual $5,052 holding contributes 0.7% to the portfolio.
+- Content-sized wide layouts keep Holdings by source in the right column and Open lots below the chart on the left. If either column is over 1.5 times taller, the shorter column follows scrolling within the grid. Transactions begin after the taller column, so their vertical position differs from the static reference. Sources with no balance occupy one expandable row; more than ten non-zero sources remain nine rows plus Others. Lots initially show eight rows, with an expandable scroll area for the full list. Short chart histories show an inline hint instead of an empty plot. At 1100–1300px, hero values scale down and notes wrap to keep all text visible.
 - The header keeps the live total, DatePicker, Refresh, and sync-status popover because they are existing portfolio controls absent from the static design. `Updated 09:41` describes a local refresh; the source's `Synced 09:41` would incorrectly imply S3 synchronization.
 - Stored assets have a ticker and type but no reliable full name or company name. The headings therefore use BTC, NVDA, and NOVA; the NVDA subtitle says it is held at its broker without claiming `NVIDIA Corporation`. The stock price feed also lacks NASDAQ and delay metadata, so its price note says `Per NVDA, all sources`.
 - Stored transactions have no original imported type, edited flag, linked transfer endpoints, or order reference. The `Edited` pills, BTC `from`/`to` transfer labels, and sell-sheet order number in the source cannot be recovered. The BTC edit dialog shows the effective type and Reset clears pending edits.

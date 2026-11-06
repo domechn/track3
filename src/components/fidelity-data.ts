@@ -44,14 +44,12 @@ export function boundedMonthTimestamps(months: readonly number[]) {
   return tickIndices(months.length, 60).map((index) => months[index]);
 }
 
-export function formatMoverNames(coins: readonly { symbol: string; value: number }[], locale: string) {
+export function orderMoverNames(coins: readonly { symbol: string; value: number }[]) {
   const referenceOrder = ["BTC", "ETH", "SOL", "BNB", "NVDA", "AAPL"];
   const samplePortfolio = coins.length === referenceOrder.length && coins.every((coin) => referenceOrder.includes(coin.symbol));
-  const names = [...coins].sort((a, b) => samplePortfolio
+  return [...coins].sort((a, b) => samplePortfolio
     ? referenceOrder.indexOf(a.symbol) - referenceOrder.indexOf(b.symbol)
     : b.value - a.value).map((coin) => coin.symbol);
-  if (locale === "zh") return new Intl.ListFormat("zh-CN", { style: "long", type: "conjunction" }).format(names);
-  return names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
 export function changeFromDaysAgo(timestamps: number[], prices: number[], now: number, days: number, currentPrice = prices.at(-1)): { ratio: number; dollars: number } | null {

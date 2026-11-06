@@ -28,18 +28,11 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/mobile/i18n";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
+import { PartialProfitHint } from "@/components/profit-summary-hints";
+import { HintPopover } from "@/components/ui/hint-popover";
 
 type SummaryType = "month" | "year";
 type UnknownCoins = Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"];
-
-function unknownHint(coins: UnknownCoins, t: (key: string) => string) {
-  const names = coins.slice(0, 5).map((coin) => coin.symbol).join(", ");
-  const more = coins.length > 5 ? ` ${t("profitSummary.more").replace("{n}", String(coins.length - 5))}` : "";
-  return t(coins.length === 1 ? "profitSummary.unknownWithdrawal" : "profitSummary.unknownWithdrawals")
-    .replace("{n}", String(coins.length))
-    .replace("{coins}", names + more);
-}
-
 
 function getToneClass(value: number, quoteColor: QuoteColor) {
   if (value === 0) {
@@ -94,8 +87,6 @@ const App = ({
   const [selectedYear, setSelectedYear] = useState(dateRange.end.getFullYear());
   const [summaryType, setSummaryType] = useState<SummaryType>("month");
   const [clickedMonth, setClickedMonth] = useState<number | null>(null);
-  const [explainedMonth, setExplainedMonth] = useState<number | null>(null);
-  const [explainedPartial, setExplainedPartial] = useState<string | null>(null);
   const [monthChartRange, setMonthChartRange] = useState<"week" | "month">("month");
   const { t, locale } = useTranslation();
   const isMobile = useIsMobile();
@@ -429,19 +420,9 @@ const App = ({
     return t("profitSummary.since").replace("{date}", formatted);
   }
 
-  function renderPartialInfo(coins: UnknownCoins, label: string, key: string) {
-    const hint = unknownHint(coins, t);
-    return (
-      <>
-        <button type="button" className="absolute right-1 top-1 flex h-8 w-8 touch:h-11 touch:w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          aria-label={t("profitSummary.explain").replace("{period}", label)}
-          aria-expanded={explainedPartial === key}
-          title={hint}
-          onClick={() => setExplainedPartial(explainedPartial === key ? null : key)}><span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] leading-none">?</span></button>
-        <div className={cn("mt-1 text-xs text-muted-foreground",
-          explainedPartial === key ? "" : "hidden group-hover:block group-focus-within:block")}>{hint}</div>
-      </>
-    );
+  function renderPartialInfo(coins: UnknownCoins, label: string) {
+    return <PartialProfitHint names={coins.map((coin) => coin.symbol)} period={label} t={t}
+      className="absolute right-1 top-1 flex h-8 w-8 touch:h-11 touch:w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />;
   }
 
   function renderMonthSummary() {
@@ -481,32 +462,22 @@ const App = ({
         {(isMobile ? [...monthCards].reverse() : monthCards).map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
           const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
-          return <div key={item.key} data-partial={partial} className={cn("profit-month-card group relative rounded-lg border p-2",
-            value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor))}>
-          <button
-            type="button"
-            disabled={!item.hasData && !item.noSnapshot}
-            onClick={() => item.hasData ? onMonthClick(item.month) : setExplainedMonth(item.month)}
-            aria-label={item.noSnapshot ? `${item.label}: ${t("profitSummary.noSnapshot")}` : undefined}
-            title={item.noSnapshot ? t("profitSummary.noSnapshot") : undefined}
-            className={cn("flex min-h-11 w-full flex-col justify-start text-left transition-colors", partial && "pr-5")}
-          >
+          const cardContent = <>
             <div className="text-xs text-muted-foreground">{item.label}</div>
-            <div
-              className={cn(
-                "mt-1 text-sm font-semibold tracking-tight",
-                value === null ? "text-muted-foreground" : getToneClass(value, quoteColor)
-              )}
-            >
+            <div className={cn("mt-1 text-sm font-semibold tracking-tight",
+              value === null ? "text-muted-foreground" : getToneClass(value, quoteColor))}>
               {item.hasData ? renderAmount(value) : "—"}
             </div>
             {item.gapDate && <div className="mt-1 text-xs text-muted-foreground">{gapHint(item.gapDate, selectedYear)}</div>}
-            {item.noSnapshot && <div className={cn("mt-1 text-xs text-muted-foreground",
-              explainedMonth === item.month ? "" : "hidden group-hover:block group-focus-within:block")}>
-              {t("profitSummary.noSnapshot")}
-            </div>}
-          </button>
-          {partial && renderPartialInfo(item.unknownCoins, item.label, item.key)}
+          </>;
+          return <div key={item.key} data-partial={partial} className={cn("profit-month-card relative rounded-lg border p-2",
+            value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor))}>
+          {item.noSnapshot ? <HintPopover label={`${item.label}: ${t("profitSummary.noSnapshot")}`}
+            className={cn("flex min-h-11 w-full flex-col justify-start text-left transition-colors", partial && "pr-5")}
+            trigger={cardContent} hoverParent>{t("profitSummary.noSnapshot")}</HintPopover>
+            : <button type="button" disabled={!item.hasData} onClick={() => onMonthClick(item.month)}
+              className={cn("flex min-h-11 w-full flex-col justify-start text-left transition-colors", partial && "pr-5")}>{cardContent}</button>}
+          {partial && renderPartialInfo(item.unknownCoins, item.label)}
           </div>;
         })}
       </div>
@@ -524,7 +495,7 @@ const App = ({
             key={`y-profit-summary-${item.year}`}
             data-partial={partial}
             className={cn(
-              "group relative rounded-lg border p-2 text-left",
+              "relative rounded-lg border p-2 text-left",
               value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor)
             )}
           >
@@ -537,7 +508,7 @@ const App = ({
             >
               {item.hasData ? renderAmount(value) : "—"}
             </div>
-            {partial && renderPartialInfo(item.unknownCoins, String(item.year), `year-${item.year}`)}
+            {partial && renderPartialInfo(item.unknownCoins, String(item.year))}
           </div>
           );
         })}

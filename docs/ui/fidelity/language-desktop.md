@@ -8,6 +8,8 @@ Left card begins with “App language / Menus, labels and messages. Your data is
 
 ## Remaining differences
 
+At 1100px the app shows its editable summary and language controls in one column. The static source shows App language and Preview side by side; stacking the live summary cards keeps the Language card within the 60px empty-space limit.
+
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.
 
 Settings toasts retain a visible 44px close × target for keyboard and pointer dismissal; the reference toasts omit it.
@@ -22,6 +24,6 @@ The capture table records current ratios at a 24/255 maximum RGB channel thresho
 
 | State | Pixel difference | App capture |
 | --- | ---: | --- |
-| `language-default` | 1.53% | `/tmp/fidelity-desktop/language/language-default-desktop.png` |
+| `language-default` | 1.63% | `/tmp/fidelity-desktop/language/language-default-desktop.png` |
 | `language-zh` | 1.22% | `/tmp/fidelity-desktop/language/language-zh-desktop.png` |
 | `language-zh-toast` | 0.98% | `/tmp/fidelity-desktop/language/language-zh-toast-desktop.png` |

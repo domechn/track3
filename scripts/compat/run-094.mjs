@@ -28,7 +28,7 @@ try {
   run("corepack", ["yarn", "install", "--immutable"], worktree);
   const oldTests = resolve(worktree, "src/test/compat");
   mkdirSync(oldTests, { recursive: true });
-  for (const name of ["files.test.ts", "sync.test.ts"]) {
+  for (const name of ["files.test.ts", "sync.test.ts", "assistant-panes.test.tsx"]) {
     copyFileSync(resolve(root, "src/test/compat", name), resolve(oldTests, name));
   }
   const oldForward = resolve(worktree, "tests/compat/forward");

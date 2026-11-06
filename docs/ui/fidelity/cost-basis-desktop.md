@@ -39,6 +39,8 @@ The selected range uses the report's calculator values. The desktop page reads t
 
 ## Remaining differences
 
+When there are no chart rows, average prices, or lots, those sections show the shared 200px centred empty state. The supplied cost-basis source shows the earlier compact no-sales presentation.
+
 The 1600 px dark captures in `/tmp/fidelity-desktop/cost-basis/` were compared with fresh source HTML renders in `/tmp/rv1103b/design/`; side-by-side images are in `/tmp/wdb-final-sbs/`. Source Chromium measurements confirm that secondary KPI values are 17/22 px, weight 500, `#9b9da3`; date inputs are 132 × 34 px with 13 px text; and the holding tracks are 4 px `#2a2a2e`. The Avg. buy/sell `Asset` header starts at x=857 px with zero left padding and the four numeric headers align right. A pixel differs when the sum of its absolute RGB channel differences exceeds 60; images are padded with black to the larger full-page size. The before column uses the last reviewer's saved captures in `/tmp/rv1103b/pre/` against the same source PNGs. The source-area column measures only the vertical extent of the design page, excluding the app's required gaps table where the source has no content.
 
 | Screen | Last review, full page | Current, full page | Last review, source area | Current, source area |

@@ -538,12 +538,12 @@
   .app-layout :is(.ios-d3-goals, .ios-d3-rebalance) .glass { border: 0; border-radius: 16px; background: hsl(var(--card)); box-shadow: none; }
   .app-layout :is(.ios-d3-goals, .ios-d3-rebalance, .ios-d3-settings-page, .d2-summary, .d2-wallets, .d2-comparison, .d2-coin, .d2-cost) [data-ui-card] > div:first-child h3 { color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.3; font-weight: 500; letter-spacing: 0; }
   .app-layout [data-ai-setup-card] h2, .app-layout .assistant-insights-card > div:first-child h3 { color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.3; font-weight: 500; letter-spacing: 0; }
-  :is(.ios-d3-goals, .ios-d3-rebalance) .glass > div:first-child { padding: 18px 18px 10px; }
+  :is(.ios-d3-goals, .ios-d3-rebalance) .glass:where(:not([data-ai-setup-card])) > div:first-child { padding: 18px 18px 10px; }
   :is(.ios-d3-goals, .ios-d3-rebalance) .glass > div:nth-child(2) { padding: 0 18px 18px; }
   :is(.ios-d3-goals, .ios-d3-rebalance) button:not([role="switch"]) { min-height: 44px; border-radius: 11px; box-shadow: none; }
   :is(.ios-d3-goals, .ios-d3-rebalance) :is(input:not([type="checkbox"]):not([type="range"]), select) { min-height: 44px; border-color: transparent; border-radius: 10px; background: hsl(var(--secondary)); font-size: 16px; }
   :is(.ios-d3-goals, .ios-d3-rebalance) .text-xs { font-size: 13px; line-height: 1.3; }
-  :is(.ios-d3-goals, .ios-d3-rebalance) .ios-d3-ai-suggestions { flex-wrap: wrap; min-width: 0; overflow: hidden; margin: 0; padding: 0; }
+  :is(.ios-d3-goals, .ios-d3-rebalance) .ios-d3-ai-suggestions { flex-wrap: wrap; min-width: 0; overflow: visible; margin: 0; padding: 0; }
   :is(.ios-d3-goals, .ios-d3-rebalance) [data-ai-setup-suggestion] { flex: 0 1 auto; max-width: 100%; height: auto; min-height: 44px; border: 0; border-radius: 16px; background: hsl(var(--secondary)); padding: 8px 14px; font-size: 13px; line-height: 1.3; white-space: normal; text-align: left; overflow-wrap: anywhere; }
   .ios-d3-goals-heading > div { min-width: 0; }
   .ios-d3-goals .ios-d3-goals-add, .ios-d3-goals .ios-d3-goals-add:hover { position: fixed; top: calc(var(--mobile-safe-top) + 6px); right: max(16px, var(--mobile-safe-right)); z-index: 31; display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: transparent; padding: 0; color: hsl(var(--primary)); }
@@ -1056,6 +1056,7 @@
   flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: auto;
   overscroll-behavior: contain;
 }
+.app-layout #app-main-content[data-route-focus="true"]:focus { outline: none; }
 .mobile-rail-scroll { min-height: 0; flex: 1; overflow-y: auto; overflow-x: hidden; }
 @media print {
   #root > .min-h-dvh, #root > .min-h-dvh > div:last-child, .t3-mobile-app,
@@ -1207,6 +1208,13 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
   .ios-chat-split .ios-d3-chat-header h3 { position: static; transform: none; }
   .ios-chat-split .ios-d3-chat-header-primary > button:first-child { display: none; }
   .ios-chat-split [data-testid="chat-card"] { background: hsl(var(--card)); }
+  .ios-chat-split.ios-chat-split { display: block; }
+  .ios-chat-split[data-selected="false"] > .mobile-split-detail,
+  .ios-chat-split[data-selected="true"] > .mobile-split-master { display: none !important; }
+  .ios-chat-split[data-selected="true"] > .mobile-split-detail,
+  .ios-chat-split[data-selected="false"] > .mobile-split-master { display: flex !important; width: 100%; height: 100%; }
+  .ios-chat-split .ios-d3-chat-header-primary > button:first-child { display: inline-flex; }
+  .ios-chat-split > .mobile-split-master > div > button:first-child { display: block; }
   .analytics-split { grid-template-columns: minmax(320px, 42%) minmax(0, 1fr); }
   .analytics-split .analytics-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .analytics-split .analytics-tile-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
@@ -2534,6 +2542,39 @@ body:has(.fidelity-history, .fidelity-history-detail) {
 
 
 /* Assistant phone layout follows the Terminal chat source at 390px. */
+.ios-assistant-context-sheet { padding-right: 16px; padding-left: 16px; background: hsl(var(--background)); }
+.ios-assistant-context-sheet .t3-assistant-context {
+  width: 100%; height: auto; min-height: 100%; padding: 12px 0 24px;
+  overflow: visible; border: 0; box-shadow: none;
+}
+.ios-assistant-context-sheet .t3-assistant-context-heading:first-child { align-items: center; min-height: 44px; }
+.ios-assistant-context-sheet .t3-assistant-context-heading > .t3-assistant-pane-toggle,
+.ios-assistant-context-sheet .t3-assistant-context-heading > .t3-assistant-pane-toggle:hover {
+  display: grid; flex: none; place-items: center; width: 44px; height: 44px; margin: 0;
+  border-radius: 6px; color: hsl(var(--muted-foreground));
+}
+.ios-assistant-context-sheet .t3-assistant-context-heading > .t3-assistant-pane-toggle:focus-visible,
+.ios-d3-chat .mobile-context-toggle:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.mobile-context-toggle { position: relative; display: grid; flex: none; place-items: center; width: 44px; height: 44px; color: hsl(var(--muted-foreground)); }
+.mobile-context-toggle svg { width: 18px; height: 18px; }
+.mobile-context-toggle .t3-assistant-attention {
+  position: absolute; top: 7px; right: 7px; width: 6px; height: 6px;
+  border-radius: 50%; background: hsl(var(--warning));
+}
+@media (min-width: 700px) {
+  .ios-d3-chat-header .fidelity-chat-header-button { display: grid; flex: none; place-items: center; width: 44px; height: 44px; }
+}
+@media (min-width: 700px) and (max-width: 999px) {
+  #app-top-bar .fidelity-chat-header-primary { display: flex; flex: 1; align-items: center; }
+  #app-top-bar .ios-d3-chat-header:has(.mobile-context-toggle) h3 { left: calc(50% - 12px); }
+  #app-top-bar .fidelity-chat-header-title span {
+    position: absolute; top: 41px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; line-height: 14px; white-space: nowrap;
+  }
+}
+@media (min-width: 700px) {
+  .ios-assistant-context-sheet { left: auto; width: min(380px, 100vw); box-shadow: -12px 0 30px hsl(var(--background) / .35); }
+}
 @media (max-width: 699px) {
   #app-main-content:has(.ios-d3-chat) {
     overflow: hidden;
@@ -3152,6 +3193,7 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .fidelity-source-empty strong, .fidelity-source-empty span { display: block; }
   .fidelity-source-empty span { color: #b4b6bc; }
   .fidelity-source-empty-inner > span { max-width: 240px; }
+  .fidelity-source-empty [data-empty-state] p, .fidelity-custom-empty p { color: #b4b6bc; }
   .fidelity-source-empty ol { display: grid; gap: 8px; margin-top: 16px; text-align: left; }
   .fidelity-source-empty li { display: flex; gap: 12px; align-items: center; border: 1px solid #222224; border-radius: 6px; padding: 10px; }
   .fidelity-source-empty li span { flex: none; color: #4a8ad6; }
@@ -3960,10 +4002,26 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   }
   .fidelity-b-sync > .t3-sync-connection { order: 2; }
   .fidelity-b-sync > .t3-sync-passphrase { order: 3; }
-  .fidelity-b-sync > .t3-sync-devices { order: 4; }
-  .fidelity-b-sync > .t3-sync-categories { order: 5; }
-  .fidelity-b-sync > .t3-sync-conflicts { order: 6; }
-  .fidelity-b-sync > [role="status"] { order: 7; }
+  .fidelity-b-sync > .t3-sync-status { order: 4; }
+  .fidelity-b-sync > .t3-sync-devices { order: 5; }
+  .fidelity-b-sync > .t3-sync-categories { order: 6; }
+  .fidelity-b-sync > .t3-sync-conflicts { order: 7; }
+  .fidelity-b-sync > [role="status"] { order: 8; }
+  .fidelity-b-sync[data-mode="locked"] > .t3-sync-passphrase { order: 2; }
+  .fidelity-b-sync[data-mode="locked"] > .t3-sync-connection { order: 3; }
+  #app-main-content .fidelity-b-sync > [data-ui-card] { color: #fff; }
+  #app-main-content .fidelity-b-sync > .t3-sync-status {
+    min-width: 0; border-color: #222224; background: #131217; box-shadow: 0 12px 28px rgba(0,0,0,.2);
+  }
+  #app-main-content .fidelity-b-sync > .t3-sync-status h3 { color: #fff; }
+  #app-main-content .fidelity-b-sync .t3-sync-status-rows > div { border-top-color: #222224; }
+  #app-main-content .fidelity-b-sync .t3-sync-status button:disabled {
+    background: #35353a; color: #b4b6bc; opacity: 1;
+  }
+  #app-main-content .fidelity-b-sync label,
+  #app-main-content .fidelity-b-sync .t3-sync-status-rows dd { color: #fff; }
+  #app-main-content .fidelity-b-sync .text-muted-foreground,
+  #app-main-content .fidelity-b-sync .t3-sync-status-rows dt { color: #b4b6bc; }
   #app-main-content .fidelity-b-sync > .glass > div:first-child {
     position: relative; display: block; min-width: 0; margin: 0 0 14px; padding: 0;
   }
@@ -4015,6 +4073,15 @@ body:has(.fidelity-history, .fidelity-history-detail) {
 
 @media (min-width: 700px) {
   #app-main-content .fidelity-b-sync-status { display: none; }
+  .ios-d3-settings .fidelity-b-sync > .fidelity-b-subtitle { order: 0; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-connection { order: 1; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-passphrase { order: 2; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-status { order: 3; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-devices { order: 4; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-categories { order: 5; }
+  .ios-d3-settings .fidelity-b-sync > .t3-sync-conflicts { order: 6; }
+  .ios-d3-settings .fidelity-b-sync[data-mode="locked"] > .t3-sync-passphrase { order: 1; }
+  .ios-d3-settings .fidelity-b-sync[data-mode="locked"] > .t3-sync-connection { order: 2; }
   #app-main-content :is(.fidelity-source-avatar-action, .fidelity-b-input-end > button, .fidelity-b-head-actions button) {
     min-width: 44px;
     min-height: 44px;
@@ -4027,4 +4094,13 @@ body:has(.fidelity-history, .fidelity-history-detail) {
     font-size: 13px;
     overflow-wrap: anywhere;
   }
+}
+
+@media (max-width: 760px) {
+  [data-ai-setup-card] > .ai-setup-content { padding: var(--card-pad); }
+  [data-ai-setup-card] .ai-setup-content .ai-setup-form input { height: 40px; min-height: 40px; }
+  [data-ai-setup-card] .ai-setup-content .ai-setup-send { position: relative; isolation: isolate; height: 44px; min-height: 44px; margin-block: -2px; border: 0; background: transparent; }
+  [data-ai-setup-card] .ai-setup-send::before { position: absolute; z-index: -1; top: 2px; right: 0; bottom: 2px; left: 0; border-radius: inherit; background: hsl(var(--primary)); content: ""; }
+  [data-ai-setup-card] .ai-setup-suggestions [data-ai-setup-suggestion] { display: flex; align-items: center; height: auto; min-height: 44px; margin-block: -8px; border: 0; background: transparent; padding: 8px 0; }
+  [data-ai-setup-card] .ai-setup-chip-label { display: flex; align-items: center; min-height: 28px; border-radius: 16px; background: hsl(var(--secondary)); padding: 4px 10px; line-height: 18px; }
 }

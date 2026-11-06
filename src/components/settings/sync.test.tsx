@@ -3,7 +3,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import SyncSettingsPage from "./sync";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { S3Error } from "@/middlelayers/sync/object-store";
-import type { ReactNode } from "react";
+import { I18nProvider, useTranslation } from "@/i18n";
+import { useEffect, type ReactNode } from "react";
+
+function ChineseSyncSettingsPage() {
+  const { setLocale } = useTranslation();
+  useEffect(() => { setLocale("zh"); }, [setLocale]);
+  return <SyncSettingsPage />;
+}
 
 const toastMock = vi.fn((_options: { action?: ReactNode }) => ({ dismiss: dismissMock }));
 const dismissMock = vi.fn();
@@ -42,6 +49,7 @@ vi.mock("@/middlelayers/sync/runtime", () => ({
 
 const status = { mode: "disabled", sync: {
   phase: "idle", error: undefined as string | undefined,
+  lastSync: undefined as number | undefined,
   report: undefined as { pulled: number; pushed: number } | undefined,
 } };
 let configuredEndpoint = "";
@@ -52,6 +60,7 @@ afterEach(() => {
   status.mode = "disabled";
   status.sync.phase = "idle";
   status.sync.error = undefined;
+  status.sync.lastSync = undefined;
   status.sync.report = undefined;
   vi.mocked(syncRuntime.devices).mockResolvedValue([]);
   vi.mocked(syncRuntime.configConflicts).mockResolvedValue([]);
@@ -69,6 +78,69 @@ afterEach(() => {
 });
 
 describe("Sync settings page", () => {
+  it("hides Sync status until sync is configured", () => {
+    wide = true;
+    render(<SyncSettingsPage />);
+    expect(screen.queryByText("Sync status")).not.toBeInTheDocument();
+  });
+
+  it("shows a locked status and disables its Sync now action", () => {
+    wide = true;
+    status.mode = "locked";
+    render(<SyncSettingsPage />);
+    const card = screen.getByText("Sync status").closest("[data-ui-card]")!;
+    expect(card).toHaveTextContent("Sync locked");
+    expect(card).toHaveTextContent("Not synced yet");
+    expect(card.querySelector("button")).toBeDisabled();
+  });
+
+  it("shows an unlocked status with last sync and actual report counts", () => {
+    wide = true;
+    status.mode = "ready";
+    status.sync.lastSync = Date.parse("2026-10-31T09:41:00.000Z");
+    status.sync.report = { pulled: 2, pushed: 3 };
+    render(<SyncSettingsPage />);
+    const card = screen.getByText("Sync status").closest("[data-ui-card]")!;
+    expect(card).toHaveTextContent("Connected");
+    expect(card).toHaveTextContent("31/10/2026, 09:41");
+    expect(card).not.toHaveTextContent("09:41:00");
+    expect(card).not.toHaveTextContent("Next automatic sync");
+    expect(card).toHaveTextContent("3");
+    expect(card).toHaveTextContent("2");
+    expect(card.querySelector("button")).toBeEnabled();
+  });
+
+  it("shows never synced without invented transfer counts", () => {
+    wide = true;
+    status.mode = "ready";
+    render(<SyncSettingsPage />);
+    const card = screen.getByText("Sync status").closest("[data-ui-card]")!;
+    expect(card).toHaveTextContent("Not synced yet");
+    expect(card).not.toHaveTextContent("Uploaded");
+    expect(card).not.toHaveTextContent("Downloaded");
+  });
+
+  it("uses the app language when formatting the last successful sync", async () => {
+    wide = true;
+    status.mode = "ready";
+    status.sync.lastSync = Date.parse("2026-10-31T09:41:00.000Z");
+    render(<I18nProvider><ChineseSyncSettingsPage /></I18nProvider>);
+    const card = (await screen.findByText("同步状态")).closest("[data-ui-card]")!;
+    expect(card).toHaveTextContent("2026/10/31 09:41");
+  });
+
+  it("shows an error and retains the last successful sync", () => {
+    wide = true;
+    status.mode = "ready";
+    status.sync.phase = "error";
+    status.sync.error = "timeout";
+    status.sync.lastSync = Date.parse("2026-10-31T09:41:00.000Z");
+    render(<SyncSettingsPage />);
+    const card = screen.getByText("Sync status").closest("[data-ui-card]")!;
+    expect(card).toHaveTextContent("Sync error");
+    expect(card).toHaveTextContent("2026");
+  });
+
   it("keeps category focus and loaded devices through a report refresh", async () => {
     wide = true;
     status.mode = "ready";

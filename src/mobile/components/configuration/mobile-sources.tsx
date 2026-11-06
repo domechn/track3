@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/mobile/i18n";
 import { maskSensitive, truncateAddress } from "@/utils/attach-to";
 import { redactSecrets } from "@/middlelayers/security/redact";
-import { ChevronRightIcon, DotsHorizontalIcon, EyeOpenIcon, ExclamationTriangleIcon, TrashIcon, LockClosedIcon, PlusIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { BackpackIcon, ChevronRightIcon, DotsHorizontalIcon, EyeOpenIcon, ExclamationTriangleIcon, TrashIcon, LockClosedIcon, PlusIcon, UpdateIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 import { FidelityIcon } from "@/mobile/components/fidelity-icon";
 import { ActionSheet, useHaptics } from "@/mobile/components/mobile";
 import { ConfirmSheet, ModalPage } from "@/mobile/components/mobile/overlays";
@@ -243,10 +244,10 @@ export function MobileSources(props: MobileSourcesProps) {
   return (
     <div className={`ios-d3-sources${props.fidelityLayout ? " fidelity-sources" : ""}`}>
       {!hasSources && props.fidelityLayout && <div className="fidelity-source-empty">
-        <div className="fidelity-source-empty-inner">
-        <strong>{props.fromOnboarding ? t("fidelity.settings.sources.emptyTitle")
-          : t(`fidelity.settings.sources.empty.${props.selectedKind ?? "exchange"}`)}</strong>
-        <span>{t("fidelity.settings.sources.emptyHint")}</span>
+        <EmptyState icon={BackpackIcon} className="fidelity-source-empty-inner"
+          title={props.fromOnboarding ? t("fidelity.settings.sources.emptyTitle")
+            : t(`fidelity.settings.sources.empty.${props.selectedKind ?? "exchange"}`)}
+          hint={t("fidelity.settings.sources.emptyHint")}>
         {props.fromOnboarding && <ol aria-label={t("mobile.sources.gettingStarted")}>
           {[1, 2, 3].map((step) => <li key={step}><span>{step}</span>{t(`mobile.sources.step.${step}`)}</li>)}
         </ol>}
@@ -256,7 +257,7 @@ export function MobileSources(props: MobileSourcesProps) {
           {props.fromOnboarding || !props.selectedKind ? t("mobile.sources.addSource")
             : t(`fidelity.settings.sources.add${props.selectedKind[0].toUpperCase()}${props.selectedKind.slice(1)}`)}
         </Button>
-        </div>
+        </EmptyState>
       </div>}
       {!hasSources && !props.fidelityLayout && <div className="ios-d3-onboarding">
         <div className="ios-d3-onboarding-art" aria-hidden="true">
@@ -284,7 +285,8 @@ export function MobileSources(props: MobileSourcesProps) {
               ? <>{rows.map((row, index) => <div key={`${row.type}-${index}`} className="fidelity-source-skeleton-row" aria-hidden="true">
                 <div><i /><span><i /><i /></span><i /></div><div><i /><i /></div>
               </div>)}<div className="fidelity-source-skeleton-foot" aria-hidden="true" /></>
-              : rows.length === 0 ? <p className="px-4 py-5 text-sm text-muted-foreground">{t("mobile.sources.empty")}</p> : rows.map((row, index) => {
+              : rows.length === 0 ? <EmptyState icon={BackpackIcon} title={t("mobile.sources.empty")}
+                hint={t("fidelity.settings.sources.emptyHint")} /> : rows.map((row, index) => {
               const identity = kind === "exchange" ? maskSensitive((row as ExchangeRow).apiKey)
                 : kind === "wallet" ? truncateAddress((row as WalletRow).address)
                 : maskSensitive((row as StockBrokerRow).queryId);

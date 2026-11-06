@@ -13,7 +13,7 @@ const routes = [
 test("desktop Goals drawer saves and restores focus to New rule", async ({ page }) => {
   await installTauriBridge(page);
   await page.goto("/#/goals");
-  await expect(page.getByText("No rules yet")).toBeVisible();
+  await expect(page.getByText("Create your first rule")).toBeVisible();
   await page.getByRole("spinbutton", { name: "Threshold" }).fill("100");
   await page.getByRole("button", { name: "Save rule" }).click();
   const trigger = page.getByRole("button", { name: "New rule" });
@@ -231,6 +231,11 @@ test.describe("coarse pointer attribution", () => {
 test("expanded overview and asset charts expose text summaries", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 740 });
   await installTauriBridge(page);
+  await page.evaluate(() => (window as any).__e2eInvoke("plugin:sql|execute", {
+    query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('snapshot-third', '2024-01-03T00:00:00.000Z', 'wallet-1', 'crypto', 'BTC', 1, 43000, 43000)`,
+    values: [],
+  }));
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Show More" }).click();
   await expect(page.getByText("Coins Percentage Overview")).toBeVisible();
@@ -250,6 +255,12 @@ test("expanded overview and asset charts expose text summaries", async ({ page }
   }
 });
 
+test("a two-day coin history announces why no chart is plotted", async ({ page }) => {
+  await installTauriBridge(page);
+  await page.goto("/#/coins/BTC?assetType=crypto");
+  await expect(page.locator(".coin-fidelity-plot[role='status']")).toHaveText("Not enough history yet");
+});
+
 test("expanded Overview content passes axe with its percentage rows visible", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 740 });
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -266,6 +277,7 @@ test("assistant with pinned and recent sessions passes axe", async ({ page }) =>
   await page.setViewportSize({ width: 768, height: 740 });
   await installTauriBridge(page, undefined, true);
   await page.goto("/#/assistant");
+  await page.getByRole("button", { name: "Expand chats" }).click();
   await expect(page.getByText("Pinned portfolio review")).toBeVisible();
   await expect(page.getByText("Recent portfolio review")).toBeVisible();
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
@@ -277,6 +289,7 @@ test("small muted text in assistant sessions and expanded Overview meets AA cont
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installTauriBridge(page, undefined, true);
   await page.goto("/#/assistant");
+  await page.getByRole("button", { name: "Expand chats" }).click();
   await expect(page.getByText("Pinned portfolio review")).toBeVisible();
   for (const label of ["Pinned", "Recent"]) {
     expect(await contrastWithBackground(page.getByText(label, { exact: true })), label).toBeGreaterThanOrEqual(4.5);
@@ -384,6 +397,15 @@ test("remaining configuration editors have named controls", async ({ page }) => 
 
 test.describe("coarse pointer touch targets", () => {
 test.use({ isMobile: true, hasTouch: true });
+
+test("Full release notes has a 44px touch target", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await installTauriBridge(page);
+  await page.goto("/#/settings/systemInfo?section=about", { waitUntil: "domcontentloaded" });
+  const notes = page.getByRole("button", { name: "Full release notes" });
+  await expect(notes).toBeVisible({ timeout: 15_000 });
+  expect((await notes.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+});
 
 test("visible controls across routes have 44px targets or 44px labels", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
@@ -529,7 +551,7 @@ test.use({ isMobile: true, hasTouch: true });
 
 test("wide cost basis tables keep their first column visible while scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
-  await installTauriBridge(page);
+  await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/cost-basis");
   const table = page.locator(".fidelity-cost-averages table");
   await expect(table).toBeVisible();

@@ -12,6 +12,7 @@ import {
   Cross2Icon,
   PlusIcon,
   LockClosedIcon,
+  ChevronLeftIcon,
 } from "@radix-ui/react-icons";
 import type { ChatSessionMeta } from "@/middlelayers/ai";
 
@@ -24,6 +25,9 @@ export type SessionSidebarProps = {
   onNew: () => void;
   onDelete: (id: string) => void;
   onPin: (id: string, pinned: boolean) => void;
+  onCollapse?: () => void;
+  collapseRef?: React.Ref<HTMLButtonElement>;
+  controlsId?: string;
 };
 
 function relativeTime(iso: string, t: (key: string) => string, locale: Locale): string {
@@ -45,6 +49,9 @@ export default function SessionSidebar({
   onNew,
   onDelete,
   onPin,
+  onCollapse,
+  collapseRef,
+  controlsId = "assistant-chats",
 }: SessionSidebarProps) {
   const { t, locale } = useTranslation();
 
@@ -63,7 +70,7 @@ export default function SessionSidebar({
         <h2 className="text-[15px] font-semibold text-foreground">
           {t("fidelity.assistant.chats")}
         </h2>
-        <Button
+        <div className="t3-assistant-sidebar-actions"><Button
           variant="ghost"
           size="sm"
           onClick={onNew}
@@ -73,6 +80,12 @@ export default function SessionSidebar({
           <PlusIcon className="h-3.5 w-3.5" />
           {t("ai.session.newChat")}
         </Button>
+        {onCollapse && <button type="button" onClick={onCollapse} ref={collapseRef}
+          aria-label={t("assistant.panes.collapseChats")} aria-expanded="true" aria-controls={controlsId}
+          title={`${t("assistant.panes.collapseChats")} (Ctrl/⌘+Shift+[)`}
+          className="t3-assistant-pane-toggle" data-testid="chats-header-toggle">
+          <ChevronLeftIcon aria-hidden="true" />
+        </button>}</div>
       </div>
 
       {/* Session list */}

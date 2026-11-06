@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -127,6 +127,8 @@ const config: AIConfig = {
  }
 
 beforeEach(() => {
+  localStorage.removeItem("track3.ui.assistant.panes");
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
   chatOptions.current = null;
   useActualChat.current = false;
   liveChat.current = null;
@@ -159,6 +161,83 @@ beforeEach(() => {
 });
 
 describe("ChatPage", () => {
+  it("collapses both desktop panes into accessible rails and restores focus on expand", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant", true);
+    const chats = await screen.findByTestId("chats-pane");
+    const context = screen.getByTestId("context-pane");
+    expect(chats).toHaveAttribute("data-collapsed", "false");
+    expect(context).toHaveAttribute("data-collapsed", "false");
+    const collapseChats = screen.getByRole("button", { name: "Collapse chats" });
+    expect(collapseChats).toHaveAttribute("aria-expanded", "true");
+    expect(collapseChats).toHaveAttribute("aria-controls", "assistant-chats");
+    await userEvent.click(collapseChats);
+    expect(chats).toHaveAttribute("data-collapsed", "true");
+    const expandChats = screen.getByRole("button", { name: "Expand chats" });
+    expect(expandChats).toHaveFocus();
+    expect(expandChats).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "New chat" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Collapse context" }));
+    expect(context).toHaveAttribute("data-collapsed", "true");
+    expect(screen.getByRole("button", { name: "Expand context" })).toHaveFocus();
+    await userEvent.click(expandChats);
+    expect(screen.getByRole("button", { name: "Collapse chats" })).toHaveFocus();
+    expect(JSON.parse(localStorage.getItem("track3.ui.assistant.panes")!)).toEqual({ chats: true, context: false });
+  });
+
+  it("uses responsive defaults until a stored choice wins and supports pane shortcuts", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant", true);
+    expect(await screen.findByTestId("chats-pane")).toHaveAttribute("data-collapsed", "true");
+    expect(screen.getByTestId("context-pane")).toHaveAttribute("data-collapsed", "true");
+    fireEvent.keyDown(window, { key: "[", ctrlKey: true, shiftKey: true });
+    expect(screen.getByTestId("chats-pane")).toHaveAttribute("data-collapsed", "false");
+    expect(screen.getByRole("button", { name: "Collapse chats" })).toHaveFocus();
+    fireEvent.keyDown(window, { key: "]", metaKey: true, shiftKey: true });
+    expect(screen.getByTestId("chats-pane")).toHaveAttribute("data-collapsed", "true");
+    expect(screen.getByTestId("context-pane")).toHaveAttribute("data-collapsed", "false");
+    expect(screen.getByRole("button", { name: "Collapse context" })).toHaveFocus();
+  });
+
+  it("allows pane shortcuts when an unrelated dialog is mounted but unfocused", async () => {
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant", true);
+    const chats = await screen.findByTestId("chats-pane");
+    const dialog = document.createElement("div");
+    dialog.setAttribute("role", "dialog");
+    document.body.append(dialog);
+    try {
+      fireEvent.keyDown(window, { key: "[", ctrlKey: true, shiftKey: true });
+      expect(chats).toHaveAttribute("data-collapsed", "true");
+    } finally {
+      dialog.remove();
+    }
+  });
+
+  it("recomputes responsive defaults on resize until the user chooses a pane state", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
+    vi.mocked(loadAIConfig).mockResolvedValue(config);
+    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+    renderAt("/assistant", true);
+    expect(await screen.findByTestId("chats-pane")).toHaveAttribute("data-collapsed", "true");
+    expect(screen.getByTestId("context-pane")).toHaveAttribute("data-collapsed", "true");
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1400 });
+    fireEvent.resize(window);
+    expect(screen.getByTestId("chats-pane")).toHaveAttribute("data-collapsed", "false");
+    expect(screen.getByTestId("context-pane")).toHaveAttribute("data-collapsed", "false");
+
+    await userEvent.click(screen.getByRole("button", { name: "Collapse context" }));
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 800 });
+    fireEvent.resize(window);
+    expect(screen.getByTestId("chats-pane")).toHaveAttribute("data-collapsed", "true");
+    expect(screen.getByTestId("context-pane")).toHaveAttribute("data-collapsed", "true");
+  });
+
   it("auto-sends a setup question with its page and safe settings context in a new session", async () => {
     storePendingAssistantQuestion({ question: "Make it equal weight", page: "rebalance", summary: "BTC 75%, ETH 25%" });
     vi.mocked(loadAIConfig).mockResolvedValue(config);
@@ -430,7 +509,6 @@ describe("ChatPage", () => {
       { role: "assistant", blocks: [{ kind: "text", text: "Answer A" }] },
     ]);
     await waitFor(() => expect(appendMessages).toHaveBeenCalledTimes(1));
-    await userEvent.click(screen.getByTestId("sidebar-toggle"));
     await userEvent.click(screen.getByTestId("session-select-session-b"));
     await waitFor(() => expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question B" }));
     await act(async () => {
@@ -471,7 +549,6 @@ describe("ChatPage", () => {
       { role: "assistant", blocks: [{ kind: "text", text: "Answer A" }] },
     ]);
     await waitFor(() => expect(appendMessages).toHaveBeenCalledTimes(1));
-    await userEvent.click(screen.getByTestId("sidebar-toggle"));
     await userEvent.click(screen.getByTestId("session-select-session-b"));
     await waitFor(() => expect(chatOptions.current.sessionId).toBe("session-b"));
     await userEvent.click(screen.getByText("Assistant route"));
@@ -505,7 +582,6 @@ describe("ChatPage", () => {
       { role: "assistant", blocks: [{ kind: "text", text: "Old answer" }] },
     ]);
     await waitFor(() => expect(createNewSpy).toHaveBeenCalledTimes(1));
-    await userEvent.click(screen.getByTestId("sidebar-toggle"));
     await userEvent.click(screen.getByTestId("session-select-session-b"));
     await waitFor(() => expect(chatOptions.current.sessionId).toBe("session-b"));
     await userEvent.click(screen.getByText("Assistant route"));
@@ -556,7 +632,6 @@ describe("ChatPage", () => {
       { role: "assistant", blocks: [{ kind: "text", text: "Answer A" }] },
     ]);
     await waitFor(() => expect(chatOptions.current.sessionId).toBe("mock-session-id"), { timeout: 5000 });
-    await userEvent.click(screen.getByTestId("sidebar-toggle"));
     await userEvent.click(screen.getByTestId("session-select-session-b"));
     await waitFor(() => expect(chatOptions.current.initialMessages[0]).toEqual({ role: "user", content: "Question B" }), { timeout: 5000 });
     await userEvent.click(screen.getByTestId("session-select-mock-session-id"));
@@ -574,7 +649,6 @@ describe("ChatPage", () => {
     removeSpy.mockRejectedValueOnce(new Error("permission denied"));
     renderAt("/assistant/session-a", true);
     await screen.findByTestId("chat-thread");
-    await userEvent.click(screen.getByTestId("sidebar-toggle"));
     await userEvent.click(screen.getByTestId("session-delete-session-a"));
     await userEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("permission denied");

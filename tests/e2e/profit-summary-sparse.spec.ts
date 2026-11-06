@@ -20,13 +20,13 @@ test("desktop explains sparse 2026 profit months and the October baseline", asyn
     const feb = summary.locator(".fidelity-month-card").nth(1);
     await expect(feb).toContainText("–");
     await feb.getByRole("button").first().focus();
-    await expect(feb.getByText("No snapshot in this month")).toBeVisible();
+    await expect(page.getByRole("tooltip")).toHaveText("No snapshot in this month");
     await feb.getByRole("button").first().evaluate((button) => button.blur());
-    await expect(feb.getByText("No snapshot in this month")).toBeHidden();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
     await feb.hover();
-    await expect(feb.getByText("No snapshot in this month")).toBeVisible();
+    await expect(page.getByRole("tooltip")).toHaveText("No snapshot in this month");
     mkdirSync("test-results/profit-summary-sparse", { recursive: true });
-    await summary.screenshot({ path: "test-results/profit-summary-sparse/desktop-1440.png" });
+    await page.screenshot({ path: "test-results/profit-summary-sparse/desktop-1440.png" });
   } finally {
     await context.close();
   }

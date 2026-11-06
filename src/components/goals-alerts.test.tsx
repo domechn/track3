@@ -74,9 +74,22 @@ it("uses the evaluator's blacklist for the goal line and ETA", async () => {
 
 it("has no axe violations in the goals summary", async () => {
   const { container } = render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
   expect(results.violations.map(({ id }) => id)).toEqual([]);
+});
+
+it("names the empty rule templates as an accessible group", async () => {
+  render(<GoalsAlerts />);
+  await screen.findByText("Create your first rule");
+  expect(screen.getByRole("group", { name: "Rule templates" })).toBeInTheDocument();
+});
+
+it("shows the legacy empty label as visible copy", async () => {
+  render(<GoalsAlerts />);
+  expect(await screen.findByRole("heading", { name: "Create your first rule" })).toBeVisible();
+  expect(screen.getByText("No rules yet")).toBeVisible();
+  expect(document.querySelector(".t3-goals-rules .sr-only")).not.toBeInTheDocument();
 });
 
 it("summarizes active rules and unread triggers from existing data", async () => {
@@ -99,7 +112,7 @@ it("shows the full unread count when recent history is capped", async () => {
 
 it("labels the capped history count as recent triggers", async () => {
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   expect(screen.getByTestId("goals-summary")).toHaveTextContent("Recent triggers");
 });
 
@@ -108,7 +121,7 @@ it("shows the last portfolio check instead of a last trigger", async () => {
     snapshots: [{ at: "2026-04-16T12:00:00.000Z", assets: [] }], prices: {}, excludedSymbols: [],
   });
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   expect(screen.getByTestId("goals-summary")).toHaveTextContent("Last check");
   expect(screen.getByText("Last check").nextElementSibling).toHaveTextContent("Apr 16, 2026, 12:00 PM");
 });
@@ -169,7 +182,7 @@ it("does not turn the inline editor into a drawer after the first rule is saved"
   });
   const user = userEvent.setup();
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   await user.type(screen.getByRole("spinbutton", { name: "Threshold" }), "1000");
   await user.click(screen.getByRole("button", { name: "Save rule" }));
   await screen.findByRole("button", { name: "Edit" });
@@ -178,19 +191,37 @@ it("does not turn the inline editor into a drawer after the first rule is saved"
 
 it("scrolls to the inline editor when New rule is pressed before any rules exist", async () => {
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   const editor = document.getElementById("goal-rule-editor")!;
   const scrollIntoView = vi.fn();
   editor.scrollIntoView = scrollIntoView;
-  await userEvent.click(screen.getByRole("button", { name: "New rule" }));
+  await userEvent.click(screen.getAllByRole("button", { name: "New rule" })[0]);
   await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth" }));
 });
 
 it("shows the empty state and a clear explanation before notification permission", async () => {
   render(<GoalsAlerts />);
-  expect(await screen.findByText("No rules yet")).toBeInTheDocument();
+  expect(await screen.findByText("Create your first rule")).toBeInTheDocument();
   expect(screen.getByText(/Allow system notifications/i)).toBeInTheDocument();
   expect(enableSystemNotifications).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["BTC above a price", "asset_price_target", "BTC", "gte", 70000, null],
+  ["Portfolio value reaches a target", "total_value_target", null, "gte", 800000, null],
+  ["Allocation drifts from target", "allocation_deviation", "BTC", "gte", 2, null],
+  ["Daily drop of 5% or more", "portfolio_value_change", null, "lte", -5, "24h"],
+] as const)("opens a prefilled rule editor for %s", async (label, kind, symbol, comparator, threshold, window) => {
+  render(<GoalsAlerts />);
+  await screen.findByText("Create your first rule");
+  await userEvent.click(screen.getByRole("button", { name: label }));
+  expect(screen.getByRole("combobox", { name: "Alert kind" })).toHaveValue(kind);
+  if (symbol) expect(screen.getByRole("textbox", { name: "Symbol" })).toHaveValue(symbol);
+  else expect(screen.queryByRole("textbox", { name: "Symbol" })).not.toBeInTheDocument();
+  expect(screen.getByRole("combobox", { name: "Comparison" })).toHaveValue(comparator);
+  expect(screen.getByRole("spinbutton", { name: "Threshold" })).toHaveValue(threshold);
+  if (window) expect(screen.getByRole("combobox", { name: "Window" })).toHaveValue(window);
+  else expect(screen.queryByRole("combobox", { name: "Window" })).not.toBeInTheDocument();
 });
 
 it("shows an AI setup entry before manual rule editing", async () => {
@@ -203,7 +234,7 @@ it("shows an AI setup entry before manual rule editing", async () => {
 it("validates a new goal before saving", async () => {
   const user = userEvent.setup();
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   await user.click(screen.getByRole("button", { name: "Save rule" }));
   expect(saveAlertRule).not.toHaveBeenCalled();
   const threshold = screen.getByLabelText("Threshold");
@@ -220,7 +251,7 @@ it("validates a new goal before saving", async () => {
 it("keeps success and validation feedback in separate live regions", async () => {
   const user = userEvent.setup();
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   await user.click(screen.getByRole("button", { name: "Save rule" }));
   const alert = screen.getByRole("alert");
   expect(alert).toHaveTextContent(/enter a valid threshold/i);
@@ -258,7 +289,8 @@ it("marks a portfolio loss in the history timeline as high severity", async () =
 it("shows an already granted notification permission on opening the page", async () => {
   vi.mocked(systemNotificationsEnabled).mockResolvedValue(true);
   render(<GoalsAlerts />);
-  expect(await screen.findByRole("button", { name: "System notifications enabled" })).toBeInTheDocument();
+  expect(await screen.findByText("System notifications enabled")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "System notifications enabled" })).not.toBeInTheDocument();
   expect(enableSystemNotifications).not.toHaveBeenCalled();
 });
 

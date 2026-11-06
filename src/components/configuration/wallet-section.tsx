@@ -42,6 +42,8 @@ import {
 import { useTranslation } from "@/i18n";
 import { getWalletLogo } from "@/lib/utils";
 import type { WalletSectionProps } from "./types";
+import { BackpackIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 
 const CONFIG_LIST_PAGE_SIZE = 30;
 
@@ -200,9 +202,8 @@ const WalletSection = memo(function WalletSection({
       </CardHeader>
       <CardContent className="space-y-2">
         {wallets.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-            No wallet found. Add your first wallet address to start tracking.
-          </div>
+          <EmptyState icon={BackpackIcon} title={t("fidelity.source.empty").replace("{name}", t("config.wallets").toLowerCase())}
+            hint={t("fidelity.source.emptyBody")} />
         ) : (
           <>
             <Table className="table-fixed">

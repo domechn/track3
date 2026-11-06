@@ -39,6 +39,8 @@ import type { OthersSectionProps, OtherDraft } from "./types";
 import { CustomPriceFields, parsePriceDraft, priceDraft } from "./custom-price-fields";
 import type { PriceDraft } from "./custom-price-fields";
 import { validateCustomPrice } from "@/middlelayers/custom-price";
+import { BackpackIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 
 const CONFIG_LIST_PAGE_SIZE = 30;
 
@@ -99,9 +101,8 @@ const OthersSection = memo(function OthersSection({
         </CardHeader>
         <CardContent className="space-y-2">
           {others.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-              No custom symbol yet.
-            </div>
+            <EmptyState icon={BackpackIcon} title={t("config.sources.empty.custom")}
+              hint={t("fidelity.source.emptyBody")} />
           ) : (
             <>
               <Table>

@@ -56,7 +56,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-month { min-height:148px; }
 .fd-month-main { display:flex; flex:1; flex-direction:column; gap:2px; width:100%; text-align:left; }
 .fd-month-main:focus-visible { outline:2px solid var(--fd-accent); outline-offset:2px; }
-.fd-month[data-partial="true"] .fd-month-top,.fd-year[data-partial="true"] .fd-month-top { padding-right:26px; }
+.fd-month[data-partial="true"] .fd-month-top { padding-right:26px; }
 .fd-partial-badge { position:absolute; top:0; right:0; display:grid; place-items:center; width:44px; height:44px; color:var(--fd-muted); }
 .fd-partial-badge span { display:grid; place-items:center; width:16px; height:16px; border:1px solid currentColor; border-radius:50%; font-size:10px; line-height:1; }
 .fd-partial-badge:focus-visible { outline:2px solid var(--fd-accent); outline-offset:-4px; border-radius:6px; }
@@ -72,8 +72,14 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-zero-bar i[data-tone="loss"] { left:auto; right:50%; }
 .fd-month-foot { display:block; width:100%; margin-top:auto; padding-top:8px; border-top:1px solid var(--fd-rule); color:var(--fd-faint); font-size:12px; }
 .fd-footnote { margin:14px 0 0; color:var(--fd-faint); font-size:12px; }
+.fd-profit-hint { margin:-8px 0 10px; }
 .fd-year-list { display:grid; gap:12px; }
-.fd-year { min-height:183px; }
+.fd-year { display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:auto auto auto auto 1fr; min-height:183px; }
+.fd-year>.fd-month-top { grid-column:1/-1; grid-row:1; align-self:start; }
+.fd-year[data-partial="true"]>.fd-month-top { grid-column:1; min-width:0; }
+.fd-year>.fd-year-badge { position:static; grid-column:2; grid-row:1; margin:-14px -14px -14px 0; }
+.fd-year>strong,.fd-year>small,.fd-year>.fd-year-deposit,.fd-year>.fd-year-foot { grid-column:1/-1; min-width:0; }
+.fd-year>strong,.fd-year-deposit span,.fd-year-foot span { white-space:nowrap; font-variant-numeric:tabular-nums; }
 .fd-year.selected { border-color:var(--fd-accent); background:rgba(74,138,214,.14); }
 .fd-year strong { margin-top:6px; font:500 22px/28px "Public Sans Variable","Public Sans",sans-serif; }
 .fd-year-deposit,.fd-year-foot { display:flex; justify-content:space-between; gap:8px; width:100%; margin-top:10px; color:var(--fd-muted); font-size:12px; }
@@ -160,8 +166,6 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-source-row strong { float:right; font-weight:500; }
 .fd-source-row small { display:block; clear:both; margin-top:3px; color:var(--fd-faint); font-size:12px; }
 .fd-source-row.total { border-top-color:var(--fd-control); }
-.fd-open-lots { margin-top:22px; }
-.fd-open-lots .fd-card-heading { margin-bottom:6px; }
 .fd-lot-header,.fd-lot-row { display:grid; grid-template-columns:60px 65px 96px minmax(0,1fr); align-items:center; gap:0; }
 .fd-coin[data-asset-type="stock"] .fd-lot-header,.fd-coin[data-asset-type="stock"] .fd-lot-row { grid-template-columns:82px 65px 74px minmax(0,1fr); }
 .fd-coin[data-manual="true"] .fd-lot-header,.fd-coin[data-manual="true"] .fd-lot-row { grid-template-columns:86.6px 79.5px 75.4px minmax(0,1fr); }
@@ -178,6 +182,14 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-tx-main strong { margin-left:auto; font-weight:500; white-space:nowrap; }
 .fd-tx-row small { display:block; margin-top:6px; color:var(--fd-faint); font-size:12px; }
 .fd-coin-chart-empty { min-height:190px; }
+.fd-coin-trend { min-height:320px; }
+.fd-open-lots { margin-top:22px; }
+.fd-open-lots .fd-card-heading { margin-bottom:6px; }
+.fd-source-empty-toggle { display:flex; justify-content:space-between; width:100%; min-height:42px; align-items:center; border-top:1px solid var(--fd-rule); color:var(--fd-faint); text-align:left; }
+.fd-source-empty-toggle:focus-visible,.fd-lots-toggle:focus-visible { outline:2px solid var(--fd-accent); outline-offset:2px; }
+.fd-source-zero { color:var(--fd-faint); }
+.fd-lots-scroll.expanded { max-height:350px; overflow-y:auto; }
+.fd-lots-toggle { display:block; margin:12px auto 0; color:var(--fd-accent); }
 .fd-manual-rows { margin-top:14px; }
 .fd-manual-rows>div { min-height:52px; display:grid; grid-template-columns:1fr auto; align-content:center; border-top:1px solid var(--fd-rule); }
 .fd-manual-rows strong { grid-row:span 2; align-self:center; font-weight:500; }
@@ -232,6 +244,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-coin-changes:not(.manual)>.fd-coin-metric:nth-child(4) { border-left:0; }
 .fd-position { margin-top:20px; }
 .fd-coin .fd-card-heading { margin-bottom:12px; }
+.fd-open-lots .fd-card-heading { margin-bottom:3px; }
 .fd-coin-trend>.fd-card-heading { margin-bottom:0; }
 .fd-coin .fd-coin-transactions .fd-tx-main em { text-transform:capitalize; min-width:72px; justify-content:center; }
 .fd-coin-transactions .fd-tx-filters button { text-transform:capitalize; }
@@ -251,8 +264,6 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .app-layout:has(.fd-page) .mobile-tab { flex:none; font-size:11px; font-weight:400; line-height:18px; }
 .app-layout:has(.fd-page) .mobile-tab-badge { top:-4px; left:100%; min-width:16px; padding:0 5px; font-size:10px; font-weight:700; }
 .fd-coin-stats { margin-top:11px; }
-.fd-open-lots { margin-top:20px; }
-.fd-open-lots .fd-card-heading { margin-bottom:3px; }
 .fd-lot-header { height:24px; }
 .fd-tx-row { height:64px; min-height:64px; padding:10px 0; }
 .fd-coin .fd-card nav { margin-top:12px; }
@@ -274,7 +285,6 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-coin-changes.manual>.fd-coin-metric,.fd-coin-changes.manual>.fd-coin-metric:nth-child(3),.fd-coin-changes.manual>.fd-coin-metric:nth-child(4) { min-height:88px; }
 .fd-coin:has(.fd-coin-changes.manual) .fd-position { margin-top:20px; }
 .fd-coin:has(.fd-coin-changes.manual) .fd-position-grid { grid-template-rows:114px 78px 60px; }
-.fd-open-lots { margin-top:22px; }
 .fd-coin-holdings { padding-bottom:19.5px; }
 .fd-coin-transactions>.fd-footnote { margin-top:12px; }
 .fd-coin-transactions:has(.fd-tx-filters button:nth-child(3):last-child)>.fd-card-heading { float:left; align-items:center; height:32px; margin:0; }
@@ -890,7 +900,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
   .fd-comparison-movers.percent .fd-comparison-mover-list { grid-template-columns:64px minmax(0,1fr) minmax(64px,max-content); }
   .fd-comparison-mover.percent small { display:none; }
 }
-.fd-comparison-picker.mobile-sheet { height:476px; max-height:100dvh; padding:8px 16px 20px; border:1px solid var(--fd-control); border-radius:16px 16px 0 0; background:var(--fd-surface); font-variant-numeric:tabular-nums; }
+.fd-comparison-picker.mobile-sheet { height:482px; max-height:100dvh; padding:var(--card-pad); border:1px solid var(--fd-control); border-radius:16px 16px 0 0; background:var(--fd-surface); font-variant-numeric:tabular-nums; }
 .fd-comparison-picker .mobile-sheet-handle-area { min-height:16px; }
 .fd-comparison-picker .mobile-sheet-handle { width:36px; height:4px; transform:translateY(-6px); background:#44454b; }
 .fd-comparison-picker .mobile-sheet-heading { height:27px; min-height:27px; margin-bottom:1px; padding:0; border:0; }
@@ -925,8 +935,6 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
   .fd-overview-range-row .fd-range,.fd-wallet-range .fd-range { flex-basis:100%; width:100%; }
   .fd-overview-clock,.fd-wallet-refresh { margin-left:auto; }
 }
-.fd-unknown-hint { display:block; margin-top:8px; color:var(--fd-faint); font-size:11px; line-height:15px; }
-.fd-unknown-hint[hidden] { display:none; }
 .fd-coin-trend:has(.fd-chart-controls>div:first-child button:nth-child(2)[aria-pressed="true"]) .fd-coin-chart,
 .fd-coin-trend:has(.fd-chart-controls>div:first-child button:nth-child(2)[aria-pressed="true"]) .fd-coin-stats { margin-top:14px; }
 .fd-year-deposit { margin-top:18px; }

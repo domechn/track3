@@ -43,6 +43,8 @@ import { useIsMobile } from "@/mobile/components/mobile";
 import { formatPhoneMoney } from "@/mobile/currency";
 import RebalanceFidelity from "@/mobile/components/rebalance-fidelity";
 import { usePhoneWidth } from "@/mobile/components/mobile/size-class";
+import { TargetIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 
 type TargetDraft = RebalanceTarget & { id: number; previousAsset?: { assetType: AssetType; symbol: string } };
 
@@ -454,7 +456,8 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
           </details>
           <p className="t3-rebalance-sync-note">{t("rebalance.syncNote")}</p>
           {!optionsValid && <p role="alert" className="text-xs text-destructive">{t("rebalance.validationOptions")}</p>}
-          {!targets.length && <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">{t("rebalance.empty")}</p>}
+          {!targets.length && <EmptyState icon={TargetIcon} title={t("rebalance.empty")}
+            hint={t("fidelity.rebalance.emptySubtitle")} />}
           {result && (
             <>
               <RebalanceCharts result={result} quoteColor={quoteColor} tolerancePercent={tolerance} />

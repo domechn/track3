@@ -10,6 +10,10 @@ import FidelityRail from "./fidelity-rail";
 import FidelityIcon from "./fidelity-icon";
 import { useDarkTheme } from "./common/theme";
 import { useWindowSize } from "@/utils/hook";
+import { BellIcon, TargetIcon } from "@radix-ui/react-icons";
+import EmptyState from "./empty-state";
+import { AttributionPager, useAttributionPage } from "./attribution-pager";
+import { alertTemplateDraft, alertTemplates } from "./goals-alert-templates";
 import "./rebalance-desktop.css";
 import "./goals-desktop.css";
 
@@ -68,7 +72,7 @@ type Props = {
   onEditorOpen: (open: boolean) => void;
   onEditorCloseFocus: () => void;
   onEdit: (rule: AlertRule, trigger: HTMLButtonElement) => void;
-  onAdd: (trigger: HTMLButtonElement) => void;
+  onAdd: (trigger: HTMLButtonElement, draft?: AlertDraft) => void;
   onSave: () => void;
   onToggle: (rule: AlertRule, enabled: boolean) => void;
   onDelete: (rule: AlertRule) => void;
@@ -83,13 +87,15 @@ type Props = {
 
 export default function GoalsDesktop(props: Props) {
   const { t, locale } = useTranslation();
+  const rules = [...props.rules].sort((a, b) => a.id - b.id);
+  const history = [...props.history].sort((a, b) => b.triggeredAt.localeCompare(a.triggeredAt) || a.id - b.id);
+  const rulePaging = useAttributionPage(rules, rules.map((rule) => rule.id).join(","), 20);
+  const historyPaging = useAttributionPage(history, history.map((alert) => alert.id).join(","), 20);
   const money = (value: number, digits = 2) => `${props.currencySymbol ?? "$"}${fixed(Math.abs(value), digits)}`;
   const pts = (value: string) => t("goals.fidelity.pts").replace("{value}", value);
   const [deleteRule, setDeleteRule] = useState<AlertRule | null>(null);
   const [clearOpen, setClearOpen] = useState(false);
   const [attempted, setAttempted] = useState(false);
-  const rules = [...props.rules].sort((a, b) => a.id - b.id);
-  const history = [...props.history].sort((a, b) => b.triggeredAt.localeCompare(a.triggeredAt) || a.id - b.id);
   const latest = props.snapshots[0];
   const measurements = rules.map((rule) => measureRule(rule, props.snapshots, props.prices, props.targets));
   const currentTotal = latest?.assets.reduce((sum, asset) => sum + asset.value, 0) ?? 0;
@@ -135,9 +141,9 @@ export default function GoalsDesktop(props: Props) {
       (needsAsset(props.draft.kind) && !props.draft.symbol.trim())) return;
     props.onSave();
   };
-  const openAdd = (button: HTMLButtonElement) => {
+  const openAdd = (button: HTMLButtonElement, draft?: AlertDraft) => {
     setAttempted(false);
-    props.onAdd(button);
+    props.onAdd(button, draft);
   };
   const openEdit = (rule: AlertRule, button: HTMLButtonElement) => {
     setAttempted(false);
@@ -236,9 +242,10 @@ export default function GoalsDesktop(props: Props) {
       <section className="t3-fidelity-card t3-fidelity-goal-rules">
         <div className="t3-fidelity-card-head"><h2>{t("goals.rules")}</h2><span>{rules.length ? t("goals.fidelity.rulesHint").replace("{on}", String(onCount)).replace("{off}", String(rules.length - onCount)).replace("{time}", time(latest?.at)) : t("goals.fidelity.zeroRules")}</span></div>
         {props.loading ? <div className="t3-fidelity-empty" role="status">{t("goals.loading")}</div> : rules.length ? <>
+          <div className="t3-fidelity-rule-list">
           <div className="t3-fidelity-goal-row t3-fidelity-table-head"><span /><span>{t("goals.fidelity.column.rule")}</span><span>{t("goals.fidelity.column.progress")}</span><span>{t("goals.fidelity.kind")}</span><span>{t("goals.fidelity.column.status")}</span><span /></div>
-          {rules.map((rule, index) => {
-            const measurement = measurements[index];
+          {rulePaging.rows.map((rule) => {
+            const measurement = measurements[rules.indexOf(rule)];
             const raw = rule.threshold !== 0 && measurement.value !== undefined
               ? rule.kind === "portfolio_value_change" && rule.comparator === "lte" && measurement.value > rule.threshold ? 0
                 : (rule.comparator === "gte" ? measurement.value / rule.threshold : rule.threshold / measurement.value) * 100 : 0;
@@ -257,23 +264,28 @@ export default function GoalsDesktop(props: Props) {
                 <button aria-label={t("goals.fidelity.deleteAction")} onClick={() => setDeleteRule(rule)}><FidelityIcon name="trash" /></button></div>
             </div>;
           })}
-        </> : <div className="t3-fidelity-empty"><b>{t("goals.empty")}</b><span>{t("goals.fidelity.emptyRulesHint")}</span>
-          <div><button className="primary" onClick={(event) => openAdd(event.currentTarget)}><FidelityIcon name="plus" />{t("goals.fidelity.addRule")}</button></div></div>}
+          </div><AttributionPager count={rules.length} {...rulePaging} t={t} ariaLabel={t("goals.rules")} />
+        </> : <EmptyState icon={TargetIcon} title={t("goals.empty.title")} hint={t("goals.empty.hint")} className="t3-fidelity-empty">
+          <button className="primary" onClick={(event) => openAdd(event.currentTarget)}><FidelityIcon name="plus" />{t("goals.newRule")}</button>
+          <div className="t3-empty-state-chips">{alertTemplates.map((template) => <button key={template}
+            onClick={(event) => openAdd(event.currentTarget, alertTemplateDraft(template, latest))}>{t(`goals.template.${template}`)}</button>)}</div>
+        </EmptyState>}
       </section>
       <section className="t3-fidelity-card t3-fidelity-triggered">
         <div className="t3-fidelity-card-head"><h2>{t("goals.fidelity.triggered")}</h2>
           {!!props.unreadCount && <span className="t3-fidelity-badge">{props.unreadCount}</span>}
           <span className="t3-fidelity-goal-history-actions"><button className="t3-fidelity-notifications" aria-label={t(props.notificationsEnabled ? "goals.notificationEnabled" : "goals.enableNotifications")}
             title={t(props.notificationsEnabled ? "goals.notificationEnabled" : "goals.enableNotifications")} aria-pressed={props.notificationsEnabled} onClick={props.onEnableNotifications}><FidelityIcon name="bell" /></button>
-          {!!history.length && <><button disabled={!props.unreadCount} onClick={props.onAcknowledgeAll}>{t("goals.ackAll")}</button>
-            <button onClick={() => setClearOpen(true)}>{t("goals.fidelity.clear")}</button></>}</span></div>
-        {props.loading ? <div className="t3-fidelity-empty" role="status">{t("goals.loading")}</div> : history.length ? <><div className="t3-fidelity-history-list">{history.map((alert) => {
+          <button disabled={!props.unreadCount} onClick={props.onAcknowledgeAll}>{t("goals.ackAll")}</button>
+            <button disabled={!history.length} onClick={() => setClearOpen(true)}>{t("goals.fidelity.clear")}</button></span></div>
+        {props.loading ? <div className="t3-fidelity-empty" role="status">{t("goals.loading")}</div> : history.length ? <><div className="t3-fidelity-history-list">{historyPaging.rows.map((alert) => {
           const text = historyText(alert);
           return <div key={alert.id} className={`t3-fidelity-history-row ${alert.acknowledgedAt ? "" : "unread"}`}>
           <i /><div><b>{text.title}</b><small>{text.message}</small><small>{dateLabel(alert.triggeredAt)}{alert.ruleId === null ? ` · ${t("goals.fidelity.ruleDeleted")}` : ""}</small></div>
           {alert.acknowledgedAt ? <span><FidelityIcon name="check" />{t("goals.fidelity.read")}</span> : <button onClick={() => props.onAcknowledge(alert.id)}>{t("goals.ack")}</button>}
-        </div>})}</div><div className="t3-fidelity-foot"><FidelityIcon name="info" />{t("goals.fidelity.historyFoot")}</div></>
-          : <div className="t3-fidelity-empty">{t("goals.fidelity.emptyHistory")}</div>}
+        </div>})}</div><AttributionPager count={history.length} {...historyPaging} t={t} ariaLabel={t("goals.history")} />
+        <div className="t3-fidelity-foot"><FidelityIcon name="info" />{t("goals.fidelity.historyFoot")}</div></>
+          : <EmptyState icon={BellIcon} title={t("goals.noHistory")} hint={t("goals.history.empty.hint")} className="t3-fidelity-empty" />}
       </section>
     </div>
     <Dialog open={!!deleteRule} onOpenChange={(open) => { if (!open) setDeleteRule(null); }}>
