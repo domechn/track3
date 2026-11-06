@@ -29,7 +29,7 @@ test("phone shows partial months and year with a tap explanation", async ({ brow
       await expect(main.locator(".fd-month").filter({ hasText: "Jun" }).locator("strong")).toHaveText("+$4,500");
       const mainBadge = mainFeb.getByRole("button", { name: "Explain partial profit for Feb" });
       await expect(mainBadge).toContainText("?");
-      await expect(mainFeb.getByText(/1 coin \(ETH\) has a withdrawal without a matching deposit/)).toBeHidden();
+      await expect(page.getByRole("tooltip")).toHaveCount(0);
       expect((await mainBadge.boundingBox())!.width).toBeGreaterThanOrEqual(44);
       await expect(main.locator(".fd-month").filter({ hasText: "Jan" }).getByRole("button", { name: /^Explain partial/ })).toHaveCount(0);
       await main.locator(".fd-profit-summary").screenshot({ path: `${directory}/mobile-390-${theme}-main-months.png` });
@@ -41,7 +41,8 @@ test("phone shows partial months and year with a tap explanation", async ({ brow
       await main.locator(".fd-profit-summary").screenshot({ path: `${directory}/mobile-390-${theme}-main-months-red-up.png` });
       await page.evaluate(() => document.documentElement.removeAttribute("data-quote"));
       await mainBadge.tap();
-      await expect(mainFeb.getByText(/1 coin \(ETH\) has a withdrawal without a matching deposit/)).toBeVisible();
+      await expect(page.getByRole("tooltip")).toContainText("1 coin has a withdrawal without a matching deposit");
+      await expect(page.getByRole("tooltip")).toContainText("ETH");
       const mainYear = main.locator(".fd-year").filter({ hasText: "2026" });
       await expect(mainYear).toHaveAttribute("data-partial", "true");
       await expect(mainYear.locator("strong")).toHaveText("+$45,600");
@@ -66,10 +67,14 @@ test("phone shows partial months and year with a tap explanation", async ({ brow
       await page.mouse.down();
       await expect(feb.locator("..")).toHaveCSS("transform", "none");
       await page.mouse.up();
+      await expect(page.getByRole("tooltip")).toContainText("ETH");
       await febInfo.tap();
-      await expect(feb.locator("..").getByText(/1 coin \(ETH\) has a withdrawal without a matching deposit/)).toBeVisible();
+      await expect(page.getByRole("tooltip")).toHaveCount(0);
+      await febInfo.tap();
+      await expect(page.getByRole("tooltip")).toContainText("1 coin has a withdrawal without a matching deposit");
+      await expect(page.getByRole("tooltip")).toContainText("ETH");
       await feb.locator("..").evaluate((node) => node.scrollIntoView({ block: "center" }));
-      await feb.locator("..").screenshot({ path: `${directory}/mobile-390-${theme}-explanation.png` });
+      await page.screenshot({ path: `${directory}/mobile-390-${theme}-explanation.png` });
       await summary.getByRole("radio", { name: "Y" }).tap();
       await expect(summary).toContainText("Partial 1");
       const yearInfo = summary.getByRole("button", { name: "Explain partial profit for 2026" });

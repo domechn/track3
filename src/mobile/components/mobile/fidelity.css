@@ -56,7 +56,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-month { min-height:148px; }
 .fd-month-main { display:flex; flex:1; flex-direction:column; gap:2px; width:100%; text-align:left; }
 .fd-month-main:focus-visible { outline:2px solid var(--fd-accent); outline-offset:2px; }
-.fd-month[data-partial="true"] .fd-month-top,.fd-year[data-partial="true"] .fd-month-top { padding-right:26px; }
+.fd-month[data-partial="true"] .fd-month-top { padding-right:26px; }
 .fd-partial-badge { position:absolute; top:0; right:0; display:grid; place-items:center; width:44px; height:44px; color:var(--fd-muted); }
 .fd-partial-badge span { display:grid; place-items:center; width:16px; height:16px; border:1px solid currentColor; border-radius:50%; font-size:10px; line-height:1; }
 .fd-partial-badge:focus-visible { outline:2px solid var(--fd-accent); outline-offset:-4px; border-radius:6px; }
@@ -72,8 +72,14 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-zero-bar i[data-tone="loss"] { left:auto; right:50%; }
 .fd-month-foot { display:block; width:100%; margin-top:auto; padding-top:8px; border-top:1px solid var(--fd-rule); color:var(--fd-faint); font-size:12px; }
 .fd-footnote { margin:14px 0 0; color:var(--fd-faint); font-size:12px; }
+.fd-profit-hint { margin:-8px 0 10px; }
 .fd-year-list { display:grid; gap:12px; }
-.fd-year { min-height:183px; }
+.fd-year { display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:auto auto auto auto 1fr; min-height:183px; }
+.fd-year>.fd-month-top { grid-column:1/-1; grid-row:1; align-self:start; }
+.fd-year[data-partial="true"]>.fd-month-top { grid-column:1; min-width:0; }
+.fd-year>.fd-year-badge { position:static; grid-column:2; grid-row:1; margin:-14px -14px -14px 0; }
+.fd-year>strong,.fd-year>small,.fd-year>.fd-year-deposit,.fd-year>.fd-year-foot { grid-column:1/-1; min-width:0; }
+.fd-year>strong,.fd-year-deposit span,.fd-year-foot span { white-space:nowrap; font-variant-numeric:tabular-nums; }
 .fd-year.selected { border-color:var(--fd-accent); background:rgba(74,138,214,.14); }
 .fd-year strong { margin-top:6px; font:500 22px/28px "Public Sans Variable","Public Sans",sans-serif; }
 .fd-year-deposit,.fd-year-foot { display:flex; justify-content:space-between; gap:8px; width:100%; margin-top:10px; color:var(--fd-muted); font-size:12px; }
@@ -909,8 +915,6 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
   .fd-overview-range-row .fd-range,.fd-wallet-range .fd-range { flex-basis:100%; width:100%; }
   .fd-overview-clock,.fd-wallet-refresh { margin-left:auto; }
 }
-.fd-unknown-hint { display:block; margin-top:8px; color:var(--fd-faint); font-size:11px; line-height:15px; }
-.fd-unknown-hint[hidden] { display:none; }
 .fd-coin-trend:has(.fd-chart-controls>div:first-child button:nth-child(2)[aria-pressed="true"]) .fd-coin-chart,
 .fd-coin-trend:has(.fd-chart-controls>div:first-child button:nth-child(2)[aria-pressed="true"]) .fd-coin-stats { margin-top:14px; }
 .fd-year-deposit { margin-top:18px; }

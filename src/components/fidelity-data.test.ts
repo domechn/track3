@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { axisForValues, changeFromDaysAgo, coinAxisForValues, coinChartY, compactMoney, isExchangeSource, tickIndices, yearSpan, hasProfitLine, formatMoverNames, boundedMonthTimestamps } from "./fidelity-data";
+import { axisForValues, changeFromDaysAgo, coinAxisForValues, coinChartY, compactMoney, isExchangeSource, tickIndices, yearSpan, hasProfitLine, orderMoverNames, boundedMonthTimestamps } from "./fidelity-data";
 
 describe("desktop portfolio data labels", () => {
   it("scales a small portfolio chart to its values", () => {
@@ -57,12 +57,15 @@ describe("desktop portfolio data labels", () => {
     expect(hasProfitLine([1])).toBe(false);
   });
 
-  it("uses the source portfolio's reading order without an Oxford comma", () => {
-    expect(formatMoverNames([
+  it("keeps the source portfolio's reading order in the P&L hint", () => {
+    expect(orderMoverNames([
       { symbol: "BNB", value: 20 }, { symbol: "BTC", value: 100 },
       { symbol: "AAPL", value: 30 }, { symbol: "ETH", value: 80 },
       { symbol: "NVDA", value: 15 }, { symbol: "SOL", value: 30 },
-    ], "en")).toBe("BTC, ETH, SOL, BNB, NVDA and AAPL");
+    ])).toEqual(["BTC", "ETH", "SOL", "BNB", "NVDA", "AAPL"]);
+    expect(orderMoverNames([
+      { symbol: "NVDA", value: 15 }, { symbol: "BTC", value: 100 },
+    ])).toEqual(["BTC", "NVDA"]);
   });
 
   it("bounds P&L history work while retaining both ends", () => {

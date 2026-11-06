@@ -29,14 +29,16 @@ test("phone explains sparse 2026 profit months and the October baseline", async 
     await expect(summary.getByRole("button", { name: /^Oct/ })).toContainText("-$81.9k");
     const feb = summary.getByRole("button", { name: /Feb: No snapshot in this month/ });
     await feb.focus();
-    await expect(feb.getByText("No snapshot in this month")).toBeVisible();
+    await expect(page.getByRole("tooltip")).toHaveText("No snapshot in this month");
+    await feb.evaluate((button) => button.blur());
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
     await feb.tap();
-    await expect(feb.getByText("No snapshot in this month")).toBeVisible();
-    expect(await feb.getByText("No snapshot in this month").evaluate((node) =>
+    await expect(page.getByRole("tooltip")).toHaveText("No snapshot in this month");
+    expect(await page.getByRole("tooltip").evaluate((node) =>
       node.scrollWidth <= node.clientWidth)).toBe(true);
     await summary.scrollIntoViewIfNeeded();
     mkdirSync("test-results/profit-summary-sparse", { recursive: true });
-    await summary.screenshot({ path: "test-results/profit-summary-sparse/mobile-390.png" });
+    await page.screenshot({ path: "test-results/profit-summary-sparse/mobile-390.png" });
   } finally {
     await context.close();
   }
