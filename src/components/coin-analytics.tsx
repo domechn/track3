@@ -250,6 +250,8 @@ const App = ({
   const [dataPage, setDataPage] = useState<number>(0);
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const transactionsQueryKey = useRef(queryKey);
   const [lastAsset, setLastAsset] = useState<Asset | undefined>();
 
   const [buyAmount, setBuyAmount] = useState<number>();
@@ -376,7 +378,12 @@ const App = ({
   }, [queryKey, dataChangedVersion]);
 
   useEffect(() => {
-    loadSymbolData(symbol, dateRange, assetType);
+    setTransactionsLoading(transactions.length === 0 || transactionsQueryKey.current !== queryKey);
+    transactionsQueryKey.current = queryKey;
+    const gen = loadGenRef.current;
+    loadSymbolData(symbol, dateRange, assetType).catch(() => {
+      if (gen === loadGenRef.current) setTransactionsLoading(false);
+    });
     setDataPage(0);
 
     const timer = setTimeout(() => setPageLoading(false), 8000);
@@ -555,6 +562,7 @@ const App = ({
     if (gen !== loadGenRef.current) return;
 
     setTransactions(txns);
+    setTransactionsLoading(false);
     setLastAsset(la);
     setMaxPosition(ama);
     setLogo(lp);
@@ -891,7 +899,7 @@ const App = ({
     );
   }
 
-  if (fidelity) return <CoinFidelityView symbol={symbol} assetType={assetType} currency={currency} dateRange={dateRange} lastAsset={lastAsset} transactions={transactions} walletAliasMap={walletAliasMap} quoteColor={quoteColor} onEdit={async (transaction, type, quotePrice) => {
+  if (fidelity) return <CoinFidelityView symbol={symbol} assetType={assetType} currency={currency} dateRange={dateRange} lastAsset={lastAsset} transactions={transactions} transactionsLoading={transactionsLoading} walletAliasMap={walletAliasMap} quoteColor={quoteColor} onEdit={async (transaction, type, quotePrice) => {
     if (quotePrice !== undefined && !await onUpdatePriceDialogSaveClick({
       id: transaction.id, value: String(quotePrice), rate: currency.rate, original: transaction.price, dirty: true,
     })) return false;
