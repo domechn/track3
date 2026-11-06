@@ -3220,5 +3220,10 @@
   "fidelity.settingsB.sync.pop.stoppedWarning": "反复出错后已停止自动重试",
   "fidelity.settingsB.sync.showSecret": "显示秘密访问密钥",
   "fidelity.settingsB.sync.hideSecret": "隐藏秘密访问密钥",
-  "fidelity.settingsB.sync.pop.errorDetails": "错误详情"
+  "fidelity.settingsB.sync.pop.errorDetails": "错误详情",
+  "assistant.panes.collapseChats": "折叠聊天",
+  "assistant.panes.expandChats": "展开聊天",
+  "assistant.panes.collapseContext": "折叠上下文",
+  "assistant.panes.expandContext": "展开上下文",
+  "assistant.panes.attention": "需要关注"
 }

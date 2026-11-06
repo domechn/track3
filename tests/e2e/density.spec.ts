@@ -46,6 +46,7 @@ test("mouse session actions keep their compact size and hover reveal", async ({ 
   await page.setViewportSize({ width: 600, height: 800 });
   await installTauriBridge(page, undefined, true);
   await page.goto("/#/assistant");
+  await page.getByRole("button", { name: "Expand chats" }).click();
   const pin = page.getByTestId("session-pin-pinned-e2e");
   await expect(pin).toBeAttached();
   expect((await pin.boundingBox())!.height).toBe(24);
