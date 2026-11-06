@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { reloadApp } from "@/utils/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { I18nProvider } from "@/i18n";
+import notes096 from "./release-notes.fixture.md?raw";
 
 vi.mock("@tauri-apps/plugin-updater", () => ({
   check: vi.fn(),
@@ -226,6 +227,19 @@ describe("AutoUpdater", () => {
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
     }
+  });
+
+  it("shows the 0.9.6 Markdown in a scrollable dialog with actions outside the notes", async () => {
+    vi.mocked(check).mockResolvedValueOnce({
+      available: true, version: "0.9.6", currentVersion: "0.9.5", body: notes096,
+      downloadAndInstall: vi.fn(),
+    } as unknown as Awaited<ReturnType<typeof check>>);
+    render(<AutoUpdater />);
+    fireEvent.click(await screen.findByRole("button", { name: "See what's new" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.querySelector(".t3-update-fidelity-notes")).toContainElement(screen.getByRole("heading", { name: "🎉 Features" }));
+    expect(dialog.querySelector(".t3-update-fidelity-notes")).not.toContainElement(screen.getByRole("button", { name: "Download and install" }));
+    expect(dialog.querySelector("ol > li")).toHaveTextContent("Every page now follows");
   });
 
   it("formats the release date in the selected Chinese locale", async () => {

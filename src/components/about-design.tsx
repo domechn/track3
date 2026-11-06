@@ -11,6 +11,7 @@ import { requestOnboardingReplay } from "@/middlelayers/onboarding";
 import { reloadApp } from "@/utils/app";
 import packageJson from "../../package.json";
 import { TrackLogo } from "@/components/brand/track-logo";
+import ReleaseNotes from "@/components/release-notes";
 
 type Props = { version: string };
 
@@ -60,7 +61,6 @@ export function AboutDesign({ version }: Props) {
   };
   const external = (url: string) => { void openUrl(url); };
   const platform = navigator.platform || "—";
-  const updateNotes = update?.body?.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) ?? [];
   const releaseDate = update?.date && Number.isFinite(Date.parse(update.date))
     ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(update.date))
     : undefined;
@@ -118,11 +118,7 @@ export function AboutDesign({ version }: Props) {
       <DialogContent className="t3-b-about-update-dialog"><DialogHeader><DialogTitle>{t("fidelity.settingsB.about.updateAvailable").replace("{version}", update?.version ?? "")}</DialogTitle>
         <DialogDescription>{t("fidelity.settingsB.about.youHave").replace("{version}", version)}
           {releaseDate && <> {t("fidelity.settingsB.about.released").replace("{date}", releaseDate)}</>}</DialogDescription></DialogHeader>
-        {updateNotes.length > 0 && (updateNotes.some((line) => line.startsWith("- ")) ? <div className="t3-b-update-notes">
-          {updateNotes.map((line, index) => line.startsWith("- ")
-            ? <div className="t3-b-update-note" key={index}><CheckIcon aria-hidden="true" /><span>{line.slice(2)}</span></div>
-            : <div className="t3-b-update-heading" key={index}>{line.replace(/^#+\s*/, "")}</div>)}
-        </div> : <p className="t3-b-update-body">{update?.body}</p>)}
+        {update?.body && <ReleaseNotes content={update.body} />}
         {downloadState === "downloading" && <div className="t3-b-update-progress"><b>{t("fidelity.settingsB.about.downloading")}</b>
           <span>{total ? `${(downloaded / 1_000_000).toFixed(1)} / ${(total / 1_000_000).toFixed(1)} MB` : `${(downloaded / 1_000_000).toFixed(1)} MB`}</span>
           {total && <progress value={downloaded} max={total} />}</div>}
