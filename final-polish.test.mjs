@@ -189,6 +189,16 @@ test("pricing inclusion card fills the width beneath equal price cards", async (
   await page.close();
 });
 
+test("Pro inclusions use the available card width without crowding mobile", async () => {
+  for (const width of [1440, 1024, 390]) {
+    const page = await open(width);
+    const tops = await page.locator(".limits li").evaluateAll(items => items.map(item => Math.round(item.getBoundingClientRect().top)));
+    if (width === 390) assert.ok(tops[1] > tops[0], `${width}: mobile list is not stacked`);
+    else assert.equal(tops[1], tops[0], `${width}: desktop card has an empty column`);
+    await page.close();
+  }
+});
+
 test("core screenshots share edges and copy starts at screenshot top", async () => {
   const page = await open(1440);
   const rows = await page.locator(".feature").evaluateAll(items => items.map(item => {

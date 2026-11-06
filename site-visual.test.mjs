@@ -9,11 +9,19 @@ const pages = [
 ];
 const read = (file) => readFileSync(new URL(file, root), "utf8");
 
-test("home primary actions share the Download label", () => {
+test("home download actions keep one label while Pro has its own action", () => {
   const html = read("index.html");
   const labels = [...html.matchAll(/<a\b[^>]*class="btn primary"[^>]*>([\s\S]*?)<\/a\s*>/g)]
     .map(([, label]) => label.replace(/<[^>]+>/g, "").trim());
-  assert.deepEqual(labels, ["Download", "Download", "Download"]);
+  assert.deepEqual(labels, ["Download", "Download", "Get Pro in the app", "Download"]);
+});
+
+test("Pro has one clear action to the desktop download page", () => {
+  const html = read("index.html");
+  const matches = [...html.matchAll(/<a\b[^>]*href="([^"]*download\.html)"[^>]*>Get Pro in the app<\/a>/g)];
+  assert.equal([...html.matchAll(/>Get Pro in the app</g)].length, 1);
+  assert.equal(matches.length, 1);
+  assert.match(html, /Pro is activated inside the app\. Download Track3, then open Settings → System → Subscribe\./);
 });
 
 test("home links to the full privacy notice", () => {

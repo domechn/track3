@@ -15,6 +15,7 @@ test("HTML does not suggest unavailable mobile license entry or unsupported subs
     assert.doesNotMatch(html, /in-app subscriptions? (?:are|is) not supported/i, file);
     assert.doesNotMatch(html, /(?:desktop or |on )iPhone\/iPad/i, file);
     assert.doesNotMatch(html, /More → Settings → Pro and license/i, file);
+    assert.doesNotMatch(html, /subscribe on this website/i, file);
   }
 });
 
@@ -30,12 +31,28 @@ test("success page tells subscribers how to manage or cancel", () => {
   assert.doesNotMatch(html, /Subscriptions are also available in the desktop app/i);
 });
 
-test("home page identifies the desktop app for existing Pro keys", () => {
+test("home page explains desktop subscription and existing Pro keys", () => {
   const html = read("index.html").replace(/\s+/g, " ");
   assert.match(
     html,
-    /Enter an existing Pro license key in the desktop app under Settings → System → Pro license/i,
+    /Subscribe inside the desktop app: Settings → System → Subscribe\. Already have a licence key\? Enter it under Settings → System → Pro license\./,
   );
+});
+
+test("Pro prices and inclusions remain intact", () => {
+  const pro = read("index.html").match(/<section id="pro"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(pro);
+  assert.match(pro, /\$9\.99\s*<small>\/ month<\/small>/);
+  assert.match(pro, /\$83\.99\s*<small>\/ year<\/small>/);
+  assert.match(pro, /About 30% less than monthly\./);
+  assert.match(pro, /Both plans include/);
+});
+
+test("checkout cancellation and download page point to an in-app subscription", () => {
+  const cancel = read("cancel.html").replace(/\s+/g, " ");
+  assert.match(cancel, /No charge was made\. You can subscribe any time in the desktop app under Settings → System → Subscribe\./);
+  assert.match(cancel, /Settings → System → Pro license/);
+  assert.match(read("download.html").replace(/\s+/g, " "), /Track3 is free\. Pro adds more chains and the assistant; subscribe inside the app\./);
 });
 
 test("checkout pages do not pair mobile devices with license entry", () => {

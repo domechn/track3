@@ -680,13 +680,22 @@ header .btn.primary {
   margin-top: var(--space-2);
   padding-left: 18px;
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1) var(--space-4);
   font-size: 14px;
   color: hsl(var(--muted-foreground));
 }
 .plan-note {
   margin-top: var(--space-3);
   max-width: 100ch;
+}
+.plan-action {
+  margin-top: var(--space-2);
+}
+.plan-caption {
+  margin-top: var(--space-1);
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
 }
 .devices {
   display: grid;
@@ -1120,6 +1129,9 @@ main:has(.notice) > .page-section {
   }
   .plans .limits {
     grid-column: auto;
+  }
+  .limits ul {
+    grid-template-columns: 1fr;
   }
   .facts > div {
     padding-top: var(--space-2);
