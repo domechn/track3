@@ -17,6 +17,7 @@ import {
   ChevronRightIcon,
   GearIcon,
   RocketIcon,
+  DashboardIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/mobile/i18n";
 import { FidelityIcon } from "@/mobile/components/fidelity-icon";
@@ -53,6 +54,8 @@ export * from "@/middlelayers/ui-state/chat-persist";
 import { takePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
 import { isIOS, usePlatform } from "@/utils/platform";
 import { SplitView, useSizeClass } from "@/mobile/components/mobile";
+import { ModalPage } from "@/mobile/components/mobile/overlays";
+import AssistantContextPanel, { useAssistantAttention } from "@/components/assistant/context-panel";
 
 type LoadState =
   | { status: "loading" }
@@ -133,7 +136,6 @@ function ReadyChat({
   const { t } = useTranslation();
   const { keyboardHeight } = usePlatform();
   const mobile = isIOS();
-  const widthClass = useSizeClass().width;
   const layoutRef = useRef<HTMLDivElement>(null);
   const [mobileHeight, setMobileHeight] = useState<number>();
   const { sessionId } = useParams();
@@ -181,6 +183,7 @@ function ReadyChat({
   const [processingSessionId, setProcessingSessionId] = useState<string | null>(null);
   const { sessions, isLoading, refresh, createNew, remove, pin } =
     useChatSessions();
+  const contextAttention = useAssistantAttention(sessions);
   const [initialMsgs, setInitialMsgs] = useState<ChatMessage[]>([]);
   const [initialTimes, setInitialTimes] = useState<Array<string | undefined>>([]);
   const [initialSummary, setInitialSummary] = useState<ConversationSummary | undefined>();
@@ -409,7 +412,7 @@ function ReadyChat({
       )}
       {mobile ? <SplitView selected={!sidebarOpen} className="ios-chat-split"
         masterLabel={t("ai.session.show")} detailLabel={t("nav.assistant")}
-        master={sidebarOpen || widthClass === "wide" ? <div className="flex h-full w-full min-w-0 flex-col">
+        master={sidebarOpen ? <div className="flex h-full w-full min-w-0 flex-col">
         <SessionSidebar
           mobile
           sessions={sessions}
@@ -423,7 +426,7 @@ function ReadyChat({
           processingId={processingSessionId}
         />
       </div> : null}
-        detail={sidebarOpen && widthClass !== "wide" ? null : sessionLoadError ? (
+        detail={sidebarOpen ? null : sessionLoadError ? (
           <div role="alert" className="flex-1 p-6 text-sm text-destructive">
             {t("assistant.chat.sessionLoadFailed")}: {sessionLoadError}
           </div>
@@ -441,6 +444,8 @@ function ReadyChat({
           onStreamingChange={handleStreamingChange}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={handleToggleSidebar}
+          sessions={sessions}
+          contextAttention={contextAttention}
           sessionTitle={sessionId && sessionId !== liveSessionIdRef.current
             ? sessions.find((session) => session.id === sessionId)?.title : undefined}
         />} /> : <><div
@@ -497,6 +502,8 @@ function ChatContent({
   onStreamingChange,
   sidebarOpen,
   onToggleSidebar,
+  sessions,
+  contextAttention,
   sessionTitle,
 }: {
   config: AIConfig;
@@ -510,9 +517,12 @@ function ChatContent({
   onStreamingChange?: (streaming: boolean) => void;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  sessions?: import("@/middlelayers/ai").ChatSessionMeta[];
+  contextAttention?: boolean;
   sessionTitle?: string;
 }) {
   const { t } = useTranslation();
+  const [contextOpen, setContextOpen] = useState(false);
   const sizeClass = useSizeClass();
   const chat = useChat({
     config,
@@ -559,11 +569,18 @@ function ChatContent({
     >
       {mobileHeaderHost ? createPortal(<ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage}
         replyCount={chat.messages.filter((message) => message.role === "assistant").length}
-        failed={failed} sessionTitle={sessionTitle} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />, mobileHeaderHost)
+        failed={failed} sessionTitle={sessionTitle} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar}
+        onOpenContext={() => setContextOpen(true)} contextOpen={contextOpen} contextAttention={contextAttention} />, mobileHeaderHost)
         : <ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage}
         replyCount={chat.messages.filter((message) => message.role === "assistant").length}
         failed={failed}
-        sessionTitle={sessionTitle} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />}
+        sessionTitle={sessionTitle} sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar}
+        onOpenContext={isIOS() ? () => setContextOpen(true) : undefined} contextOpen={contextOpen} contextAttention={contextAttention} />}
+      {isIOS() && contextOpen && <ModalPage title={t("fidelity.assistant.context")} onDismiss={() => setContextOpen(false)}
+        className="ios-assistant-context-sheet">
+        <AssistantContextPanel config={config} sessions={sessions ?? []} baseCurrency={baseCurrency}
+          translate={t} onCollapse={() => setContextOpen(false)} />
+      </ModalPage>}
       {saveError && (
         <p role="alert" className="px-4 py-2 text-sm text-destructive">
           {t("assistant.chat.saveFailed")}: {saveError}
@@ -609,6 +626,7 @@ function ChatContent({
 
 function ChatHeader({
   config, contextTokens, sessionUsage, replyCount, failed, sessionTitle, sidebarOpen, onToggleSidebar,
+  onOpenContext, contextOpen, contextAttention,
 }: {
   config: AIConfig;
   contextTokens: number;
@@ -618,6 +636,9 @@ function ChatHeader({
   sessionTitle?: string;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  onOpenContext?: () => void;
+  contextOpen?: boolean;
+  contextAttention?: boolean;
 }) {
   const { t } = useTranslation();
   const compact = useSizeClass().width !== "wide";
@@ -628,8 +649,8 @@ function ChatHeader({
     const cost = (sessionUsage.promptTokens * priceIn + sessionUsage.completionTokens * priceOut) / 1_000_000;
     return <header className="fidelity-chat-header ios-d3-chat-header">
       <div className="fidelity-chat-header-primary">
-      <button type="button" onClick={onToggleSidebar} aria-label={t(sidebarOpen ? "ai.session.hide" : "ai.session.show")}
-        data-testid="sidebar-toggle" className="fidelity-chat-header-button"><FidelityIcon name="back" /></button>
+      <button type="button" onClick={onToggleSidebar} aria-label={t("fidelity.assistant.chats")}
+        data-testid="sidebar-toggle" className="fidelity-chat-header-button"><HamburgerMenuIcon aria-hidden="true" /></button>
       <div className="fidelity-chat-header-title">
         <h3>{sessionTitle || t("assistant.chat.title")}</h3>
         <span>{failed ? t("fidelity.assistant.requestFailed") : replyCount > 0
@@ -642,6 +663,12 @@ function ChatHeader({
         aria-label={t("assistant.usage.context").replace("{percent}", String(percent))}
         aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}
         className="fidelity-chat-header-context">{percent}%</span>}
+      <button type="button" onClick={onOpenContext} aria-label={t("fidelity.assistant.context")}
+        aria-expanded={!!contextOpen} aria-description={contextAttention ? t("assistant.panes.attention") : undefined}
+        data-testid="mobile-context-toggle" className="fidelity-chat-header-button mobile-context-toggle">
+        <DashboardIcon aria-hidden="true" />
+        {contextAttention && <span className="t3-assistant-attention" aria-hidden="true" />}
+      </button>
       <Link to="/settings/assistant" aria-label={t("settings.tab.assistant")} data-testid="chat-open-settings"
         className="fidelity-chat-header-button"><FidelityIcon name="more" /></Link>
     </header>;
@@ -652,6 +679,7 @@ function ChatHeader({
         <button
           type="button"
           onClick={onToggleSidebar}
+          aria-label={isIOS() ? t("fidelity.assistant.chats") : t(sidebarOpen ? "ai.session.hide" : "ai.session.show")}
           title={sidebarOpen ? t("ai.session.hide") : t("ai.session.show")}
           className="inline-flex touch:h-11 touch:w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring h-8 w-8"
           data-testid="sidebar-toggle"
@@ -679,6 +707,13 @@ function ChatHeader({
           </p>
         </div>
       </div>
+      {onOpenContext && <button type="button" onClick={onOpenContext}
+        aria-label={t("fidelity.assistant.context")} aria-expanded={!!contextOpen}
+        aria-description={contextAttention ? t("assistant.panes.attention") : undefined}
+        data-testid="mobile-context-toggle" className="fidelity-chat-header-button mobile-context-toggle">
+        <DashboardIcon aria-hidden="true" />
+        {contextAttention && <span className="t3-assistant-attention" aria-hidden="true" />}
+      </button>}
       <div className="ios-d3-chat-header-usage ml-auto flex shrink-0 flex-col items-end gap-0.5 touch:ml-0 touch:items-start">
         {contextTokens > 0 && (
           <span role="progressbar" aria-label={t("assistant.usage.context").replace("{percent}", String(percent))}

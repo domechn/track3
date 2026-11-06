@@ -634,7 +634,7 @@ test("regular width history rows align with their month card", async ({ browser 
   }
 });
 
-test("wide history, settings, and analytics keep list and detail visible together", async ({ browser }) => {
+test("wide history, settings, and analytics keep split views while Assistant switches views", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 1376, height: 1032 }, hasTouch: true, isMobile: true, reducedMotion: "reduce" });
   const page = await context.newPage();
   try {
@@ -671,7 +671,11 @@ test("wide history, settings, and analytics keep list and detail visible togethe
     }
 
     await page.goto("/#/assistant");
+    await expect(page.locator(".ios-chat-split .mobile-split-detail")).toBeVisible();
+    await page.getByTestId("sidebar-toggle").click();
     await expect(page.locator(".ios-chat-split .mobile-split-master")).toBeVisible();
+    await expect(page.locator(".ios-chat-split .mobile-split-detail")).not.toBeVisible();
+    await page.getByTestId("session-sidebar").getByRole("button", { name: "Back" }).click();
     await expect(page.locator(".ios-chat-split .mobile-split-detail")).toBeVisible();
     expect(await page.locator('[data-testid="chat-session-layout"]').evaluate((node) =>
       node.getBoundingClientRect().height)).toBeGreaterThan(400);

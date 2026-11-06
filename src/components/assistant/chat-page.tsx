@@ -16,6 +16,9 @@ import {
   ChevronRightIcon,
   GearIcon,
   RocketIcon,
+  ChatBubbleIcon,
+  PlusIcon,
+  DashboardIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
 import { useChat } from "./use-chat";
@@ -50,10 +53,10 @@ import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions";
 import { takeInsightQuestion, persistedToRuntime, runtimeToPersisted } from "@/middlelayers/ui-state/chat-persist";
 export * from "@/middlelayers/ui-state/chat-persist";
 import { takePendingAssistantQuestion } from "@/middlelayers/ai/pending-question";
-import { getRebalanceProfile, loadRebalanceHoldings } from "@/middlelayers/rebalance";
-import { queryHistoricalPage, queryLastRefreshAt } from "@/middlelayers/charts";
-import { listAlertRules, listAlertHistory } from "@/middlelayers/alerts";
+import { queryLastRefreshAt } from "@/middlelayers/charts";
 import SyncStatusIndicator from "@/components/sync-status-indicator";
+import AssistantContextPanel, { useAssistantAttention } from "./context-panel";
+import { readAssistantPanes, writeAssistantPanes, type AssistantPanes } from "@/middlelayers/ui-state/assistant-panes";
 
 type LoadState =
   | { status: "loading" }
@@ -145,87 +148,6 @@ function AssistantPageHeading({ ready, isProUser, model, refreshedAt }: {
   </header>;
 }
 
-function AssistantContextPanel({ config, sessions, baseCurrency }: { config: AIConfig; sessions: ChatSessionMeta[]; baseCurrency: CurrencyRateDetail }) {
-  const { t } = useTranslation();
-  const usageCache = useRef(new Map<string, { updatedAt: string; input: number; output: number; requests: number }>());
-  const [data, setData] = useState<{
-    assets: number; total: number; snapshots: number; first: string; last: string;
-    targets: number; targetTotal: number; rules: number; unread: number;
-    requests: number; tokensIn: number; tokensOut: number;
-  }>();
-  useEffect(() => {
-    let cancelled = false;
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
-    void Promise.all([
-      loadRebalanceHoldings(baseCurrency),
-      getRebalanceProfile(),
-      listAlertRules(),
-      listAlertHistory(),
-      queryHistoricalPage({ start: new Date(monthStart), end: new Date(nextMonth) }, 1, 0),
-      Promise.all(sessions.filter((session) => session.updatedAt >= monthStart).map(async (session) => {
-        const cached = usageCache.current.get(session.id);
-        if (cached?.updatedAt === session.updatedAt) return cached;
-        const loaded = await loadSession(session.id).catch(() => null);
-        const usage = (loaded?.messages ?? []).filter((message) =>
-          message.role === "assistant" && message.at && message.at >= monthStart && message.at < nextMonth && message.usage);
-        const entry = {
-          updatedAt: session.updatedAt,
-          requests: usage.length,
-          input: usage.reduce((sum, message) => sum + (message.role === "assistant" ? message.usage?.promptTokens ?? 0 : 0), 0),
-          output: usage.reduce((sum, message) => sum + (message.role === "assistant" ? message.usage?.completionTokens ?? 0 : 0), 0),
-        };
-        usageCache.current.set(session.id, entry);
-        return entry;
-      })),
-    ]).then(async ([portfolio, profile, rules, history, snapshots, usage]) => {
-      const first = snapshots.totalCount > 0
-        ? (await queryHistoricalPage({ start: new Date(monthStart), end: new Date(nextMonth) }, 1, snapshots.totalCount - 1)).rows[0]?.createdAt ?? ""
-        : "";
-      if (!cancelled) setData({
-        assets: portfolio.holdings.length, total: portfolio.holdings.reduce((sum, holding) => sum + holding.value, 0),
-        snapshots: snapshots.totalCount, first, last: snapshots.rows[0]?.createdAt ?? "",
-        targets: profile?.targets.length ?? 0,
-        targetTotal: profile?.targets.reduce((sum, target) => sum + target.percent, 0) ?? 0,
-        rules: rules.length, unread: history.filter((item) => !item.acknowledgedAt).length,
-        requests: usage.reduce((sum, item) => sum + item.requests, 0),
-        tokensIn: usage.reduce((sum, item) => sum + item.input, 0),
-        tokensOut: usage.reduce((sum, item) => sum + item.output, 0),
-      });
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [sessions, baseCurrency]);
-  const currency = new Intl.NumberFormat(undefined, { style: "currency", currency: baseCurrency.currency });
-  const month = new Date().toLocaleDateString(undefined, { month: "short" });
-  const cost = ((data?.tokensIn ?? 0) * (config.inputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0)
-    + (data?.tokensOut ?? 0) * (config.outputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0)) / 1_000_000;
-  return <aside className="t3-assistant-context">
-      <div className="t3-assistant-context-heading"><h2>{t("fidelity.assistant.context")}</h2><span>{t("fidelity.assistant.contextHint")}</span></div>
-    <div className="t3-assistant-context-source"><b>{t("fidelity.assistant.holdings")}</b><small>{data ? `${data.assets} ${t("fidelity.assistant.assets")}, ${currency.format(data.total)}` : "—"}</small></div>
-    <div className="t3-assistant-context-source"><b>{t("fidelity.assistant.snapshots")}</b><small>{data ? data.snapshots ? t("fidelity.assistant.snapshotRangeActual").replace("{count}", String(data.snapshots)).replace("{start}", String(new Date(data.first).getDate())).replace("{end}", String(new Date(data.last).getDate())).replace("{month}", month) : t("fidelity.assistant.snapshotEmpty") : "—"}</small></div>
-    <div className="t3-assistant-context-source"><b>{t("fidelity.assistant.targets")}</b><small>{data ? `${data.targets} ${t("fidelity.assistant.targetsLower")} ${data.targetTotal.toFixed(1)}%` : "—"}</small></div>
-    <div className="t3-assistant-context-source"><b>{t("fidelity.assistant.alertRules")}</b><small>{data ? `${data.rules} ${t("fidelity.assistant.rules")}, ${data.unread} ${t("fidelity.assistant.unread")}` : "—"}</small></div>
-    <div className="t3-assistant-context-section">
-      <div className="t3-assistant-context-heading"><h2>{t("fidelity.assistant.usageMonth")}</h2><span>1–{new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()} {month}</span></div>
-      <div><span>{t("fidelity.assistant.requests")}</span><b>{data?.requests.toLocaleString() ?? "—"}</b></div>
-      <div><span>{t("fidelity.assistant.tokensIn")}</span><b>{data?.tokensIn.toLocaleString() ?? "—"}</b></div>
-      <div><span>{t("fidelity.assistant.tokensOut")}</span><b>{data?.tokensOut.toLocaleString() ?? "—"}</b></div>
-      <div><span>{t("fidelity.assistant.estimatedCost")}</span><b>{data ? currency.format(cost * baseCurrency.rate) : "—"}</b></div>
-      <p>{t("fidelity.assistant.usageNote").replace("{input}", (config.inputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0).toFixed(2)).replace("{output}", (config.outputPricePerMillionTokens ?? config.pricePerMillionTokens ?? 0).toFixed(2))}</p>
-    </div>
-    <div className="t3-assistant-context-section">
-      <div><span>{t("fidelity.assistant.actions")}</span><b>{config.allowActions === false ? t("fidelity.assistant.off") : t("fidelity.assistant.askFirst")}</b></div>
-      <div><span>{t("fidelity.assistant.dailyInsights")}</span><b>{config.proactiveInsightsSummary ? t("fidelity.assistant.on") : t("fidelity.assistant.off")}</b></div>
-    </div>
-    <div className="t3-assistant-context-section t3-assistant-context-tools">
-      <div className="t3-assistant-context-heading"><h2>{t("fidelity.assistant.tools")}</h2><span>{t("fidelity.assistant.toolsHint")}</span></div>
-      {["lookUp", "compare", "readTargets", "changeAlerts"].map((key) => <div key={key}><span>{t(`fidelity.assistant.tool.${key}`)}</span><b className={key === "changeAlerts" && config.allowActions !== false ? "t3-assistant-ask-first" : ""}>{t(key === "changeAlerts" ? config.allowActions === false ? "fidelity.assistant.off" : "fidelity.assistant.askFirstStatus" : "fidelity.assistant.allowed")}</b></div>)}
-    </div>
-    <Link to="/settings/assistant">{t("fidelity.assistant.settings")}<ChevronRightIcon aria-hidden="true" /></Link>
-  </aside>;
-}
-
 function ReadyChat({
   config,
   baseCurrency,
@@ -237,10 +159,108 @@ function ReadyChat({
   const secrets = useMemo(() => configuredSecretValues(config), [config]);
   const { sessionId } = useParams();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [panes, setPanes] = useState(() => readAssistantPanes(window.innerWidth));
+  const [drawer, setDrawer] = useState<keyof AssistantPanes | null>(null);
+  const chatsOpen = drawer === "chats" || (windowWidth >= 880 && panes.chats);
+  const contextOpen = drawer === "context" || (windowWidth >= 1120 && panes.context);
+  const sidebarOpen = chatsOpen;
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const stopScrollRestoreRef = useRef<(() => void) | null>(null);
+  const chatsHeaderRef = useRef<HTMLButtonElement>(null);
+  const chatsRailRef = useRef<HTMLButtonElement>(null);
+  const contextHeaderRef = useRef<HTMLButtonElement>(null);
+  const contextRailRef = useRef<HTMLButtonElement>(null);
+  const focusPaneRef = useRef<keyof AssistantPanes | null>(null);
   const [processingSessionId, setProcessingSessionId] = useState<string | null>(null);
   const { sessions, isLoading, refresh, createNew, remove, pin } =
     useChatSessions();
+  const contextAttention = useAssistantAttention(sessions);
+  const setPane = useCallback((pane: keyof AssistantPanes) => {
+    stopScrollRestoreRef.current?.();
+    const viewport = layoutRef.current?.querySelector<HTMLElement>('[data-testid="chat-card"] [data-radix-scroll-area-viewport]');
+    if (viewport) {
+      const atBottom = viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop < 5;
+      const top = viewport.getBoundingClientRect().top;
+      const message = [...viewport.querySelectorAll<HTMLElement>('[data-testid="user-bubble"], [data-testid="assistant-bubble"]')]
+        .find((item) => item.getBoundingClientRect().bottom > top + 1);
+      const anchor = [...(message?.querySelectorAll<HTMLElement>("p, li, pre, table") ?? [])]
+        .find((item) => item.getBoundingClientRect().bottom > top + 1) ?? message;
+      const offset = anchor ? anchor.getBoundingClientRect().top - top : 0;
+      const restore = () => {
+        if (atBottom) viewport.scrollTop = viewport.scrollHeight;
+        else if (anchor?.isConnected) {
+          viewport.scrollTop += anchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top - offset;
+        }
+      };
+      const element = layoutRef.current?.querySelector<HTMLElement>(`#assistant-${pane}`);
+      let frame = 0;
+      const stop = () => {
+        restore();
+        cancelAnimationFrame(frame);
+        element?.removeEventListener("transitionend", onEnd);
+        if (stopScrollRestoreRef.current === stop) stopScrollRestoreRef.current = null;
+      };
+      const onEnd = (event: TransitionEvent) => {
+        if (event.target !== element || event.propertyName !== "width") return;
+        restore();
+        stop();
+      };
+      const started = performance.now();
+      const tick = () => {
+        restore();
+        if (performance.now() - started < 200) frame = requestAnimationFrame(tick);
+        else stop();
+      };
+      element?.addEventListener("transitionend", onEnd);
+      frame = requestAnimationFrame(tick);
+      stopScrollRestoreRef.current = stop;
+    }
+    focusPaneRef.current = pane;
+    if (windowWidth < (pane === "chats" ? 880 : 1120)) {
+      setDrawer((previous) => previous === pane ? null : pane);
+      return;
+    }
+    setPanes((previous) => {
+      const next = { ...previous, [pane]: !previous[pane] };
+      writeAssistantPanes(next);
+      return next;
+    });
+  }, [windowWidth]);
+  useEffect(() => () => stopScrollRestoreRef.current?.(), []);
+  useEffect(() => {
+    const onResize = () => {
+      setWindowWidth(window.innerWidth);
+      setDrawer(null);
+      const next = readAssistantPanes(window.innerWidth);
+      setPanes((previous) => previous.chats === next.chats && previous.context === next.context ? previous : next);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  useEffect(() => {
+    if (!focusPaneRef.current) return;
+    const target = focusPaneRef.current === "chats"
+      ? chatsOpen ? chatsHeaderRef : chatsRailRef
+      : contextOpen ? contextHeaderRef : contextRailRef;
+    target.current?.focus({ preventScroll: true });
+    focusPaneRef.current = null;
+  }, [chatsOpen, contextOpen]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.altKey) return;
+      if (document.activeElement?.closest('[role="dialog"], [role="alertdialog"]')) return;
+      if (event.key === "[" || event.code === "BracketLeft") {
+        event.preventDefault();
+        setPane("chats");
+      } else if (event.key === "]" || event.code === "BracketRight") {
+        event.preventDefault();
+        setPane("context");
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [setPane]);
   const [initialMsgs, setInitialMsgs] = useState<ChatMessage[]>([]);
   const [initialTimes, setInitialTimes] = useState<Array<string | undefined>>([]);
   const [initialSummary, setInitialSummary] = useState<ConversationSummary | undefined>();
@@ -406,8 +426,8 @@ function ReadyChat({
   // Hooks must be before the conditional early return so hook ordering
   // is consistent across renders.
   const handleToggleSidebar = useCallback(() => {
-    setSidebarOpen((prev) => !prev);
-  }, []);
+    setPane("chats");
+  }, [setPane]);
 
   const handleStreamingChange = useCallback(
     (streaming: boolean) => {
@@ -448,6 +468,7 @@ function ReadyChat({
 
   return (
     <div
+      ref={layoutRef}
       className="t3-manage-assistant relative flex h-[calc(100vh-88px)] min-h-[560px] gap-4 overflow-hidden"
       data-testid="chat-session-layout"
     >
@@ -456,12 +477,13 @@ function ReadyChat({
           {t("assistant.chat.deleteFailed")}: {deleteError}
         </p>
       )}
-      <div
-        className={`overflow-hidden transition-[width] duration-200 ease-in-out ${
-          sidebarOpen ? "w-[300px]" : "w-0"
-        }`}
-      >
-        <div className="w-[300px]">
+      {drawer && <button type="button" className="absolute inset-0 z-[4] bg-black/40"
+        data-testid="assistant-pane-scrim" aria-label={t("common.close")}
+        onClick={() => setPane(drawer)} />}
+      <div className="t3-assistant-pane t3-assistant-chats-pane" id="assistant-chats"
+        data-testid="chats-pane" data-collapsed={!chatsOpen} data-drawer={drawer === "chats"}
+        style={{ width: chatsOpen ? 300 : 44 }}>
+        {chatsOpen ? <div className="w-[300px] h-full">
           <SessionSidebar
             sessions={sessions}
             activeId={sessionId ?? null}
@@ -471,8 +493,19 @@ function ReadyChat({
         onDelete={handleDeleteSession}
         onPin={pin}
           processingId={processingSessionId}
+          onCollapse={() => setPane("chats")}
+          collapseRef={chatsHeaderRef}
+          controlsId="assistant-chats"
        />
-        </div>
+        </div> : <div className="t3-assistant-pane-rail">
+          <button type="button" onClick={() => setPane("chats")} ref={chatsRailRef}
+            aria-label={t("assistant.panes.expandChats")} aria-expanded="false" aria-controls="assistant-chats"
+            title={`${t("assistant.panes.expandChats")} (Ctrl/⌘+Shift+[)`} data-testid="chats-rail-toggle">
+            <ChatBubbleIcon aria-hidden="true" />
+          </button>
+          <button type="button" onClick={() => void handleNewChat()} aria-label={t("ai.session.newChat")}
+            title={t("ai.session.newChat")}><PlusIcon aria-hidden="true" /></button>
+        </div>}
       </div>
      {sessionLoadError ? (
        <div role="alert" className="flex-1 p-6 text-sm text-destructive">
@@ -494,7 +527,21 @@ function ReadyChat({
        sidebarOpen={sidebarOpen}
         onToggleSidebar={handleToggleSidebar}
      />}
-     <AssistantContextPanel config={config} sessions={sessions} baseCurrency={baseCurrency} />
+     <div className="t3-assistant-pane t3-assistant-context-pane" id="assistant-context" data-testid="context-pane"
+       data-collapsed={!contextOpen} data-drawer={drawer === "context"} style={{ width: contextOpen ? 296 : 44 }}>
+       {contextOpen ? <AssistantContextPanel config={config} sessions={sessions} baseCurrency={baseCurrency}
+         onCollapse={() => setPane("context")} collapseRef={contextHeaderRef} controlsId="assistant-context" />
+         : <div className="t3-assistant-pane-rail">
+           <button type="button" onClick={() => setPane("context")} ref={contextRailRef}
+             aria-label={t("assistant.panes.expandContext")} aria-expanded="false" aria-controls="assistant-context"
+             aria-description={contextAttention ? t("assistant.panes.attention") : undefined}
+             title={`${t("assistant.panes.expandContext")} (Ctrl/⌘+Shift+])${contextAttention ? ` · ${t("assistant.panes.attention")}` : ""}`}
+             data-testid="context-rail-toggle">
+             <DashboardIcon aria-hidden="true" />
+             {contextAttention && <span className="t3-assistant-attention" aria-hidden="true" />}
+           </button>
+         </div>}
+     </div>
     </div>
   );
 }

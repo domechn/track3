@@ -1207,6 +1207,13 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
   .ios-chat-split .ios-d3-chat-header h3 { position: static; transform: none; }
   .ios-chat-split .ios-d3-chat-header-primary > button:first-child { display: none; }
   .ios-chat-split [data-testid="chat-card"] { background: hsl(var(--card)); }
+  .ios-chat-split.ios-chat-split { display: block; }
+  .ios-chat-split[data-selected="false"] > .mobile-split-detail,
+  .ios-chat-split[data-selected="true"] > .mobile-split-master { display: none !important; }
+  .ios-chat-split[data-selected="true"] > .mobile-split-detail,
+  .ios-chat-split[data-selected="false"] > .mobile-split-master { display: flex !important; width: 100%; height: 100%; }
+  .ios-chat-split .ios-d3-chat-header-primary > button:first-child { display: inline-flex; }
+  .ios-chat-split > .mobile-split-master > div > button:first-child { display: block; }
   .analytics-split { grid-template-columns: minmax(320px, 42%) minmax(0, 1fr); }
   .analytics-split .analytics-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .analytics-split .analytics-tile-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
@@ -2529,6 +2536,39 @@ body:has(.fidelity-history, .fidelity-history-detail) {
 
 
 /* Assistant phone layout follows the Terminal chat source at 390px. */
+.ios-assistant-context-sheet { padding-right: 16px; padding-left: 16px; background: hsl(var(--background)); }
+.ios-assistant-context-sheet .t3-assistant-context {
+  width: 100%; height: auto; min-height: 100%; padding: 12px 0 24px;
+  overflow: visible; border: 0; box-shadow: none;
+}
+.ios-assistant-context-sheet .t3-assistant-context-heading:first-child { align-items: center; min-height: 44px; }
+.ios-assistant-context-sheet .t3-assistant-context-heading > .t3-assistant-pane-toggle,
+.ios-assistant-context-sheet .t3-assistant-context-heading > .t3-assistant-pane-toggle:hover {
+  display: grid; flex: none; place-items: center; width: 44px; height: 44px; margin: 0;
+  border-radius: 6px; color: hsl(var(--muted-foreground));
+}
+.ios-assistant-context-sheet .t3-assistant-context-heading > .t3-assistant-pane-toggle:focus-visible,
+.ios-d3-chat .mobile-context-toggle:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.mobile-context-toggle { position: relative; display: grid; flex: none; place-items: center; width: 44px; height: 44px; color: hsl(var(--muted-foreground)); }
+.mobile-context-toggle svg { width: 18px; height: 18px; }
+.mobile-context-toggle .t3-assistant-attention {
+  position: absolute; top: 7px; right: 7px; width: 6px; height: 6px;
+  border-radius: 50%; background: hsl(var(--warning));
+}
+@media (min-width: 700px) {
+  .ios-d3-chat-header .fidelity-chat-header-button { display: grid; flex: none; place-items: center; width: 44px; height: 44px; }
+}
+@media (min-width: 700px) and (max-width: 999px) {
+  #app-top-bar .fidelity-chat-header-primary { display: flex; flex: 1; align-items: center; }
+  #app-top-bar .ios-d3-chat-header:has(.mobile-context-toggle) h3 { left: calc(50% - 12px); }
+  #app-top-bar .fidelity-chat-header-title span {
+    position: absolute; top: 41px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; line-height: 14px; white-space: nowrap;
+  }
+}
+@media (min-width: 700px) {
+  .ios-assistant-context-sheet { left: auto; width: min(380px, 100vw); box-shadow: -12px 0 30px hsl(var(--background) / .35); }
+}
 @media (max-width: 699px) {
   #app-main-content:has(.ios-d3-chat) {
     overflow: hidden;

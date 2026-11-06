@@ -3242,5 +3242,10 @@
   "fidelity.settingsB.sync.pop.stoppedWarning": "Automatic retry stopped after repeated errors",
   "fidelity.settingsB.sync.showSecret": "Show secret access key",
   "fidelity.settingsB.sync.hideSecret": "Hide secret access key",
-  "fidelity.settingsB.sync.pop.errorDetails": "Error details"
+  "fidelity.settingsB.sync.pop.errorDetails": "Error details",
+  "assistant.panes.collapseChats": "Collapse chats",
+  "assistant.panes.expandChats": "Expand chats",
+  "assistant.panes.collapseContext": "Collapse context",
+  "assistant.panes.expandContext": "Expand context",
+  "assistant.panes.attention": "needs attention"
 }

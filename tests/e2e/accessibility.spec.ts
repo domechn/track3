@@ -277,6 +277,7 @@ test("assistant with pinned and recent sessions passes axe", async ({ page }) =>
   await page.setViewportSize({ width: 768, height: 740 });
   await installTauriBridge(page, undefined, true);
   await page.goto("/#/assistant");
+  await page.getByRole("button", { name: "Expand chats" }).click();
   await expect(page.getByText("Pinned portfolio review")).toBeVisible();
   await expect(page.getByText("Recent portfolio review")).toBeVisible();
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
@@ -288,6 +289,7 @@ test("small muted text in assistant sessions and expanded Overview meets AA cont
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installTauriBridge(page, undefined, true);
   await page.goto("/#/assistant");
+  await page.getByRole("button", { name: "Expand chats" }).click();
   await expect(page.getByText("Pinned portfolio review")).toBeVisible();
   for (const label of ["Pinned", "Recent"]) {
     expect(await contrastWithBackground(page.getByText(label, { exact: true })), label).toBeGreaterThanOrEqual(4.5);
