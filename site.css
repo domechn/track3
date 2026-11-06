@@ -578,10 +578,13 @@ header .btn.primary {
 }
 .source-grid img {
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  background: #fff;
   object-fit: contain;
-  filter: grayscale(1) brightness(0) invert(0.85);
 }
 .source-grid small {
   margin-left: auto;
@@ -593,12 +596,6 @@ header .btn.primary {
   font-size: 12px;
   font-weight: 600;
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) .source-grid img {
-    filter: grayscale(1) brightness(0) invert(0.25);
-  }
-}
-:root[data-theme="light"] .source-grid img { filter: grayscale(1) brightness(0) invert(0.25); }
 .facts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -1,0 +1,23 @@
+{
+  "backpack-logo.svg": "624f57541a8deacfc9e400c2666a944e0c8c52145dd9662e63b1c1561860b63e",
+  "binance-logo.svg": "a6e2b708dcd2ee0bbaed8ab8356b12872de44e54bb6658fe6ae4d4a6cc6e801c",
+  "bitget-logo.svg": "eb22546db397d91dfab5000cc61b225de2bb555c41566408bf0f60b4df634fbe",
+  "btc-logo.svg": "665f0b8114296693c5e3d3106c87fd3b1e40d994debcf8f12238b0aad69543f9",
+  "bybit-logo.svg": "48e381c39fc906aa1453afcbc08418eaa0b72bcb1d97d749b1abac3a9bcd942f",
+  "doge-logo.svg": "b6cb5aced522b0baafd4f2e9f965ec537a4d6af3e6abbbde71adaa3f502cf2ad",
+  "eth-logo.svg": "e81b1da77035c3e814c9319a1e28d5b1556e9d6a7e2a7a35ff2ef9cd94bf6afd",
+  "gate-logo.svg": "55fb427e9368c757ec516559466cb1c80815622cb08b71d5d59a64d956e26d74",
+  "htx-logo.svg": "e38a8408cb3ff0c5c82e291e6feb9517996e45bbaae4ef8b49951912d419dd73",
+  "ibkr-logo.svg": "836655b790ad67569556e229022fe6379c69d097eec506c18cf0622baf3197c7",
+  "kraken-logo.svg": "b456a3879cabea8d575d7aff3f9c0ae2504e7d6d630a03937f33b6fb5ddb330e",
+  "mexc-logo.svg": "e5a7a81d42fd6cad6de35cc39fac80f3608ec1f9d7c8db123b800c9ca466b1d6",
+  "okex-logo.svg": "2be629a128a6dcd80250c8ad2c9bea6f1734efbeb3c592b2d848fd4a330c6eb3",
+  "sol-logo.svg": "8ef4a9d16143c5956dbf2782c3b7a8803febf701a467256db0e076d120293f23",
+  "sui-logo.svg": "20a6ae6ce038f9f48d610c05d7269cf0a4a0fe2226a86172498b9ae3b7ddaebc",
+  "ton-logo.svg": "36d771b74b84589be9c7f28601175f30d5d2170549a475906678f52f43fa1d8e",
+  "tron-logo.svg": "83788a2767cae0b863b254a30d8c643ac03146eecf93b75ff92077cfc68bf9f4",
+  "coinbase-logo.png": {
+    "app": "c7a152e1ebb4bc49bbabd0a8012db2c5b8a406784eeca3ebe25fdc3198bef6ed",
+    "site": "8e2b187598ac416a5f0b90a26a2b07e51f3ebec173f7021c2d28324ecb7e9359"
+  }
+}

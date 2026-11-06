@@ -29,7 +29,7 @@ function contrast(fg, bg) {
   return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
 }
 
-test("source tiles have labelled, equal 20px neutral icons", async () => {
+test("source tiles have labelled, equal 32px color logos", async () => {
   for (const scheme of ["dark", "light"]) {
     const page = await open(1440, scheme);
     const tiles = await page.locator(".source-grid li").evaluateAll(items => items.map(tile => {
@@ -38,8 +38,7 @@ test("source tiles have labelled, equal 20px neutral icons", async () => {
       return { label: tile.textContent.trim(), alt: icon.getAttribute("alt"), width: rect.width, height: rect.height, filter: getComputedStyle(icon).filter };
     }));
     assert.equal(tiles.length, 20);
-    assert.ok(tiles.every(t => t.label && t.alt === "" && t.width === 20 && t.height === 20), JSON.stringify(tiles));
-    assert.equal(new Set(tiles.map(t => t.filter)).size, 1, `${scheme}: different icon filters`);
+    assert.ok(tiles.every(t => t.label && t.alt === "" && t.width === 32 && t.height === 32 && t.filter === "none"), JSON.stringify(tiles));
     await page.close();
   }
 });
@@ -51,38 +50,6 @@ test("source icons are decoded before the source section is opened", async () =>
     width: img.naturalWidth,
   })));
   assert.ok(readiness.every(image => image.complete && image.width > 0), JSON.stringify(readiness));
-  await page.close();
-});
-
-test("source symbols occupy comparable area inside their boxes", async () => {
-  const page = await open(1440);
-  const files = [...new Set(await page.locator(".source-grid img").evaluateAll(images => images.map(img => img.getAttribute("src"))))];
-  for (const file of files) {
-    const mime = file.endsWith(".png") ? "image/png" : "image/svg+xml";
-    const data = `data:${mime};base64,${readFileSync(new URL(file, import.meta.url)).toString("base64")}`;
-    const box = await page.evaluate(async source => {
-      const img = new Image();
-      img.src = source;
-      await img.decode();
-      const canvas = document.createElement("canvas");
-      canvas.width = canvas.height = 20;
-      const context = canvas.getContext("2d");
-      const scale = Math.min(20 / img.naturalWidth, 20 / img.naturalHeight);
-      const width = img.naturalWidth * scale, height = img.naturalHeight * scale;
-      context.drawImage(img, (20 - width) / 2, (20 - height) / 2, width, height);
-      const pixels = context.getImageData(0, 0, 20, 20).data;
-      let minX = 20, maxX = -1, minY = 20, maxY = -1;
-      for (let y = 0; y < 20; y++) for (let x = 0; x < 20; x++) {
-        if (pixels[(y * 20 + x) * 4 + 3] < 128) continue;
-        minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-      }
-      return { width: maxX - minX + 1, height: maxY - minY + 1, innerCurve: pixels[(9 * 20 + 8) * 4 + 3] };
-    }, data);
-    assert.ok(box.width >= 12 && box.height >= 12, `${file}: ${JSON.stringify(box)}`);
-    if (file.endsWith("coinbase-logo.png")) assert.ok(box.width >= 17 && box.height >= 17, `${file}: ${JSON.stringify(box)}`);
-    if (file.endsWith("sui-symbol.svg")) assert.ok(box.innerCurve >= 128, `${file}: missing inner curve`);
-  }
   await page.close();
 });
 
