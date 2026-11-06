@@ -435,7 +435,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
               const restoredAsset = (edits ?? []).find((edit) => edit.symbol === asset.symbol &&
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "restore");
               return <tr key={`${asset.assetType}:${asset.symbol}`}><td>{asset.symbol}
-                <button type="button" aria-label={t("history.fidelity.deleteAsset").replace("{asset}", asset.symbol)}
+                <button type="button" className="t3-icon-button" aria-label={t("history.fidelity.deleteAsset").replace("{asset}", asset.symbol)}
                   disabled={isDeletingAsset} onClick={() => setDeleteAssetId(asset.id)}><TrashIcon aria-hidden="true" /></button></td>
               <td>{restoredAsset ? <><span className="fidelity-edited-value">{quantity(asset.assetType === "crypto" &&
                 stablecoins.has(asset.symbol.toUpperCase()) ? "stablecoin" : asset.assetType, asset.amount)}</span>

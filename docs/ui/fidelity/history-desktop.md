@@ -48,22 +48,25 @@ Chromium briefly sets a 1 × 1 viewport during some full page screenshots. The d
 
 ## Remaining differences
 
-The fresh 5 Nov 2026 populated History source render is 1600 × 1272. The current fixed-shell app viewport is 1600 × 1024 and differs by **5.95%** over that viewport (RGB sum threshold 60): its local scroll container clips the lower rows and Sources section in a full-page screenshot. Expanding only that capture container gives a 1600 × 1272 app image and **1.43%** difference against the source. The source and app heading bounds match; source images, app images and computed bounds are in `/tmp/ui3-remeasure/`. This capture difference follows the product's fixed-height shell, which keeps Settings pinned while the content scrolls.
+The fresh 6 Nov 2026 populated History source render is 1600 × 1272. The fixed-shell app viewport is 1600 × 1024 and differs by **5.95%** over that viewport (RGB sum threshold 60): its local scroll container clips the lower rows and Sources section in a full-page screenshot and creates a 15 px scrollbar. Expanding only that capture container gives a 1600 × 1272 app image and **2.38%** difference against the source. The source and app heading bounds match; fresh source images and Chromium measurements are in `/tmp/ui21-source-fresh/` and `/tmp/ui21-design-history.json`, and the expanded app image is `/tmp/ui21-history-expanded2.png`. This capture difference follows the product's fixed-height shell, which keeps Settings pinned while the content scrolls.
 
-The 1600 px dark captures in `/tmp/fidelity-desktop/history/` were compared with fresh source HTML renders in `/tmp/rv1103b/design/`; side-by-side images are in `/tmp/wdb-final-sbs/`. Chromium computed style and rectangle measurements were repeated on the source pages: the populated list headers begin at x=85, 294.61, 431.31, 668.27 and 739.88 px, with widths 209.61, 136.70, 236.95, 71.61 and 204.45 px. The detail table headers begin at x=982.33, 1033.52, 1178.78, 1311.61 and 1456.88 px; their widths scale proportionally below 1600 px to avoid overflow. The delete summary is 12/18 px in `#b4b6bc`, and the detail action buttons are 89, 61 and 76 px wide with 14 px icons. A pixel differs when the sum of its absolute RGB channel differences exceeds 60; images are padded with black to the larger full-page size. The before column uses the last reviewer's saved captures in `/tmp/rv1103b/pre/` against the same source PNGs.
+The 1600 px dark captures in `/tmp/fidelity-desktop/history/` were compared with fresh source HTML renders in `/tmp/rv1103b/design/`; side-by-side images are in `/tmp/wdb-final-sbs/`. Chromium computed style and rectangle measurements were repeated on the source pages: the populated list headers begin at x=85, 294.61, 431.31, 668.27 and 739.88 px, with widths 209.61, 136.70, 236.95, 71.61 and 204.45 px. The detail table headers begin at x=982.33, 1033.52, 1178.78, 1311.61 and 1456.88 px. At 1100 px the source table has a 402 px minimum width and extends about 20 px beyond its card; the app keeps its table and text inside the card. The delete summary is 12/18 px in `#b4b6bc`, and the detail action buttons are 89, 61 and 76 px wide with 14 px icons. A pixel differs when the sum of its absolute RGB channel differences exceeds 60; images are padded with black to the larger full-page size. The before column uses the last reviewer's saved captures in `/tmp/rv1103b/pre/` against the same source PNGs.
 
-| Screen | Last review | Current |
+| Screen | Prior documented ratio | Current comparable capture |
 |---|---:|---:|
-| History, All / page 1 / 28 Oct selected | 1.3752% | 1.3752% |
-| Delete | 1.3688% | 1.3688% |
-| Empty | 0.1619% | 0.1619% |
-| Loading | 0.1774% | 0.1774% |
-| Undo | 1.0854% | 1.0854% |
+| History, All / page 1 / 28 Oct selected | 1.3752% | 2.3833% |
+| Delete | 1.3688% | 1.9557% |
+| Empty | 0.1619% | 0.8546% |
+| Loading | 0.1774% | 0.5527% |
+| Undo | 1.0854% | 1.9834% |
+
+Current app captures are `/tmp/ui21-history-expanded2.png`, `/tmp/ui21-history-delete-expanded.png`, `/tmp/ui21-history-empty-fresh.png`, `/tmp/ui21-history-loading-fresh.png`, and `/tmp/ui21-history-undo-expanded.png` in table order. Only the desktop capture container was expanded where the source page is taller than the fixed viewport.
 
 - The source invents a `5 of 5` count for every complete snapshot. Stored complete snapshots have no source count, so their list rows say `All refreshed`. The source's 22 Oct row is complete after a retry, but the stored partial record has no retry count. The fixture now uses a real missing-source shape and shows `4 of 5`; showing `5 of 5` with a partial record would claim all sources refreshed.
 - The source shows asset-level USDC quantity and AAPL market-price edits. The product's edit records support asset delete/restore and transaction price edits, not those snapshot value edits. The closest stored records are a USDC restore, worth +$39,853.99 to the snapshot, and an AAPL trade price edit, worth $0 to the snapshot. The Price column keeps the saved AAPL market price and has no `was` line; the Edits row labels the trade price as a transaction edit. A restore has no before quantity or value; the asset table shows `was –`, and the audit row shows `– → $39,853.99`. Using the previous day's 40,000 USDC as a before value would misstate what the record knows.
 - After deleting the sole edited snapshot, the query returns `Edited 0`; the source still says `Edited 1`. The product reflects its remaining stored edit logs.
 - The current two-peak mark and Settings cog differ from the source's blue chart tile and sun. History detail now resolves saved wallet aliases, exchange names and broker names. The source illustration has five named sources, while the three-source alias and exchange fixtures have no pixel-identical reference page.
+- The populated Asset header starts at x=973.58 in the app rather than x=982.33 in the source, and Quantity starts at x=1045.58 rather than x=1033.52. The app reserves a 72 px Asset column for each working 32 px delete target and its symbol; the source table has no delete targets. This shifts the remaining desktop headers while keeping every target inside its symbol cell.
 
 The fidelity fixture includes two stored unread Goals alerts, matching the source rail's red badge.
 

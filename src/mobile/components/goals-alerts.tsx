@@ -315,7 +315,7 @@ export default function GoalsAlerts() {
           {loading ? <p className="text-sm text-muted-foreground">{t("goals.loading")}</p>
             : rules.length === 0 ? <p className="text-sm text-muted-foreground">{t("goals.empty")}</p>
               : rules.map((rule) => {
-                const RuleIcon = ruleIcons[rule.kind];
+                const RuleIcon = ruleIcons[rule.kind] ?? ClockIcon;
                 const measurement = measureRule(rule, snapshots, prices, targets);
                 const isGoal = rule.kind === "total_value_target" || rule.kind === "asset_value_target";
                 const progress = isGoal && measurement.value !== undefined
@@ -401,7 +401,7 @@ export default function GoalsAlerts() {
           <ol className="space-y-2">
             {history.map((alert) => {
               const severity = historySeverity(alert.kind);
-              const HistoryIcon = ruleIcons[alert.kind];
+              const HistoryIcon = ruleIcons[alert.kind] ?? ClockIcon;
               return <li key={alert.id} data-severity={severity} className={`flex flex-wrap items-center justify-between gap-2 rounded-md border border-l-4 p-3 ${
                 severity === "high" ? "border-l-rose-500" : severity === "medium" ? "border-l-amber-500" : "border-l-primary/50"
               }`}>

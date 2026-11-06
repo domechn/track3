@@ -48,6 +48,12 @@ beforeEach(() => {
   vi.mocked(queryPNLChartValue).mockResolvedValue([]);
 });
 
+it("renders a stored rule with an unfamiliar kind", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([{ ...savedRule, kind: "price" as AlertRule["kind"] }]);
+  render(<GoalsAlerts />);
+  await waitFor(() => expect(document.querySelector(".t3-goals-rules .flex.min-w-0 > svg")).toBeInTheDocument());
+});
+
 it("shows stored portfolio values as a line chart", async () => {
   vi.mocked(queryPNLChartValue).mockResolvedValue([
     { timestamp: Date.parse("2025-01-01"), totalValue: 100 },

@@ -628,8 +628,9 @@ const App = ({
               type="button"
               variant="ghost"
               size="icon"
-              className="touch:h-11 touch:w-11 text-muted-foreground h-8 w-8"
+              className="t3-icon-button text-muted-foreground"
               aria-label={t("totalValue.showPercentage")}
+              aria-pressed={showPercentageInChart}
               onClick={() => setShowPercentageInChart(!showPercentageInChart)}
             >
               <svg
@@ -653,8 +654,9 @@ const App = ({
               type="button"
               variant="ghost"
               size="icon"
-              className="touch:h-11 touch:w-11 text-muted-foreground h-8 w-8"
+              className="t3-icon-button text-muted-foreground"
               aria-label={t("totalValue.switchBase")}
+              aria-pressed={btcAsBase}
               onClick={() => setBtcAsBase(!btcAsBase)}
             >
               <svg

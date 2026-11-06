@@ -585,7 +585,7 @@ const App = ({
               type="button"
               variant="ghost"
               size="icon"
-              className="touch:h-11 touch:w-11 text-muted-foreground h-8 w-8"
+              className="t3-icon-button text-muted-foreground"
               aria-label={isMobile ? `${t("overview.percentChart")} — ${t("totalValue.showPercentage")}` : t("totalValue.showPercentage")}
               aria-pressed={showPercentageInChart}
               onClick={() => setShowPercentageInChart(!showPercentageInChart)}
@@ -616,7 +616,7 @@ const App = ({
               type="button"
               variant="ghost"
               size="icon"
-              className="touch:h-11 touch:w-11 text-muted-foreground h-8 w-8"
+              className="t3-icon-button text-muted-foreground"
               aria-label={isMobile ? `${t("overview.btcBase")} — ${t("totalValue.switchBase")}` : t("totalValue.switchBase")}
               aria-pressed={btcAsBase}
               onClick={() => setBtcAsBase(!btcAsBase)}

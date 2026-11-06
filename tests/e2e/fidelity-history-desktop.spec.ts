@@ -1,12 +1,21 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { installTauriBridge, seedFidelityCompletedSync } from "./fidelity-bridge-captures";
+import { installTauriBridge as installSampleBridge } from "./fidelity-scenes";
 import { installTauriBridge as installBaseBridge } from "./tauri-bridge";
 
 test.use({ viewport: { width: 1600, height: 1024 }, colorScheme: "dark", timezoneId: "UTC" });
 
 const directory = "/tmp/fidelity-desktop/history";
 const backupDirectory = "/tmp/fidelity-wdb-locked/history";
+// Keep the source column positions as the reference while reserving room for the 32px delete target.
+function reflowedDetailHeader(sourceX: number, sourceFirstWidth: number) {
+  const left = 973.58;
+  const right = 1536;
+  const firstWidth = 72;
+  return left + firstWidth + (sourceX - left - sourceFirstWidth)
+    * (right - left - firstWidth) / (right - left - sourceFirstWidth);
+}
 async function capture(page: Page, name: string) {
   await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
   await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
@@ -122,8 +131,11 @@ test("populated history shows the selected snapshot beside the list", async ({ p
     .getByRole("button", { name: "Delete BTC from snapshot" })).toBeAttached();
   await expect(page.getByTestId("history-desktop-detail")).toContainText("5 of 5 sources");
   const detailHeaders = page.getByTestId("history-desktop-detail").locator("table").first().locator("thead th");
-  for (const [index, left] of [973.58, 1024.19, 1167.88, 1299.19, 1442.88].entries())
+  const sourceHeaders = [973.58, 1024.19, 1167.88, 1299.19, 1442.88];
+  for (const [index, sourceLeft] of sourceHeaders.entries()) {
+    const left = index === 0 ? sourceLeft : reflowedDetailHeader(sourceLeft, sourceHeaders[1] - sourceHeaders[0]);
     expect(Math.abs((await detailHeaders.nth(index).boundingBox())!.x - left)).toBeLessThan(1);
+  }
   const editAction = page.locator(".fidelity-history-actions button").nth(1);
   expect((await editAction.boundingBox())!.width).toBeCloseTo(61, 0);
   expect((await editAction.locator("svg").boundingBox())!.width).toBeCloseTo(14, 0);
@@ -205,7 +217,8 @@ test("delete confirmation and undo show the designed overlays", async ({ page })
   await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("border", "1px solid rgb(58, 58, 62)");
   await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("color", "rgb(154, 156, 162)");
   expect((await page.locator(".fidelity-history-list th").first().boundingBox())!.width).toBeCloseTo(147.83, 0);
-  expect((await page.locator(".fidelity-history-detail th").nth(2).boundingBox())!.x).toBeCloseTo(1159.61, 0);
+  expect((await page.locator(".fidelity-history-detail th").nth(2).boundingBox())!.x)
+    .toBeCloseTo(reflowedDetailHeader(1159.61, (1536 - 973.58) * .092), 0);
   await capture(page, "history-undo");
 });
 
@@ -218,6 +231,61 @@ test("a transient tiny viewport preserves the selected desktop snapshot", async 
   await expect(page.getByTestId("history-desktop-detail")).toContainText("$752,642.71");
   await page.setViewportSize({ width: 1600, height: 1024 });
   await expect(page.getByTestId("history-desktop-detail")).toContainText("$752,642.71");
+});
+
+test("history detail keeps every value distinct inside its card at narrow desktop widths", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1100, height: 1024 });
+  await installSampleBridge(page, { fidelitySample: "full" });
+  await page.goto("/#/history");
+  const detail = page.getByTestId("history-desktop-detail");
+  await expect(detail).toContainText("$763,809.27", { timeout: 30_000 });
+  expect(await detail.locator("tbody tr").count()).toBeGreaterThan(5);
+  const allCollisions: string[] = [];
+  for (const width of [1100, 1180, 1240]) {
+    await page.setViewportSize({ width, height: 1024 });
+    await page.evaluate(() => document.fonts.ready);
+    const collisions = await detail.evaluate((card) => {
+      const table = card.querySelector("table")!;
+      const tableRight = table.getBoundingClientRect().right;
+      const cardStyle = getComputedStyle(card);
+      const contentRight = card.getBoundingClientRect().right
+        - Number.parseFloat(cardStyle.paddingRight) - Number.parseFloat(cardStyle.borderRightWidth);
+      const textRects = (cell: HTMLTableCellElement) => {
+        const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+        const rects: DOMRect[] = [];
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          if (!node.textContent?.trim() || node.parentElement?.closest("button")) continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          rects.push(...range.getClientRects());
+        }
+        return rects;
+      };
+      const failures = [...table.querySelectorAll("tbody tr")].flatMap((row, rowIndex) => {
+        const cells = [...row.querySelectorAll("td")];
+        const rects = cells.map(textRects);
+        const failures: string[] = [];
+        for (let column = 0; column < rects.length - 1; column++) {
+          if (!rects[column].length || !rects[column + 1].length) continue;
+          const right = Math.max(...rects[column].map((rect) => rect.right));
+          const nextLeft = Math.min(...rects[column + 1].map((rect) => rect.left));
+          if (right > nextLeft + 0.5) failures.push(`row ${rowIndex} columns ${column + 1}-${column + 2}: ${right - nextLeft}px overlap`);
+        }
+        const lastRight = Math.max(...rects.flat().map((rect) => rect.right));
+        if (lastRight > contentRight + 0.5) failures.push(`row ${rowIndex}: ${lastRight - contentRight}px past card content (table right ${tableRight}, last cell right ${cells.at(-1)!.getBoundingClientRect().right})`);
+        return failures;
+      });
+      if (table.scrollWidth > card.clientWidth) failures.push("table scrolls past card");
+      if (tableRight > contentRight + 0.5) failures.push("table extends into card padding");
+      if (table.querySelector("th:last-child")!.getBoundingClientRect().right > card.getBoundingClientRect().right)
+        failures.push("Share header exceeds card");
+      return failures;
+    });
+    allCollisions.push(...collisions.map((collision) => `${width}px ${collision}`));
+  }
+  expect(allCollisions).toEqual([]);
 });
 
 test("empty history offers refresh", async ({ page }) => {
