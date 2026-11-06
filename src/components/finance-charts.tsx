@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Skeleton } from "./ui/skeleton";
 import { useTheme } from "./common/theme";
 import { chartThemeColor } from "@/utils/chart-theme";
+import { BarChartIcon } from "@radix-ui/react-icons";
+import EmptyState from "./empty-state";
 
 const palette = ["#6366f1", "#06b6d4", "#f59e0b", "#8b5cf6", "#14b8a6", "#f97316", "#ec4899", "#94a3b8"];
 const tone = (positive: boolean, quoteColor: QuoteColor) =>
@@ -37,7 +39,7 @@ function ChartPanel({ title, children, empty }: { title: string; children?: Reac
   return <Card className="min-w-0">
     <CardHeader className="px-4 pb-1 pt-3"><CardTitle className="text-sm font-medium">{title}</CardTitle></CardHeader>
     <CardContent className="px-4 pb-4">
-      {empty ? <p className="flex h-40 items-center justify-center text-sm text-muted-foreground">{t("finance.noChartData")}</p>
+      {empty ? <EmptyState icon={BarChartIcon} title={t("finance.noChartData")} hint={t("finance.chart.empty.hint")} />
         : <div className="relative h-44">{children}</div>}
     </CardContent>
   </Card>;

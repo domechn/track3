@@ -23,6 +23,8 @@ Source names, aliases, wallet addresses, broker IDs, prices, source inclusion, e
 
 ## Remaining differences
 
+The wide empty Sources card keeps the design's 188px outer height; its dashed inner state has a 146px minimum. This is shorter than the shared component's 200px default because the approved source page uses the compact card.
+
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.
 
 Settings toasts retain a visible 44px close × target for keyboard and pointer dismissal; the reference toasts omit it.

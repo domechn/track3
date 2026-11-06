@@ -25,6 +25,8 @@ The product's real profile validator rejects a saved 103% profile. The invalid s
 
 ## Remaining differences
 
+The zero-target trade panel adds the shared centred icon and 200px minimum required by UI18. The source's earlier dashed panel is shorter; the target and export actions still use the same handlers.
+
 The design pages were rendered again from `source/ds/pages/plan-rebalance*.html` into `/tmp/fidelity/design-fresh/`; app captures are in `/tmp/fidelity/rebalance/`. Both use a 390 × 844 viewport and DPR 2. The diff ratio counts a pixel when any RGB channel differs by more than 10, divided by the larger canvas with the design ground colour filling extra height. The second ratio uses the review's source render for a direct before/after comparison; an independent render of the same source changes a few antialiased text edges.
 
 | State | Fresh source full / first | Review source full / first | Remaining visible difference and reason |

@@ -53,6 +53,8 @@ The source depicts the **empty** state. Inputs and buttons retain their existing
 
 ## Remaining differences
 
+The zero-source view now uses the shared centred icon and substantial empty-state height. Its source page predates the UI18 shared component, so the icon and vertical space remain visible differences.
+
 - The remaining difference is minor icon stroke and text rasterization; it could be matched but is below the 3% threshold. The copy, dashed panel, actions, and measured block positions match.
 
 ## Pixel difference

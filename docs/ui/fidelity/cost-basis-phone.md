@@ -25,25 +25,23 @@ The selected-range average buy and sell prices and quantities use the existing t
 
 ## Remaining differences
 
-The HTML source pages are present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. The table compares fresh Chromium renders in `/tmp/fidelity/source-review/` with app captures in `/tmp/fidelity/cost-basis/` at 390 × 844. A pixel differs when its summed absolute RGB difference exceeds 48. Long pages hide the fixed tab bar. The shared-height column compares the entire common height. The full-height column also counts rows where only one page has content.
+The shared no-sales state occupies more vertical space than the source's 184px dashed box because UI18 requires a substantial centred state. The source page predates the icon and explanatory copy. This is visible below the first screen in the empty tax year; the no-sales actions still use their existing handlers.
+
+The HTML source pages are present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. The table compares Chromium renders in `/tmp/fidelity/source-review/` with 6 Nov app captures in `/tmp/fidelity/cost-basis/` at 390 × 844. A pixel differs when its summed absolute RGB difference exceeds 48. Long captures expand the product scroll container and hide the fixed tab bar. Both images use the page's `#0d0d0e` ground colour outside their content. The shared-height column compares the entire common height; the full-height column also counts rows where only one page has content.
 
 | State | Shared-height difference | Full-height difference |
 | --- | ---: | ---: |
-| First screen | 2.49% | 2.49% |
-| Export sheet | 2.29% | 2.29% |
-| Average cost | 2.85% | 2.85% |
-| Custom range | 3.18% | 3.18% |
-| Open lots | 2.49% | 2.49% |
-| Empty tax year | 2.07% | 2.07% |
-| Long page, first 390 × 2500 | 2.15% | 2.15% |
-| Average long page, first 390 × 2500 | 2.37% | 2.37% |
-| Custom long page, first 390 × 2500 | 2.28% | 2.28% |
-| Open long page, first 390 × 2500 | 1.99% | 1.99% |
-| Empty long page, source 2073 px / app 2316 px | 3.27% | 13.42% |
-| Default long page, source 3291 px / app 3802 px | 2.33% | 15.45% |
-| Average long page, source 3187 px / app 3698 px | 2.68% | 16.13% |
-| Custom long page, source 2871 px / app 3382 px | 2.68% | 17.38% |
-| Open long page, source 3791 px / app 4302 px | 1.81% | 13.47% |
+| First screen | 2.495% | 2.495% |
+| Export sheet | 2.301% | 2.301% |
+| Average cost | 2.857% | 2.857% |
+| Custom range | 3.170% | 3.170% |
+| Open lots | 2.495% | 2.495% |
+| Empty tax year | 2.077% | 2.077% |
+| Default long page, source 3291 px / app 3757 px | 2.348% | 3.016% |
+| Average long page, source 3187 px / app 3653 px | 2.702% | 3.344% |
+| Custom long page, source 2871 px / app 3337 px | 2.697% | 3.400% |
+| Open long page, source 3791 px / app 4257 px | 1.825% | 2.472% |
+| Empty long page, source 2073 px / app 2271 px | 3.232% | 3.377% |
 
 Remaining visible differences, with product reasons:
 
@@ -53,7 +51,7 @@ Remaining visible differences, with product reasons:
 - The required Data gaps table adds a section below the design page. Its date, coin, amount, reason, reason filter, dust folding and 50-row paging use the existing warning data; the approved design has no corresponding section.
 - The required Date wrapping makes the app-only Data gaps table 36 px taller in the default, Average, Custom and Open long pages. This increases their full-height ratios while the shared-height ratios fall.
 - Back remains available to return to the prior Analytics route, and the shared sync lock/status control keeps the existing unlock and sync flow reachable and its state visible. The assistant setup card follows the report so its existing entry point remains available. The reference has none of these product controls.
-- In the empty 2025 long-page comparison, the correctly sized 184 px no-sales box brings the existing assistant setup card into the final 2073 px common region. That makes the measured ratio higher than with the previous oversized box; the box and both recovery actions now match the source bounds.
+- In the empty 2025 long-page comparison, the shared no-sales box is 230 px rather than the source's 184 px, with a 15 px heading rather than 13 px. Its icon and explanation satisfy UI18's shared empty-state requirement; the two existing recovery actions remain 44 px touch targets. The added height and the existing assistant setup card explain the remaining long-page difference.
 - The final note accurately states that recorded stablecoin trades are included in cost basis; the reference says stablecoins are excluded.
 
 ## Coarse-pointer accessibility outside the phone route

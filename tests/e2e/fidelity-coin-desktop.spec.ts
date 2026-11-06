@@ -5,6 +5,22 @@ import AxeBuilder from "@axe-core/playwright";
 
 test.use({ viewport: { width: 1600, height: 1000 }, colorScheme: "dark", reducedMotion: "reduce", timezoneId: "UTC" });
 
+test("coin toolbar stays opaque and separate from scrolled content at 1440px", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await installTauriBridge(page, { fidelityDesktop: "full" });
+  await page.goto("/#/coins/BTC");
+  await expect(page.locator(".coin-fidelity-hero")).toBeVisible();
+  await page.locator("#app-main-content").evaluate((element) => { element.scrollTop = 150; });
+  const toolbar = page.locator(".t3-fidelity-topbar-coin");
+  const main = page.locator("#app-main-content");
+  const toolbarBox = (await toolbar.boundingBox())!;
+  const mainBox = (await main.boundingBox())!;
+  expect(toolbarBox.y + toolbarBox.height).toBeLessThanOrEqual(mainBox.y);
+  await expect(toolbar).toHaveCSS("background-color", "rgb(12, 12, 13)");
+  mkdirSync("/tmp/wui18-evidence", { recursive: true });
+  await page.screenshot({ path: "/tmp/wui18-evidence/coin-1440-scrolled.png", animations: "disabled" });
+});
+
 async function saveOverlayFullPage(page: import("@playwright/test").Page, background: Buffer, viewport: Buffer, path: string) {
   const data = await page.evaluate(async ({ base, overlay }) => {
     const load = (image: string) => new Promise<HTMLImageElement>((resolve, reject) => {
@@ -36,11 +52,16 @@ for (const state of ["btc", "btc-edit", "btc-price", "btc-sheet", "nvda", "nova"
     await expect(page.locator(".analyze-coin")).toBeVisible();
     await expect(page.locator(".t3-fidelity-sidebar nav a[href='#/goals']")).toHaveAttribute("aria-label", /2 unread/);
     await expect(page.getByRole("link", { name: "Overview", exact: true })).toHaveAttribute("aria-current", "page");
-    await expect(page.getByRole("heading", { name: "Transactions" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Transactions", exact: true })).toBeVisible();
     await expect(page.locator(".coin-fidelity-transactions tbody tr")).toHaveCount(symbol === "BTC" ? 8 : symbol === "NVDA" ? 3 : 2);
     await expect(page.locator(".coin-fidelity-sources table").first().locator("tbody tr"))
       .toHaveCount(symbol === "BTC" ? 3 : 2, { timeout: 40_000 });
     if (state.startsWith("nova")) await expect(page.locator(".coin-fidelity-custom")).toBeVisible();
+    if (state === "nova") {
+      expect((await page.locator(".coin-fidelity-crumb").boundingBox())!.y).toBe(69);
+      expect((await page.locator(".coin-fidelity-hero").boundingBox())!.y).toBe(159);
+      expect((await page.locator(".coin-fidelity-hero").boundingBox())!.width).toBe(1473);
+    }
     if (symbol !== "NOVA") await expect(page.locator(".coin-fidelity-plot [data-point]").first()).toHaveAttribute("aria-label", /1 Oct 2026.*\$/);
     if (state === "btc") {
       await expect(page.locator(".coin-fidelity-metrics.bottom")).toContainText("$51,762.65");
@@ -98,7 +119,7 @@ for (const state of ["btc", "btc-edit", "btc-price", "btc-sheet", "nvda", "nova"
     if (state.endsWith("edit") || state === "btc-sheet") await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
     await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-    const dir = "/tmp/fidelity-desktop/coin";
+    const dir = process.env.WUI18_CAPTURE_DIR ?? "/tmp/fidelity-desktop/coin";
     mkdirSync(dir, { recursive: true });
     if (overlayState) {
       const viewport = await page.screenshot({ path: `${dir}/coin-${state}-desktop.png`, animations: "disabled" });

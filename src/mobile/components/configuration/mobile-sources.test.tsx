@@ -152,6 +152,12 @@ describe("mobile data sources", () => {
     expect(screen.queryByRole("button", { name: "Add source" })).toBeNull();
   });
 
+  it("uses a full empty state for an unconfigured section beside an existing source", () => {
+    render(<MobileSources {...props} />);
+    const wallets = screen.getByRole("region", { name: "Wallets" });
+    expect(wallets.querySelector("[data-empty-state]")).toBeVisible();
+  });
+
   it("keeps IP actions beside the detected address in the fidelity editor", async () => {
     render(<MobileSources {...props} fidelityLayout selectedKind="exchange" addRequest={1} />);
     fireEvent.click(screen.getByRole("button", { name: /Continue with Binance/ }));

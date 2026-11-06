@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { ExclamationTriangleIcon, UpdateIcon } from "@radix-ui/react-icons";
+import { BackpackIcon, ExclamationTriangleIcon, UpdateIcon } from "@radix-ui/react-icons";
+import EmptyState from "./empty-state";
 import type { AssetModel, CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
 import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
 import { queryHistoricalPage } from "@/middlelayers/charts";
@@ -214,7 +215,8 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
       <button type="button" onClick={() => onRefresh(selectedStatus.sourceId)}><UpdateIcon />{t("wallets.fidelity.retry")}</button>
     </div>}
     {error ? <div className="t3-wallet-empty" role="alert">{t("wallets.changeUnavailable")}</div>
-      : !loading && !data ? <div className="t3-wallet-empty">{t("common.noData")}</div>
+      : !loading && (!data || !sources.length) ? <EmptyState icon={BackpackIcon}
+        title={t("common.noData")} hint={t("wallets.empty.hint")} className="t3-wallet-empty" />
       : <div className="t3-wallet-grid">
         <section className="t3-wallet-card t3-wallet-allocation">
           <div className="t3-wallet-card-head"><h2>{chosen ? chosen.label : t("wallets.fidelity.allocation")}</h2>

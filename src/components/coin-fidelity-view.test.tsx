@@ -24,12 +24,23 @@ const transactions = Array.from({ length: 51 }, (_, index): Transaction => ({
   txnCreatedAt: new Date(Date.UTC(2026, 9, 31) - index * 86400000).toISOString(),
 }));
 
-function view(rows: Transaction[]) {
+function view(rows: Transaction[], transactionsLoading = false) {
   return <MemoryRouter><CoinFidelityView symbol="BTC" assetType="crypto"
     currency={{ currency: "USD", alias: "USD", symbol: "$", rate: 1 }} dateRange={{
       start: new Date("2020-01-01T00:00:00Z"), end: new Date("2026-10-31T12:00:00Z"),
-    }} transactions={rows} walletAliasMap={{}} quoteColor="green-up-red-down" onEdit={async () => true} /></MemoryRouter>;
+    }} transactions={rows} transactionsLoading={transactionsLoading} walletAliasMap={{}} quoteColor="green-up-red-down" onEdit={async () => true} /></MemoryRouter>;
 }
+
+it("shows empty sections after transactions finish loading", () => {
+  const mounted = render(view([], true));
+  const transactionsCard = within(document.querySelector(".coin-fidelity-transactions") as HTMLElement);
+  expect(transactionsCard.queryByText("No transactions yet")).not.toBeInTheDocument();
+  expect(document.querySelectorAll(".coin-fidelity-row-skeleton")).toHaveLength(25);
+  mounted.rerender(view([]));
+  expect(screen.getByText("No transactions yet")).toBeInTheDocument();
+  expect(screen.getByText("No sources yet")).toBeInTheDocument();
+  expect(screen.getByText("No open lots yet")).toBeInTheDocument();
+});
 
 it("pages transactions, resets on a filter, and clamps after a last-page deletion", async () => {
   Element.prototype.scrollIntoView = vi.fn();

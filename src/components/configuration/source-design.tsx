@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import md5 from "md5";
 import {
-  CheckIcon, Cross2Icon, ExclamationTriangleIcon, Link2Icon, MagnifyingGlassIcon, Pencil1Icon,
+  BackpackIcon, CheckIcon, Cross2Icon, ExclamationTriangleIcon, Link2Icon, MagnifyingGlassIcon, Pencil1Icon,
   PlusIcon, ReloadIcon, TrashIcon,
 } from "@radix-ui/react-icons";
 import { queryHistoricalData } from "@/middlelayers/charts-history";
@@ -13,6 +13,7 @@ import { sourceStatusesChangedEvent } from "@/components/source-status-event";
 import { LicenseCenter, type ProUsage } from "@/middlelayers/license";
 import type { ExchangeDraft, ExchangeRow, OtherRow, StockBrokerDraft, StockBrokerRow, WalletDraft, WalletRow } from "./types";
 import { SourceEditorDesign } from "./source-editor-design";
+import EmptyState from "@/components/empty-state";
 
 type Tab = "exchanges" | "wallets" | "brokers" | "custom";
 type Holding = { wallet: string; symbol: string; amount: number; value: number; price: number };
@@ -149,6 +150,12 @@ export function SourceDesign({
     };
   }, [editor]);
 
+  const emptySource = <div className="t3-fidelity-source-empty"><EmptyState icon={BackpackIcon}
+    className="t3-fidelity-source-empty-inner"
+    title={t("fidelity.source.empty").replace("{name}", names[tab].toLowerCase())}
+    hint={t("fidelity.source.emptyBody")}
+    action={<button onClick={() => setEditor(tab)}><PlusIcon />{addLabels[tab]}</button>} /></div>;
+
   return <section className="t3-fidelity-source-page" data-editor-open={!!editor}>
     <button className="t3-fidelity-source-add" type="button" onClick={() => setEditor(tab)}><PlusIcon />{addLabels[tab]}</button>
     <div className="t3-fidelity-source-tabs" role="group" aria-label={t("settings.phase6.sources")}>
@@ -206,7 +213,7 @@ export function SourceDesign({
           </div>;
         })}
         <div className="t3-fidelity-source-foot"><span>{activeCount} {t("fidelity.source.activeLower")}{rows.length - activeCount ? `, ${rows.length - activeCount} ${t("fidelity.source.pausedLower")}` : ""}{sourceStatuses.filter((status) => status.status === "stale" && rows.some((item) => item.name === status.label)).map((status) => ` · ${t("fidelity.source.staleNote").replace("{name}", status.label).replace("{time}", status.lastSuccessAt ? new Date(status.lastSuccessAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : "—")}`).join("")}</span><b>{usd(total)}</b></div>
-      </> : <div className="t3-fidelity-source-empty"><div><b>{t("fidelity.source.empty").replace("{name}", names[tab].toLowerCase())}</b><p>{t("fidelity.source.emptyBody")}</p><button onClick={() => setEditor(tab)}><PlusIcon />{addLabels[tab]}</button></div></div> : <>
+      </> : emptySource : !others.length ? emptySource : <>
         <div className="t3-fidelity-source-head custom"><span>{t("fidelity.source.asset")}</span><span>{t("fidelity.source.price")}</span><span>{t("fidelity.source.attachedTo")}</span><span>{t("fidelity.source.value")}</span><span>{t("fidelity.source.active")}</span><span /></div>
         {others.map((row, index) => <div className="t3-fidelity-source-row custom" key={`${row.symbol}:${index}`}>
           <div className="t3-fidelity-source-id"><span className="t3-fidelity-source-logo">{row.symbol === "GOLD" ? "AU" : row.symbol.slice(0, 2)}</span><div><b>{row.symbol}</b><small>{row.alias || row.symbol} · {amount(row.amount)}</small></div></div>

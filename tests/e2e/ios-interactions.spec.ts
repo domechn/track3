@@ -9,6 +9,7 @@ test.use({
 
 const topCoinsTrigger = (page: Page) =>
   page.locator('.fd-top-dialog-trigger:visible, .mobile-analytics-hub .analytics-tile:has-text("Top coins"):visible').first();
+
 async function clickCoinBack(page: Page) {
   await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
   const compactBack = page.locator('#app-top-bar button[aria-label="Back"]');
@@ -214,7 +215,7 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
   await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(50);
   await page.goto("/#/goals");
   await page.evaluate(async () => {
-    for (let index = 0; index < 7; index += 1) {
+    for (let index = 0; index < 20; index += 1) {
       await (window as any).__e2eInvoke("plugin:sql|execute", {
         query: "INSERT INTO alert_rules (kind, asset_type, symbol, comparator, threshold, window, enabled, cooldown_seconds) VALUES ('total_value_target', NULL, NULL, 'gte', ?, NULL, 1, 3600)",
         values: [100_000 + index * 10_000],
@@ -222,14 +223,16 @@ test("opening and closing an on-page control keeps the page's scroll", async ({ 
     }
   });
   await page.reload();
-  await expect(page.locator(".pf-goal-row")).toHaveCount(7);
-  const editRule = page.locator(".pf-goal-row").nth(2).getByRole("button", { name: /Edit/ });
+  await expect(page.locator(".pf-goal-row")).toHaveCount(20);
+  const editRule = page.locator(".pf-goal-row").nth(19).getByRole("button", { name: /Edit/ });
   await editRule.scrollIntoViewIfNeeded();
   const before = await page.evaluate(() => document.getElementById("app-main-content")!.scrollTop);
-  expect(before).toBeGreaterThan(100);
+  const rulesScroll = await page.locator(".pf-rules-list").evaluate((element) => element.scrollTop);
+  expect(rulesScroll).toBeGreaterThan(100);
   await editRule.click();
   await page.getByRole("dialog", { name: "Edit rule" }).getByRole("button", { name: "Cancel" }).click();
   await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(before);
+  await expect.poll(() => page.locator(".pf-rules-list").evaluate((element) => element.scrollTop)).toBe(rulesScroll);
   await page.goto("/#/history");
   const historyRow = page.locator(".history-mobile-snapshot-button").first();
   await historyRow.scrollIntoViewIfNeeded();

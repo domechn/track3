@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { installPlanFidelityScene } from "./plan-fidelity-scenes";
 
-const output = "/tmp/fidelity-desktop/goals";
+const output = process.env.WUI18_CAPTURE_DIR ?? "/tmp/fidelity-desktop/goals";
 
 for (const state of ["list", "delete", "edit", "edit-error", "empty", "kinds"] as const) {
   test(`Goals ${state} matches the desktop structure`, async ({ page }) => {
@@ -39,6 +39,7 @@ for (const state of ["list", "delete", "edit", "edit-error", "empty", "kinds"] a
     }
     await page.waitForTimeout(350);
     if (state === "list") {
+      expect((await page.getByTestId("goals-summary").boundingBox())!.width).toBe(1488);
       const switchRect = await page.locator(".t3-fidelity-goal-switch input").first().boundingBox();
       expect(switchRect?.y).toBeCloseTo(321.5, 1);
       expect(await page.locator(".t3-fidelity-head p b").evaluate((element) => {
@@ -56,15 +57,18 @@ for (const state of ["list", "delete", "edit", "edit-error", "empty", "kinds"] a
       await expect(page.locator(".t3-fidelity-preview")).toContainText("once the 24 hour cooldown allows");
     }
     await expect(page.locator(".t3-fidelity-page").locator("xpath=..")).toHaveCSS("opacity", "1");
-    // Full-page Chromium captures offset fixed rails by the overflow height.
-    await page.addStyleTag({ content: ".t3-fidelity-rail { position: absolute !important; top: -20px !important; left: -84px !important; height: 1000px !important; bottom: auto !important; }" });
     await mkdir(output, { recursive: true });
+    if (state === "list" || state === "empty") {
+      await page.screenshot({ path: `${output}/${state}-viewport.png`, animations: "disabled" });
+    }
+    // Full-page captures need the rail positioned within the scrolled content.
+    await page.addStyleTag({ content: ".t3-fidelity-rail { position: absolute !important; top: -20px !important; left: -84px !important; height: 1000px !important; bottom: auto !important; }" });
     await page.screenshot({ path: `${output}/${state}.png`, fullPage: true, animations: "disabled" });
     if (state === "kinds") {
       await expect(page.getByRole("heading", { name: "Rule kinds" })).toBeVisible();
       await expect(page.getByText("How rules run")).toBeVisible();
     } else if (state === "empty") {
-      await expect(page.getByText("No rules yet")).toBeVisible();
+      await expect(page.getByText("Create your first rule")).toBeVisible();
     } else {
       await expect(page.getByText("SOL 7d move", { exact: true }).first()).toBeVisible();
       if (state === "edit-error") await expect(page.getByText("2 fields need attention")).toBeVisible();
