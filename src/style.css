@@ -1187,8 +1187,8 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-month-main { display: flex; flex-direction: column; gap: 2px; width: 100%; height: 100%; padding: 14px 14px 12px; text-align: left; font-variant-numeric: inherit; }
 .fidelity-month-main:focus-visible, .fidelity-year-card:focus-visible { outline: 2px solid #4a8ad6; outline-offset: 2px; }
 .fidelity-month-head, .fidelity-year-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; width: 100%; }
-.fidelity-month-card[data-partial="true"] .fidelity-month-head,
-.fidelity-year-item[data-partial="true"] .fidelity-year-head { padding-right: 22px; }
+.fidelity-month-card[data-partial="true"] .fidelity-month-head { padding-right: 22px; }
+.fidelity-year-item[data-partial="true"] .fidelity-year-head { padding-right: 28px; }
 .fidelity-month-head b, .fidelity-year-head b { color: #fff; font-size: 15px; font-weight: 600; }
 .fidelity-month-head > span, .fidelity-year-head > span { color: #9b9da3; font-size: 13px; }
 .fidelity-month-value { margin-top: 6px; font-size: 17px; line-height: 24px; font-weight: 500; font-variant-numeric: normal; }
@@ -1199,17 +1199,20 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-month-bar i.positive { left: 50%; background: hsl(var(--gain)); }
 .fidelity-month-bar i.negative { right: 50%; background: hsl(var(--loss)); }
 .fidelity-month-count { display: block; width: 100%; margin-top: 6px; padding-top: 8px; border-top: 1px solid #1b1a1f; color: #9b9da3; font-size: 12px; }
+.fidelity-month-gap { color: #9b9da3; font-size: 12px; }
 .fidelity-summary .fidelity-zero { color: #9b9da3; }
-.fidelity-month-hint { position: absolute; z-index: 2; top: 100%; left: 0; padding: 4px 6px; border: 1px solid #3a3a3e; border-radius: 4px; background: #131217; color: #b4b6bc; font-size: 12px; }
 .fidelity-year-stack { display: grid; flex: 1; grid-auto-rows: minmax(150px, 1fr); gap: 12px; }
-.fidelity-year-item { position: relative; display: flex; min-width: 0; }
-.fidelity-year-card { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; padding: 14px 14px 12px; border: 1px solid #222224; border-radius: 6px; background: #0d0d0e; text-align: left; font-variant-numeric: inherit; }
+.fidelity-year-item { position: relative; display: grid; grid-template-columns: minmax(0,1fr) 40px; min-width: 0; }
+.fidelity-year-card { display: flex; grid-column: 1/-1; grid-row: 1; flex-direction: column; gap: 2px; min-width: 0; padding: 14px 14px 12px; border: 1px solid #222224; border-radius: 6px; background: #0d0d0e; text-align: left; font-variant-numeric: inherit; }
+.fidelity-year-badge { grid-column: 2; grid-row: 1; align-self: start; justify-self: center; margin-top: 6px; }
 .fidelity-year-card.selected { border-color: #4a8ad6; background: rgba(74,138,214,.14); }
-.fidelity-year-card strong { margin-top: 6px; font-size: 22px; line-height: 28px; font-weight: 500; font-variant-numeric: normal; }
+.fidelity-year-card strong { margin-top: 6px; font-size: 22px; line-height: 28px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fidelity-year-percent { color: #b4b6bc; font-size: 12px; }
-.fidelity-year-deposits { display: flex; justify-content: space-between; margin-top: 10px; padding: 9px 0; color: #b4b6bc; }
+.fidelity-year-deposits { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 9px 0; color: #b4b6bc; }
 .fidelity-year-deposits span:last-child { color: #fff; }
 .fidelity-year-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; padding-top: 4px; color: #9b9da3; font-size: 12px; }
+.fidelity-year-deposits span, .fidelity-year-foot span { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fidelity-pnl-hint { align-self: flex-start; }
 .fidelity-attribution, .fidelity-leaders { min-height: 588px; }
 .fidelity-attribution-key { display: flex; gap: 16px; color: #b4b6bc; font-size: 12px; }
 .fidelity-attribution-key span { display: flex; align-items: center; gap: 6px; }

@@ -46,9 +46,14 @@ for (const state of ["full", "empty", "loading"] as const) {
       expect(quantityLeft).toBeCloseTo(zero, 5);
       await expect(page.locator(".fidelity-attribution-axis")).not.toContainText("−$50");
       await expect(page.locator(".fidelity-summary-pnl strong.big")).toHaveText("+$188,809.27");
+      const pnlHint = page.locator(".fidelity-period-card").first()
+        .getByRole("button", { name: "How P&L % is calculated" });
+      await pnlHint.click();
       for (const ticker of ["BTC", "ETH", "SOL", "BNB", "NVDA", "AAPL"]) {
-        await expect(page.locator(".fidelity-period-card").first().locator(".fidelity-caption")).toContainText(ticker);
+        await expect(page.getByRole("tooltip")).toContainText(ticker);
       }
+      await expect(page.getByRole("tooltip")).toContainText("stablecoins are excluded.");
+      await pnlHint.click();
       await expect(page.locator(".fidelity-month-card")).toHaveCount(10);
       await expect(page.locator(".fidelity-month-card").nth(1)).toContainText("0 up · 6 down");
       await expect(page.locator(".fidelity-year-card").nth(1)).toContainText("5 up · 1 down");
@@ -234,9 +239,9 @@ test("Summary leaders and attribution footer follow the source spacing", async (
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".fidelity-group-label").first().boundingBox())!.y).toBeCloseTo(1111, 0);
-  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1543, 0);
-  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1561, 0);
+  expect((await page.locator(".fidelity-group-label").first().boundingBox())!.y).toBeCloseTo(1143, 0);
+  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1575, 0);
+  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1593, 0);
   const totalRange = page.locator(".fidelity-attribution-row.total > span:nth-child(2)");
   await expect(totalRange).toHaveText("$310,000 → $763,809");
   const arrow = await totalRange.evaluate((node) => {
@@ -371,26 +376,27 @@ test("Summary range starts at the source heading position", async ({ page }) => 
   expect(box.width).toBeCloseTo(260, 0);
 });
 
-test("Summary month cards and footer follow the source row spacing", async ({ page }) => {
+test("Summary month cards and calculation hint follow the source row spacing", async ({ page }) => {
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
   const card = (await page.locator(".fidelity-period-card").first().boundingBox())!;
   const months = (await page.locator(".fidelity-month-grid").boundingBox())!;
-  const footer = (await page.locator(".fidelity-period-card .fidelity-caption").boundingBox())!;
+  const hint = (await page.locator(".fidelity-period-card").first()
+    .getByRole("button", { name: "How P&L % is calculated" }).boundingBox())!;
   expect(card.y).toBe(572);
-  expect(months.y).toBe(627);
-  expect(months.height).toBe(346);
-  expect(footer.y).toBe(987);
+  expect(months.y).toBe(663);
+  expect(months.height).toBe(374);
+  expect(hint.y).toBe(621);
 });
 
-test("Summary card labels use tabular digits while amounts stay proportional", async ({ page }) => {
+test("Summary card labels and year amounts use tabular digits", async ({ page }) => {
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
   expect(await page.locator(".fidelity-year-card").first().evaluate((node) => getComputedStyle(node).fontVariantNumeric)).toBe("tabular-nums");
   expect(await page.locator(".fidelity-month-main").first().evaluate((node) => getComputedStyle(node).fontVariantNumeric)).toBe("tabular-nums");
-  expect(await page.locator(".fidelity-year-card strong").first().evaluate((node) => getComputedStyle(node).fontVariantNumeric)).toBe("normal");
+  expect(await page.locator(".fidelity-year-card strong").first().evaluate((node) => getComputedStyle(node).fontVariantNumeric)).toBe("tabular-nums");
   expect(await page.locator(".fidelity-month-value").first().evaluate((node) => getComputedStyle(node).fontVariantNumeric)).toBe("normal");
 });
 
@@ -410,11 +416,11 @@ test("Summary attribution header and leaders footnote match source vertical rhyt
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".fidelity-attribution-row.head").boundingBox())!.y).toBe(1127);
+  expect((await page.locator(".fidelity-attribution-row.head").boundingBox())!.y).toBe(1159);
   expect(await page.locator(".fidelity-attribution-row.head > span").first().evaluate((node) => {
     const range = document.createRange();
     range.selectNodeContents(node);
     return range.getBoundingClientRect().y;
-  })).toBe(1129);
+  })).toBe(1161);
   expect(await page.locator(".fidelity-leaders .fidelity-caption").evaluate((node) => getComputedStyle(node).lineHeight)).toBe("18px");
 });

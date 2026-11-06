@@ -30,20 +30,13 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
 import { SummaryFidelityYearContext } from "./summary-fidelity-range-context";
-import { formatMoverNames, yearSpan } from "./fidelity-data";
+import { orderMoverNames, yearSpan } from "./fidelity-data";
+import { PartialProfitHint, PnlPercentHint } from "./profit-summary-hints";
+import { HintPopover } from "./ui/hint-popover";
 
 type SummaryType = "month" | "year";
 type UnknownCoins = Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"];
 type PeriodCount = { up: number; down: number };
-
-function unknownHint(coins: UnknownCoins, t: (key: string) => string) {
-  const names = coins.slice(0, 5).map((coin) => coin.symbol).join(", ");
-  const more = coins.length > 5 ? ` ${t("profitSummary.more").replace("{n}", String(coins.length - 5))}` : "";
-  return t(coins.length === 1 ? "profitSummary.unknownWithdrawal" : "profitSummary.unknownWithdrawals")
-    .replace("{n}", String(coins.length))
-    .replace("{coins}", names + more);
-}
-
 
 function getToneClass(value: number, quoteColor: QuoteColor) {
   if (value === 0) {
@@ -118,10 +111,7 @@ const App = ({
   const setSelectedYear = fidelity && sharedYear.year ? sharedYear.setYear : setLocalYear;
   const [summaryType, setSummaryType] = useState<SummaryType>(initialType);
   const [clickedMonth, setClickedMonth] = useState<number | null>(null);
-  const [explainedMonth, setExplainedMonth] = useState<number | null>(null);
-  const [explainedPartial, setExplainedPartial] = useState<string | null>(null);
   const { t, locale } = useTranslation();
-  const [moverNames, setMoverNames] = useState("");
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
   const monthlyCacheRef = useRef<
@@ -163,8 +153,9 @@ const App = ({
   const monthlyKey = `${rangeKey}-${selectedYear}-${dataChangedVersion}`;
 
   useEffect(() => {
-    if (!fidelity || initialType !== "month") return;
+    if (!fidelity || initialType === "year") return;
     let active = true;
+    sharedYear.setMoverNames([]);
     Promise.all([calculateTotalProfit(dateRange), new StableCoinsQuery().listAllStableCoins(), queryLatestAssets()]).then(([profit, stable, assets]) => {
       if (!active) return;
       const stableSymbols = new Set(stable);
@@ -172,10 +163,10 @@ const App = ({
       for (const asset of assets) holdings.set(asset.symbol, (holdings.get(asset.symbol) ?? 0) + asset.value);
       const movers = profit.coins.filter((coin) => !stableSymbols.has(coin.symbol) && coin.value !== null && Math.abs(coin.value) > 0.005)
         .map((coin) => ({ symbol: coin.symbol, value: holdings.get(coin.symbol) ?? 0 }));
-      setMoverNames(formatMoverNames(movers, locale));
-    }).catch(() => { if (active) setMoverNames(""); });
+      sharedYear.setMoverNames(orderMoverNames(movers));
+    }).catch(() => { if (active) sharedYear.setMoverNames([]); });
     return () => { active = false; };
-  }, [fidelity, initialType, rangeKey, dataChangedVersion, locale]);
+  }, [fidelity, initialType, rangeKey, dataChangedVersion, sharedYear.setMoverNames]);
 
   useEffect(() => {
     if (summaryType !== "month") {
@@ -492,19 +483,10 @@ const App = ({
     return t("profitSummary.since").replace("{date}", formatted);
   }
 
-  function renderPartialInfo(coins: UnknownCoins, label: string, key: string) {
-    const hint = unknownHint(coins, t);
-    return (
-      <>
-        <button type="button" className="absolute right-1 top-1 flex h-8 w-8 touch:h-11 touch:w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          aria-label={t("profitSummary.explain").replace("{period}", label)}
-          aria-expanded={explainedPartial === key}
-          title={hint}
-          onClick={() => setExplainedPartial(explainedPartial === key ? null : key)}><span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] leading-none">?</span></button>
-        <div className={cn("mt-1 text-xs text-muted-foreground",
-          explainedPartial === key ? "" : "hidden group-hover:block group-focus-within:block")}>{hint}</div>
-      </>
-    );
+  function renderPartialInfo(coins: UnknownCoins, label: string, year = false) {
+    return <PartialProfitHint names={coins.map((coin) => coin.symbol)} period={label} t={t}
+      className={cn("flex h-8 w-8 touch:h-11 touch:w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        year ? "fidelity-year-badge" : "absolute right-1 top-1")} />;
   }
 
   function renderMonthSummary() {
@@ -536,10 +518,7 @@ const App = ({
         {monthCards.filter((item) => item.inRange).map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
           const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
-          return <div key={item.key} className="fidelity-month-card group" data-partial={partial}>
-            <button type="button" className="fidelity-month-main" disabled={!item.hasData && !item.noSnapshot}
-              onClick={() => item.hasData ? onMonthClick(item.month) : setExplainedMonth(item.month)}
-              aria-label={item.noSnapshot ? `${item.label}: ${t("profitSummary.noSnapshot")}` : undefined}>
+          const cardContent = <>
               <span className="fidelity-month-head"><b>{item.label}</b><span>{item.month === dateRange.end.getMonth() && selectedYear === dateRange.end.getFullYear()
                 ? t("summary.fidelity.toDate").replace("{date}", `${dateRange.end.getDate()} ${item.label}`) : selectedYear}</span></span>
               <span className={cn("fidelity-month-value", value == null ? "text-muted-foreground" : getToneClass(value, quoteColor))}>
@@ -548,11 +527,16 @@ const App = ({
               <span className="fidelity-month-percent">{fidelityPercentage(item.percentage)}</span>
               <span className="fidelity-month-bar"><i className={value != null && value < 0 ? "negative" : "positive"}
                 style={{ width: `${Math.min(50, Math.abs(item.percentage ?? 0) / 16 * 50)}%` }} /></span>
+              {item.gapDate && <span className="fidelity-month-gap">{gapHint(item.gapDate, selectedYear)}</span>}
               <span className="fidelity-month-count"><span className={countTone(item.count?.up ?? 0, true, quoteColor)}>{item.count?.up ?? 0} {t("summary.fidelity.up")}</span> · <span className={countTone(item.count?.down ?? 0, false, quoteColor)}>{item.count?.down ?? 0} {t("summary.fidelity.down")}</span></span>
-            </button>
-            {item.noSnapshot && <span className={cn("fidelity-month-hint", explainedMonth === item.month ? "" : "hidden group-hover:block group-focus-within:block")}>{t("profitSummary.noSnapshot")}</span>}
-            {item.gapDate && <span className="fidelity-month-hint">{gapHint(item.gapDate, selectedYear)}</span>}
-            {partial && renderPartialInfo(item.unknownCoins, item.label, item.key)}
+          </>;
+          return <div key={item.key} className="fidelity-month-card" data-partial={partial}>
+            {item.noSnapshot ? <HintPopover label={`${item.label}: ${t("profitSummary.noSnapshot")}`}
+              className="fidelity-month-main" trigger={cardContent} hoverParent>
+              {t("profitSummary.noSnapshot")}
+            </HintPopover> : <button type="button" className="fidelity-month-main" disabled={!item.hasData}
+              onClick={() => onMonthClick(item.month)}>{cardContent}</button>}
+            {partial && renderPartialInfo(item.unknownCoins, item.label)}
           </div>;
         })}
       </div>
@@ -563,32 +547,22 @@ const App = ({
         {monthCards.map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
           const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
-          return <div key={item.key} data-partial={partial} className={cn("group relative rounded-lg border p-2",
-            value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor))}>
-          <button
-            type="button"
-            disabled={!item.hasData && !item.noSnapshot}
-            onClick={() => item.hasData ? onMonthClick(item.month) : setExplainedMonth(item.month)}
-            aria-label={item.noSnapshot ? `${item.label}: ${t("profitSummary.noSnapshot")}` : undefined}
-            title={item.noSnapshot ? t("profitSummary.noSnapshot") : undefined}
-            className={cn("flex min-h-11 w-full flex-col justify-start text-left transition-colors", partial && "pr-5")}
-          >
+          const cardContent = <>
             <div className="text-xs text-muted-foreground">{item.label}</div>
-            <div
-              className={cn(
-                "analyze-period-amount mt-1 text-sm font-semibold tracking-tight",
-                value === null ? "text-muted-foreground" : getToneClass(value, quoteColor)
-              )}
-            >
+            <div className={cn("analyze-period-amount mt-1 text-sm font-semibold tracking-tight",
+              value === null ? "text-muted-foreground" : getToneClass(value, quoteColor))}>
               {item.hasData ? renderAmount(value) : "—"}
             </div>
             {item.gapDate && <div className="mt-1 text-xs text-muted-foreground">{gapHint(item.gapDate, selectedYear)}</div>}
-            {item.noSnapshot && <div className={cn("mt-1 text-xs text-muted-foreground",
-              explainedMonth === item.month ? "" : "hidden group-hover:block group-focus-within:block")}>
-              {t("profitSummary.noSnapshot")}
-            </div>}
-          </button>
-          {partial && renderPartialInfo(item.unknownCoins, item.label, item.key)}
+          </>;
+          return <div key={item.key} data-partial={partial} className={cn("relative rounded-lg border p-2",
+            value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor))}>
+          {item.noSnapshot ? <HintPopover label={`${item.label}: ${t("profitSummary.noSnapshot")}`}
+            className={cn("flex min-h-11 w-full flex-col justify-start text-left transition-colors", partial && "pr-5")}
+            trigger={cardContent} hoverParent>{t("profitSummary.noSnapshot")}</HintPopover>
+            : <button type="button" disabled={!item.hasData} onClick={() => onMonthClick(item.month)}
+              className={cn("flex min-h-11 w-full flex-col justify-start text-left transition-colors", partial && "pr-5")}>{cardContent}</button>}
+          {partial && renderPartialInfo(item.unknownCoins, item.label)}
           </div>;
         })}
       </div>
@@ -600,7 +574,7 @@ const App = ({
       const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
       const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
       const span = yearSpan(item.year, dateRange.start, dateRange.end);
-      return <div className="fidelity-year-item group" key={item.year} data-partial={partial}><button type="button" className={cn("fidelity-year-card", item.year === selectedYear && "selected")}
+      return <div className="fidelity-year-item" key={item.year} data-partial={partial}><button type="button" className={cn("fidelity-year-card", item.year === selectedYear && "selected")}
         onClick={() => setSelectedYear(item.year)}>
         <span className="fidelity-year-head"><b>{item.year}</b><span>{getMonthAbbreviation(span.first)}–{getMonthAbbreviation(span.last)}</span></span>
         <strong className={value == null ? "text-muted-foreground" : getToneClass(value, quoteColor)}>
@@ -609,7 +583,7 @@ const App = ({
         <span className={cn("fidelity-year-percent", item.total == null ? "text-muted-foreground" : getToneClass(item.total, quoteColor))}>{fidelityPercentage(item.percentage)}</span>
         <span className="fidelity-year-deposits"><span>{t("summary.fidelity.deposits")}</span><span>{item.deposits == null ? "–" : fidelityAmount(item.deposits)}</span></span>
         <span className="fidelity-year-foot"><span><span className={countTone(item.count?.up ?? 0, true, quoteColor)}>{item.count?.up ?? 0} {t("summary.fidelity.up")}</span> · <span className={countTone(item.count?.down ?? 0, false, quoteColor)}>{item.count?.down ?? 0} {t("summary.fidelity.down")}</span></span><span>{span.last - span.first + 1} {t("summary.fidelity.months")}</span></span>
-      </button>{partial && renderPartialInfo(item.unknownCoins, String(item.year), `year-${item.year}`)}</div>;
+      </button>{partial && renderPartialInfo(item.unknownCoins, String(item.year), true)}</div>;
     })}</div>;
 
     return (
@@ -622,7 +596,7 @@ const App = ({
             key={`y-profit-summary-${item.year}`}
             data-partial={partial}
             className={cn(
-              "group relative rounded-lg border p-2 text-left",
+              "relative rounded-lg border p-2 text-left",
               value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor)
             )}
           >
@@ -635,7 +609,7 @@ const App = ({
             >
               {item.hasData ? renderAmount(value) : "—"}
             </div>
-            {partial && renderPartialInfo(item.unknownCoins, String(item.year), `year-${item.year}`)}
+            {partial && renderPartialInfo(item.unknownCoins, String(item.year))}
           </div>
           );
         })}
@@ -690,12 +664,12 @@ const App = ({
           </div>
           </>}
         </div>
+        {fidelity && !oneSnapshot && <div className="fidelity-pnl-hint"><PnlPercentHint names={sharedYear.moverNames} t={t} /></div>}
         {fidelity && statsRow}
       </CardHeader>
       <CardContent className="space-y-3">
         {!fidelity && statsRow}
         {summaryType === "month" ? renderMonthSummary() : renderYearSummary()}
-        {fidelity && initialType === "month" && !oneSnapshot && <p className="fidelity-caption">{moverNames ? t("summary.fidelity.periodNoteAssets").replace("{assets}", moverNames) : t("summary.fidelity.periodNote")}</p>}
       </CardContent>
     </Card>
   );
