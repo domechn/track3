@@ -184,7 +184,7 @@ for (const state of ["default", "setup", "locked", "loading", "testing", "test-f
         }
         if (state === "pop-stopped") {
           await expect(page.getByRole("dialog").getByText("Network timeout", { exact: true })).toBeVisible();
-          await expect(page.locator(".t3-fidelity-settings-topbar").getByRole("button", { name: "Sync stopped" })).toBeVisible();
+          await expect(page.locator(".t3-fidelity-settings-topbar").getByRole("button", { name: /Sync failed - open Backup & sync/ })).toBeVisible();
         }
       }
     } else if (state === "rename") {

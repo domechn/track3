@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   refreshAllData,
   type RefreshAllDataResult,
@@ -51,11 +51,13 @@ const App = ({
   loading: refreshLoading,
   afterRefresh,
   overviewFlow = false,
+  liveTotalVisible = false,
   fidelity = false,
 }: {
   loading: boolean;
   afterRefresh?: (success: boolean) => unknown;
   overviewFlow?: boolean;
+  liveTotalVisible?: boolean;
   fidelity?: boolean;
 }) => {
   const { toast } = useToast();
@@ -64,6 +66,7 @@ const App = ({
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [showLastKnownOffer, setShowLastKnownOffer] = useState(false);
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const sourceTriggerRef = useRef<HTMLButtonElement>(null);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult | undefined>(() => lastRetryResult);
   const lastResultRef = useRef(lastResult);
   const [preflight, setPreflight] = useState<{ sourceId?: string; warnings: UsageWarning[] } | null>(null);
@@ -354,6 +357,34 @@ const App = ({
     return () => window.removeEventListener(FULL_REFRESH_REQUEST_EVENT, listener);
   }, []);
 
+  useLayoutEffect(() => {
+    if (!overviewFlow || !desktopFlow || !liveTotalVisible || sourceStatuses.length === 0) return;
+    const source = sourceTriggerRef.current;
+    const live = document.querySelector<HTMLButtonElement>(".t3-desktop-column .t3-live-trigger");
+    if (!source || !live) return;
+    const place = () => {
+      const box = live.getBoundingClientRect();
+      source.style.left = `${box.right + 12}px`;
+      source.style.top = `${box.top + (box.height - source.offsetHeight) / 2}px`;
+      source.dataset.pinned = "";
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(live);
+    const sidebar = document.querySelector(".t3-desktop-rail");
+    const sidebarObserver = sidebar ? new MutationObserver(place) : undefined;
+    if (sidebar) sidebarObserver?.observe(sidebar, { attributes: true, attributeFilter: ["style"] });
+    window.addEventListener("resize", place);
+    return () => {
+      observer.disconnect();
+      sidebarObserver?.disconnect();
+      window.removeEventListener("resize", place);
+      source.style.removeProperty("left");
+      source.style.removeProperty("top");
+      delete source.dataset.pinned;
+    };
+  }, [desktopFlow, overviewFlow, liveTotalVisible, sourceStatuses.length]);
+
   const hasFailure = sourceStatuses.some((source) => source.status === "failed" || source.status === "stale");
   const hasPartial = sourceStatuses.some((source) => source.status === "partial");
   const sourceLabel = (source: PortfolioSourceStatus) => {
@@ -433,16 +464,18 @@ const App = ({
         </Button>}
       {(sourceStatuses.length > 0 || refreshLoading) && (
         <Button
+          ref={sourceTriggerRef}
           variant="outline"
           size="sm"
           className="t3-refresh-source-trigger"
           data-refreshed={lastResult ? "" : undefined}
           aria-label={t("refresh.sourceStatus")}
+          title={t("refresh.sourceStatus")}
           data-tone={hasFailure ? "err" : hasPartial ? "warn" : "ok"}
           onClick={() => setStatusDialogOpen(true)}
           disabled={preflightPending}
         >
-          <InfoCircledIcon aria-hidden="true" className="t3-refresh-source-icon mr-1.5 h-3.5 w-3.5" />
+          {(hasFailure || !hasPartial) && <InfoCircledIcon aria-hidden="true" data-icon="source-info" className="t3-refresh-source-icon mr-1.5 h-3.5 w-3.5" />}
           {!hasFailure && hasPartial && <ExclamationTriangleIcon aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}
           <span className="t3-refresh-source-default">{t("refresh.sourceStatus")}</span>
           <span className="t3-refresh-source-summary">{t("refresh.fidelity.sourceCountAt")

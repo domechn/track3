@@ -60,7 +60,7 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
       await page.goto("/#/overview");
       await page.getByLabel("Sync passphrase").fill(syncPassphrase);
       await page.getByRole("button", { name: /^Unlock( sync)?$/ }).click();
-      await expect(page.locator(".desktop-sync-status-indicator button")).toHaveAttribute("aria-label", "Sync idle");
+      await expect(page.locator(".desktop-sync-status-indicator button")).toHaveAttribute("data-sync-state", /^(ready|syncing|synced)$/);
       await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible({ timeout: 30_000 });
       await expect(page.locator(".t3-hero-value")).toContainText("$763,809.27", { timeout: 30_000 });
       await expect(page.locator("[aria-busy='true']")).toHaveCount(0, { timeout: 30_000 });

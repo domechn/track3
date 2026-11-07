@@ -19,7 +19,7 @@ vi.mock("@/middlelayers/sync/runtime", () => ({
 
 it("shows real sync details in the desktop overview card", () => {
   render(<SyncStatusIndicator overviewFidelity />);
-  fireEvent.click(screen.getByRole("button", { name: "Sync idle" }));
+  fireEvent.click(screen.getByRole("button", { name: /Synced .* ago$/ }));
   expect(screen.getByText("Backup & sync")).toBeInTheDocument();
   expect(screen.getByText("Last upload")).toBeInTheDocument();
   expect(screen.getByText("Destination")).toBeInTheDocument();

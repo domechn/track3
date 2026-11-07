@@ -7,8 +7,10 @@ type Locale = "en" | "zh";
 type Platform = "desktop" | "mobile";
 
 const pill = {
-  en: { locked: "Sync locked", skipped: "Sync locked — tap to unlock", idle: "Sync idle", syncing: "Syncing", error: "Sync error" },
-  zh: { locked: "同步已锁定", skipped: "同步已锁定，点按以解锁", idle: "同步空闲", syncing: "正在同步", error: "同步错误" },
+  en: { locked: "Sync locked - unlock sync", skipped: "Sync locked - tap to unlock",
+    ready: "Not synced yet - open Backup & sync", syncing: "Syncing...", error: "Sync failed - open Backup & sync" },
+  zh: { locked: "同步已锁定 - 解锁同步", skipped: "同步已锁定 - 点按以解锁",
+    ready: "尚未同步 - 打开备份与同步", syncing: "正在同步...", error: "同步失败 - 打开备份与同步" },
 };
 const skip = { en: "Skip for now", zh: "暂时跳过" };
 const mobileSkip = { en: "Continue without sync", zh: "不使用同步，继续" };
@@ -36,25 +38,25 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
   await page.goto("/#/overview");
   await expect(page.locator("#app-main-content")).toContainText("$42,000.00", { timeout: 30_000 });
   await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0);
-  const button = (name: string) => page.getByRole("button", { name });
+  const button = page.locator(".t3-topbar-sync-button");
   const capture = async (state: string) => {
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.screenshot({ path: `${output}/${size}-${theme}-${locale}-${state}.png`, animations: "disabled" });
   };
-  await expect(button(pill[locale].locked)).toBeVisible();
+  await expect(button).toHaveAttribute("title", pill[locale].locked);
   await expect(page.getByRole("dialog")).toBeVisible();
   if (platform === "mobile") {
-    await expect(button(locale === "en" ? "Unlock" : "解锁")).toBeVisible();
-    await expect(button(mobileSkip[locale])).toBeVisible();
+    await expect(page.getByRole("button", { name: locale === "en" ? "Unlock" : "解锁", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: mobileSkip[locale] })).toBeVisible();
   }
   await capture("locked");
-  await button(platform === "mobile" ? mobileSkip[locale] : skip[locale]).click();
-  await expect(button(pill[locale].skipped)).toBeVisible();
+  await page.getByRole("button", { name: platform === "mobile" ? mobileSkip[locale] : skip[locale] }).click();
+  await expect(button).toHaveAttribute("title", pill[locale].skipped);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.screenshot({ path: `${output}/${size}-${theme}-${locale}-skipped.png`, animations: "disabled" });
 
   const cases = [
-    { name: "never", phase: "idle", pill: pill[locale].idle, sync: { phase: "idle" } },
+    { name: "never", phase: "idle", pill: pill[locale].ready, sync: { phase: "idle" } },
     { name: "running", phase: "syncing", pill: pill[locale].syncing, sync: { phase: "syncing", startedAt: Date.now() - 5000 } },
     { name: "uploading", phase: "syncing", pill: pill[locale].syncing, sync: {
       phase: "syncing", startedAt: Date.now() - 5000, progress: { phase: "push", completed: 1240, total: 4567 },
@@ -63,12 +65,13 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
       phase: "syncing", startedAt: Date.now() - 5000, progress: { phase: "pull", completed: 82, total: 400 },
     } },
     { name: "error", phase: "error", pill: pill[locale].error, sync: { phase: "error", error: "bucket", lastSync: Date.parse("2026-10-28T12:00:00Z") } },
-    { name: "up-to-date", phase: "idle", pill: pill[locale].idle, sync: { phase: "idle", report: { pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] }, lastSync: Date.parse("2026-10-28T12:00:00Z") } },
-    { name: "changed", phase: "idle", pill: pill[locale].idle, sync: { phase: "idle", report: { pulled: 2, pushed: 1, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] }, lastSync: Date.parse("2026-10-28T12:00:00Z") } },
+    { name: "up-to-date", phase: "idle", pill: locale === "en" ? /^Synced / : /已同步$/, sync: { phase: "idle", report: { pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] }, lastSync: Date.parse("2026-10-28T12:00:00Z") } },
+    { name: "changed", phase: "idle", pill: locale === "en" ? /^Synced / : /已同步$/, sync: { phase: "idle", report: { pulled: 2, pushed: 1, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] }, lastSync: Date.parse("2026-10-28T12:00:00Z") } },
   ];
   for (const item of cases) {
     await publish(page, item.sync);
-    await button(item.pill).click();
+    await expect(button).toHaveAttribute("title", item.pill);
+    await button.click();
     if (item.name === "uploading" || item.name === "downloading") {
       await expect(page.getByRole("progressbar")).toHaveAttribute("aria-valuenow",
         item.name === "uploading" ? "1240" : "82");
@@ -84,7 +87,8 @@ export async function captureSyncStates(page: Page, platform: Platform, theme: T
     await page.setViewportSize({ width: 320, height: 700 });
     await publish(page, { phase: "syncing", startedAt: Date.now() - 5000,
       progress: { phase: "push", completed: 1240, total: 4567 } });
-    await button(pill[locale].syncing).click();
+    await expect(button).toHaveAttribute("title", pill[locale].syncing);
+    await button.click();
     const box = (await page.getByRole("dialog").boundingBox())!;
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(320);
@@ -110,7 +114,7 @@ export async function captureSyncStatusWithToast(page: Page, platform: Platform)
   const pill = page.locator(mobile ? ".ios-d3-sync-indicator button[aria-label]" : ".desktop-sync-status-indicator button[aria-label]");
   await expect(toast).toBeVisible();
   await expect(pill).toBeVisible();
-  await expect(pill).toHaveAttribute("aria-label", "Sync error");
+  await expect(pill).toHaveAttribute("title", "Sync failed - open Backup & sync");
   const toastBox = (await toast.boundingBox())!;
   const pillBox = (await pill.boundingBox())!;
   expect(pillBox.x < toastBox.x + toastBox.width && pillBox.x + pillBox.width > toastBox.x &&

@@ -24,7 +24,6 @@
 .t3-fidelity-rail-item svg { width: 18px; height: 18px; }
 .t3-fidelity-rail .desktop-sync-status-indicator { display: grid; width: 36px; min-height: 36px; place-items: center; }
 .t3-fidelity-rail .t3-topbar-sync-button { width: 34px; min-height: 34px; height: 34px; justify-content: center; padding: 0; overflow: hidden; font-size: 0; }
-.t3-fidelity-rail .t3-topbar-sync-button > span:first-child { width: 8px; height: 8px; flex: none; }
 .t3-fidelity-rail-sep { height: 1px; flex: none; margin: 8px 6px; background: #222224; }
 .t3-fidelity-rail-spacer { flex: 1; }
 .t3-fidelity-rail-badge { position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border: 2px solid #0d0d0e; border-radius: 50%; background: #ee6a82; }

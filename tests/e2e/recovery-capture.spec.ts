@@ -27,7 +27,7 @@ for (const [size, width, height, mobile] of [
         const bridge = await installTauriBridge(page, { seedLockedSync: true, richPortfolio: true });
         bridge.setImportFile("{}");
         await page.goto("/#/overview");
-        await expect(page.getByRole("button", { name: "Sync locked" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "Sync locked - unlock sync" })).toBeVisible();
         await expect(page.getByRole("dialog")).toBeVisible();
         await page.getByRole("dialog").getByRole("button", { name: "Use recovery file" }).click({ force: true });
         await page.getByRole("dialog").getByRole("button", { name: "Choose .t3key file" }).click({ force: true });

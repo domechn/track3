@@ -42,7 +42,9 @@ export async function captureSyncDetails(page: Page, platform: "desktop" | "mobi
         slowest: [{ verb: "GET", phase: "pull", ms: 3200 }, { verb: "LIST", phase: "discover", ms: 2450 }] },
     });
   });
-  await page.getByRole("button", { name: locale === "en" ? "Sync error" : "同步错误" }).click();
+  const sync = page.locator(".t3-topbar-sync-button");
+  await expect(sync).toHaveAttribute("title", locale === "en" ? "Sync failed - open Backup & sync" : "同步失败 - 打开备份与同步");
+  await sync.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   const details = dialog.locator("details").first();

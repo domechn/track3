@@ -48,6 +48,14 @@ Chromium briefly sets a 1 × 1 viewport during some full page screenshots. The d
 
 ## Remaining differences
 
+The 7 Nov 2026 populated History capture is **5.71%** different from the
+saved 1600 × 1272 source render at RGB-sum threshold 60 when the app's
+1600 × 1024 scroll viewport is padded to the source height. The fixed shell
+and truthful stored edits below explain the larger full-page ratio. The
+sync stamp now uses a neutral cloud icon where the source has a green dot;
+this distinguishes backup sync from live prices. Its button remains pinned
+at x=1465 with a 92 px width, and the icon stays inside its box.
+
 With no saved snapshots, the shared empty state adds a centred icon and a 200px minimum to the source's dashed explanation. The Refresh action and disabled filters retain their existing behaviour.
 
 The 5 Nov 2026 measurement compared a 1600 × 1272 populated History source render with the app's 1600 × 1024 fixed-shell viewport: **5.95%** differed at RGB sum threshold 60. Expanding the capture container to 1600 × 1272 gave **1.43%** against the source; images and bounds are in `/tmp/ui3-remeasure/`. A fresh 6 Nov source render and expanded app capture measured **2.38%**; their images and bounds are in `/tmp/ui21-source-fresh/`, `/tmp/ui21-design-history.json`, and `/tmp/ui21-history-expanded2.png`. The fixed viewport's scroll container clips lower rows and Sources in a full-page screenshot and creates a 15 px scrollbar. The source and app heading bounds match. This capture difference follows the product's fixed-height shell, which keeps Settings pinned while the content scrolls.

@@ -15,10 +15,11 @@ test("connection test uses a fake S3 bucket", async ({ page }) => {
   await page.getByLabel("Sync passphrase", { exact: true }).fill("correct horse battery staple");
   await page.getByLabel("Confirm sync passphrase").fill("correct horse battery staple");
   await page.getByRole("button", { name: "Enable sync" }).click();
-  await expect(page.getByRole("button", { name: "Sync idle" })).toBeVisible({ timeout: 15000 });
+  const syncControl = page.locator(".t3-topbar-sync-button");
+  await expect(syncControl).toBeVisible({ timeout: 15000 });
   await expect(page.getByLabel(/Name for device/)).toBeVisible({ timeout: 15000 });
   await page.setViewportSize({ width: 320, height: 640 });
-  await page.getByRole("button", { name: "Sync idle" }).click();
+  await syncControl.click();
   const dialog = page.getByRole("dialog");
   await expect.poll(async () => (await dialog.boundingBox())?.x).toBeGreaterThanOrEqual(8);
   const popover = await dialog.boundingBox();
@@ -54,7 +55,7 @@ test("a second device pulls history from the first device", async ({ browser }) 
       await page.getByLabel("Sync passphrase", { exact: true }).fill("correct horse battery staple");
       await page.getByLabel("Confirm sync passphrase").fill("correct horse battery staple");
       await page.getByRole("button", { name: "Enable sync" }).click();
-      await expect(page.getByRole("button", { name: "Sync idle" })).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(".t3-topbar-sync-button")).toBeVisible({ timeout: 15000 });
     };
     await enable(first);
     await expect(first.getByLabel(/Name for device/)).toBeVisible({ timeout: 15000 });

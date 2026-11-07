@@ -27,6 +27,8 @@ async function capture(page: Page, name: string) {
     expect(box.x).toBeCloseTo(1465, 0);
     expect(box.y).toBeCloseTo(54, 0);
     expect(box.width).toBeCloseTo(92, 0);
+    const iconBox = (await stamp.locator(".fd-sync-cloud-icon").boundingBox())!;
+    expect(iconBox.x).toBeGreaterThanOrEqual(box.x);
     await expect(stamp).toHaveCSS("color", "rgb(155, 157, 163)");
   }
   if (name !== "history-loading" && name !== "history-empty") {

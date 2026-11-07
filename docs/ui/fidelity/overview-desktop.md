@@ -37,6 +37,35 @@ The type face is Public Sans with tabular numbers. Tokens: `--ground #0d0d0e`, `
 
 ## Remaining differences
 
+The 7 Nov 2026 UI27 captures compare the saved source page renders
+`/tmp/fidelity-desktop/design/overview-{base,sync}-1440.png` with
+`/tmp/fidelity-desktop/overview/overview{-sync}-desktop.png`. At the RGB-sum
+threshold of 60, the padded full-page differences are **6.36%** for Overview
+and **6.59%** for Sync open. The source pages are 1440 × 1523 px and the app
+captures are 1440 × 900 px because the app scrolls inside its desktop shell.
+The uncovered area uses the shell background `#0d0d0e` when comparing pixels.
+The saved source `getBoundingClientRect`/`getComputedStyle` record gives the
+top bar `(84,14,1328,36)` at 1440 px. The app source-status icon is now
+positioned from the live trigger's current rectangle and follows amount and
+sidebar width changes; the 1280 px browser checks verify its vertical centre
+matches the live dot within 2 px.
+
+After the Source status overlap fix, the 1280 px checks use
+`getBoundingClientRect` and computed
+`position`: with a visible live total the Source status icon is pinned beside
+the dot; without Pro or without stored results it stays beside Refresh in
+normal flow. The still visible full-page differences are the product data,
+chart renderer, rail glyphs, and controls listed below. The design has no
+Source status action, while the app keeps its working action.
+
+- UI27 deliberately shows one live-price dot and a separate neutral cloud sync
+  icon. The source uses a green sync dot, has no clickable source-status icon,
+  and displays its saved `$763,809.27` total as though it were live. The app
+  keeps the true live quote, source-status dialog and actual sync state. These
+  different controls and data remain visible in the top bar.
+- The live-price explanation appears in the opened live-value popover so touch
+  users can read it. Its content and size differ from the static source state.
+
 The fresh 6 Nov 2026 1280 × 800 dark viewport differs by **8.55%** against `source/ds/pages/core-overview.html` (RGB sum threshold 60). The source hero begins at (84,132) and is 773.33 × 457 px. The app's percentage and base-currency buttons are 32 × 32 px at (754.33,151) and (794.33,151); both have live pointer events. Captures are in `/tmp/ui21-overview-{source,app}-1280.png`. The larger page difference follows the product data and controls described below.
 
 Fresh 5 Nov 2026 browser captures against the source HTML renders differ by **7.38%** for Overview, **6.63%** for AI off, **9.07%** for Expanded 1024, **8.14%** for Expanded 1440, **6.65%** for Hover, **9.48%** for Range open, **7.38%** for Stale source, and **7.78%** for Sync open at the RGB-sum threshold of 60. The app's fixed-height content scroller clips most captures at 900 px while the source page is 1510–2411 px tall. The current two-peak product mark also differs from the source tile. The stored AI summary, live total, charts, source status, and sync details below remain product-data differences; source labels now use the same alias and short-name rules as Wallets.

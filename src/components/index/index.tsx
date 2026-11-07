@@ -254,6 +254,7 @@ function TopBar({
                       loading={refreshButtonLoading}
                       fidelity={!!fidelityPage}
                       overviewFlow={isOverview}
+                      liveTotalVisible={isProUser}
                       afterRefresh={(success) => {
                         if (success) {
                           onRefreshSuccess();

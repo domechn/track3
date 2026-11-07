@@ -21,6 +21,8 @@ async function capture(page: Page, name: string) {
   expect(box.x).toBeCloseTo(1341, 0);
   expect(box.y).toBeCloseTo(46, 0);
   expect(box.width).toBeCloseTo(92, 0);
+  const iconBox = (await stamp.locator(".fd-sync-cloud-icon").boundingBox())!;
+  expect(iconBox.x).toBeGreaterThanOrEqual(box.x);
   await expect(stamp).toHaveCSS("color", "rgb(155, 157, 163)");
   await expect(page.getByRole("status", { name: /Loading/i })).toHaveCount(0);
   await expect(page.getByTestId("cost-desktop-table")).toBeVisible();
