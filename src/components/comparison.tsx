@@ -472,7 +472,7 @@ const App = ({
     }
 
     if (convertCurrency) {
-      return `${currency.symbol} ${res}`;
+      return `${currency.symbol}${res}`;
     }
     return res;
   }

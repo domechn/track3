@@ -5,7 +5,6 @@ import { groupAttribution } from "@/middlelayers/charts-attribution";
 import { queryAttribution } from "@/middlelayers/charts-attribution-data";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/mobile/i18n";
-import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { positiveNegativeTone, positiveNegativeTextClass } from "@/utils/color";
 import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,6 +13,8 @@ import { getAssetLogoKey, resolveAssetLogoSrc } from "@/utils/assets";
 import { AttributionPager, useAttributionPage } from "@/components/attribution-pager";
 import { sourceDisplayNames } from "@/components/source-display-name";
 import { useLatestWalletOrdinals } from "@/components/source-name-order";
+import { attributionAmount, attributionCompactAmount, attributionRoundedValue } from "@/components/attribution-amount";
+import { FittingAttributionAmount } from "@/components/fitting-attribution-amount";
 
 type Data = Awaited<ReturnType<typeof queryAttribution>>;
 const dimensions: AttributionDimension[] = ["coin", "source", "wallet", "assetType"];
@@ -21,7 +22,7 @@ const dimensions: AttributionDimension[] = ["coin", "source", "wallet", "assetTy
 export default function ProfitAttribution({ currency, dateRange, quoteColor, logoMap = {} }: {
   currency: CurrencyRateDetail; dateRange: TDateRange; quoteColor: QuoteColor; logoMap?: Record<string, string>;
 }) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const isMobile = useIsMobile();
   const [loaded, setLoaded] = useState<{ rangeKey: string; result: Data } | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -55,9 +56,9 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
     return Object.fromEntries(groups.map((group, index) => [group.key, names[index]]));
   }, [data, dimension, groups, t, walletOrdinals]);
   const paging = useAttributionPage(groups, `${rangeKey}:${dimension}`);
-  const rounded = (value: number) => Math.round(currencyWrapper(currency)(value) * 100) / 100;
-  const format = (value: number) => `${rounded(value) > 0 ? "+" : rounded(value) < 0 ? "-" : ""}${currency.symbol}${prettyNumberToLocaleString(Math.abs(rounded(value)))}`;
-  const tone = (value: number) => positiveNegativeTextClass(rounded(value), quoteColor, 500);
+  const format = (value: number) => attributionAmount(value, currency);
+  const exact = (value: number) => attributionAmount(value, currency, true);
+  const tone = (value: number) => positiveNegativeTextClass(attributionRoundedValue(value, currency), quoteColor, 500);
   const barTone = (value: number) => positiveNegativeTone(value, quoteColor) === "green" ? "var(--ios-gain)" : "var(--ios-loss)";
   const label = (key: string) => t(`profit.attribution.${key}`);
   const displayGroup = (group: { key: string; label: string }) =>
@@ -88,15 +89,17 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
             ? <img className="attribution-rank-logo" src={resolveAssetLogoSrc(asset, logoMap[getAssetLogoKey(asset)])} alt="" />
             : <span className="attribution-rank-logo attribution-rank-mark" aria-hidden="true">{displayGroup(group).slice(0, 1).toUpperCase()}</span>)}
           <span className="truncate font-medium" title={displayGroup(group)}>{displayGroup(group)}</span>
-          <span className="h-2 rounded-full bg-muted" aria-hidden="true"><span className="block h-full rounded-full" style={{ width: `${Math.abs(group.priceEffect) / max * 100}%`, background: barTone(group.priceEffect) }} /></span>
-          <span className={`min-w-[5.5rem] text-right tabular-nums ${tone(group.priceEffect)}`}>{format(group.priceEffect)}</span>
+          <span className="h-4 rounded-full bg-muted" aria-hidden="true"><span className="block h-full rounded-full" style={{ width: `${Math.abs(group.priceEffect) / max * 100}%`, background: barTone(group.priceEffect) }} /></span>
+          <span className={`min-w-0 whitespace-nowrap text-right tabular-nums ${tone(group.priceEffect)}`} title={exact(group.priceEffect)}>{isMobile
+            ? <FittingAttributionAmount full={format(group.priceEffect)} compact={attributionCompactAmount(group.priceEffect, currency, locale)} minBarWidth={32} />
+            : format(group.priceEffect)}</span>
         </>;
         return <li key={group.key} className={isMobile ? "attribution-rank" : "grid grid-cols-[minmax(5rem,1fr)_minmax(4rem,2fr)_auto] items-center gap-2 text-xs sm:text-sm"}>
           {isMobile ? <button type="button" className="attribution-rank-button" aria-expanded={expandedKey === key}
             onClick={() => setExpandedKey(expandedKey === key ? null : key)}>{content}</button> : content}
           {isMobile && expandedKey === key && <dl className="attribution-rank-details">
             {(["priceEffect", "flowEffect", "residual", "totalChange"] as const).map((field) =>
-              <div key={field}><dt>{label(field)}</dt><dd className={tone(group[field])}>{format(group[field])}</dd></div>)}
+              <div key={field}><dt>{label(field)}</dt><dd className={`whitespace-nowrap text-right tabular-nums ${tone(group[field])}`} title={exact(group[field])}>{format(group[field])}</dd></div>)}
           </dl>}
         </li>;
       })}
@@ -110,7 +113,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
       {(["totalChange", "priceEffect", "flowEffect", "residual"] as const).map((key) => (
         <div key={key} className="min-w-0 rounded-md border border-border/50 bg-muted/20 p-2">
           <div className="text-xs text-muted-foreground">{label(key)}</div>
-          <div className={`attribution-total truncate text-sm font-semibold tabular-nums sm:text-base ${tone(totals[key])}`} title={format(totals[key])}>{format(totals[key])}</div>
+          <div className={`attribution-total truncate text-sm font-semibold tabular-nums sm:text-base ${tone(totals[key])}`} title={exact(totals[key])}>{format(totals[key])}</div>
         </div>
       ))}
     </div>
@@ -132,18 +135,18 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
     </section>}
     {isMobile && <AttributionPager count={groups.length} {...paging} t={t} />}
     {!isMobile && <div className="max-w-full overflow-x-auto rounded-md border border-border/50">
-      <Table className="min-w-[580px] text-xs sm:text-sm">
+      <Table className="min-w-[760px] text-xs sm:text-sm">
         <caption className="sr-only">{label("table")}</caption>
         <TableHeader><TableRow>
           <TableHead>{label("group")}</TableHead>
-          <TableHead className="text-right">{label("priceEffect")}</TableHead>
-          <TableHead className="text-right">{label("flowEffect")}</TableHead>
-          <TableHead className="text-right">{label("residual")}</TableHead>
-          <TableHead className="text-right">{label("totalChange")}</TableHead>
+          <TableHead className="whitespace-nowrap text-right">{label("priceEffect")}</TableHead>
+          <TableHead className="whitespace-nowrap text-right">{label("flowEffect")}</TableHead>
+          <TableHead className="whitespace-nowrap text-right">{label("residual")}</TableHead>
+          <TableHead className="whitespace-nowrap text-right">{label("totalChange")}</TableHead>
         </TableRow></TableHeader>
-        <TableBody>{paging.rows.map((group) => <TableRow key={group.key}>
+        <TableBody>{paging.rows.map((group) => <TableRow key={group.key} className="h-[52px]">
           <TableCell className="max-w-[130px] truncate py-2 font-medium" title={displayGroup(group)}>{displayGroup(group)}</TableCell>
-          {(["priceEffect", "flowEffect", "residual", "totalChange"] as const).map((key) => <TableCell key={key} className={`py-2 text-right tabular-nums ${tone(group[key])}`}>{format(group[key])}</TableCell>)}
+          {(["priceEffect", "flowEffect", "residual", "totalChange"] as const).map((key) => <TableCell key={key} className={`whitespace-nowrap py-2 text-right tabular-nums ${tone(group[key])}`} title={exact(group[key])}>{format(group[key])}</TableCell>)}
         </TableRow>)}</TableBody>
       </Table>
     </div>}

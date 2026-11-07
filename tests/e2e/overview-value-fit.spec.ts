@@ -57,9 +57,17 @@ test("other desktop hero totals fit their own metric columns", async ({ page }) 
           const value = page.locator(selector).first();
           await expect(value).toBeVisible({ timeout: 30_000 });
           await value.evaluate((element) => {
-            element.textContent = "−$999,999,999.99";
-            if (element.matches(".fidelity-summary-pnl-kpis strong.big")) element.classList.add("fidelity-long-money");
+            if (element.matches(".fidelity-summary-pnl-kpis strong.big")) {
+              const compact = document.createElement("span");
+              compact.className = "whitespace-nowrap";
+              compact.textContent = "−$1B";
+              element.replaceChildren(compact);
+              element.setAttribute("title", "−$999,999,999.99");
+              element.classList.add("fidelity-long-money");
+            } else element.textContent = "−$999,999,999.99";
           });
+          if (route === "summary" && selector.includes("strong"))
+            await expect(value).toHaveAttribute("title", "−$999,999,999.99");
           const fit = await value.evaluate((element) => {
             const range = document.createRange();
             range.selectNodeContents(element);

@@ -957,13 +957,18 @@
   .d2-summary .overview-movers-card > .mobile-movers-header { min-width: 0; padding: 16px 16px 8px; }
   .d2-summary .overview-movers-card > :last-child { min-width: 0; padding: 4px 16px 16px; }
   .d2-summary .attribution-rank { border-radius: 12px; background: hsl(var(--secondary)); }
-  .d2-summary .attribution-rank-button { display: grid; width: 100%; min-height: 48px; grid-template-columns: 24px minmax(3rem, 1fr) minmax(2rem, .75fr) auto; align-items: center; gap: 8px; padding: 8px 10px; text-align: left; font-size: 13px; }
+  .d2-summary .attribution-rank-button { display: grid; width: 100%; min-height: 56px; grid-template-columns: 24px minmax(0, max-content) minmax(32px, 1fr) minmax(0, max-content); align-items: center; gap: 8px; padding: 8px 10px; text-align: left; font-size: 13px; }
   .d2-summary .attribution-rank-logo { width: 24px; height: 24px; flex: none; border-radius: 50%; }
   .d2-summary .attribution-rank-mark { display: grid; place-items: center; background: color-mix(in srgb, var(--ios-accent) 12%, transparent); color: var(--ios-accent); font-weight: 600; }
   .d2-summary .attribution-rank-details { display: grid; gap: 8px; padding: 0 12px 12px; }
+  .d2-summary .attribution-rank-button .rounded-full { height: 16px; }
+  .d2-summary .attribution-rank-button .tabular-nums { white-space: nowrap; }
   .d2-summary .attribution-rank-details > div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
   .d2-summary .attribution-rank-details dt { color: hsl(var(--muted-foreground)); }
   .d2-summary .profit-range { width: 100%; margin-top: 12px; }
+  @media (max-width: 1199px) {
+    .d2-summary .attribution-rank-button { gap: 4px; padding-inline: 6px; }
+  }
 
   .d2-wallets > .wallet-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
   .d2-wallets > .wallet-stack > * { min-width: 0; margin: 0; }
@@ -1524,7 +1529,7 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
 }
 .d2-summary .summary-hero-metrics { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .d2-summary .analyze-profit-card, .d2-summary .analyze-attribution-section { container-type: inline-size; }
-.d2-summary .attribution-rank-button .truncate { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+.d2-summary .attribution-rank-button .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
 @container (max-width: 560px) {
   .d2-summary .profit-movers-grid { grid-template-columns: minmax(0, 1fr); }
   .d2-summary .attribution-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1661,7 +1666,6 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
 }
 @media (max-width: 359px) {
   .d2-summary .profit-mobile-list .mobile-list-label .truncate { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
-  .d2-summary .attribution-rank-button .truncate { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
 }
 @media (max-width: 700px) {
   .d2-wallets .wallet-source-change-list > div { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }

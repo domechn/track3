@@ -42,7 +42,7 @@ describe("profit attribution", () => {
     expect(within(table).getAllByRole("row")).toHaveLength(11);
     expect(screen.getByText("Showing 1-10 of 47")).toBeInTheDocument();
     expect(screen.getByText("Showing 1-10 of 47")).toHaveAttribute("aria-live", "polite");
-    expect(screen.getAllByText("+€2,256.00")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("+€2,256")[0]).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Showing 11-20 of 47")).toBeInTheDocument();
     expect(within(table).queryByText("COIN47")).not.toBeInTheDocument();
@@ -87,7 +87,7 @@ describe("profit attribution", () => {
     render(view());
     expect(await screen.findByText("Top contributors")).toBeInTheDocument();
     expect(screen.getByText("Top detractors")).toBeInTheDocument();
-    expect(screen.getAllByText("+€240.00")[0]).toHaveClass("text-gain");
+    expect(screen.getAllByText("+€240")[0]).toHaveClass("text-gain");
     expect(screen.getByRole("figure", { name: "Top attribution contributors and detractors" })).toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(screen.getAllByText("BTC").length).toBeGreaterThan(0);
@@ -131,11 +131,11 @@ describe("profit attribution", () => {
     const [contributors, detractors] = within(figure).getAllByRole("list");
     expect(within(contributors).getAllByRole("listitem")).toHaveLength(1);
     expect(within(contributors).getByText("ETH")).toBeInTheDocument();
-    expect(within(contributors).getByText("+€200.00")).toBeInTheDocument();
+    expect(within(contributors).getByText("+€200")).toBeInTheDocument();
     expect(within(contributors).getByText("ETH").closest("li")?.querySelector("[style]")).toHaveStyle({ width: "100%" });
     expect(within(detractors).getAllByRole("listitem")).toHaveLength(1);
     expect(within(detractors).getByText("SOL")).toBeInTheDocument();
-    expect(within(detractors).getByText("-€80.00")).toBeInTheDocument();
+    expect(within(detractors).getByText("−€80")).toBeInTheDocument();
   });
 
   it("shows an alert when attribution cannot be loaded", async () => {

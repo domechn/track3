@@ -33,6 +33,8 @@ import { SummaryFidelityYearContext } from "./summary-fidelity-range-context";
 import { orderMoverNames, yearSpan } from "./fidelity-data";
 import { PartialProfitHint, PnlPercentHint } from "./profit-summary-hints";
 import { HintPopover } from "./ui/hint-popover";
+import { attributionCompactAmount } from "./attribution-amount";
+import { FittingAttributionAmount } from "./fitting-attribution-amount";
 
 type SummaryType = "month" | "year";
 type UnknownCoins = Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"];
@@ -521,8 +523,8 @@ const App = ({
           const cardContent = <>
               <span className="fidelity-month-head"><b>{item.label}</b><span>{item.month === dateRange.end.getMonth() && selectedYear === dateRange.end.getFullYear()
                 ? t("summary.fidelity.toDate").replace("{date}", `${dateRange.end.getDate()} ${item.label}`) : selectedYear}</span></span>
-              <span className={cn("fidelity-month-value", value == null ? "text-muted-foreground" : getToneClass(value, quoteColor))}>
-                {fidelityAmount(value)}
+              <span className={cn("fidelity-month-value", value == null ? "text-muted-foreground" : getToneClass(value, quoteColor))} title={fidelityAmount(value)}>
+                {value === null ? "–" : <FittingAttributionAmount full={fidelityAmount(value)} compact={attributionCompactAmount(value, currency, locale)} />}
               </span>
               <span className="fidelity-month-percent">{fidelityPercentage(item.percentage)}</span>
               <span className="fidelity-month-bar"><i className={value != null && value < 0 ? "negative" : "positive"}
@@ -577,7 +579,7 @@ const App = ({
       return <div className="fidelity-year-item" key={item.year} data-partial={partial}><button type="button" className={cn("fidelity-year-card", item.year === selectedYear && "selected")}
         onClick={() => setSelectedYear(item.year)}>
         <span className="fidelity-year-head"><b>{item.year}</b><span>{getMonthAbbreviation(span.first)}–{getMonthAbbreviation(span.last)}</span></span>
-        <strong className={value == null ? "text-muted-foreground" : getToneClass(value, quoteColor)}>
+        <strong className={value == null ? "text-muted-foreground" : getToneClass(value, quoteColor)} title={fidelityAmount(value)}>
           {fidelityAmount(value)}
         </strong>
         <span className={cn("fidelity-year-percent", item.total == null ? "text-muted-foreground" : getToneClass(item.total, quoteColor))}>{fidelityPercentage(item.percentage)}</span>

@@ -5,13 +5,13 @@ import { groupAttribution } from "@/middlelayers/charts-attribution";
 import { queryAttribution } from "@/middlelayers/charts-attribution-data";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
-import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { positiveNegativeTone, positiveNegativeTextClass } from "@/utils/color";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { AttributionPager, useAttributionPage } from "./attribution-pager";
 import { sourceDisplayNames } from "./source-display-name";
 import { useLatestWalletOrdinals } from "./source-name-order";
+import { attributionAmount, attributionRoundedValue } from "./attribution-amount";
 
 type Data = Awaited<ReturnType<typeof queryAttribution>>;
 const dimensions: AttributionDimension[] = ["coin", "source", "wallet", "assetType"];
@@ -49,8 +49,9 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
     return Object.fromEntries(groups.map((group, index) => [group.key, names[index]]));
   }, [data, dimension, groups, t, walletOrdinals]);
   const paging = useAttributionPage(groups, `${rangeKey}:${dimension}`);
-  const format = (value: number) => `${value > 0 ? "+" : value < 0 ? "-" : ""}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(value)))}`;
-  const tone = (value: number) => positiveNegativeTextClass(value, quoteColor, 500);
+  const format = (value: number) => attributionAmount(value, currency);
+  const exact = (value: number) => attributionAmount(value, currency, true);
+  const tone = (value: number) => positiveNegativeTextClass(attributionRoundedValue(value, currency), quoteColor, 500);
   const barTone = (value: number) => positiveNegativeTone(value, quoteColor) === "green" ? "bg-positive" : "bg-negative";
   const label = (key: string) => t(`profit.attribution.${key}`);
   const displayGroup = (group: { key: string; label: string }) =>
@@ -72,8 +73,8 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
       {items.map((group) => (
         <li key={group.key} className="grid grid-cols-[minmax(5rem,1fr)_minmax(4rem,2fr)_auto] items-center gap-2 text-xs sm:text-sm">
           <span className="truncate font-medium" title={displayGroup(group)}>{displayGroup(group)}</span>
-          <span className="h-2 rounded-full bg-muted" aria-hidden="true"><span className={`block h-full rounded-full ${barTone(group.priceEffect)}`} style={{ width: `${Math.abs(group.priceEffect) / max * 100}%` }} /></span>
-          <span className={`min-w-[5.5rem] text-right tabular-nums ${tone(group.priceEffect)}`}>{format(group.priceEffect)}</span>
+          <span className="h-4 rounded-full bg-muted" aria-hidden="true"><span className={`block h-full rounded-full ${barTone(group.priceEffect)}`} style={{ width: `${Math.abs(group.priceEffect) / max * 100}%` }} /></span>
+          <span className={`min-w-[5.5rem] whitespace-nowrap text-right tabular-nums ${tone(group.priceEffect)}`} title={exact(group.priceEffect)}>{format(group.priceEffect)}</span>
         </li>
       ))}
     </ol>
@@ -86,7 +87,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
       {(["totalChange", "priceEffect", "flowEffect", "residual"] as const).map((key) => (
         <div key={key} className="min-w-0 rounded-md border border-border/50 bg-muted/20 p-2">
           <div className="text-xs text-muted-foreground">{label(key)}</div>
-          <div className={`truncate text-sm font-semibold tabular-nums sm:text-base ${tone(totals[key])}`} title={format(totals[key])}>{format(totals[key])}</div>
+          <div className={`truncate text-sm font-semibold tabular-nums sm:text-base ${tone(totals[key])}`} title={exact(totals[key])}>{format(totals[key])}</div>
         </div>
       ))}
     </div>
@@ -98,18 +99,18 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
       <section className="space-y-2"><h3 className="text-xs font-medium text-muted-foreground">{label("detractors")}</h3>{bars(detractors)}</section>
     </figure>
     <div className="max-w-full overflow-x-auto rounded-md border border-border/50">
-      <Table className="min-w-[580px] text-xs sm:text-sm">
+      <Table className="min-w-[760px] text-xs sm:text-sm">
         <caption className="sr-only">{label("table")}</caption>
         <TableHeader><TableRow>
           <TableHead>{label("group")}</TableHead>
-          <TableHead className="text-right">{label("priceEffect")}</TableHead>
-          <TableHead className="text-right">{label("flowEffect")}</TableHead>
-          <TableHead className="text-right">{label("residual")}</TableHead>
-          <TableHead className="text-right">{label("totalChange")}</TableHead>
+          <TableHead className="whitespace-nowrap text-right">{label("priceEffect")}</TableHead>
+          <TableHead className="whitespace-nowrap text-right">{label("flowEffect")}</TableHead>
+          <TableHead className="whitespace-nowrap text-right">{label("residual")}</TableHead>
+          <TableHead className="whitespace-nowrap text-right">{label("totalChange")}</TableHead>
         </TableRow></TableHeader>
-        <TableBody>{paging.rows.map((group) => <TableRow key={group.key}>
+        <TableBody>{paging.rows.map((group) => <TableRow key={group.key} className="h-[52px]">
           <TableCell className="max-w-[130px] truncate py-2 font-medium" title={displayGroup(group)}>{displayGroup(group)}</TableCell>
-          {(["priceEffect", "flowEffect", "residual", "totalChange"] as const).map((key) => <TableCell key={key} className={`py-2 text-right tabular-nums ${tone(group[key])}`}>{format(group[key])}</TableCell>)}
+          {(["priceEffect", "flowEffect", "residual", "totalChange"] as const).map((key) => <TableCell key={key} className={`whitespace-nowrap py-2 text-right tabular-nums ${tone(group[key])}`} title={exact(group[key])}>{format(group[key])}</TableCell>)}
         </TableRow>)}</TableBody>
       </Table>
     </div>
