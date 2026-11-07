@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import type { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
-import { positiveNegativeTextClass, positiveNegativeTone } from "@/utils/color";
+import { directionBackgroundClass, directionClass } from "@/utils/color";
 import { comparisonMovers } from "./comparison-movers";
 import { barGeometry, divergingScale } from "./comparison-fidelity-movers";
 import { boundedPercentText } from "./profit-percentage";
@@ -34,18 +34,17 @@ export default function ComparisonMoversPanel({ rows, currency, quoteColor, t, s
       const label = shouldMaskValue ? "***" : kind === "value" ? money(difference) :
         `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
       const shown = kind === "percent" && !shouldMaskValue ? boundedPercentText(value, label) : { text: label, exact: label };
-      const barTone = positiveNegativeTone(value, quoteColor);
       return <li key={`${row.assetType}:${row.symbol}`}>
         <strong>{row.symbol}</strong>
         <span className="comparison-mover-track" aria-hidden="true" style={{ "--zero": `${scale.zero}%` } as CSSProperties}>
-          {bar && <span className={barTone === "green" ? "bg-positive" : "bg-negative"}
+          {bar && <span className={directionBackgroundClass(value, quoteColor)}
             style={{
               width: `min(${bar.side}%, max(${bar.minimumPixels}px, ${bar.width}%))`,
               left: bar.left === undefined ? undefined : `${bar.left}%`,
               right: bar.right === undefined ? undefined : `${bar.right}%`,
             }} />}
         </span>
-        <span className={positiveNegativeTextClass(value, quoteColor, 500)}
+        <span className={directionClass(value, quoteColor)}
           title={kind === "percent" && !shouldMaskValue ? shown.exact : undefined}
           aria-label={kind === "percent" && !shouldMaskValue ? shown.exact : undefined}>{shown.text}</span>
         {kind === "percent" && <small>{shouldMaskValue ? "***" : money(difference)}</small>}

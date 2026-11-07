@@ -9,6 +9,7 @@ import { useTranslation } from "@/mobile/i18n";
 import { BottomSheet } from "@/mobile/components/mobile";
 import { ArchiveIcon, BarChartIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
+import { directionPhysicalTone } from "@/utils/color";
 
 const PAGE_SIZE = 50;
 const methods: CostBasisMethod[] = ["FIFO", "LIFO", "HIFO", "AVERAGE"];
@@ -117,8 +118,7 @@ export function PhoneCostBasis({
     new RegExp(`(${locale === "en" ? custom ? "custom range|" : `tax year ${year}|` : ""}${methodText})`, "g"),
   ).map((part, index) => part === methodText || part === `tax year ${year}` || part === "custom range"
     ? <strong key={index}>{part}</strong> : part);
-  const gainsAreGreen = quoteColor === "green-up-red-down";
-  const tone = (value: number) => value === 0 ? "neutral" : (value > 0) === gainsAreGreen ? "gain" : "loss";
+  const tone = (value: number) => directionPhysicalTone(value, quoteColor);
   const gain = (value: number) => <span className="cost-gain ios-money" data-tone={tone(value)}>{signed(value)}</span>;
   const kpiGain = (value: number) => <strong className={signed(value).length > 12 ? "fidelity-long-money" : undefined}>{gain(value)}</strong>;
   const kpiMoney = (value: number) => <strong className={money(value).length > 12 ? "fidelity-long-money" : undefined}>{money(value)}</strong>;

@@ -776,6 +776,7 @@
   .pnl-scrub-chip strong { font-variant-numeric: tabular-nums; }
   .pnl-scrub-chip [data-tone="gain"] { color: var(--ios-gain); }
   .pnl-scrub-chip [data-tone="loss"] { color: var(--ios-loss); }
+  .pnl-scrub-chip [data-tone="neutral"] { color: hsl(var(--muted-foreground)); }
   .analytics-tile-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2448,8 +2449,10 @@ body:has(.fidelity-history, .fidelity-history-detail) {
 .fidelity-history-detail-subkpis small { color: var(--h-muted); }
 .fidelity-history-detail-kpis small [data-tone="loss"] { color: var(--h-negative, #ee6a82); }
 .fidelity-history-detail-kpis small [data-tone="gain"] { color: var(--h-positive, #5fc39c); }
+.fidelity-history-detail-kpis small [data-tone="neutral"] { color: var(--h-faint); }
 .fidelity-history-detail-kpis strong[data-tone="loss"] { color: var(--h-negative, #ee6a82); }
 .fidelity-history-detail-kpis strong[data-tone="gain"] { color: var(--h-positive, #5fc39c); }
+.fidelity-history-detail-kpis strong[data-tone="neutral"] { color: var(--h-faint); }
 .fidelity-history-detail-total { padding: 0 0 14px; border-bottom: 1px solid var(--h-border); }
 .fidelity-history-detail-total > span { position: relative; top: 5px; }
 .fidelity-history-detail-total > strong { margin-top: 7px; }

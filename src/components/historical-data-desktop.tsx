@@ -6,7 +6,7 @@ import { InfoCircledIcon, Pencil1Icon, ReloadIcon, TrashIcon } from "@radix-ui/r
 import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { currencyWrapper } from "@/utils/currency";
-import { positiveNegativeColor } from "@/utils/color";
+import { directionPhysicalTone, positiveNegativeColor } from "@/utils/color";
 import {
   deleteHistoricalDataByUUID as removeHistoricalSnapshot, deleteHistoricalDataDetailById as removeHistoricalAsset, queryEditLog,
   queryHistoricalDetail, queryHistoricalPage,
@@ -197,6 +197,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
     const value = assetEditValue(edit, edit.action === "delete", "value");
     return value === null ? sum : sum + (edit.action === "delete" ? -value : value);
   }, 0);
+  const editDeltaTone = directionPhysicalTone(editDelta, quoteColor);
   const [editSummaryBeforeAmount, editSummaryAfterAmount = ""] = t("history.fidelity.editDelta")
     .replace("{count}", String(edits?.length ?? 0)).split("{amount}");
   const sources = useMemo(() => {
@@ -465,7 +466,8 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
             <HistoryPartialDetails partial={detail.partial} t={t} locale={locale} /></div>}
           {(editLogError || edits === null || edits.length > 0) && <section className="fidelity-history-section fidelity-history-edit-log" aria-label={t("history.fidelity.edits")}>
             <div className="fidelity-card-head"><h3>{t("history.fidelity.edits")}</h3>
-              {!!edits?.length && <span>{editSummaryBeforeAmount}<span className={editDelta >= 0 ? "pos" : "neg"}>
+              {!!edits?.length && <span>{editSummaryBeforeAmount}<span className={
+                editDeltaTone === "gain" ? "pos" : editDeltaTone === "loss" ? "neg" : "zero"}>
                 {signed(Math.round(editDelta * 100) / 100)}</span>{editSummaryAfterAmount}</span>}</div>
             {editLogError ? <p role="alert">{t("history.editLog.loadFailed")}</p>
               : edits === null ? <p role="status">{t("common.loading")}</p>

@@ -29,6 +29,19 @@ describe("overview panels", () => {
     expect((document.querySelector(".t3-daily-up") as HTMLElement).style.height).toBe("48%");
   });
 
+  it("uses directional colours for daily bars and labels while keeping zero neutral", () => {
+    render(<DailyChangeCard currency={usd} daily={[
+      { timestamp: Date.parse("2026-10-29"), value: 120 },
+      { timestamp: Date.parse("2026-10-30"), value: -30 },
+      { timestamp: Date.parse("2026-10-31"), value: 0 },
+    ]} desktopFidelity />);
+    expect(document.querySelector(".t3-daily-up")).toHaveAttribute("data-direction", "gain");
+    expect(document.querySelector(".t3-daily-down")).toHaveAttribute("data-direction", "loss");
+    expect(document.querySelector(".t3-daily-neutral")).toHaveAttribute("data-direction", "neutral");
+    expect(screen.getByText("▲ Up")).toHaveClass("text-gain");
+    expect(screen.getByText("▼ Down")).toHaveClass("text-loss");
+  });
+
   it("lists signed asset contributions", () => {
     render(<MemoryRouter><WhatMovedCard currency={usd} count={3} rows={[
       { symbol: "ETH", assetType: "crypto", value: 40 },
@@ -38,6 +51,23 @@ describe("overview panels", () => {
     expect(screen.getByText("Last 3 snapshots")).toBeInTheDocument();
     expect(screen.getByText("+$40.00")).toBeInTheDocument();
     expect(screen.getByText("−$25.00")).toBeInTheDocument();
+  });
+  it("uses shared direction tokens for What moved bars and coin changes", () => {
+    render(<MemoryRouter>
+      <WhatMovedCard currency={usd} count={2} quoteColor="red-up-green-down" rows={[
+        { symbol: "ETH", assetType: "crypto", value: 40 },
+        { symbol: "SOL", assetType: "crypto", value: -25 },
+      ]} />
+      <TopCoinsCard currency={usd} quoteColor="red-up-green-down" rows={[
+        { symbol: "BTC", assetType: "crypto", value: 100, amount: 1, priceChange: -2 },
+      ]} />
+    </MemoryRouter>);
+    const bars = document.querySelectorAll<HTMLElement>(".t3-moved-track > span");
+    expect(bars[0].style.backgroundColor).toBe("hsl(var(--gain))");
+    expect(bars[1].style.backgroundColor).toBe("hsl(var(--loss))");
+    expect(screen.getByText("+$40.00")).toHaveClass("text-gain");
+    expect(screen.getByText("−$25.00")).toHaveClass("text-loss");
+    expect(screen.getByText("−2.0%")).toHaveClass("text-loss");
   });
   it("keeps nonzero contribution bars visible at their original scale outside desktop fidelity", () => {
     const { rerender } = render(<MemoryRouter><WhatMovedCard currency={usd} count={2} rows={[

@@ -60,8 +60,8 @@ it("maps calculator gains and composition to charts without Cartesian axes on th
   });
   rerender(<CostCharts report={report} quoteColor="red-up-green-down" />);
   const line = vi.mocked(Line).mock.calls.at(-1)?.[0];
-  expect(line?.data.datasets[0].borderColor).toBe("#f43f5e");
-  expect(line?.data.datasets[0].backgroundColor).toBe("#f43f5e20");
+  expect(line?.data.datasets[0].borderColor).toBe("hsl(349 70% 40%)");
+  expect(line?.data.datasets[0].backgroundColor).toBe("hsla(349, 70%, 40%, 0.12)");
 });
 
 it("maps deviations from the calculator and includes the configured tolerance", () => {
@@ -75,6 +75,7 @@ it("maps deviations from the calculator and includes the configured tolerance", 
   const deviations = vi.mocked(Bar).mock.calls[1][0];
   expect(deviations.data.labels).toEqual(["BTC", "ETH"]);
   expect(deviations.data.datasets[0].data).toEqual([20, -20]);
+  expect(deviations.data.datasets[0].backgroundColor).toEqual(["hsl(158 60% 25%)", "hsl(349 70% 40%)"]);
   expect(deviations["aria-label"]).toContain("3%");
   expect(deviations.plugins?.[0]?.id).toBe("tolerance-band");
 });

@@ -1,6 +1,7 @@
 import type { CostBasisReport } from "@/middlelayers/cost-basis-report";
 import { Card } from "./ui/card";
 import type { QuoteColor } from "@/middlelayers/types";
+import { directionBackgroundClass, directionClass } from "@/utils/color";
 
 type Row = {
   assetType: CostBasisReport["disposals"][number]["assetType"];
@@ -56,8 +57,7 @@ export function CostBasisPanels({ report, quoteColor, t }: {
   const maximum = Math.max(1, ...rows.map((row) => Math.abs(row.gainLoss ?? 0)));
   const money = (value: number) => `$${Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const signed = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${money(value)}`;
-  const tone = (value: number | null) => value === null || value === 0 ? "" :
-    (value > 0) === (quoteColor === "green-up-red-down") ? "text-positive" : "text-negative";
+  const tone = (value: number | null) => directionClass(value, quoteColor);
   const metric = (key: string, value: number, note: string) => <div className="cost-dashboard-metric">
     <span>{t(key)}</span><strong className={tone(value)}>{signed(value)}</strong><small>{note}</small>
   </div>;
@@ -86,7 +86,7 @@ export function CostBasisPanels({ report, quoteColor, t }: {
       <h2>{t("finance.realizedByAsset")}</h2>
       {rows.length ? <ol>{preview.map((row) => <li key={`${row.assetType}:${row.symbol}`}>
         <strong>{row.symbol}</strong>
-        <span className="cost-dashboard-bar"><span className={tone(row.gainLoss).replace("text-", "bg-")} style={{ width: `${Math.abs(row.gainLoss ?? 0) / maximum * 100}%` }} /></span>
+        <span className="cost-dashboard-bar"><span className={directionBackgroundClass(row.gainLoss, quoteColor)} style={{ width: `${Math.abs(row.gainLoss ?? 0) / maximum * 100}%` }} /></span>
         <span className={tone(row.gainLoss)}>{row.gainLoss === null ? "—" : signed(row.gainLoss)}</span>
       </li>)}</ol> : <p className="cost-dashboard-empty">{t("cost.noDisposals")}</p>}
     </Card>

@@ -63,7 +63,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { resolveAssetLogoSrc } from "@/utils/assets";
-import { positiveNegativeColor, positiveNegativeTone } from "@/utils/color";
+import { positiveNegativeColor } from "@/utils/color";
+import { directionPhysicalTone } from "@/utils/color";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
 import { useOptimisticDelete } from "@/mobile/components/common/use-optimistic-delete";
 import { StaggerContainer, FadeUp } from "@/components/motion";
@@ -760,12 +761,11 @@ const App = ({
           <div className="fidelity-history-detail-subkpis">
             <div>
               <span>{t("history.change")}</span>
-              <strong className="ios-money" data-tone={phoneSelectedRow?.change == null ? "neutral" :
-                positiveNegativeTone(phoneSelectedRow.change, quoteColor) === "green" ? "gain" : "loss"}>
-                {phoneSelectedRow?.change == null ? "–" : `${phoneSelectedRow.change < 0 ? "−" : "+"}${phoneMoney(Math.abs(phoneSelectedRow.change))}`}
+              <strong className="ios-money" data-tone={directionPhysicalTone(phoneSelectedRow?.change, quoteColor)}>
+                {phoneSelectedRow?.change == null ? "–" : `${phoneSelectedRow.change < 0 ? "−" : phoneSelectedRow.change > 0 ? "+" : ""}${phoneMoney(Math.abs(phoneSelectedRow.change))}`}
               </strong>
               <small>{phoneSelectedRow?.change == null ? t("fidelity.history.detail.noPrevious") : <>
-                <span data-tone={positiveNegativeTone(phoneSelectedRow.change, quoteColor) === "green" ? "gain" : "loss"}>{`${phoneChangePercent > 0 ? "+" : phoneChangePercent < 0 ? "−" : ""}${Math.abs(phoneChangePercent).toFixed(2)}%`}</span>
+                <span data-tone={directionPhysicalTone(phoneChangePercent, quoteColor)}>{`${phoneChangePercent > 0 ? "+" : phoneChangePercent < 0 ? "−" : ""}${Math.abs(phoneChangePercent).toFixed(2)}%`}</span>
                 {` ${t("fidelity.history.detail.vsDate").replace("{date}", phonePreviousDate ? phoneDate(phonePreviousDate) : "–")}`}
               </>}</small>
             </div>
@@ -1186,8 +1186,7 @@ const App = ({
                 <span className="fidelity-history-hidden-logos"><ImageStack imageSrcs={row.topAssets.slice(0, 3).map((asset) =>
                   resolveAssetLogoSrc(asset, logoMap[asset.symbol]))} imageWidth={18} imageHeight={18} /></span>
               </span>
-              <span className="history-mobile-snapshot-delta ios-money" data-tone={row.change === null ? "neutral" :
-                positiveNegativeTone(row.change, quoteColor) === "green" ? "gain" : "loss"}>
+              <span className="history-mobile-snapshot-delta ios-money" data-tone={directionPhysicalTone(row.change, quoteColor)}>
                 {phoneChange(row.change, row.total)}
               </span>
             </button>
@@ -1369,7 +1368,7 @@ const App = ({
                               imageWidth={18} imageHeight={18} />
                             {t("history.assetCount").replace("{n}", String(row.assetCount))}
                           </span>
-                          <span className="history-mobile-snapshot-delta ios-money" data-tone={row.change === null ? "neutral" : positiveNegativeTone(row.change, quoteColor) === "green" ? "gain" : "loss"}>
+                          <span className="history-mobile-snapshot-delta ios-money" data-tone={directionPhysicalTone(row.change, quoteColor)}>
                             {row.change === null ? "—" : `${row.change > 0 ? "+" : row.change < 0 ? "-" : ""}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(row.change)))}`}
                           </span>
                         </span>

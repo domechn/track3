@@ -136,7 +136,7 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
     --sunken: 240 7% 96%;
     --hover: 240 5% 94%;
     --faint: 240 4% 38%;
-    --positive: 158 60% 30%;
+    --positive: 158 60% 25%;
     --negative: 349 70% 40%;
     --warning: 37 79% 32%;
     --accent-data: 213 63% 43%;
@@ -485,7 +485,6 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
   }
   body:not(:has(.app-layout)) .t3-daily-zero { left: 44px; background: hsl(var(--faint) / .5); }
   body:not(:has(.app-layout)) .t3-daily-column { z-index: 1; }
-  body:not(:has(.app-layout)) .t3-daily-column .t3-daily-up { background: hsl(var(--accent-data)); }
   body:not(:has(.app-layout)) .t3-daily-y-axis {
     position: absolute; top: 0; bottom: 0; left: 0; width: 40px;
     display: flex; flex-direction: column; justify-content: space-between;
@@ -634,6 +633,7 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
 .t3-daily-down { background: hsl(var(--loss)); }
 .t3-daily-column .t3-daily-up { bottom: 50%; }
 .t3-daily-column .t3-daily-down { top: 50%; }
+.t3-daily-column .t3-daily-neutral { bottom: 50%; }
 .t3-moved-list { display: grid; gap: 12px; }
 .t3-moved-list li { display: grid; grid-template-columns: 54px minmax(0, 1fr) 92px; align-items: center; gap: 8px; font-size: 12px; }
 .t3-moved-symbol { color: hsl(var(--foreground)); font-weight: 600; }
@@ -3747,8 +3747,8 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .light .coin-fidelity-crumb, .light .coin-fidelity-position-header > div { color: hsl(var(--muted-foreground)); }
 .light .t3-fidelity-ranges button { color: hsl(var(--foreground)); }
 .light .fidelity-summary :is(span, small, p, summary, button, .fidelity-label) { color: hsl(var(--muted-foreground)); }
-.light .fidelity-summary :is(.positive, .text-positive) { color: hsl(var(--gain)); }
-.light .fidelity-summary :is(.negative, .text-negative) { color: hsl(var(--loss)); }
+.light .fidelity-summary :is(.positive, .text-positive) { color: hsl(var(--positive)); }
+.light .fidelity-summary :is(.negative, .text-negative) { color: hsl(var(--negative)); }
 .light :where(.fidelity-summary) .fidelity-empty button { color: hsl(var(--primary-foreground)); }
 .light .fidelity-attribution-row.total > span:nth-child(2) { color: hsl(var(--muted-foreground)); }
 .light .fidelity-attribution-row { border-top-color: hsl(var(--rule)); }

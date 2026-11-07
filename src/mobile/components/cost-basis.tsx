@@ -23,6 +23,7 @@ import type { QuoteColor } from "@/middlelayers/types";
 import { MobileRecordList, useIsMobile, useSizeClass, type MobileRecord } from "@/mobile/components/mobile";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { PhoneCostBasis } from "@/mobile/components/cost-basis-phone";
+import { directionPhysicalTone } from "@/utils/color";
 
 const methods: CostBasisMethod[] = ["FIFO", "LIFO", "HIFO", "AVERAGE"];
 const pageSize = 50;
@@ -189,7 +190,7 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
   const mobileDate = (value: string) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US",
     { year: "numeric", month: "short", day: "numeric" }).format(new Date(value));
   const gain = (value: number) => <span className="cost-gain ios-money"
-    data-tone={value === 0 ? "neutral" : (value > 0) === (quoteColor === "green-up-red-down") ? "gain" : "loss"}>
+    data-tone={directionPhysicalTone(value, quoteColor)}>
     {value > 0 ? "+" : value < 0 ? "−" : ""}{isMobile ? "$" : ""}{Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
   </span>;
   const qty = (value: number) => value !== 0 && Math.abs(value) < 1e-8

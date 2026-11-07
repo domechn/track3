@@ -20,6 +20,8 @@ import { useFittingAttributionTicks } from "@/components/use-fitting-attribution
 import { SummaryTopList } from "@/components/summary-top-list";
 import { marketProfitPercentage } from "@/components/profit-percentage";
 import "@/mobile/components/mobile/fidelity.css";
+import { directionColorVar, directionTone } from "@/utils/color";
+import { splitDirectionLine } from "@/components/direction-line";
 
 type Profit = Awaited<ReturnType<typeof calculateTotalProfit>>;
 type ChartProfit = Pick<Profit, "total" | "knownTotal" | "unknownCoins">;
@@ -44,7 +46,7 @@ const money = (value: number, symbol: string, digits = 2, signed = false) =>
   `${signed ? value > 0 ? "+" : value < 0 ? "−" : "" : value < 0 ? "−" : ""}${symbol}${Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 const percent = (value: number, digits = 2) =>
   `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value * 100).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
-const tone = (value: number | null) => value === null || value === 0 ? "neutral" : value > 0 ? "gain" : "loss";
+const tone = directionTone;
 
 function Heading({ title, right }: { title: string; right?: string }) {
   return <div className="fd-card-heading"><h3>{title}</h3>{right && <span>{right}</span>}</div>;
@@ -93,7 +95,10 @@ function LineChart({ values, dates, label, symbol, formatMonth, bestMonthText, f
     {ticks.map(n => <g key={n}><line x1={padL} x2="324" y1={y(n)} y2={y(n)} stroke="var(--fd-border)" /><text x={padL-8} y={y(n)+4} fill="var(--fd-faint)" textAnchor="end" fontSize="12">{tickLabel(n)}</text></g>)}
     <line x1={x(bestMonth)} x2={x(bestMonth)} y1="9" y2="26" stroke="var(--fd-faint)" strokeWidth="1" opacity=".45" shapeRendering="crispEdges" /><line x1={x(bestMonth)} x2={x(bestMonth)} y1="26" y2="164" stroke="var(--fd-faint)" strokeWidth="1" opacity=".45" shapeRendering="crispEdges" />
     <text x={x(bestMonth)+4} y="17" fill="var(--fd-muted)" fontSize="11">{bestMonthText}</text>
-    <path fill="none" stroke="var(--fd-accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" d={values.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join("")} />
+    {splitDirectionLine(values, x, y).map(({ start, end, value }, index) =>
+      <line key={index} data-direction={value > 0 ? "gain" : value < 0 ? "loss" : "neutral"}
+        x1={start.x} y1={start.y} x2={end.x} y2={end.y}
+        stroke={directionColorVar(value)} strokeWidth="2" />)}
     {selected !== null && <g className="fd-chart-chip" role="status" aria-live="polite" transform={`translate(${Math.min(164, Math.max(0, x(selected) - 70))},36)`}>
       <rect width="160" height="26" rx="13" fill="var(--fd-raised)" stroke="var(--fd-control)" />
       <text x="80" y="17" textAnchor="middle" fill="var(--fd-text)" fontSize="11">{formatMonth(dates[selected])} {dates[selected].getFullYear()} · {money(values[selected],symbol,0,true)}</text>
@@ -101,7 +106,8 @@ function LineChart({ values, dates, label, symbol, formatMonth, bestMonthText, f
     <text x={x(0)} y="182" fill="var(--fd-faint)" fontSize="12">{dates.length ? `${dates[0].getDate()} ${formatMonth(dates[0])} ${String(dates[0].getFullYear()).slice(2)}` : ""}</text>
     {dates.length > 2 && <text x={x(Math.floor((dates.length-1)/2))} y="182" fill="var(--fd-faint)" textAnchor="middle" fontSize="12">{formatMonth(dates[Math.floor((dates.length-1)/2)])} {String(dates[Math.floor((dates.length-1)/2)].getFullYear()).slice(2)}</text>}
     <text x={x(values.length-1)} y="182" fill="var(--fd-faint)" textAnchor="end" fontSize="12">{dates.length ? formatMonth(dates.at(-1)!) + " " + String(dates.at(-1)!.getFullYear()).slice(2) : ""}</text>
-    <text x={x(values.length-1)+6} y={y(values.at(-1) ?? 0)+4} fill="var(--fd-text)" fontSize="12" fontWeight="600">{endLabel}</text>
+    <text x={x(values.length-1)+6} y={y(values.at(-1) ?? 0)+4}
+      fill={directionColorVar(values.at(-1))} fontSize="12" fontWeight="600">{endLabel}</text>
   </svg>;
 }
 

@@ -13,6 +13,7 @@ import {
   Asset,
   AssetReference,
   CurrencyRateDetail,
+  QuoteColor,
   TDateRange,
   Transaction,
   TransactionType,
@@ -211,10 +212,12 @@ const App = ({
   currency,
   dateRange,
   onDataChanged,
+  quoteColor,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   onDataChanged?: () => void;
+  quoteColor: QuoteColor;
 }) => {
   const { symbol } = useParams() as { symbol: string };
   const [searchParams] = useSearchParams();
@@ -874,7 +877,7 @@ const App = ({
           <p className="coin-detail-price ios-money">{lastPriceStr}</p>
           <CoinCustomPrice symbol={symbol} assetType={assetType} locale={locale} t={t} />
           <div className="coin-detail-change">
-            <DeltaPill value={change24h ?? 0}>{change24h === undefined ? "—" : `${change24h > 0 ? "+" : ""}${change24h.toFixed(2)}%`}</DeltaPill>
+            <DeltaPill value={change24h ?? 0} quoteColor={quoteColor}>{change24h === undefined ? "—" : `${change24h > 0 ? "+" : ""}${change24h.toFixed(2)}%`}</DeltaPill>
             <span>{t("coin.change24h")}</span>
           </div>
           <Button variant="outline" className="coin-cost-link" onClick={() => navigate("/cost-basis")}>{t("coin.openCostBasis")}</Button>
@@ -1203,7 +1206,7 @@ const App = ({
   );
 };
 
-const CoinAnalytics = (props: { currency: CurrencyRateDetail; dateRange: TDateRange; onDataChanged?: () => void }) => {
+const CoinAnalytics = (props: { currency: CurrencyRateDetail; dateRange: TDateRange; onDataChanged?: () => void; quoteColor?: QuoteColor }) => {
   const { symbol } = useParams() as { symbol: string };
   const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
@@ -1217,7 +1220,7 @@ const CoinAnalytics = (props: { currency: CurrencyRateDetail; dateRange: TDateRa
       {...props}
     />;
   }
-  return <App {...props} />;
+  return <App {...props} quoteColor={props.quoteColor ?? "green-up-red-down"} />;
 };
 
 export default CoinAnalytics;

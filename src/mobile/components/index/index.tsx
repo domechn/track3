@@ -856,6 +856,7 @@ function AppRoutes({
                 currency={currentCurrency}
                 dateRange={tDateRange}
                 onDataChanged={onDataChanged}
+                quoteColor={quoteColor}
               />
             </AnimatedPage>
           }

@@ -10,8 +10,8 @@ import {
   QuoteColor,
   TDateRange,
 } from "@/middlelayers/types";
-import { positiveNegativeTone } from "@/utils/color";
-import { chartTokenColor } from "@/utils/chart-theme";
+import { directionPhysicalTone } from "@/utils/color";
+import { directionChartColor } from "@/utils/color";
 import { useTheme } from "@/mobile/components/common/theme";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { glassScaleOptions, glassTooltip } from "@/mobile/chart-theme";
@@ -224,8 +224,7 @@ const App = ({
   }
 
   function pnlBackgroundColor(val: "positive" | "negative"): string {
-    const c = positiveNegativeTone(val === "positive" ? 1 : -1, quoteColor);
-    return chartTokenColor(c === "green" ? "positive" : "negative", isMobile ? undefined : 0.8, resolvedTheme);
+    return directionChartColor(val === "positive" ? 1 : -1, quoteColor, resolvedTheme, isMobile ? undefined : 0.8);
   }
 
   function lineData() {
@@ -287,8 +286,8 @@ const App = ({
         {isMobile && scrub && plottedPNL[scrub.index] && <div className="pnl-scrub-chip" style={{ left: scrub.left }}>
           <span>{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US",
             { month: "short", day: "numeric" }).format(new Date(plottedPNL[scrub.index].timestamp))}</span>
-          <strong data-tone={positiveNegativeTone(plottedPNL[scrub.index].change, quoteColor) === "green" ? "gain" : "loss"}>
-            {plottedPNL[scrub.index].change < 0 ? "−" : "+"}{currency.symbol}{Math.abs(plottedPNL[scrub.index].change).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          <strong data-tone={directionPhysicalTone(plottedPNL[scrub.index].change, quoteColor)}>
+            {plottedPNL[scrub.index].change < 0 ? "−" : plottedPNL[scrub.index].change > 0 ? "+" : ""}{currency.symbol}{Math.abs(plottedPNL[scrub.index].change).toLocaleString(undefined, { maximumFractionDigits: 2 })}
           </strong>
         </div>}
       </div>

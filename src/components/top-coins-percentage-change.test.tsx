@@ -222,7 +222,7 @@ describe("TopCoinsPercentageChange", () => {
     });
   });
 
-  it("uses emerald color class for positive value and rose for negative", async () => {
+  it("uses quote-aware direction classes for positive and negative values", async () => {
     vi.mocked(queryTopCoinsPercentageChangeData).mockResolvedValue({
       timestamps: [1713158400000, 1713244800000],
       coins: [
@@ -256,8 +256,8 @@ describe("TopCoinsPercentageChange", () => {
     const rows = getAllByTestId("tcpc-row");
     const gainerClasses = within(rows[0]).getByTestId("tcpc-value").className;
     const loserClasses = within(rows[1]).getByTestId("tcpc-value").className;
-    expect(gainerClasses).toMatch(/emerald/);
-    expect(loserClasses).toMatch(/rose/);
+    expect(gainerClasses).toContain("text-gain");
+    expect(loserClasses).toContain("text-loss");
   });
 
   it("renders a real logo image per row sourced from the local cache", async () => {
@@ -486,7 +486,7 @@ describe("TopCoinsPercentageChange", () => {
     const pathBefore = getAllByTestId("tcpc-sparkline")[0].querySelector("path");
     const dBefore = pathBefore?.getAttribute("d");
     const strokeBefore = pathBefore?.getAttribute("stroke");
-    expect(strokeBefore).toBe("#f43f5e");
+    expect(strokeBefore).toBe("hsl(var(--loss))");
 
     // Switch to price sort. ALPHA stays first, but now its price path is shown
     // (ending at +20, emerald). The path d, color, and min/max all change.
@@ -503,7 +503,7 @@ describe("TopCoinsPercentageChange", () => {
     const dAfter = pathAfter?.getAttribute("d");
     const strokeAfter = pathAfter?.getAttribute("stroke");
     expect(dAfter).not.toBe(dBefore);
-    expect(strokeAfter).toBe("#10b981");
+    expect(strokeAfter).toBe("hsl(var(--gain))");
   });
 
   it("renders the empty state when no coins are returned", async () => {

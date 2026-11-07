@@ -104,9 +104,9 @@ const LegacyOverview = ({
               </FadeUp>
             <FadeUp className="t3-grid-holdings"><LatestAssetsPercentage currency={currency} dateRange={dateRange} holdings /></FadeUp>
             <FadeUp className="t3-grid-insights"><InsightsCard currency={currency} overview /></FadeUp>
-            <FadeUp className="t3-grid-daily"><DailyChangeCard currency={currency} daily={series.daily} bestDay={series.bestDay} /></FadeUp>
-            <FadeUp className="t3-grid-moved"><WhatMovedCard currency={currency} rows={contributions} count={contributionCount} /></FadeUp>
-            <FadeUp className="t3-grid-coins"><TopCoinsCard currency={currency} rows={coins} compact={phone} /></FadeUp>
+            <FadeUp className="t3-grid-daily"><DailyChangeCard currency={currency} daily={series.daily} bestDay={series.bestDay} quoteColor={quoteColor} /></FadeUp>
+            <FadeUp className="t3-grid-moved"><WhatMovedCard currency={currency} rows={contributions} count={contributionCount} quoteColor={quoteColor} /></FadeUp>
+            <FadeUp className="t3-grid-coins"><TopCoinsCard currency={currency} rows={coins} compact={phone} quoteColor={quoteColor} /></FadeUp>
             <FadeUp className="t3-grid-sources"><SourceStatusCard statuses={statuses} variant="card" /></FadeUp>
             {isMobile && <FadeUp className="t3-grid-disclosure"><MobileCard className="overview-more-disclosure">
               <CollapsibleTrigger asChild>
