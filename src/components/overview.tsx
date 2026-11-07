@@ -122,9 +122,9 @@ const App = ({
               </FadeUp>
               <FadeUp className="t3-grid-holdings"><LatestAssetsPercentage currency={currency} dateRange={dateRange} holdings /></FadeUp>
               <FadeUp className="t3-grid-insights"><InsightsCard currency={currency} overviewFidelity /></FadeUp>
-              <FadeUp className="t3-grid-daily"><DailyChangeCard currency={currency} daily={series.daily} bestDay={series.bestDay} desktopFidelity /></FadeUp>
-              <FadeUp className="t3-grid-moved"><WhatMovedCard currency={currency} rows={contributions} count={contributionCount} weekBased={weekBased} desktopFidelity /></FadeUp>
-              <FadeUp className="t3-grid-coins"><TopCoinsCard currency={currency} rows={coins} overviewFidelity /></FadeUp>
+              <FadeUp className="t3-grid-daily"><DailyChangeCard currency={currency} daily={series.daily} bestDay={series.bestDay} quoteColor={quoteColor} desktopFidelity /></FadeUp>
+              <FadeUp className="t3-grid-moved"><WhatMovedCard currency={currency} rows={contributions} count={contributionCount} weekBased={weekBased} quoteColor={quoteColor} desktopFidelity /></FadeUp>
+              <FadeUp className="t3-grid-coins"><TopCoinsCard currency={currency} rows={coins} quoteColor={quoteColor} overviewFidelity /></FadeUp>
               <FadeUp className="t3-grid-sources"><SourceStatusCard statuses={statuses} sources={sources} currency={currency} variant="card" desktopFidelity /></FadeUp>
           </StaggerContainer>
           <div className="t3-overview-footer">

@@ -21,6 +21,7 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { DataChangedContext } from "@/contexts/data-changed";
 import type {
   CurrencyRateDetail,
+  QuoteColor,
   TDateRange,
   Transaction,
 } from "@/middlelayers/types";
@@ -209,11 +210,13 @@ function CoinAnalysisTestTree({
   currency = usdCurrency,
   onDataChanged,
   dataVersion = 0,
+  quoteColor = "green-up-red-down",
 }: {
   initialEntries?: string[];
   currency?: CurrencyRateDetail;
   onDataChanged?: () => void;
   dataVersion?: number;
+  quoteColor?: QuoteColor;
 }) {
   return (
     <DataChangedContext.Provider value={dataVersion}>
@@ -234,6 +237,7 @@ function CoinAnalysisTestTree({
                     currency={currency}
                     dateRange={dateRange}
                     onDataChanged={onDataChanged}
+                    quoteColor={quoteColor}
                   />
                 }
               />
@@ -508,6 +512,31 @@ it("shows a compact phone identity, 24h price change, and an unbroken transactio
   fireEvent.click(history.querySelector(".fd-tx-row")!);
   expect(await screen.findByRole("dialog", { name: /buy 1\.0000 BTC/i })).toHaveTextContent("2024");
 }, 20_000);
+
+it("changes the iPad 24h loss badge with the quote-colour preference", async () => {
+  const originalWidth = window.innerWidth;
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 820 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  try {
+    mocks.queryAllDataDates.mockResolvedValue([
+      { id: "latest", date: "2024-04-30", createdAt: "2024-04-30T00:00:00.000Z" },
+      { id: "prior", date: "2024-04-29", createdAt: "2024-04-29T00:00:00.000Z" },
+    ]);
+    mocks.queryLastAssetsBySymbol.mockImplementation(async (_symbol: string, range: TDateRange) => ({
+      symbol: "BTC", assetType: "crypto", amount: 1, value: 100,
+      price: range.end.getDate() === 29 ? 101 : 100,
+    }));
+    const view = render(<CoinAnalysisTestTree quoteColor="green-up-red-down" />);
+    await waitFor(() => expect(document.querySelector(".coin-detail-change .mobile-delta-pill")).toHaveTextContent("-0.99%"));
+    expect(document.querySelector(".coin-detail-change .mobile-delta-pill")).toHaveAttribute("data-tone", "loss");
+    view.rerender(<CoinAnalysisTestTree quoteColor="red-up-green-down" />);
+    expect(document.querySelector(".coin-detail-change .mobile-delta-pill")).toHaveAttribute("data-tone", "gain");
+  } finally {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+  }
+});
 
 it("anchors the prior-day coin price to the latest snapshot instead of the range end", async () => {
   mocks.queryAllDataDates.mockResolvedValue([

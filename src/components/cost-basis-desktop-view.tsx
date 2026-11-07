@@ -10,6 +10,7 @@ import { withdrawnLotDetails } from "./cost-basis-withdrawal";
 import { costBasisDisplayRows } from "./cost-basis-panels";
 import { ArchiveIcon, BarChartIcon, ExclamationTriangleIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import EmptyState from "./empty-state";
+import { directionPhysicalTone } from "@/utils/color";
 
 const pageSize = 50;
 
@@ -17,8 +18,10 @@ const date = (value: string, locale: string) => {
   const parsed = new Date(value);
   return Number.isFinite(parsed.getTime()) ? format(parsed, "d MMM yyyy", locale === "zh" ? { locale: zhCN } : undefined) : "–";
 };
-const tone = (value: number | null, quoteColor: QuoteColor) =>
-  value === null || value === 0 ? "zero" : (value > 0) === (quoteColor === "green-up-red-down") ? "pos" : "neg";
+const tone = (value: number | null, quoteColor: QuoteColor) => {
+  const physical = directionPhysicalTone(value, quoteColor);
+  return physical === "neutral" ? "zero" : physical === "gain" ? "pos" : "neg";
+};
 const isWarning = (row: CostBasisReport["disposals"][number] | CostBasisReport["unrealized"][number] | CostBasisWarning):
   row is CostBasisWarning => "code" in row;
 

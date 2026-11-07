@@ -7,6 +7,7 @@ import { useTranslation } from "@/mobile/i18n";
 import { BottomSheet } from "@/mobile/components/mobile";
 import "@/mobile/components/mobile/fidelity.css";
 import { barGeometry, comparisonMoverFacts, divergingScale } from "@/components/comparison-fidelity-movers";
+import { directionTone } from "@/utils/color";
 
 const dateAt = (option?: DateOption) => option ? new Date(option.createdAt ?? `${option.label}T00:00:00`) : null;
 const day = (date: Date, locale: string, year = true) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB",
@@ -24,7 +25,7 @@ const percentText = (fraction: number, digits = 2, signed = true, masked = false
   const rounded = Number((fraction * 100).toFixed(digits));
   return `${signed && rounded > 0 ? "+" : rounded < 0 ? "−" : ""}${Math.abs(rounded).toFixed(digits)}%`;
 };
-const tone = (value: number) => value > 0 ? "gain" : value < 0 ? "loss" : "neutral";
+const tone = directionTone;
 const barStyle = (value: number, scale: ReturnType<typeof divergingScale>): CSSProperties => {
   const bar = barGeometry(value, scale);
   return bar ? {

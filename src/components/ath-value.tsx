@@ -143,6 +143,7 @@ const App = ({
           <div className="text-xs text-muted-foreground">{t("ath.athDate")} · {timeToDateStr(maxTotalValueData.date)}</div>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={t("ath.progress")} aria-valuenow={distance?.progressPercent ?? 0} aria-valuemin={0} aria-valuemax={100}>
+          {/* color-semantics: neutral the progress fill shows distance to the high, not a change. */}
           <div className="h-full bg-accent-data" style={{ width: `${Math.min(100, distance?.progressPercent ?? 0)}%` }} />
         </div>
         <div className="space-y-0">

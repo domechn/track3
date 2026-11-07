@@ -16,12 +16,9 @@ import { getChartPalette, phoneChartFontFamily } from "@/mobile/chart-theme";
 import { chartThemeColor } from "@/utils/chart-theme";
 import { BarChartIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
+import { directionChartColor } from "@/utils/color";
 
 const chartPalette = (theme: "light" | "dark") => getChartPalette(true, theme).map((color) => color.main);
-const tone = (positive: boolean, quoteColor: QuoteColor, theme: "light" | "dark", opacity?: number) => {
-  const gain = positive === (quoteColor === "green-up-red-down");
-  return chartThemeColor(gain ? "positive" : "negative", opacity, theme);
-};
 function useChartOptions() {
   const { resolvedTheme } = useTheme();
   const isMobile = useIsMobile();
@@ -102,7 +99,7 @@ export function CostCharts({ report, quoteColor }: { report: CostBasisReport; qu
       ].map(({ key, value, rate, rateKey }) => <Card key={key} className="min-w-0">
         <CardContent className="space-y-1 p-3">
           <p className="cost-metric-label text-xs text-muted-foreground">{t(key)}</p>
-          <p className="cost-metric-value truncate text-lg font-semibold tabular-nums" style={{ color: value === 0 ? undefined : tone(value > 0, quoteColor, resolvedTheme) }}>
+          <p className="cost-metric-value truncate text-lg font-semibold tabular-nums" style={{ color: value === 0 ? undefined : directionChartColor(value, quoteColor, resolvedTheme) }}>
             {isMobile
               ? `${value > 0 ? "+" : value < 0 ? "−" : ""}$${Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
               : `${value > 0 ? "+" : ""}${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD`}
@@ -116,15 +113,15 @@ export function CostCharts({ report, quoteColor }: { report: CostBasisReport; qu
         <Bar aria-label={visual.gains.map((row) => `${row.label}: ${row.value.toFixed(2)} USD`).join("; ")}
           role="img" data={{ labels: visual.gains.map((row) => row.label), datasets: [{
             data: visual.gains.map((row) => row.value),
-            backgroundColor: visual.gains.map((row) => tone(row.value >= 0, quoteColor, resolvedTheme)),
+            backgroundColor: visual.gains.map((row) => directionChartColor(row.value, quoteColor, resolvedTheme)),
             borderRadius: 3,
           }] }} options={{ ...chartOptions, indexAxis: "y" as const }} />
       </ChartPanel>
       <ChartPanel title={t("finance.cumulativeGains")} empty={!visual.cumulative.length}>
         <Line aria-label={visual.cumulative.map((row) => `${row.date}: ${row.value.toFixed(2)} USD`).join("; ")}
           role="img" data={{ labels: visual.cumulative.map((row) => row.date), datasets: [{
-            data: visual.cumulative.map((row) => row.value), borderColor: tone(true, quoteColor, resolvedTheme),
-            backgroundColor: tone(true, quoteColor, resolvedTheme, 0.12), fill: true, tension: 0.2, pointRadius: 2,
+            data: visual.cumulative.map((row) => row.value), borderColor: directionChartColor(1, quoteColor, resolvedTheme),
+            backgroundColor: directionChartColor(1, quoteColor, resolvedTheme, 0.12), fill: true, tension: 0.2, pointRadius: 2,
           }] }} options={chartOptions} plugins={[{
             id: "tax-year-markers",
             afterDraw(chart: ChartJS<"line">) {
@@ -190,6 +187,7 @@ export function GoalChart({ rules, snapshots, portfolioValues = [] }: {
         const date = new Date(`${row.date}T00:00:00Z`);
         return Number.isNaN(date.getTime()) ? row.date : dateFormatter.format(date);
       }), datasets: [
+        // color-semantics: neutral portfolio value is a total, not a change.
         { label: t("finance.portfolioValue"), data: values.map((row) => row.value), borderColor: palette[0], backgroundColor: chartThemeColor("accent-data", 0.12, resolvedTheme), fill: true, tension: 0.2, pointRadius: 1 },
         ...visual.goals.filter((goal) => goal.kind === "total_value_target").map((goal) => ({
           label: t("finance.goalThreshold"), data: values.map(() => goal.target),
@@ -225,6 +223,7 @@ export function RebalanceCharts({ result, quoteColor, tolerancePercent }: {
       <Bar role="img" aria-label={visual.labels.map((label, index) => `${label}: ${visual.current[index].toFixed(1)}% ${t("rebalance.current")}, ${visual.target[index].toFixed(1)}% ${t("rebalance.target")}`).join("; ")}
         data={{ labels: visual.labels, datasets: [
           { label: t("rebalance.current"), data: visual.current, backgroundColor: palette[0] },
+          // color-semantics: neutral target bars show allocation, not drift.
           { label: t("rebalance.target"), data: visual.target, backgroundColor: chartThemeColor("chart-blue-soft", undefined, resolvedTheme) },
         ] }} options={{ ...labeledOptions, plugins: { ...chartOptions.plugins, legend: { display: true, labels: { color: chartOptions.scales.y.ticks.color, font: { size: 12 } } } } }} />
     </ChartPanel>
@@ -232,7 +231,7 @@ export function RebalanceCharts({ result, quoteColor, tolerancePercent }: {
       <Bar role="img" aria-label={`${visual.labels.map((label, index) => `${label}: ${visual.deviations[index].toFixed(1)} ${t("rebalance.percentagePoints")}`).join("; ")}; ${t("finance.toleranceBand")} ±${tolerancePercent}%`}
         data={{ labels: visual.labels, datasets: [{
           data: visual.deviations,
-          backgroundColor: visual.deviations.map((value) => tone(value >= 0, quoteColor, resolvedTheme)),
+          backgroundColor: visual.deviations.map((value) => directionChartColor(value, quoteColor, resolvedTheme)),
         }] }} options={labeledOptions}
         plugins={[{
           id: "tolerance-band",

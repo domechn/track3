@@ -5,7 +5,7 @@ import { groupAttribution } from "@/middlelayers/charts-attribution";
 import { queryAttribution } from "@/middlelayers/charts-attribution-data";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/mobile/i18n";
-import { positiveNegativeTone, positiveNegativeTextClass } from "@/utils/color";
+import { directionClass, directionColorVar } from "@/utils/color";
 import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
@@ -58,8 +58,8 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
   const paging = useAttributionPage(groups, `${rangeKey}:${dimension}`);
   const format = (value: number) => attributionAmount(value, currency);
   const exact = (value: number) => attributionAmount(value, currency, true);
-  const tone = (value: number) => positiveNegativeTextClass(attributionRoundedValue(value, currency), quoteColor, 500);
-  const barTone = (value: number) => positiveNegativeTone(value, quoteColor) === "green" ? "var(--ios-gain)" : "var(--ios-loss)";
+  const tone = (value: number) => directionClass(attributionRoundedValue(value, currency), quoteColor);
+  const barTone = (value: number) => directionColorVar(value, quoteColor);
   const label = (key: string) => t(`profit.attribution.${key}`);
   const displayGroup = (group: { key: string; label: string }) =>
     dimension === "wallet" ? walletLabels[group.key] ?? t("common.unknown")

@@ -10,6 +10,8 @@ import { cn } from "@/lib/utils";
 import bluebird from "bluebird";
 import { axisForValues, boundedMonthTimestamps, compactMoney, hasProfitLine } from "./fidelity-data";
 import { requestFullRefresh } from "./refresh-request";
+import { directionColorVar } from "@/utils/color";
+import { splitDirectionLine } from "@/components/direction-line";
 
 type Point = { timestamp: number; value: number | null };
 type SummaryData = {
@@ -96,6 +98,7 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
   const width = 945, height = 215, left = 44, right = 70, top = 26, bottom = 26;
   const x = (index: number) => left + index / Math.max(usablePoints.length - 1, 1) * (width - left - right);
   const y = (value: number) => top + (topValue - value) / span * (height - top - bottom);
+  const lineSegments = splitDirectionLine(usablePoints.map((point) => point.value), x, y);
   const ticks = axis.ticks;
   const best = data?.sampled ? undefined : usablePoints.slice(1).map((point, index) => ({ point, index: index + 1, change: point.value - usablePoints[index].value }))
     .sort((a, b) => b.change - a.change)[0];
@@ -123,7 +126,9 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
         <p className="fidelity-caption">{t("summary.fidelity.chartCaption").replace("{date}", date(dateRange.start))}</p>
         <svg className="fidelity-summary-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={t("summary.fidelity.chartCaption").replace("{date}", date(dateRange.start))}>
           {ticks.map((tick, index) => <g key={index}><line x1={left} x2={width} y1={y(tick)} y2={y(tick)} stroke="#262629" shapeRendering="crispEdges" /><text x={left - 8} y={y(tick) + 4} textAnchor="end" fill="#9b9da3" fontSize="12">{compactMoney(currencyWrapper(currency)(tick), currency.symbol).replace(currency.symbol, "")}</text></g>)}
-          <polyline points={usablePoints.map((point, index) => `${x(index)},${y(point.value)}`).join(" ")} fill="none" stroke="#4a8ad6" strokeWidth="2" />
+          {lineSegments.map(({ start, end, value }, index) => <line key={index} data-direction={value > 0 ? "gain" : value < 0 ? "loss" : "neutral"}
+            x1={start.x} y1={start.y} x2={end.x} y2={end.y}
+            stroke={directionColorVar(value, quoteColor)} strokeWidth="2" />)}
           {usablePoints.map((point, index) => {
             const label = `${date(new Date(point.timestamp))}: ${money(point.value, currency)}`;
             return <circle key={point.timestamp} data-point cx={x(index)} cy={y(point.value)} r="6" fill="transparent" role="img" tabIndex={0} aria-label={label}><title>{label}</title></circle>;
@@ -133,7 +138,9 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
             const index = usablePoints.indexOf(point);
             return <text key={index} x={x(index)} y={height - 8} textAnchor={index === 0 ? "start" : index === usablePoints.length - 1 ? "end" : "middle"} fill="#9b9da3" fontSize="12">{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { ...(index === 0 ? { day: "numeric" as const } : {}), month: "short", year: "2-digit" }).format(point.timestamp)}</text>;
           })}
-          <text x={x(usablePoints.length - 1) + 6} y={y(usablePoints.at(-1)!.value) + 4} textAnchor="start" fill="#fff" fontSize="12" fontWeight="600">{money(usablePoints.at(-1)!.value, currency, 0).replace(/^[+−]/, "")}</text>
+          <text data-direction-end="" x={x(usablePoints.length - 1) + 6} y={y(usablePoints.at(-1)!.value) + 4}
+            textAnchor="start" fill={directionColorVar(usablePoints.at(-1)!.value, quoteColor)}
+            fontSize="12" fontWeight="600">{money(usablePoints.at(-1)!.value, currency, 0).replace(/^[+−]/, "")}</text>
         </svg>
       </>}
   </section>;

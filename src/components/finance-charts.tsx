@@ -13,10 +13,9 @@ import { useTheme } from "./common/theme";
 import { chartThemeColor } from "@/utils/chart-theme";
 import { BarChartIcon } from "@radix-ui/react-icons";
 import EmptyState from "./empty-state";
+import { directionChartColor } from "@/utils/color";
 
 const palette = ["#6366f1", "#06b6d4", "#f59e0b", "#8b5cf6", "#14b8a6", "#f97316", "#ec4899", "#94a3b8"];
-const tone = (positive: boolean, quoteColor: QuoteColor) =>
-  (positive === (quoteColor === "green-up-red-down")) ? "#10b981" : "#f43f5e";
 function useResolvedTheme(): "light" | "dark" {
   const { theme } = useTheme();
   return theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
@@ -62,6 +61,7 @@ export function FinanceChartSkeleton() {
 
 export function CostCharts({ report, quoteColor }: { report: CostBasisReport; quoteColor: QuoteColor }) {
   const { t } = useTranslation();
+  const resolvedTheme = useResolvedTheme();
   const chartOptions = useChartOptions();
   const visual = costBasisVisuals(report, 8, t("finance.other"));
   return <>
@@ -74,7 +74,7 @@ export function CostCharts({ report, quoteColor }: { report: CostBasisReport; qu
       ].map(({ key, value, rate, rateKey }) => <Card key={key} className="min-w-0">
         <CardContent className="space-y-1 p-3">
           <p className="text-xs text-muted-foreground">{t(key)}</p>
-          <p className="truncate text-lg font-semibold tabular-nums" style={{ color: value === 0 ? undefined : tone(value > 0, quoteColor) }}>
+          <p className="truncate text-lg font-semibold tabular-nums" style={{ color: value === 0 ? undefined : directionChartColor(value, quoteColor, resolvedTheme) }}>
             {value > 0 ? "+" : ""}{value.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
           </p>
           <p className="text-[11px] text-muted-foreground tabular-nums">{rate === null ? "—" : `${rate > 0 ? "+" : ""}${rate.toFixed(1)}%`} {t(rateKey)}</p>
@@ -86,15 +86,15 @@ export function CostCharts({ report, quoteColor }: { report: CostBasisReport; qu
         <Bar aria-label={visual.gains.map((row) => `${row.label}: ${row.value.toFixed(2)} USD`).join("; ")}
           role="img" data={{ labels: visual.gains.map((row) => row.label), datasets: [{
             data: visual.gains.map((row) => row.value),
-            backgroundColor: visual.gains.map((row) => tone(row.value >= 0, quoteColor)),
+            backgroundColor: visual.gains.map((row) => directionChartColor(row.value, quoteColor, resolvedTheme)),
             borderRadius: 3,
           }] }} options={{ ...chartOptions, indexAxis: "y" as const }} />
       </ChartPanel>
       <ChartPanel title={t("finance.cumulativeGains")} empty={!visual.cumulative.length}>
         <Line aria-label={visual.cumulative.map((row) => `${row.date}: ${row.value.toFixed(2)} USD`).join("; ")}
           role="img" data={{ labels: visual.cumulative.map((row) => row.date), datasets: [{
-            data: visual.cumulative.map((row) => row.value), borderColor: tone(true, quoteColor),
-            backgroundColor: `${tone(true, quoteColor)}20`, fill: true, tension: 0.2, pointRadius: 2,
+            data: visual.cumulative.map((row) => row.value), borderColor: directionChartColor(1, quoteColor, resolvedTheme),
+            backgroundColor: directionChartColor(1, quoteColor, resolvedTheme, 0.12), fill: true, tension: 0.2, pointRadius: 2,
           }] }} options={chartOptions} plugins={[{
             id: "tax-year-markers",
             afterDraw(chart: ChartJS<"line">) {
@@ -153,6 +153,7 @@ export function GoalChart({ rules, snapshots, portfolioValues = [] }: {
   return <ChartPanel title={t("finance.portfolioAndGoals")} empty={!values.length}>
     <Line role="img" aria-label={values.map((row) => `${row.date}: ${row.value.toFixed(2)}`).join("; ")}
       data={{ labels: values.map((row) => row.date), datasets: [
+        // color-semantics: neutral portfolio value is a total, not a change.
         { label: t("finance.portfolioValue"), data: values.map((row) => row.value), borderColor: chartThemeColor("accent-data", undefined, resolvedTheme), backgroundColor: chartThemeColor("accent-data", 0.12, resolvedTheme), fill: true, tension: 0.2, pointRadius: 1 },
         ...visual.goals.filter((goal) => goal.kind === "total_value_target").map((goal) => ({
           label: t("finance.goalThreshold"), data: values.map(() => goal.target),
@@ -173,6 +174,7 @@ export function RebalanceCharts({ result, quoteColor, tolerancePercent }: {
     <ChartPanel title={t("finance.currentVsTarget")} empty={!visual.labels.length}>
       <Bar role="img" aria-label={visual.labels.map((label, index) => `${label}: ${visual.current[index].toFixed(1)}% ${t("rebalance.current")}, ${visual.target[index].toFixed(1)}% ${t("rebalance.target")}`).join("; ")}
         data={{ labels: visual.labels, datasets: [
+          // color-semantics: neutral current and target bars are allocations, not drift.
           { label: t("rebalance.current"), data: visual.current, backgroundColor: chartThemeColor("accent-data", undefined, resolvedTheme) },
           { label: t("rebalance.target"), data: visual.target, backgroundColor: chartThemeColor("chart-blue-soft", undefined, resolvedTheme) },
         ] }} options={{ ...chartOptions, indexAxis: "y" as const, plugins: { ...chartOptions.plugins, legend: { display: true } } }} />
@@ -181,7 +183,7 @@ export function RebalanceCharts({ result, quoteColor, tolerancePercent }: {
       <Bar role="img" aria-label={`${visual.labels.map((label, index) => `${label}: ${visual.deviations[index].toFixed(1)} ${t("rebalance.percentagePoints")}`).join("; ")}; ${t("finance.toleranceBand")} ±${tolerancePercent}%`}
         data={{ labels: visual.labels, datasets: [{
           data: visual.deviations,
-          backgroundColor: visual.deviations.map((value) => tone(value >= 0, quoteColor)),
+          backgroundColor: visual.deviations.map((value) => directionChartColor(value, quoteColor, resolvedTheme)),
         }] }} options={{ ...chartOptions, indexAxis: "y" as const }}
         plugins={[{
           id: "tolerance-band",

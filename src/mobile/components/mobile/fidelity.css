@@ -605,10 +605,6 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-overview-insights .overview-insights-card [id^="insight-"] { font-size:13px; line-height:18px; }
 .fd-overview-daily { height:236px; }
 .fd-overview-daily-chart { display:block; width:100%; height:170px; font-family:"Public Sans Variable","Public Sans",sans-serif; }
-.fd-overview-bars { display:flex; align-items:center; gap:2px; height:170px; border-block:1px solid var(--fd-rule); }
-.fd-overview-bars>span { display:flex; flex:1; align-items:center; justify-content:center; height:100%; }
-.fd-overview-bars i { display:block; width:100%; max-width:7px; background:var(--fd-accent); }
-.fd-overview-bars i[data-tone="loss"] { background:var(--fd-loss); }
 .fd-overview-moved { min-height:386px; }
 .fd-overview-mover { display:grid; grid-template-columns:44px 1fr 84px; align-items:center; gap:12px; min-height:44px; color:var(--fd-text); }
 .fd-overview-mover b { font-weight:600; }
@@ -640,7 +636,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-overview-source>small { grid-column:2/-1; }
 .fd-overview-source>small[data-tone="gain"] { color:var(--fd-muted); }
 .fd-overview-source>small[data-tone="gain"]::before { display:inline-block; width:6px; height:6px; margin-right:6px; border-radius:50%; background:var(--fd-positive); content:""; }
-.fd-overview-date-sheet.mobile-sheet { --fd-gain:#5fc39c; --fd-loss:#ee6a82; height:713px; max-height:100dvh; padding:8px 16px 28px; border:1px solid var(--fd-control); border-radius:16px 16px 0 0; background:var(--fd-surface); font-variant-numeric:tabular-nums; }
+.fd-overview-date-sheet.mobile-sheet { --fd-gain:hsl(var(--gain)); --fd-loss:hsl(var(--loss)); height:713px; max-height:100dvh; padding:8px 16px 28px; border:1px solid var(--fd-control); border-radius:16px 16px 0 0; background:var(--fd-surface); font-variant-numeric:tabular-nums; }
 .fd-overview-date-sheet .mobile-sheet-handle-area { min-height:16px; }
 .fd-overview-date-sheet .mobile-sheet-handle { width:36px; height:4px; transform:translateY(-6px); background:#44454b; }
 .fd-overview-date-sheet .mobile-sheet-heading { height:48px; min-height:48px; margin-bottom:8px; padding:0; border:0; }
@@ -747,7 +743,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-wallet-allocation.failed-source .fd-card-heading>span { justify-content:flex-start; max-width:none; }
 .fd-wallet-main-stat { min-height:80px; }
 .fd-wallet-main-stat>strong { display:flex; align-items:flex-end; min-height:38px; margin-top:2px; font:600 32px/36px "Public Sans Variable","Public Sans",sans-serif; letter-spacing:-.02em; }
-.fd-wallet-main-stat>small { display:block; color:var(--fd-muted)!important; font-size:12px; }
+.fd-wallet-main-stat>small { display:block; font-size:12px; }
 .fd-wallet-main-stat>small span { color:var(--fd-faint); }
 .fd-wallet-kpis { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); min-height:93px; margin-top:10px; padding-top:14px; border-top:1px solid var(--fd-border); }
 .fd-wallet-kpis>div { min-width:0; padding:0 10px; border-left:1px solid var(--fd-border); }
@@ -774,7 +770,6 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-wallet-balance strong { font-weight:500; text-align:right; }
 .fd-wallet-balance small { color:var(--fd-faint); line-height:18px; white-space:nowrap; }
 .fd-wallet-balance small:last-child { text-align:right; }
-.fd-wallet-balance small:last-child[data-tone] { color:var(--fd-faint); }
 .fd-wallet-status-error { color:var(--fd-loss); }
 .fd-wallet-status { min-height:413px; }
 .fd-wallet-status-row { display:grid; grid-template-columns:6px minmax(0,1fr) auto; align-items:center; gap:8px; min-height:52px; border-top:1px solid var(--fd-rule); }

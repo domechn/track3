@@ -15,3 +15,10 @@ it("previews portfolio history and applies the selected theme", async () => {
   fireEvent.click(screen.getByRole("radio", { name: /Light/ }));
   expect(onThemeChange).toHaveBeenCalledWith("light");
 });
+
+it("previews both quote choices with the theme's contrast-safe direction tokens", () => {
+  render(<AppearanceDesign selectedTheme="light" quoteColor="green-up-red-down" onThemeChange={vi.fn()} onQuoteColorChange={vi.fn()} />);
+  const choices = screen.getAllByRole("radio", { name: /(?:Green Up|Red Up)/i });
+  expect((choices[0].querySelector(".samples b") as HTMLElement).style.color).toBe("hsl(var(--positive))");
+  expect((choices[1].querySelector(".samples b") as HTMLElement).style.color).toBe("hsl(var(--negative))");
+});

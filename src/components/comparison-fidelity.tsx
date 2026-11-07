@@ -2,7 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import { CopyIcon, EyeClosedIcon, EyeOpenIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import type { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { useTranslation } from "@/i18n";
-import { positiveNegativeTone } from "@/utils/color";
+import { directionPhysicalTone } from "@/utils/color";
 import { currencyWrapper } from "@/utils/currency";
 import SyncStatusIndicator from "./sync-status-indicator";
 import { barGeometry, comparisonMoverFacts, divergingScale } from "./comparison-fidelity-movers";
@@ -58,7 +58,10 @@ export default function ComparisonFidelity({
     maximumFractionDigits: 4,
   });
   const pct = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(2)}%`;
-  const tone = (value: number) => value === 0 ? "zero" : positiveNegativeTone(value, quoteColor) === "green" ? "pos" : "neg";
+  const tone = (value: number) => {
+    const physical = directionPhysicalTone(value, quoteColor);
+    return physical === "neutral" ? "zero" : physical === "gain" ? "pos" : "neg";
+  };
   const [expanded, setExpanded] = useState({ value: false, percent: false });
   const diff = headTotal - baseTotal;
   const diffPct = baseTotal ? diff / baseTotal * 100 : 0;

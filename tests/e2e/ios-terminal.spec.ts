@@ -104,7 +104,7 @@ test("phone light gain text uses the readable positive token", async ({ page }) 
   await page.goto("/#/wallets");
   const gain = page.locator(".fd-wallet-matrix-row strong[data-tone='gain']").first();
   await expect(gain).toBeVisible();
-  await expect(gain).toHaveCSS("color", "rgb(31, 122, 89)");
+  await expect(gain).toHaveCSS("color", "rgb(26, 102, 74)");
 });
 
 test("phone landscape tab bar keeps its compact height", async ({ page }) => {

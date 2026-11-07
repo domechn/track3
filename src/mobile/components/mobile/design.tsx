@@ -1,6 +1,7 @@
 import { useEffect, useState, type ButtonHTMLAttributes, type HTMLAttributes, type PropsWithChildren, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { QuoteColor } from "@/middlelayers/types";
+import { directionPhysicalTone } from "@/utils/color";
 
 export function MobileCard({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("mobile-card", className)} {...props} />;
@@ -18,8 +19,7 @@ export function DeltaPill({ value, children, className, quoteColor = "green-up-r
   value: number; className?: string; quoteColor?: QuoteColor;
 }>) {
   return <span className={cn("mobile-delta-pill", className)}
-    data-tone={value === 0 ? "neutral"
-      : (value > 0) === (quoteColor === "green-up-red-down") ? "gain" : "loss"}>{children}</span>;
+    data-tone={directionPhysicalTone(value, quoteColor)}>{children}</span>;
 }
 
 export function Pill({ children, className }: PropsWithChildren<{ className?: string }>) {

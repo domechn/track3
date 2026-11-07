@@ -527,7 +527,7 @@ const App = ({
                 {value === null ? "–" : <FittingAttributionAmount full={fidelityAmount(value)} compact={attributionCompactAmount(value, currency, locale)} />}
               </span>
               <span className="fidelity-month-percent">{fidelityPercentage(item.percentage)}</span>
-              <span className="fidelity-month-bar"><i className={value != null && value < 0 ? "negative" : "positive"}
+              <span className="fidelity-month-bar"><i className={value == null || value === 0 ? "" : value < 0 ? "negative" : "positive"}
                 style={{ width: `${Math.min(50, Math.abs(item.percentage ?? 0) / 16 * 50)}%` }} /></span>
               {item.gapDate && <span className="fidelity-month-gap">{gapHint(item.gapDate, selectedYear)}</span>}
               <span className="fidelity-month-count"><span className={countTone(item.count?.up ?? 0, true, quoteColor)}>{item.count?.up ?? 0} {t("summary.fidelity.up")}</span> · <span className={countTone(item.count?.down ?? 0, false, quoteColor)}>{item.count?.down ?? 0} {t("summary.fidelity.down")}</span></span>

@@ -18,6 +18,7 @@ import { sourceDisplayNames } from "@/components/source-display-name";
 import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import { matchSourceStatus } from "@/components/source-status-match";
 import "@/mobile/components/mobile/fidelity.css";
+import { directionTone } from "@/utils/color";
 
 const WalletAssetsPercentage = lazy(() => import("@/mobile/components/wallet-assets-percentage"));
 const WalletAssetsChange = lazy(() => import("@/mobile/components/wallet-assets-change"));
@@ -27,6 +28,7 @@ type Snap = Awaited<ReturnType<typeof queryHistoricalPage>>["rows"][number];
 type Row = { symbol: string; assetType: string; amount: number; value: number };
 type Source = { id: string; label: string; kind: string; value: number; baseValue: number; rows: Row[]; baseRows: Row[]; status?: PortfolioSourceStatus };
 type WalletView = { latest: Snap; base: Snap | null; sources: Source[]; total: number; baseTotal: number; allQuantityEqual: boolean };
+// color-semantics: neutral the palette separates wallet sources by category.
 const colors = ["#4a8ad6", "#86b4ea", "#d4d6da", "#8c8e95", "#55575d"];
 const periods: Record<string, number> = { "1D": 1, "7D": 7, "30D": 30, "90D": 90, "1Y": 365, All: Infinity };
 const money = (value: number, currency: CurrencyRateDetail, digits = 2, signed = false) => {
@@ -201,7 +203,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
           <div className="fd-card-heading"><h3>{chosen?.label ?? t("fidelity.wallets.allocation")}</h3><span>{chosen ? <><i className={selectedFailed ? "error" : ""} />{statusLine}{!selectedFailed && chosen.kind === "exchange" ? ` · ${t("fidelity.wallets.exchange")}` : ""}</> : t("fidelity.wallets.shareTotal")}</span></div>
           <div className="fd-wallet-main-stat"><span className="fd-label">{chosen ? t("fidelity.wallets.sourceValue").replace("{source}", chosen.label) + (selectedFailed ? ` (${t("fidelity.wallets.asOf").replace("{time}", time(lastGood))})` : "") : t("overview.design.totalValue")}</span>
             <strong>{money(chosen?.value ?? view.total, currency)}</strong>
-            <small data-tone={diff === null ? "neutral" : diff >= 0 ? "gain" : "loss"}>{chosen ? sourceDiff === null ? "—" : `${money(sourceDiff, currency, 2, true)} · ${percent(sourceDiff / chosen.baseValue, 2, true)}` : diff === null ? "—" : `${money(diff, currency, 2, true)} · ${percent(diff / view.baseTotal, 2, true)}`} <span>{t("fidelity.wallets.vsDate").replace("{date}", date)}</span></small></div>
+            <small data-tone={directionTone(chosen ? sourceDiff : diff)}>{chosen ? sourceDiff === null ? "—" : `${money(sourceDiff, currency, 2, true)} · ${percent(sourceDiff / chosen.baseValue, 2, true)}` : diff === null ? "—" : `${money(diff, currency, 2, true)} · ${percent(diff / view.baseTotal, 2, true)}`} <span>{t("fidelity.wallets.vsDate").replace("{date}", date)}</span></small></div>
           <div className="fd-wallet-kpis">
             {chosen ? <>
               <div><span>{t("fidelity.wallets.shareOfTotal")}</span><b>{percent(share(chosen))}</b><small>{t("fidelity.wallets.ofTotal").replace("{value}", money(view.total, currency, 0))}</small></div>
@@ -219,10 +221,10 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
           {chosen ? chosen.rows.map((row, index) => { const change = assetDiff(row, chosen.baseRows); const old = chosen.baseRows.find((item) => rowKey(item) === rowKey(row));
             const price = row.amount ? row.value / row.amount : 0; const oldPrice = old?.amount ? old.value / old.amount : 0;
             return <div key={rowKey(row)} className="fd-wallet-balance"><b><i style={{ background: colors[index % colors.length] }} />{row.symbol} <em>{qty(row.amount, row.symbol === "USDT" || row.symbol === "USDC")}</em></b><strong>{money(row.value, currency)}</strong>
-              <small>{money(price, currency)} · {percent(row.value / chosen.value)}</small><small data-tone={change >= 0 ? "gain" : "loss"}>{view.base ? `${money(change, currency, 0, true)} · ${percent(oldPrice ? price / oldPrice - 1 : 0, 2, true)}` : "—"}</small></div>; }) :
+              <small>{money(price, currency)} · {percent(row.value / chosen.value)}</small><small data-tone={directionTone(view.base ? change : null)}>{view.base ? `${money(change, currency, 0, true)} · ${percent(oldPrice ? price / oldPrice - 1 : 0, 2, true)}` : "—"}</small></div>; }) :
             sources.map((source, index) => { const change = source.value - source.baseValue; return <button type="button" key={source.id} className="fd-wallet-balance" onClick={() => setSelected(source.id)}>
               <b><i style={{ background: colors[index % colors.length] }} />{source.label}</b><strong>{money(source.value, currency)}</strong>
-              <small>{t(`fidelity.overview.kind.${source.kind}`)} · {percent(share(source))}</small><small data-tone={change >= 0 ? "gain" : "loss"}>{view.base ? `${money(change, currency, 0, true)} · ${percent(source.baseValue ? change / source.baseValue : 0, 2, true)}` : "—"}</small></button>; })}
+              <small>{t(`fidelity.overview.kind.${source.kind}`)} · {percent(share(source))}</small><small data-tone={directionTone(view.base ? change : null)}>{view.base ? `${money(change, currency, 0, true)} · ${percent(source.baseValue ? change / source.baseValue : 0, 2, true)}` : "—"}</small></button>; })}
         </section>
         {!chosen && <section className="fd-card fd-wallet-status"><div className="fd-card-heading"><h3>{t("fidelity.wallets.sourceStatus")}</h3><span>{t("fidelity.wallets.today")}</span></div>
           {sources.map((source) => { const sourceFailed = source.status?.status === "failed" || source.status?.status === "stale"; const next = source.status && retry.nextBySource[source.status.sourceId];
@@ -235,12 +237,12 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
         </section>}
         {chosen ? <section className="fd-card fd-wallet-changes"><div className="fd-card-heading"><h3>{t("fidelity.wallets.assetChanges")}</h3><span>{range}, {currency.currency}</span></div>
           <MoverList items={movers} currency={currency} />
-          <div className="fd-wallet-facts"><div><span>{t("fidelity.wallets.sourceChange")}</span><b data-tone={sourceDiff !== null && sourceDiff >= 0 ? "gain" : "loss"}>{sourceDiff === null ? "—" : money(sourceDiff, currency, 2, true)}</b></div>
+          <div className="fd-wallet-facts"><div><span>{t("fidelity.wallets.sourceChange")}</span><b data-tone={directionTone(sourceDiff)}>{sourceDiff === null ? "—" : money(sourceDiff, currency, 2, true)}</b></div>
             <div><span>{t("fidelity.wallets.portfolioChangeShare")}</span><b>{sourceDiff !== null && diff ? percent(sourceDiff / diff) : "—"}</b></div></div>
           {quantityEqual && <p className="fd-wallet-note">{t("fidelity.wallets.priceMovement")}</p>}
         </section> : <>
           <section className="fd-card fd-wallet-matrix"><div className="fd-card-heading wallet-source-change-heading"><h3 aria-label={t("fidelity.wallets.assetChangesPerSource")}>{t("fidelity.wallets.assetChangesPerSource")}</h3><span>{t("fidelity.wallets.matrixSubtitle").replace("{range}", range).replace("{date}", date).replace("{currency}", currency.currency)}</span></div>
-            <div className="wallet-asset-change-mobile">{allAssets.map((item) => <div key={item.symbol} className="fd-wallet-matrix-row"><b>{item.symbol}</b><strong data-tone={item.value >= 0 ? "gain" : "loss"}>{money(item.value, currency, 2, true)}</strong><small>{item.details.map((detail, index) => <span key={`${detail.source}-${index}`}>{index > 0 && " · "}{detail.source} <span data-tone={detail.change > 0 ? "gain" : detail.change < 0 ? "loss" : "neutral"}>{money(detail.change, currency, 0, true)}</span></span>)}</small></div>)}</div>
+            <div className="wallet-asset-change-mobile">{allAssets.map((item) => <div key={item.symbol} className="fd-wallet-matrix-row"><b>{item.symbol}</b><strong data-tone={directionTone(item.value)}>{money(item.value, currency, 2, true)}</strong><small>{item.details.map((detail, index) => <span key={`${detail.source}-${index}`}>{index > 0 && " · "}{detail.source} <span data-tone={directionTone(detail.change)}>{money(detail.change, currency, 0, true)}</span></span>)}</small></div>)}</div>
           </section>
           <section className="fd-card fd-wallet-moved"><div className="fd-card-heading wallet-source-change-heading"><h3>{t("overview.design.whatMoved")}</h3><span>{range}, {t("fidelity.wallets.allSources").toLowerCase()}</span></div>
             <MoverList items={movers} currency={currency} />
@@ -266,8 +268,8 @@ function MoverList({ items, currency }: { items: { symbol: string; value: number
   const zero = negative / (positive + negative || 1) * 92 + 4;
   const unit = (100 - zero - 4) / (positive || 1);
   return <div className="fd-wallet-movers">{items.map((item) => <div className="fd-wallet-mover" key={item.symbol}><b>{item.symbol}</b>
-    <span style={{ "--fd-zero": `${zero}%` } as CSSProperties}>{item.value !== 0 && <i data-tone={item.value < 0 ? "loss" : "gain"} style={item.value > 0
+    <span style={{ "--fd-zero": `${zero}%` } as CSSProperties}>{item.value !== 0 && <i data-tone={directionTone(item.value)} style={item.value > 0
       ? { left: `${zero}%`, width: `${item.value * unit}%` }
       : { right: `${100 - zero}%`, width: `${-item.value * unit}%` }} />}</span>
-    <strong data-tone={item.value < 0 ? "loss" : "gain"}>{money(item.value, currency, 0, true)}</strong></div>)}</div>;
+    <strong data-tone={directionTone(item.value)}>{money(item.value, currency, 0, true)}</strong></div>)}</div>;
 }

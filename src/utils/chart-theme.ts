@@ -2,7 +2,7 @@ import { ChartArea } from "chart.js";
 
 const fallbacks: Record<string, [string, string]> = {
   "accent-data": ["213 63% 43%", "213 63% 56%"],
-  positive: ["158 60% 30%", "156 46% 57%"],
+  positive: ["158 60% 25%", "156 46% 57%"],
   negative: ["349 70% 40%", "349 81% 67%"],
   warning: ["37 79% 32%", "39 66% 55%"],
   "muted-foreground": ["240 4% 34%", "225 5% 72%"],

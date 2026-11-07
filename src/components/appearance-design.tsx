@@ -25,6 +25,7 @@ function Mini({ mode, values, total, faint = false, hideRail = false }: { mode: 
     {!hideRail && <div className="rail"><i /><i /><i /><i /></div>}
     <div className="main">
       {faint ? <><i className="skeleton" /><i className="skeleton" /></> : <><small>Total value</small><b>${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</b></>}
+      {/* color-semantics: neutral this preview line shows total value. */}
       <svg viewBox="0 0 160 52" aria-hidden="true"><polyline fill="none" stroke="#4a8ad6" strokeWidth="1.5" points={points} /></svg>
       {[70, 54, 38].map((width) => <div className="fake-row" key={width}><i style={{ width: width / 2 }} /><i /></div>)}
     </div>
@@ -43,8 +44,8 @@ export function AppearanceDesign({ selectedTheme, quoteColor, onThemeChange, onQ
   const total = values.at(-1) ?? 0;
   const series = values.length > 1 ? values : [0, 1];
   const quoteChoices: { value: QuoteColor; title: string; subtitle: string; up: string; down: string }[] = [
-    { value: "green-up-red-down", title: t("fidelity.appearance.green"), subtitle: t("fidelity.appearance.greenNote"), up: "#5fc39c", down: "#ee6a82" },
-    { value: "red-up-green-down", title: t("fidelity.appearance.red"), subtitle: t("fidelity.appearance.redNote"), up: "#ee6a82", down: "#5fc39c" },
+    { value: "green-up-red-down", title: t("fidelity.appearance.green"), subtitle: t("fidelity.appearance.greenNote"), up: "hsl(var(--positive))", down: "hsl(var(--negative))" },
+    { value: "red-up-green-down", title: t("fidelity.appearance.red"), subtitle: t("fidelity.appearance.redNote"), up: "hsl(var(--negative))", down: "hsl(var(--positive))" },
   ];
   return <div className="t3-fidelity-appearance" data-testid="theme-preview-grid">
     <section>

@@ -90,7 +90,7 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
       const percentage = Math.abs(base) >= 1 ? group.priceEffect / Math.abs(base) * 100 : null;
       return <div className="fidelity-leader-row" role="row" key={group.key}>
         <b role="rowheader">{group.label.split(" · ")[0]}</b>
-        <span className="fidelity-leader-track" aria-hidden="true"><b style={{ left: `${leaderZero}%` }} /><i className={group.priceEffect >= 0 ? "positive" : "negative"} style={{ left: `${group.priceEffect >= 0 ? leaderZero : leaderZero - Math.abs(cents(group.priceEffect)) * leaderUnit}%`, width: `${Math.abs(cents(group.priceEffect)) * leaderUnit}%` }} /></span>
+        <span className="fidelity-leader-track" aria-hidden="true"><b style={{ left: `${leaderZero}%` }} /><i className={cents(group.priceEffect) === 0 ? "" : group.priceEffect > 0 ? "positive" : "negative"} style={{ left: `${group.priceEffect >= 0 ? leaderZero : leaderZero - Math.abs(cents(group.priceEffect)) * leaderUnit}%`, width: `${Math.abs(cents(group.priceEffect)) * leaderUnit}%` }} /></span>
         <span role="cell" className={cn("number", tone(group.priceEffect))}>{money(group.priceEffect)}</span>
         <span role="cell" className={cn("number", tone(group.priceEffect))}>{cents(group.priceEffect) === 0 ? "0.0%" : percentage === null ? "–" : `${group.priceEffect > 0 ? "+" : "−"}${num(percentage, 1)}%`}</span>
       </div>;

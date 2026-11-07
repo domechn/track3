@@ -22,6 +22,8 @@ import { Card } from "./ui/card";
 import { deriveContributions, deriveOverviewSeries, selectBestDayContributionSnapshots, selectSevenDayContributionSnapshots, unavailableSources } from "./overview-derived";
 import { overviewRefreshRequestedEvent, sourceStatusesChangedEvent } from "./source-status-event";
 import { niceStep } from "./overview-chart-scale";
+import { directionClass, directionColorVar } from "@/utils/color";
+import type { QuoteColor } from "@/middlelayers/types";
 
 type Change = { timestamp: number; value: number };
 type Contribution = { symbol: string; assetType: AssetType; value: number };
@@ -141,8 +143,8 @@ const sourceMonogram = (label: string) => {
   return label.slice(0, 2).toUpperCase();
 };
 
-export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = false }: {
-  currency: CurrencyRateDetail; daily: Change[]; bestDay?: Change; desktopFidelity?: boolean;
+export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = false, quoteColor = "green-up-red-down" }: {
+  currency: CurrencyRateDetail; daily: Change[]; bestDay?: Change; desktopFidelity?: boolean; quoteColor?: QuoteColor;
 }) {
   const { t, locale } = useTranslation();
   const chartValue = desktopFidelity ? currencyWrapper(currency) : (value: number) => value;
@@ -164,11 +166,12 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
             <span key={value}>{value === 0 ? "0" : `${value > 0 ? "+" : "−"}${Math.abs(value) >= 1000 ? `${Math.abs(value / 1000)}K` : Math.abs(value)}`}</span>)}
         </div>}
         {desktopFidelity && <div className="t3-daily-direction" aria-hidden="true">
-          <span>▲ {t("overview.fidelity.up")}</span><span>▼ {t("overview.fidelity.down")}</span>
+          <span className={directionClass(1, quoteColor)}>▲ {t("overview.fidelity.up")}</span><span className={directionClass(-1, quoteColor)}>▼ {t("overview.fidelity.down")}</span>
         </div>}
         {daily.map((item) => <div className="t3-daily-column" key={item.timestamp} title={`${dayLabel(item.timestamp, locale)}: ${signedMoney(item.value, currency)}`}>
-          <span className={item.value >= 0 ? "t3-daily-up" : "t3-daily-down"}
-            style={{ height: `${Math.max(2, Math.abs(chartValue(item.value)) / barScale * 48)}%` }} />
+          <span className={item.value > 0 ? "t3-daily-up" : item.value < 0 ? "t3-daily-down" : "t3-daily-neutral"}
+            data-direction={item.value > 0 ? "gain" : item.value < 0 ? "loss" : "neutral"}
+            style={{ height: `${Math.max(2, Math.abs(chartValue(item.value)) / barScale * 48)}%`, backgroundColor: directionColorVar(item.value, quoteColor) }} />
         </div>)}
         {desktopFidelity && <div className="t3-daily-x-axis" aria-hidden="true">
           <span />
@@ -185,8 +188,8 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
   </Card>;
 }
 
-export function WhatMovedCard({ currency, rows, count, weekBased = false, desktopFidelity = false }: {
-  currency: CurrencyRateDetail; rows: Contribution[]; count: number; weekBased?: boolean; desktopFidelity?: boolean;
+export function WhatMovedCard({ currency, rows, count, weekBased = false, desktopFidelity = false, quoteColor = "green-up-red-down" }: {
+  currency: CurrencyRateDetail; rows: Contribution[]; count: number; weekBased?: boolean; desktopFidelity?: boolean; quoteColor?: QuoteColor;
 }) {
   const { t } = useTranslation();
   const net = rows.reduce((total, item) => total + item.value, 0);
@@ -208,13 +211,14 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
         <Link to={buildAssetDetailsPath({ symbol: row.symbol, assetType: row.assetType })} className="t3-moved-symbol">{row.symbol}</Link>
         <span className="t3-moved-track" style={desktopFidelity ? { "--zero": `${zero}%` } as CSSProperties : undefined}>
           <span className={row.value >= 0 ? "t3-daily-up" : "t3-daily-down"} style={{
+            backgroundColor: directionColorVar(row.value, quoteColor),
             width: `${row.value === 0 ? 0 : Math.max(2, desktopFidelity
               ? Math.abs(row.value) / (row.value > 0 ? positivePeak || 1 : negativePeak || 1) * (row.value > 0 ? rightSpace : leftSpace)
               : Math.abs(row.value) / peak * 100)}%`,
             ...(desktopFidelity ? row.value >= 0 ? { left: `${zero}%` } : { right: `${100 - zero}%` } : {}),
           }} />
         </span>
-        <strong className={row.value > 0 ? "text-gain" : row.value < 0 ? "text-loss" : "text-muted-foreground"}>{weekBased ? signedMoney0(row.value, currency) : signedMoney(row.value, currency)}</strong>
+        <strong className={directionClass(row.value, quoteColor)}>{weekBased ? signedMoney0(row.value, currency) : signedMoney(row.value, currency)}</strong>
       </li>)}
     </ol> : <p className="t3-panel-empty">{t("overview.design.needTwoSnapshots")}</p>}
   </Card>;
@@ -328,8 +332,8 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
   </section>;
 }
 
-export function TopCoinsCard({ currency, rows, compact = false, overviewFidelity = false }: {
-  currency: CurrencyRateDetail; rows: CoinRow[]; compact?: boolean; overviewFidelity?: boolean;
+export function TopCoinsCard({ currency, rows, compact = false, overviewFidelity = false, quoteColor = "green-up-red-down" }: {
+  currency: CurrencyRateDetail; rows: CoinRow[]; compact?: boolean; overviewFidelity?: boolean; quoteColor?: QuoteColor;
 }) {
   const { t } = useTranslation();
   const [sort, setSort] = useState<"value" | "change">("value");
@@ -343,8 +347,7 @@ export function TopCoinsCard({ currency, rows, compact = false, overviewFidelity
   };
   const percent = (value?: number) => value === undefined ? "—"
     : `${value >= 0.05 ? "+" : value <= -0.05 ? "−" : ""}${Math.abs(value).toFixed(1)}%`;
-  const tone = (value?: number) => value === undefined || Math.abs(value) < 0.05
-    ? "text-muted-foreground" : value > 0 ? "text-gain" : "text-loss";
+  const tone = (value?: number) => directionClass(value === undefined || Math.abs(value) < 0.05 ? 0 : value, quoteColor);
   return <Card className="t3-overview-panel t3-top-coins">
     <header className="t3-overview-panel-heading">
       <h2>{t("overview.design.topCoins")}</h2>
@@ -372,9 +375,7 @@ export function TopCoinsCard({ currency, rows, compact = false, overviewFidelity
           <span>{row.rank === undefined ? "—" : `#${row.rank}`}</span>
           <span>{row.amount ? money(row.value / row.amount, currency) : "—"}</span>
           {overviewFidelity && <span className={tone(row.dayChange)}>{percent(row.dayChange)}</span>}
-          <span className={overviewFidelity ? tone(row.weekChange)
-            : row.priceChange === undefined ? "text-muted-foreground"
-              : row.priceChange > 0 ? "text-gain" : row.priceChange < 0 ? "text-loss" : "text-muted-foreground"}>
+          <span className={overviewFidelity ? tone(row.weekChange) : directionClass(row.priceChange, quoteColor)}>
             {overviewFidelity ? percent(row.weekChange) : row.priceChange === undefined ? "—"
               : `${row.priceChange > 0 ? "+" : row.priceChange < 0 ? "−" : ""}${Math.abs(row.priceChange).toFixed(1)}%`}
           </span>
