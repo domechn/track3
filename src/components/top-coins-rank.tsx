@@ -20,6 +20,7 @@ import {
 } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
+import { directionClass } from "@/utils/color";
 
 const PAGE_SIZE = 20;
 
@@ -129,14 +130,14 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   function renderChangeBadge(change: number) {
     if (change > 0) {
       return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/15 text-emerald-500">
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted ${directionClass(change)}`}>
           ↑{change}
         </span>
       );
     }
     if (change < 0) {
       return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-rose-500/15 text-rose-500">
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted ${directionClass(change)}`}>
           ↓{Math.abs(change)}
         </span>
       );

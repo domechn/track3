@@ -13,14 +13,18 @@ import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { currencyWrapper } from "@/utils/currency";
 import { listAllFirstAndLastDays } from "@/utils/date";
 import { AttributionPager, useAttributionPage } from "@/components/attribution-pager";
+import { Pager, usePager } from "@/components/ui/pager";
 import { PartialProfitHint, PnlPercentHint } from "@/components/profit-summary-hints";
 import { attributionAmount, attributionCompactAmount, attributionRange } from "@/components/attribution-amount";
 import { FittingAttributionAmount } from "@/components/fitting-attribution-amount";
 import { useFittingAttributionTicks } from "@/components/use-fitting-attribution-ticks";
+import { SummaryTopList } from "@/components/summary-top-list";
+import { marketProfitPercentage } from "@/components/profit-percentage";
 import "@/mobile/components/mobile/fidelity.css";
+import { directionColorVar, directionTone } from "@/utils/color";
+import { splitDirectionLine } from "@/components/direction-line";
 
 type Profit = Awaited<ReturnType<typeof calculateTotalProfit>>;
-type ProfitCoin = Profit["coins"][number];
 type ChartProfit = Pick<Profit, "total" | "knownTotal" | "unknownCoins">;
 type Month = { date: Date; end: number; profit: number | null; knownTotal: number | null; percentage: number | null | undefined; flow: number; up: number; down: number; flat: number; hasData: boolean; gapDate?: Date; unknownCoins: Profit["unknownCoins"] };
 type Year = { year: number; profit: Profit; start: Date; end: Date; endingValue: number; months: number; flow: number | null };
@@ -43,7 +47,7 @@ const money = (value: number, symbol: string, digits = 2, signed = false) =>
   `${signed ? value > 0 ? "+" : value < 0 ? "−" : "" : value < 0 ? "−" : ""}${symbol}${Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 const percent = (value: number, digits = 2) =>
   `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value * 100).toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
-const tone = (value: number | null) => value === null || value === 0 ? "neutral" : value > 0 ? "gain" : "loss";
+const tone = directionTone;
 
 function Heading({ title, right }: { title: string; right?: string }) {
   return <div className="fd-card-heading"><h3>{title}</h3>{right && <span>{right}</span>}</div>;
@@ -92,7 +96,10 @@ function LineChart({ values, dates, label, symbol, formatMonth, bestMonthText, f
     {ticks.map(n => <g key={n}><line x1={padL} x2="324" y1={y(n)} y2={y(n)} stroke="var(--fd-border)" /><text x={padL-8} y={y(n)+4} fill="var(--fd-faint)" textAnchor="end" fontSize="12">{tickLabel(n)}</text></g>)}
     <line x1={x(bestMonth)} x2={x(bestMonth)} y1="9" y2="26" stroke="var(--fd-faint)" strokeWidth="1" opacity=".45" shapeRendering="crispEdges" /><line x1={x(bestMonth)} x2={x(bestMonth)} y1="26" y2="164" stroke="var(--fd-faint)" strokeWidth="1" opacity=".45" shapeRendering="crispEdges" />
     <text x={x(bestMonth)+4} y="17" fill="var(--fd-muted)" fontSize="11">{bestMonthText}</text>
-    <path fill="none" stroke="var(--fd-accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" d={values.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join("")} />
+    {splitDirectionLine(values, x, y).map(({ start, end, value }, index) =>
+      <line key={index} data-direction={value > 0 ? "gain" : value < 0 ? "loss" : "neutral"}
+        x1={start.x} y1={start.y} x2={end.x} y2={end.y}
+        stroke={directionColorVar(value)} strokeWidth="2" />)}
     {selected !== null && <g className="fd-chart-chip" role="status" aria-live="polite" transform={`translate(${Math.min(164, Math.max(0, x(selected) - 70))},36)`}>
       <rect width="160" height="26" rx="13" fill="var(--fd-raised)" stroke="var(--fd-control)" />
       <text x="80" y="17" textAnchor="middle" fill="var(--fd-text)" fontSize="11">{formatMonth(dates[selected])} {dates[selected].getFullYear()} · {money(values[selected],symbol,0,true)}</text>
@@ -100,7 +107,8 @@ function LineChart({ values, dates, label, symbol, formatMonth, bestMonthText, f
     <text x={x(0)} y="182" fill="var(--fd-faint)" fontSize="12">{dates.length ? `${dates[0].getDate()} ${formatMonth(dates[0])} ${String(dates[0].getFullYear()).slice(2)}` : ""}</text>
     {dates.length > 2 && <text x={x(Math.floor((dates.length-1)/2))} y="182" fill="var(--fd-faint)" textAnchor="middle" fontSize="12">{formatMonth(dates[Math.floor((dates.length-1)/2)])} {String(dates[Math.floor((dates.length-1)/2)].getFullYear()).slice(2)}</text>}
     <text x={x(values.length-1)} y="182" fill="var(--fd-faint)" textAnchor="end" fontSize="12">{dates.length ? formatMonth(dates.at(-1)!) + " " + String(dates.at(-1)!.getFullYear()).slice(2) : ""}</text>
-    <text x={x(values.length-1)+6} y={y(values.at(-1) ?? 0)+4} fill="var(--fd-text)" fontSize="12" fontWeight="600">{endLabel}</text>
+    <text x={x(values.length-1)+6} y={y(values.at(-1) ?? 0)+4}
+      fill={directionColorVar(values.at(-1))} fontSize="12" fontWeight="600">{endLabel}</text>
   </svg>;
 }
 
@@ -244,6 +252,7 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
     : shownPnl !== null && shownPercentage ? shownPnl / shownPercentage : null;
   const selectedMonths = display?.months.filter((m) => m.date.getFullYear() === lastDate.getFullYear()) ?? [];
   const years = display?.years.slice().reverse() ?? [];
+  const yearPaging = usePager(years, key, 3);
   const peak = values.reduce((best, v) => v.totalValue > best.totalValue ? v : best, values[0] ?? { timestamp: 0, totalValue: 0 });
   const peakIndex = values.indexOf(peak);
   const previousHigh = peakIndex > 0 ? values.slice(0, peakIndex).reduce((best, v) => v.totalValue > best.totalValue ? v : best) : null;
@@ -277,10 +286,6 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
   const positionCounts = { up: moving.filter((coin) => coin.value !== null && coin.value > .005).length,
     down: moving.filter((coin) => coin.value !== null && coin.value < -.005).length,
     flat: Math.max(0, (display?.assets ?? 0) - moving.filter((coin) => coin.value === null || Math.abs(coin.value) > .005).length) };
-  const marketMax = Math.max(1, ...moving.map((coin) => Math.abs(coin.value ?? 0)));
-  const negativeMax = Math.max(0, ...moving.map((coin) => -(coin.value ?? 0)));
-  const zeroPercent = negativeMax / marketMax * 30 + 2;
-  const marketUnit = (100 - zeroPercent - 2) / marketMax;
   const yearsLabel = String(lastDate.getFullYear());
   const pnlText = pnl === null ? dash : cash(pnl, 0, true);
   const sub = loading ? t("fidelity.summary.loading") : empty ? t("fidelity.summary.oneSnapshot") :
@@ -293,17 +298,6 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
     <PartialProfitHint names={coins.map((coin) => coin.symbol)} period={period} t={t}
       className={`fd-partial-badge${year ? " fd-year-badge" : ""}`} />;
   const emptyCopy = t("fidelity.summary.oneSnapshot.rich").split("**");
-  const topRow = (coin: ProfitCoin) => {
-    const stable = display?.stableSymbols.includes(coin.symbol) ?? false;
-    const value = stable ? 0 : coin.value;
-    const invested = (display?.coinValues[`${coin.assetType}:${coin.symbol}`] ?? 0) - (coin.value ?? 0);
-    const coinReturn = stable ? 0 : coin.value === null || invested <= 0 ? null : coin.value / invested;
-    return <div className="fd-top-row" key={`${coin.assetType}:${coin.symbol}`}><b>{coin.symbol}</b>
-      <span className="fd-attr-track" style={{ "--fd-zero": `${zeroPercent}%` } as React.CSSProperties}>{!stable && value !== null && <i data-tone={tone(value)} style={value < 0 ? { right: `calc(100% - ${zeroPercent}%)`, width: `${-value * marketUnit}%` } : { left: `${zeroPercent}%`, width: `${value * marketUnit}%` }} />}</span>
-      <strong data-tone={tone(value)}>{value === null ? dash : cash(value,0,true)}</strong>
-      <small data-tone={tone(coinReturn)}>{coinReturn === null ? dash : percent(coinReturn,1)}</small>
-    </div>;
-  };
   const card = (children: React.ReactNode, className = "") => <section className={`fd-card ${className}`}>{children}</section>;
   const placeholder = (text: string, height: number) => <div className="fd-empty" style={{ minHeight: height }}>{text}</div>;
   return <div className="fd-page fd-summary d2-summary" data-state={status} data-empty={empty} data-quote-color={quoteColor} aria-busy={loading}>
@@ -353,11 +347,11 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
       <div className="fd-profit-hint"><PnlPercentHint names={moving.map((coin) => coin.symbol)} t={t} /></div>
       {loading ? <div className="fd-year-list">{[0,1].map(i=><div className="fd-block" key={i} style={{height:150}} />)}</div>
       : empty ? placeholder(title("yearsNeedSecond"),150)
-      : <div className="fd-year-list">{years.map((item,index)=>{
+      : <><div className="fd-year-list">{yearPaging.rows.map((item)=>{
         const { year, profit, flow: deposits } = item;
         const moves = display?.yearMoves[year];
         const partial = profit.total === null && profit.unknownCoins.length > 0;
-        return <div key={year} className={`fd-year ${index===0?"selected":""}`} data-partial={partial}>
+        return <div key={year} className={`fd-year ${year===lastDate.getFullYear()?"selected":""}`} data-partial={partial}>
           <span className="fd-month-top"><b>{year}</b><span>{monthLabel(item.start)}–{monthLabel(item.end)}</span></span>
           <strong data-tone={tone(profit.total ?? profit.knownTotal)}>{profitText(profit.total, profit.knownTotal, profit.unknownCoins)}</strong>
           <small data-tone={tone(profit.total)}>{profit.total === null || item.endingValue === profit.total
@@ -366,15 +360,20 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
           <span className="fd-year-foot"><span><span data-tone="gain">{title("upCount").replace("{n}", String(moves?.up??0))}</span> · <span data-tone="loss">{title("downCount").replace("{n}", String(moves?.down??0))}</span></span><span>{title(item.months === 1 ? "monthCountOne" : "monthCount").replace("{n}", String(item.months))}</span></span>
           {partial && partialBadge(profit.unknownCoins, String(year), true)}
         </div>;
-      })}</div>}
+      })}</div>{years.length >= 3 && <div className="fd-year-pager"><Pager count={years.length} {...yearPaging} t={t}
+        ariaLabel={title("byYear")} /></div>}</>}
     </>,"fd-years")}
     {card(<><Heading title={title("attribution")} right={empty?title("attributionDateOnly").replace("{date}",dateLabel(lastDate)).replace("{currency}",currency.currency):title("attributionDateRange").replace("{start}",dateLabel(firstDate)).replace("{end}",dateLabel(lastDate)).replace("{currency}",currency.currency)} />{loading ? <div className="fd-row-skeleton">{Array.from({length:8},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="55%" height={8}/></div>)}</div> : empty ? placeholder(title("attributionNeedsSecond"),260) : <><div className="fd-key"><span><i />{title("marketMove")}</span><span><i />{title("quantityChange")}</span></div>{attributionPaging.rows.map(([symbol,row])=><div className="fd-attr-row" key={symbol}><b>{symbol}</b><span className="fd-attr-track" style={{ "--fd-zero": `${attrScale(0)}%` } as React.CSSProperties}><i className="fd-attr-market" style={{left:`${attrScale(Math.min(0,row.market))}%`,width:`${attrScale(Math.max(0,row.market))-attrScale(Math.min(0,row.market))}%`}} /><i className="fd-attr-flow" style={{left:`${attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`,width:`${attrScale(Math.max(flowStart(row),flowStart(row)+row.flow))-attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`}} /></span><strong data-tone={tone(row.total)} title={attributionAmount(row.total, currency, true)}><FittingAttributionAmount full={attributionAmount(row.total, currency)} compact={attributionCompactAmount(row.total, currency, locale)} /></strong><small className="sr-only"><span>{title("market")} <span data-tone={tone(row.market)}>{cash(row.market,0,true)}</span></span><span>{title("quantity")} {cash(row.flow,0,true)}</span></small></div>)}<div ref={axisRef} className="fd-axis"><span />{attrTicks.map(tick=><span key={tick} data-axis-tick="" data-value={tick} style={{left:`${attrScale(tick)}%`}}>{tick<0?"−":""}{currency.symbol}{new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Math.abs(currencyWrapper(currency)(tick))).replace("K","k")}</span>)}</div><div className="fd-attr-row fd-attr-total"><b>{title("total")}</b><span title={attrRange.full}><FittingAttributionAmount full={attrRange.text} compact={attrRange.compact} /></span><strong title={attributionAmount(gain, currency, true)}><FittingAttributionAmount full={attributionAmount(gain, currency)} compact={attributionCompactAmount(gain, currency, locale)} /></strong><small className="sr-only"><span>{title("market")} {cash(full?.totals.priceEffect??0,0,true)}</span><span>{title("quantity")} {cash((full?.totals.flowEffect??0)+(full?.totals.residual??0),0,true)}</span></small></div><AttributionPager count={grouped.length} {...attributionPaging} t={t} /></>}</>,"fd-attribution")}
-    {card(<><div className="fd-card-heading"><button className="fd-top-dialog-trigger" type="button" disabled={checking} onClick={() => setRankOpen(true)}>{title("topCoins")}</button><span>{title("allTime")}</span></div>{loading ? <div className="fd-row-skeleton">{Array.from({length:6},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="50%" height={8}/></div>)}</div> : empty ? placeholder(title("topNeedsSecond"),260) : <>{([
+    {card(<><div className="fd-card-heading"><button className="fd-top-dialog-trigger" type="button" disabled={checking} onClick={() => setRankOpen(true)}>{title("topCoins")}</button><span>{title("allTime")}</span></div>{loading ? <div className="fd-row-skeleton">{Array.from({length:6},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="50%" height={8}/></div>)}</div> : empty ? placeholder(title("topNeedsSecond"),260) : <><div role="table" aria-label={title("topCoins")} className="summary-top-collection"><div role="row" className="sr-only"><span role="columnheader">{title("assets")}</span><span role="columnheader">{title("market")}</span><span role="columnheader">%</span></div>{([
       [title("topProfit"), moving.filter((coin)=>coin.value !== null && coin.value > 0).sort((a,b)=>(b.value??0)-(a.value??0))],
       [title("topLoss"), moving.filter((coin)=>coin.value !== null && coin.value < 0).sort((a,b)=>(a.value??0)-(b.value??0))],
       [title("noMarketPnl"), (display?.profit.coins??[]).filter((coin)=>display?.stableSymbols.includes(coin.symbol))
         .sort((a,b)=>(display?.coinValues[`${b.assetType}:${b.symbol}`]??0)-(display?.coinValues[`${a.assetType}:${a.symbol}`]??0))],
-    ] as const).map(([heading,items])=><div key={heading}><h4 className="fd-list-heading">{heading}</h4>{items.map(topRow)}</div>)}<p className="fd-footnote">{title("topNote.market").replace("{date}",dateLabel(firstDate)).replace("{one}",cash(1,0))}</p></>}</>,"fd-top-coins")}
+    ] as const).map(([heading,items])=><SummaryTopList key={heading} heading={heading}
+      rows={items.slice(0, 4).map((coin) => ({ ...coin, stable: display?.stableSymbols.includes(coin.symbol) ?? false,
+        percentage: display?.stableSymbols.includes(coin.symbol) ? 0
+          : marketProfitPercentage(coin.value, display?.coinValues[`${coin.assetType}:${coin.symbol}`]) }))}
+      scaleValues={moving.map((coin) => coin.value ?? 0)} amount={(value) => cash(value,0,true)} tone={tone} />)}</div><p className="fd-footnote">{title("topNote.market").replace("{date}",dateLabel(firstDate)).replace("{one}",cash(1,0))}</p></>}</>,"fd-top-coins")}
     <BottomSheet open={rankOpen} onOpenChange={setRankOpen} title={t("analytics.rank")} detents={["large"]} initialDetent="large">
       <div className="d2-rank-sheet"><TopCoinsRank dateRange={dateRange} currency={currency} /></div>
     </BottomSheet>

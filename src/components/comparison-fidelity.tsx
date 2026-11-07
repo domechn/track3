@@ -2,10 +2,11 @@ import { useState, type CSSProperties, type ReactNode } from "react";
 import { CopyIcon, EyeClosedIcon, EyeOpenIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import type { CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { useTranslation } from "@/i18n";
-import { positiveNegativeTone } from "@/utils/color";
+import { directionPhysicalTone } from "@/utils/color";
 import { currencyWrapper } from "@/utils/currency";
 import SyncStatusIndicator from "./sync-status-indicator";
 import { barGeometry, comparisonMoverFacts, divergingScale } from "./comparison-fidelity-movers";
+import { boundedPercentText } from "./profit-percentage";
 
 export type FidelityComparisonRow = {
   symbol: string;
@@ -58,7 +59,10 @@ export default function ComparisonFidelity({
     maximumFractionDigits: 4,
   });
   const pct = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(2)}%`;
-  const tone = (value: number) => value === 0 ? "zero" : positiveNegativeTone(value, quoteColor) === "green" ? "pos" : "neg";
+  const tone = (value: number) => {
+    const physical = directionPhysicalTone(value, quoteColor);
+    return physical === "neutral" ? "zero" : physical === "gain" ? "pos" : "neg";
+  };
   const [expanded, setExpanded] = useState({ value: false, percent: false });
   const diff = headTotal - baseTotal;
   const diffPct = baseTotal ? diff / baseTotal * 100 : 0;
@@ -92,6 +96,7 @@ export default function ComparisonFidelity({
         const delta = row.value.head - row.value.base;
         const metric = by === "value" ? delta : row.value.changePercent;
         const bar = barGeometry(metric, scale);
+        const shown = by === "percent" && !mask ? boundedPercentText(metric, pct(metric)) : null;
         return <li key={`${row.assetType}:${row.symbol}`}>
           <strong>{row.symbol}</strong>
           <span className="t3-cmp-mover-track" style={{ "--zero": `${scale.zero}%` } as CSSProperties}>
@@ -101,7 +106,8 @@ export default function ComparisonFidelity({
               right: bar.right === undefined ? undefined : `${bar.right}%`,
             }} />}
           </span>
-          <span className={tone(metric)}>{by === "value" ? signedMoney(delta, 0) : pct(metric)}</span>
+          <span className={tone(metric)} title={shown?.exact} aria-label={shown?.exact}>
+            {by === "value" ? signedMoney(delta, 0) : mask ? "***" : shown?.text}</span>
           {by === "percent" && <small>{signedMoney(delta, 0)}</small>}
         </li>;
       })}

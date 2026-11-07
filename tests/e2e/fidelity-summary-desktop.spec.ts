@@ -239,7 +239,7 @@ test("Summary leaders and attribution footer follow the source spacing", async (
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".fidelity-group-label").first().boundingBox())!.y).toBeCloseTo(1143, 0);
+  expect((await page.locator(".summary-top-heading").first().boundingBox())!.y).toBeCloseTo(1145, 0);
   expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1609, 0);
   expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1627, 0);
   const totalRange = page.locator(".fidelity-attribution-row.total > span:nth-child(2)");
@@ -308,7 +308,7 @@ test("Summary end label, rail separators and Refresh control match the source", 
   expect(await label.evaluate((node) => {
     const style = getComputedStyle(node);
     return [style.fontWeight, style.fill];
-  })).toEqual(["600", "rgb(255, 255, 255)"]);
+  })).toEqual(["600", "rgb(95, 196, 155)"]);
   expect((await label.boundingBox())!.x).toBeCloseTo(976.4, 0);
   const separators = await page.locator(".t3-fidelity-nav-group").evaluateAll((nodes) =>
     nodes.map((node) => {
@@ -339,7 +339,12 @@ test("two snapshots in one month draw a profit line", async ({ page }) => {
   await bridge.keepTwoOctoberSnapshots();
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  await expect(page.locator(".fidelity-summary-chart polyline")).toBeVisible();
+  const profitLine = page.locator(".fidelity-summary-chart line[data-direction]");
+  expect(await profitLine.count()).toBeGreaterThan(0);
+  await expect(profitLine.first()).toHaveAttribute("stroke", "hsl(var(--muted-foreground))");
+  expect(await profitLine.evaluateAll((lines) => lines.every((line) =>
+    Number(line.getAttribute("x2")) > Number(line.getAttribute("x1")) &&
+    getComputedStyle(line).stroke !== "none"))).toBe(true);
   await expect(page.locator(".fidelity-summary-chart-empty")).toHaveCount(0);
 });
 
@@ -386,7 +391,7 @@ test("Summary month cards and calculation hint follow the source row spacing", a
     .getByRole("button", { name: "How P&L % is calculated" }).boundingBox())!;
   expect(card.y).toBe(572);
   expect(months.y).toBe(663);
-  expect(months.height).toBe(374);
+  expect(months.height).toBe(346);
   expect(hint.y).toBe(621);
 });
 

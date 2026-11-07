@@ -93,6 +93,7 @@ function CoinChart({ points, mode, symbol, currency, shortDate, emptyText }: { p
   const axisDate = (i: number) => shortDate(points[i].date);
   return <svg viewBox="0 0 324 200" className="fd-coin-chart" role="img" aria-label={`${symbol} ${mode} chart`}>
     {ticks.map(n=><g key={n}><line x1={padL} y1={y(n)} x2="324" y2={y(n)} stroke="var(--fd-border)"/><text x={padL-8} y={y(n)+4} textAnchor="end" fill="var(--fd-faint)" fontSize="12">{tickLabel(n)}</text></g>)}
+    {/* color-semantics: neutral this path shows price over time. */}
     <path fill="none" stroke="var(--fd-accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" d={values.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join("")}/>
     {labelIndices.map(i=><text key={i} x={x(i)} y="192" fill="var(--fd-faint)" fontSize="12" textAnchor={i===0?"start":i===points.length-1?"end":"middle"}>{axisDate(i)}</text>)}
     <text x={x(values.length-1)+6} y={y(values.at(-1)!)+4} fill="var(--fd-text)" fontSize="12" fontWeight="600">{endLabel}</text>

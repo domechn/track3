@@ -40,7 +40,7 @@ it("shows unknown profit when a sold asset also has an unmatched withdrawal", ()
   ]);
 });
 
-it("keeps asset identities distinct and colors bars like gain/loss text", () => {
+it("keeps asset identities distinct and colors bars and text for red-up preference", () => {
   const disposal = (assetType: "crypto" | "stock", gainLoss: number) => ({
     eventId: assetType, lotId: assetType, acquiredAt: "2025-01-01", disposedAt: "2026-01-01",
     term: "long" as const, method: "FIFO" as const, symbol: "BTC", assetType,
@@ -57,9 +57,9 @@ it("keeps asset identities distinct and colors bars like gain/loss text", () => 
   const rows = container.querySelectorAll(".cost-dashboard-assets li");
   expect(rows).toHaveLength(2);
   expect(rows[0].querySelector(".cost-dashboard-bar > span")).toHaveClass("bg-negative");
-  expect(rows[0].lastElementChild).toHaveClass("text-negative");
+  expect(rows[0].lastElementChild).toHaveClass("text-gain");
   expect(rows[1].querySelector(".cost-dashboard-bar > span")).toHaveClass("bg-positive");
-  expect(rows[1].lastElementChild).toHaveClass("text-positive");
+  expect(rows[1].lastElementChild).toHaveClass("text-loss");
 });
 
 it("labels the sold-lot basis separately from bought-side average price", () => {

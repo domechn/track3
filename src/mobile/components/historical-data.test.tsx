@@ -71,3 +71,20 @@ it("keeps All time inside the app date range", async () => {
   await screen.findByText("1–1 of 1");
   expect(queryHistoricalPage).toHaveBeenCalledWith(props.dateRange, 50, 0, "all");
 });
+
+it("maps history changes to physical tones under red-up and mutes zero", async () => {
+  vi.mocked(queryHistoricalPage).mockResolvedValue({
+    totalCount: 3,
+    latest: null,
+    rows: [
+      { ...row("up"), change: 12 },
+      { ...row("down"), change: -8 },
+      { ...row("flat"), change: 0 },
+    ],
+  });
+  render(<DataChangedContext.Provider value={0}><HistoricalData {...props}
+    quoteColor="red-up-green-down" /></DataChangedContext.Provider>);
+  await screen.findByText("1–3 of 3");
+  expect([...document.querySelectorAll(".history-mobile-snapshot-delta")].map((node) =>
+    node.getAttribute("data-tone"))).toEqual(["loss", "gain", "neutral"]);
+});

@@ -8,17 +8,15 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
 import { currencyWrapper } from "@/utils/currency";
-import { cn } from "@/lib/utils";
 import { axisForValues, compactMoney } from "./fidelity-data";
 import { AttributionPager, useAttributionPage } from "./attribution-pager";
 import { attributionAmount, attributionRange, attributionRoundedValue } from "./attribution-amount";
 import { FittingAttributionAmount } from "./fitting-attribution-amount";
 import { useFittingAttributionTicks } from "./use-fitting-attribution-ticks";
+import { SummaryTopList } from "./summary-top-list";
+import { marketProfitPercentage } from "./profit-percentage";
 
 type Result = Awaited<ReturnType<typeof queryAttribution>>;
-const num = (n: number, decimals = 0) => new Intl.NumberFormat("en-US", {
-  minimumFractionDigits: decimals, maximumFractionDigits: decimals,
-}).format(Math.abs(n));
 
 export default function SummaryMarketCard({ mode, currency, dateRange, quoteColor }: {
   mode: "attribution" | "leaders";
@@ -60,7 +58,7 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
   const cents = (value: number) => Math.round(value * 100) / 100;
   const money = (value: number) => attributionAmount(value, currency);
   const exactMoney = (value: number) => attributionAmount(value, currency, true);
-  const tone = (value: number) => attributionRoundedValue(value, currency) === 0 ? "text-muted-foreground" : value > 0
+  const tone = (value: number | null) => value === null || attributionRoundedValue(value, currency) === 0 ? "text-muted-foreground" : value > 0
     ? quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"
     : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive";
   const date = (value: Date) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(value);
@@ -71,10 +69,6 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
   const axis = { ...positiveAxis, lower: negative < 0 ? Math.floor(negative / negativeUnit) * negativeUnit - negativeUnit : 0 };
   const axisPosition = (value: number) => (value - axis.lower) / (axis.upper - axis.lower) * 100;
   const zero = axisPosition(0);
-  const leaderNegative = Math.max(0, ...coinGroups.map((group) => -cents(group.priceEffect)));
-  const leaderPositive = Math.max(0, ...coinGroups.map((group) => cents(group.priceEffect)));
-  const leaderZero = leaderNegative / Math.max(1, leaderPositive) * 30 + 2;
-  const leaderUnit = (100 - leaderZero - 2) / Math.max(1, leaderPositive);
   const valueRange = result && attributionRange(result.attribution.startValue, result.attribution.endValue, currency, locale);
   const axisRef = useFittingAttributionTicks();
   const axisTicks = axis.ticks.map((tick) => ({
@@ -85,25 +79,23 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
     const positives = coinGroups.filter((g) => cents(g.priceEffect) > 0).sort((a, b) => b.priceEffect - a.priceEffect).slice(0, 4);
     const negatives = coinGroups.filter((g) => cents(g.priceEffect) < 0).sort((a, b) => a.priceEffect - b.priceEffect).slice(0, 4);
     const flats = coinGroups.filter((g) => cents(g.priceEffect) === 0).slice(0, 4);
-    const row = (group: typeof coinGroups[number]) => {
-      const base = (assetValues[group.key] ?? 0) - group.priceEffect - group.residual;
-      const percentage = Math.abs(base) >= 1 ? group.priceEffect / Math.abs(base) * 100 : null;
-      return <div className="fidelity-leader-row" role="row" key={group.key}>
-        <b role="rowheader">{group.label.split(" · ")[0]}</b>
-        <span className="fidelity-leader-track" aria-hidden="true"><b style={{ left: `${leaderZero}%` }} /><i className={group.priceEffect >= 0 ? "positive" : "negative"} style={{ left: `${group.priceEffect >= 0 ? leaderZero : leaderZero - Math.abs(cents(group.priceEffect)) * leaderUnit}%`, width: `${Math.abs(cents(group.priceEffect)) * leaderUnit}%` }} /></span>
-        <span role="cell" className={cn("number", tone(group.priceEffect))}>{money(group.priceEffect)}</span>
-        <span role="cell" className={cn("number", tone(group.priceEffect))}>{cents(group.priceEffect) === 0 ? "0.0%" : percentage === null ? "–" : `${group.priceEffect > 0 ? "+" : "−"}${num(percentage, 1)}%`}</span>
-      </div>;
-    };
+    const rows = (groups: typeof coinGroups) => groups.map((group) => {
+      const value = cents(group.priceEffect);
+      return {
+        assetType: group.key.split(":")[0], symbol: group.label.split(" · ")[0], value,
+        stable: false, percentage: marketProfitPercentage(value, assetValues[group.key]),
+      };
+    });
+    const scaleValues = coinGroups.map((group) => cents(group.priceEffect));
     return <section className="fidelity-card fidelity-leaders">
       <div className="fidelity-card-head"><h2>{t("summary.fidelity.topCoins")}</h2><span>{t("summary.fidelity.allTime")}</span></div>
       {error ? <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => setRetry((n) => n + 1)}>{t("summary.fidelity.retry")}</button></div> :
         empty ? <div className="fidelity-empty"><span className="fidelity-empty-message">{t("summary.fidelity.topEmpty")}</span></div> : <>
-          <div role="table" aria-label={t("summary.fidelity.topCoins")}>
+          <div role="table" className="summary-top-collection" aria-label={t("summary.fidelity.topCoins")}>
           <div role="row" className="sr-only"><span role="columnheader">{t("summary.fidelity.asset")}</span><span role="columnheader">{t("summary.fidelity.market")}</span><span role="columnheader">%</span></div>
-          <div className="fidelity-group-label" role="row"><span role="cell" aria-colspan={3}>{t("summary.fidelity.topProfit")}</span></div>{positives.map(row)}
-          <div className="fidelity-group-label" role="row"><span role="cell" aria-colspan={3}>{t("summary.fidelity.topLoss")}</span></div>{negatives.map(row)}
-          <div className="fidelity-group-label" role="row"><span role="cell" aria-colspan={3}>{t("summary.fidelity.noMarket")}</span></div>{flats.map(row)}
+          <SummaryTopList heading={t("summary.fidelity.topProfit")} rows={rows(positives)} scaleValues={scaleValues} amount={money} tone={tone} />
+          <SummaryTopList heading={t("summary.fidelity.topLoss")} rows={rows(negatives)} scaleValues={scaleValues} amount={money} tone={tone} />
+          <SummaryTopList heading={t("summary.fidelity.noMarket")} rows={rows(flats)} scaleValues={scaleValues} amount={money} tone={tone} />
           </div>
           <p className="fidelity-caption">{t("summary.fidelity.topNote").replace("{date}", date(dateRange.start))}</p>
         </>}

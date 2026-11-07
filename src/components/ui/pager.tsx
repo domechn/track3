@@ -22,6 +22,7 @@ export function usePager<T>(rows: readonly T[], resetKey: string, initialPageSiz
   };
   return {
     page, pages, pageSize, rows: visibleRows,
+    goTo,
     previous: () => goTo(page - 1),
     next: () => goTo(page + 1),
     first: () => goTo(1),

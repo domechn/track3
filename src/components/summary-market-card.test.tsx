@@ -1,10 +1,52 @@
 import { render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { queryAttribution } from "@/middlelayers/charts-attribution-data";
+import { queryLatestAssets } from "@/middlelayers/charts";
 import SummaryMarketCard from "./summary-market-card";
 
 vi.mock("@/middlelayers/charts-attribution-data", () => ({ queryAttribution: vi.fn() }));
 vi.mock("@/middlelayers/charts", () => ({ queryLatestAssets: vi.fn().mockResolvedValue([]) }));
+
+it("includes an unrecorded quantity addition in a large Summary loss percentage", async () => {
+  vi.mocked(queryAttribution).mockResolvedValue({
+    attribution: {
+      entries: [{ symbol: "1211.HK", assetType: "stock", wallet: "w",
+        priceEffect: -109_628, flowEffect: 0, residual: 110_000, totalChange: 372 }],
+      totals: { priceEffect: -109_628, flowEffect: 0, residual: 110_000, totalChange: 372 },
+      startValue: 5_956, endValue: 6_328,
+    },
+    aliases: {},
+  });
+  vi.mocked(queryLatestAssets).mockResolvedValue([{ symbol: "1211.HK", assetType: "stock",
+    amount: 19.468770987, value: 6_328, price: 325.0364506 }]);
+  render(<SummaryMarketCard mode="leaders"
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }}
+    dateRange={{ start: new Date("2026-10-01T00:00:00Z"), end: new Date("2026-10-31T23:59:59Z") }}
+    quoteColor="green-up-red-down" />);
+  const row = await screen.findByRole("row", { name: /1211.HK/ });
+  expect(within(row).getByRole("cell", { name: /94.5%/ })).toHaveTextContent("−94.5%");
+});
+
+it("shows a cent-flat market row with no bar or signed percentage", async () => {
+  vi.mocked(queryAttribution).mockResolvedValue({
+    attribution: {
+      entries: [{ symbol: "USDT", assetType: "crypto", wallet: "w",
+        priceEffect: 0.003, flowEffect: 0, residual: 0, totalChange: 0.003 }],
+      totals: { priceEffect: 0.003, flowEffect: 0, residual: 0, totalChange: 0.003 },
+      startValue: 100, endValue: 100.003,
+    },
+    aliases: {},
+  });
+  vi.mocked(queryLatestAssets).mockResolvedValue([{ symbol: "USDT", assetType: "crypto",
+    amount: 100, value: 100.003, price: 1.00003 }]);
+  render(<SummaryMarketCard mode="leaders"
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }}
+    dateRange={{ start: new Date("2026-10-01T00:00:00Z"), end: new Date("2026-10-31T23:59:59Z") }}
+    quoteColor="green-up-red-down" />);
+  const row = await screen.findByRole("row", { name: /USDT/ });
+  expect(row.querySelector(".summary-top-track i")).not.toBeInTheDocument();
+  expect(within(row).getByRole("cell", { name: "0.0%" })).toHaveTextContent("0.0%");
+});
 
 it("shows a whole-unit Summary range with its exact title and aligned amounts", async () => {
   vi.mocked(queryAttribution).mockResolvedValue({

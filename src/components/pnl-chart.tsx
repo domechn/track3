@@ -10,8 +10,7 @@ import {
   QuoteColor,
   TDateRange,
 } from "@/middlelayers/types";
-import { positiveNegativeTone } from "@/utils/color";
-import { chartTokenColor } from "@/utils/chart-theme";
+import { directionChartColor } from "@/utils/color";
 import { currencyWrapper, simplifyNumber } from "@/utils/currency";
 import { glassScaleOptions, glassTooltip } from "@/utils/chart-theme";
 import { timeToDateStr } from "@/utils/date";
@@ -186,8 +185,7 @@ const App = ({
   }
 
   function pnlBackgroundColor(val: "positive" | "negative"): string {
-    const c = positiveNegativeTone(val === "positive" ? 1 : -1, quoteColor);
-    return chartTokenColor(c === "green" ? "positive" : "negative", 0.8);
+    return directionChartColor(val === "positive" ? 1 : -1, quoteColor, undefined, 0.8);
   }
 
   function lineData() {

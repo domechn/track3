@@ -5,6 +5,7 @@ import {
   WalletAssetsChangeData,
 } from "@/middlelayers/types";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
+import { directionClass } from "@/utils/color";
 import { sourceDisplayNames } from "@/components/source-display-name";
 import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import MoneyBankIcon from "@/assets/icons/money-bank-icon.png";
@@ -54,13 +55,7 @@ function getWalletAirdropUrl(wallet: string, walletType?: string) {
 }
 
 function getToneClass(value: number, quoteColor: QuoteColor) {
-  if (value === 0) {
-    return "text-muted-foreground";
-  }
-  const positiveIsGreen = quoteColor === "green-up-red-down";
-  const positiveClass = positiveIsGreen ? "text-emerald-500" : "text-rose-500";
-  const negativeClass = positiveIsGreen ? "text-rose-500" : "text-emerald-500";
-  return value > 0 ? positiveClass : negativeClass;
+  return directionClass(value, quoteColor);
 }
 
 function formatSignedNumber(value: number, suffix = "") {

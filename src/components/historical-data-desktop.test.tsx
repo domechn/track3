@@ -84,3 +84,23 @@ it("removes a desktop snapshot immediately and restores it through Undo", async 
   await waitFor(() => expect(screen.getAllByTestId("history-snapshot-row")).toHaveLength(2));
   await waitFor(() => expect(detail).toHaveTextContent("$200.00"));
 });
+
+it("uses the red-up physical tone for a positive edit-log delta", async () => {
+  vi.mocked(queryEditLog).mockResolvedValue([{
+    id: 1, edited_at: createdAt, origin: "local", target: "asset", action: "restore",
+    asset_type: "stock", symbol: "AAPL", old_value: null, new_value: '{"value":25}',
+  }]);
+  render(<MemoryRouter><HistoricalDataDesktop currency={currency} quoteColor="red-up-green-down" /></MemoryRouter>);
+  const log = await screen.findByRole("region", { name: "Edits" });
+  expect(within(log).getByText("+$25.00")).toHaveClass("neg");
+});
+
+it("mutes a zero edit-log delta", async () => {
+  vi.mocked(queryEditLog).mockResolvedValue([{
+    id: 1, edited_at: createdAt, origin: "local", target: "asset", action: "price",
+    asset_type: "stock", symbol: "AAPL", old_value: "10", new_value: "11",
+  }]);
+  render(<MemoryRouter><HistoricalDataDesktop currency={currency} quoteColor="red-up-green-down" /></MemoryRouter>);
+  const log = await screen.findByRole("region", { name: "Edits" });
+  expect(within(log).getByText("$0.00")).toHaveClass("zero");
+});

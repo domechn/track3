@@ -9,7 +9,7 @@ import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
 import { currencyWrapper } from "@/utils/currency";
-import { positiveNegativeTone } from "@/utils/color";
+import { directionPhysicalTone } from "@/utils/color";
 import { deriveSourceChanges } from "./wallet-snapshot-matrix";
 import { matchSourceStatus } from "./source-status-match";
 import { useLatestWalletOrdinals } from "./source-name-order";
@@ -20,6 +20,7 @@ type Source = ReturnType<typeof deriveSourceChanges>["sources"][number];
 type Matrix = ReturnType<typeof deriveSourceChanges>;
 type SnapshotData = { latest: AssetModel[]; baseline: AssetModel[]; at: string; baselineAt: string; matrix: Matrix;
   identities: Record<string, { wallet: string; alias: string; type: string } | undefined> };
+// color-semantics: neutral the palette separates wallet sources by category.
 const sourceColors = ["#4a8ad6", "#86b4ea", "#d4d6da", "#8c8e95", "#55575d"];
 const knownAssetNames: Record<string, string> = {
   BTC: "Bitcoin", ETH: "Ethereum", SOL: "Solana", BNB: "BNB", USDT: "Tether",
@@ -105,7 +106,10 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
   const signedMoney = (value: number, digits = 2) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${money(Math.abs(value), digits)}`;
   const percent = (value: number, digits = 2) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toFixed(digits)}%`;
   const share = (value: number) => `${(total > 0 ? value / total * 100 : 0).toFixed(1)}%`;
-  const tone = (value: number) => value === 0 ? "zero" : positiveNegativeTone(value, quoteColor) === "green" ? "pos" : "neg";
+  const tone = (value: number) => {
+    const physical = directionPhysicalTone(value, quoteColor);
+    return physical === "neutral" ? "zero" : physical === "gain" ? "pos" : "neg";
+  };
   const activeAssets = useMemo(() => (data?.latest ?? []).filter((asset) => asset.wallet === selectedSource)
     .sort((a, b) => b.value - a.value), [data, selectedSource]);
   const previousAssets = useMemo(() => new Map((data?.baseline ?? []).filter((asset) => asset.wallet === selectedSource)

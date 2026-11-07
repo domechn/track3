@@ -169,13 +169,13 @@ test("CNY attribution stays aligned at the owner's 1280px width", async ({ page 
     }));
   for (let index = 1; index < tickBoxes.length; index++)
     expect(tickBoxes[index].left - tickBoxes[index - 1].right).toBeGreaterThanOrEqual(8);
-  const leaders = await amountGeometry(page, ".fidelity-leaders .fidelity-leader-row", ".number:nth-child(3)");
+  const leaders = await amountGeometry(page, ".fidelity-leaders .summary-top-row", ".number:nth-child(3)");
   expect(leaders).toHaveLength(4);
   for (const row of leaders) {
     expect(row.cells[0].text).toContain("¥");
     expect(row.cells[0].height).toBeLessThanOrEqual(row.cells[0].lineHeight * 1.2);
   }
-  const leaderClipping = await page.locator(".fidelity-leaders .fidelity-leader-row .number:nth-child(3)")
+  const leaderClipping = await page.locator(".fidelity-leaders .summary-top-row .number:nth-child(3)")
     .evaluateAll((elements) => elements.map((element) => element.scrollWidth - element.clientWidth));
   for (const clipped of leaderClipping) expect(clipped).toBeLessThanOrEqual(1);
   mkdirSync("/tmp/attribution-layout", { recursive: true });

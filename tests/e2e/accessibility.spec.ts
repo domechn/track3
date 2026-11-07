@@ -344,7 +344,7 @@ test("P&L leader rows remain in normal flow", async ({ page }) => {
   const leadersTable = page.getByRole("table", { name: "Top profit and loss coins" });
   await expect(leadersTable).toBeVisible();
   await expect(leadersTable.getByRole("rowheader").first()).toBeVisible();
-  const row = page.locator(".fidelity-leader-row").first();
+  const row = page.locator(".summary-top-row").first();
   await expect(row).toBeVisible();
   const card = page.locator(".fidelity-leaders");
   await row.evaluate((node) => { (node as HTMLElement).style.minWidth = "700px"; });

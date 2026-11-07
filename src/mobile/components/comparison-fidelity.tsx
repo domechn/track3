@@ -7,6 +7,8 @@ import { useTranslation } from "@/mobile/i18n";
 import { BottomSheet } from "@/mobile/components/mobile";
 import "@/mobile/components/mobile/fidelity.css";
 import { barGeometry, comparisonMoverFacts, divergingScale } from "@/components/comparison-fidelity-movers";
+import { directionTone } from "@/utils/color";
+import { boundedPercentText } from "@/components/profit-percentage";
 
 const dateAt = (option?: DateOption) => option ? new Date(option.createdAt ?? `${option.label}T00:00:00`) : null;
 const day = (date: Date, locale: string, year = true) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB",
@@ -24,7 +26,7 @@ const percentText = (fraction: number, digits = 2, signed = true, masked = false
   const rounded = Number((fraction * 100).toFixed(digits));
   return `${signed && rounded > 0 ? "+" : rounded < 0 ? "−" : ""}${Math.abs(rounded).toFixed(digits)}%`;
 };
-const tone = (value: number) => value > 0 ? "gain" : value < 0 ? "loss" : "neutral";
+const tone = directionTone;
 const barStyle = (value: number, scale: ReturnType<typeof divergingScale>): CSSProperties => {
   const bar = barGeometry(value, scale);
   return bar ? {
@@ -170,8 +172,12 @@ export default function ComparisonFidelity({ currency, quoteColor, busy, dateOpt
           </section>
           <section className="fd-card fd-comparison-movers percent"><div className="fd-card-heading"><h3>{t("fidelity.comparison.moversPercent")}</h3><span>{t("fidelity.comparison.relative")}</span></div>
             <div className="fd-comparison-mover-list">
-              {relative.slice(0, expanded.percent ? undefined : 10).map(({ coin, change: value }) => <div key={coin.symbol} className="fd-comparison-mover percent"><b>{coin.symbol}</b><span style={{ "--fd-zero": `${percentBars.zero}%` } as CSSProperties}>{barGeometry(coin.value.changePercent, percentBars) && <i data-tone={tone(coin.value.changePercent)} style={barStyle(coin.value.changePercent, percentBars)} />}</span>
-                <strong data-tone={tone(coin.value.changePercent)}>{percentText(coin.value.changePercent / 100, 2, true, masked)}</strong><small>{currencyValue(value, 0, true)}</small></div>)}
+              {relative.slice(0, expanded.percent ? undefined : 10).map(({ coin, change: value }) => {
+                const exact = percentText(coin.value.changePercent / 100, 2, true, masked);
+                const shown = masked ? { text: exact, exact } : boundedPercentText(coin.value.changePercent, exact);
+                return <div key={coin.symbol} className="fd-comparison-mover percent"><b>{coin.symbol}</b><span style={{ "--fd-zero": `${percentBars.zero}%` } as CSSProperties}>{barGeometry(coin.value.changePercent, percentBars) && <i data-tone={tone(coin.value.changePercent)} style={barStyle(coin.value.changePercent, percentBars)} />}</span>
+                  <strong data-tone={tone(coin.value.changePercent)} title={masked ? undefined : shown.exact} aria-label={masked ? undefined : shown.exact}>{shown.text}</strong><small>{currencyValue(value, 0, true)}</small></div>;
+              })}
             </div>
             {more("percent", relative.length)}
             {!masked && stableNote && <p>{stableNote}</p>}

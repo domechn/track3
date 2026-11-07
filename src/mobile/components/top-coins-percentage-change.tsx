@@ -17,6 +17,7 @@ import {
   resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
+import { directionClass, directionColorVar } from "@/utils/color";
 
 type SortBy = "value" | "price";
 const SPARKLINE_WIDTH = 96;
@@ -279,14 +280,9 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
               const activeMin = valueIsActive ? row.valueMin : row.priceMin;
               const activeMax = valueIsActive ? row.valueMax : row.priceMax;
               const activeEnd = valueIsActive ? row.valueEnd : row.priceEnd;
-              const isGain = activeEnd >= 0;
-              const sparkColor = isGain ? "#10b981" : "#f43f5e";
-              const valueClass = row.valueEnd >= 0
-                ? "text-emerald-500"
-                : "text-rose-500";
-              const priceClass = row.priceEnd >= 0
-                ? "text-emerald-500/70"
-                : "text-rose-500/70";
+              const sparkColor = directionColorVar(activeEnd);
+              const valueClass = directionClass(row.valueEnd);
+              const priceClass = directionClass(row.priceEnd);
               const logoKey = getAssetLogoKey({
                 symbol: row.coin,
                 assetType: row.assetType,
@@ -297,8 +293,8 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                   data-testid="tcpc-row"
                   className={[
                     "grid grid-cols-[20px_minmax(0,1fr)_64px_64px] sm:grid-cols-[20px_minmax(0,1fr)_72px_64px_80px_96px] min-h-11 items-center gap-1.5 sm:gap-2 rounded-md px-1.5 sm:px-2 py-1.5",
-                    isTop && showBadges ? "bg-emerald-500/[0.04]" : "",
-                    isBot && showBadges ? "bg-rose-500/[0.04]" : "",
+                    isTop && showBadges ? "bg-muted/40" : "",
+                    isBot && showBadges ? "bg-muted/40" : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
@@ -326,7 +322,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                       {isTop && showBadges ? (
                         <span
                           data-testid="tcpc-badge"
-                          className="max-w-full rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-emerald-500"
+                          className={`max-w-full rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ${valueClass}`}
                         >
                           {t("topCoinsPercentage.topGainer")}
                         </span>
@@ -334,7 +330,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                       {isBot && showBadges ? (
                         <span
                           data-testid="tcpc-badge"
-                          className="max-w-full rounded bg-rose-500/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-rose-500"
+                          className={`max-w-full rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ${valueClass}`}
                         >
                           {t("topCoinsPercentage.topLoser")}
                         </span>

@@ -1,5 +1,6 @@
 import { diff, rgb_to_lab } from 'color-diff'
 import { QuoteColor } from '@/middlelayers/types'
+import { chartThemeColor } from '@/utils/chart-theme'
 
 const niceColors = [
 	"rgba(122, 51, 255, 1)",
@@ -107,4 +108,40 @@ export function positiveNegativeTextClass(
 ) {
 	if (val === 0) return "text-muted-foreground"
 	return val > 0 ? "text-gain" : "text-loss"
+}
+
+export function directionTone(value: number | null | undefined): "gain" | "loss" | "neutral" {
+  if (value == null || !Number.isFinite(value) || value === 0) return "neutral";
+  return value > 0 ? "gain" : "loss";
+}
+
+// --gain and --loss swap through :root[data-quote]; callers pass quoteColor for API consistency.
+export function directionColorVar(value: number | null | undefined, _quoteColor: QuoteColor = "green-up-red-down"): string {
+  const tone = directionTone(value);
+  return `hsl(var(--${tone === "neutral" ? "muted-foreground" : tone}))`;
+}
+
+export function directionClass(value: number | null | undefined, quoteColor: QuoteColor = "green-up-red-down"): string {
+  return value == null || !Number.isFinite(value) ? "text-muted-foreground" : positiveNegativeTextClass(value, quoteColor);
+}
+
+export function directionPhysicalTone(value: number | null | undefined, quoteColor: QuoteColor): "gain" | "loss" | "neutral" {
+  if (value == null || !Number.isFinite(value) || value === 0) return "neutral";
+  return positiveNegativeTone(value, quoteColor) === "green" ? "gain" : "loss";
+}
+
+export function directionBackgroundClass(value: number | null | undefined, quoteColor: QuoteColor): string {
+  if (value == null || !Number.isFinite(value) || value === 0) return "bg-muted-foreground";
+  return positiveNegativeTone(value, quoteColor) === "green" ? "bg-positive" : "bg-negative";
+}
+
+export function directionChartColor(
+  value: number | null | undefined,
+  quoteColor: QuoteColor,
+  theme?: "light" | "dark",
+  opacity?: number,
+): string {
+  const name = value == null || !Number.isFinite(value) || value === 0 ? "muted-foreground"
+    : positiveNegativeTone(value, quoteColor) === "green" ? "positive" : "negative";
+  return chartThemeColor(name, opacity, theme);
 }

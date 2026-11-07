@@ -171,18 +171,44 @@ test("390px CNY phone keeps top coin amounts on one line", async ({ browser }) =
       const run = (query: string) => (window as any).__e2eInvoke("plugin:sql|execute", { query, values: [] });
       await run("INSERT INTO currency_rates (currency, alias, symbol, rate, priority, updatedAt) VALUES ('CNY', 'Chinese yuan', '¥', 7.124, 1, '2099-01-01T00:00:00.000Z')");
       await run("INSERT INTO configuration (id, data) VALUES (7, 'CNY')");
+      for (const [symbol, start, end] of [
+        ["LOSS1", 3_000_000, 1_000_000], ["LOSS2", 3_100_000, 1_000_000],
+        ["LOSS3", 3_200_000, 1_000_000], ["LOSS4", 3_300_000, 1_000_000],
+        ["USDT", 1_000_000, 1_000_000], ["USDC", 1_100_000, 1_100_000],
+        ["DAI", 1_200_000, 1_200_000], ["FDUSD", 1_300_000, 1_300_000],
+      ] as const) {
+        await run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+          VALUES ('layout-start', '2026-10-29T09:00:00.000Z', 'layout-wallet', 'crypto', '${symbol}', 1, ${start}, ${start})`);
+        await run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+          VALUES ('layout-end', '2026-10-30T09:00:00.000Z', 'layout-wallet', 'crypto', '${symbol}', 1, ${end}, ${end})`);
+      }
     });
     await page.goto("/#/summary");
     await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 40_000 });
-    const rows = await amountGeometry(page, ".fd-top-coins .fd-top-row", "strong");
+    const rows = await amountGeometry(page, ".fd-top-coins .summary-top-row", "strong");
     expect(rows).toHaveLength(12);
+    const groups = await page.locator(".fd-top-coins .summary-top-list").evaluateAll((lists) =>
+      lists.map((list) => list.querySelectorAll(".summary-top-row").length));
+    expect(groups).toHaveLength(3);
+    for (const group of groups)
+      expect(group).toBe(4);
     for (const row of rows) {
       expect(row.cells[0].text).toContain("¥");
       expect(row.cells[0].height).toBeLessThanOrEqual(row.cells[0].lineHeight * 1.2);
     }
-    const clipping = await page.locator(".fd-top-coins .fd-top-row > strong")
+    const clipping = await page.locator(".fd-top-coins .summary-top-row > strong")
       .evaluateAll((elements) => elements.map((element) => element.scrollWidth - element.clientWidth));
     for (const clipped of clipping) expect(clipped).toBeLessThanOrEqual(1);
+    const layout = await page.locator(".fd-top-coins .summary-top-row").evaluateAll((elements) =>
+      elements.map((row) => {
+        const track = row.querySelector(".summary-top-track")!.getBoundingClientRect();
+        const percent = row.querySelector("small")!.getBoundingClientRect();
+        return { track: track.width, percentRight: percent.right, rowRight: row.getBoundingClientRect().right };
+      }));
+    for (const row of layout) {
+      expect(row.track).toBeGreaterThanOrEqual(80);
+      expect(row.percentRight).toBeLessThanOrEqual(row.rowRight + 1);
+    }
     mkdirSync("/tmp/attribution-layout", { recursive: true });
     await page.locator(".fd-top-coins").screenshot({ path: "/tmp/attribution-layout/phone-top-coins-390-cny.png" });
   } finally { await context.close(); }

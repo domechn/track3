@@ -32,6 +32,7 @@ import { formatOverviewAxisTicks } from "@/components/overview-chart-scale";
 import { isValid, parse } from "date-fns";
 import { enUS, zhCN } from "date-fns/locale";
 import "@/mobile/components/mobile/fidelity.css";
+import { directionColorVar, directionTone } from "@/utils/color";
 
 type Snapshot = Awaited<ReturnType<typeof queryHistoricalData>>[number];
 type Asset = Awaited<ReturnType<typeof queryLatestAssetsPercentage>>[number];
@@ -67,7 +68,7 @@ const pct = (value: number, digits = 2, signed = true) => {
   const rounded = Number((value * 100).toFixed(digits));
   return `${signed && rounded > 0 ? "+" : rounded < 0 ? "−" : ""}${Math.abs(rounded).toFixed(digits)}%`;
 };
-const tone = (value: number) => value > 0 ? "gain" : value < 0 ? "loss" : "neutral";
+const tone = directionTone;
 const dash = "—";
 const total = (snapshot: Snapshot | null) => snapshot?.total ?? 0;
 const from = (snapshot: Snapshot | null) => snapshot ? new Date(snapshot.createdAt) : null;
@@ -126,18 +127,20 @@ function Chart({ points, values, formatValue, formatTick, change, best }: { poin
     {bestIndex >= 0 && best && <><line x1={x(bestIndex)} x2={x(bestIndex)} y1="29" y2="166" stroke="var(--fd-faint)" opacity=".45" shapeRendering="crispEdges" />
       <line x1={x(bestIndex)} x2={x(bestIndex)} y1="22" y2="29" stroke="var(--fd-faint)" opacity=".45" shapeRendering="crispEdges" />
       <text x="11" y="17" fill="var(--fd-faint)" fontSize="11">{t("fidelity.overview.bestDayChart").replace("{date}", shortDate(best.date, locale)).replace("{change}", best.change).replace("{symbol}", best.symbol).replace("{symbolChange}", best.symbolChange)}</text></>}
+    {/* color-semantics: neutral total-value line shows level, not change. */}
     <path d={values.map((value, index) => `${index ? "L" : "M"}${x(index).toFixed(2)} ${y(value).toFixed(2)}`).join(" ")} fill="none" stroke="var(--fd-accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
     {labelIndices.map((index, order) => <text key={index} x={x(index) - (order === 0 ? 0 : order === labelIndices.length - 1 ? 40 : 20)} y="182" fill="var(--fd-faint)" fontSize="12">{shortDate(new Date(points[index].timestamp), locale)}</text>)}
     <text x="320" y={y(values.at(-1) ?? 0) + 4} textAnchor="end" fill="var(--fd-text)" fontSize="12" fontWeight="600">{formatValue(values.at(-1) ?? 0)}</text>
     {selected !== null && points[selected] && <>
       <line x1={x(selected)} x2={x(selected)} y1="29" y2="166" stroke="var(--fd-faint)" opacity=".35" />
+      {/* color-semantics: neutral selection ring marks a point on the total-value line. */}
       <circle cx={x(selected)} cy={y(values[selected])} r="3.5" fill="var(--fd-surface)" stroke="var(--fd-accent)" strokeWidth="2" />
       <g transform={`translate(${Math.min(324 - tipWidth, x(selected) + 12)},0)`}><rect width={tipWidth} height="46" rx="6" fill="var(--fd-raised)" stroke="var(--fd-control)" /><text x="8" y="18" fill="var(--fd-muted)" fontSize="12">{shortDate(new Date(points[selected].timestamp), locale)}</text><text x="8" y="35" fill="var(--fd-text)" fontSize="12" fontWeight="600">{selectedValue}</text></g>
     </>}
   </svg>;
 }
 
-function DailyChart({ daily, currency }: { daily: { timestamp: number; value: number }[]; currency: CurrencyRateDetail }) {
+function DailyChart({ daily, currency, quoteColor }: { daily: { timestamp: number; value: number }[]; currency: CurrencyRateDetail; quoteColor: QuoteColor }) {
   const { t, locale } = useTranslation();
   const converted = daily.map((item) => currencyWrapper(currency)(item.value));
   const peak = Math.max(1, ...converted.map(Math.abs));
@@ -148,16 +151,18 @@ function DailyChart({ daily, currency }: { daily: { timestamp: number; value: nu
   const label = (value: number) => value === 0 ? "0" : `${value > 0 ? "+" : "−"}${Math.abs(Math.round(value / 1000))}K`;
   return <svg className="fd-overview-daily-chart" viewBox="0 0 324 170" role="img" aria-label={t("overview.design.dailyChart")}>
     {[-bound, -bound / 2, 0, bound / 2, bound].map((value) => <g key={value}>
-      <line x1="48" x2="324" y1={y(value)} y2={y(value)} stroke="var(--fd-border)" />
+      <line x1="48" x2="324" y1={y(value)} y2={y(value)} stroke="var(--fd-border)"
+        data-direction-zero-axis={value === 0 ? "" : undefined} />
       <text x="40" y={y(value) + 4} textAnchor="end" fill="var(--fd-faint)" fontSize="12">{label(value)}</text>
     </g>)}
-    <text x="50" y="16" fill="var(--fd-faint)" fontSize="11">↑ {t("fidelity.overview.chartUp")}</text>
-    <text x="50" y="151" fill="var(--fd-faint)" fontSize="11">↓ {t("fidelity.overview.chartDown")}</text>
+    <text x="50" y="16" fill={directionColorVar(1, quoteColor)} fontSize="11">↑ {t("fidelity.overview.chartUp")}</text>
+    <text x="50" y="151" fill={directionColorVar(-1, quoteColor)} fontSize="11">↓ {t("fidelity.overview.chartDown")}</text>
     {daily.map((item, index) => {
       const value = converted[index];
       const top = Math.min(y(value), y(0));
       return <rect key={item.timestamp} x={x(index) - 3} y={top} width="6" height={Math.max(1, Math.abs(y(value) - y(0)))}
-        fill={value < 0 ? "var(--fd-loss)" : "var(--fd-accent)"}><title>{shortDate(new Date(item.timestamp), locale)}: {amt(item.value, currency, 0, true)}</title></rect>;
+        data-direction={value > 0 ? "gain" : value < 0 ? "loss" : "neutral"}
+        fill={directionColorVar(value, quoteColor)}><title>{shortDate(new Date(item.timestamp), locale)}: {amt(item.value, currency, 0, true)}</title></rect>;
     })}
     {daily.filter((_, index) => (index > 0 && index % 10 === 0) || index === daily.length - 1).map((item) => {
       const index = daily.indexOf(item);
@@ -478,7 +483,7 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
           <footer><span>{t("fidelity.overview.insightsSettingsNote")}</span></footer>
         </section>)}
       <section className="fd-card fd-overview-daily"><div className="fd-card-heading"><h3>{t("overview.design.dailyChange")}</h3><span>{t("fidelity.overview.dailySubtitle")}</span></div>
-        <DailyChart daily={daily} currency={currency} />
+        <DailyChart daily={daily} currency={currency} quoteColor={quoteColor} />
       </section>
       <section className="fd-card fd-overview-moved"><div className="fd-card-heading"><h3>{t("overview.design.whatMoved")}</h3><span>{t("fidelity.overview.movedSubtitle").replace("{amount}", amt(weekChange, currency, 0, true))}</span></div>
         {movers.map((item) => <Link key={item.key} className="fd-overview-mover" to={buildAssetDetailsPath({ symbol: item.symbol, assetType: item.key.startsWith("stock:") ? "stock" : "crypto" })}>

@@ -1893,6 +1893,7 @@
   "sync.status.syncedAt": "Synced {time}",
   "cost.fidelity.title": "Cost basis",
   "records.controls": "Records controls",
+  "records.historyFilters": "History filters",
   "cost.fidelity.subtitle": "Gains on sales in {period} ({from} – {to}) using {method}. Unrealized gains use today's prices.",
   "cost.fidelity.taxYearNumber": "tax year {year}",
   "cost.fidelity.customRangeLower": "custom range",

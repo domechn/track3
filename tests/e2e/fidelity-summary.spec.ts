@@ -1,10 +1,84 @@
 import { expect, test } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { installTauriBridge } from "./fidelity-scenes";
+import { seedSummaryYears } from "./summary-years-scenes";
 
 test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name !== "mobile"); });
 
 const phone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+
+for (const width of [390, 834]) {
+  test(`2026 month and year cards keep their content height at ${width}px`, async ({ browser }) => {
+    test.setTimeout(90_000);
+    const context = await browser.newContext({ viewport: { width, height: 1024 }, userAgent: phone,
+      isMobile: true, hasTouch: true, timezoneId: "UTC", reducedMotion: "reduce" });
+    try {
+      const page = await context.newPage();
+      await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
+      await installTauriBridge(page, { fidelitySample: "full" });
+      await page.goto("/#/summary");
+      if (width === 390) await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+      const monthSelector = width === 390 ? ".fd-month" : ".profit-month-card";
+      await expect(page.locator(monthSelector)).toHaveCount(10, { timeout: 50_000 });
+      await expect(page.locator(monthSelector).first()).toBeVisible({ timeout: 50_000 });
+      if (width === 834) {
+        await expect(page.locator(".d2-summary")).toHaveAttribute("aria-busy", "false", { timeout: 50_000 });
+        await expect(page.locator(".profit-summary-card")).toBeInViewport({ timeout: 50_000 });
+        await expect(page.locator(".d2-summary").locator("..")).toHaveCSS("opacity", "1", { timeout: 50_000 });
+      }
+      const cards = await page.evaluate(() => {
+        const rect = (node: Element) => node.getBoundingClientRect();
+        return {
+          months: [...document.querySelectorAll(".fd-month, .profit-month-card")].map((card) => ({
+            y: rect(card).y,
+            height: rect(card).height,
+            blank: rect(card).bottom - rect(card.querySelector(card.classList.contains("fd-month") ? ".fd-month-foot" : "button")!).bottom,
+            contentGap: card.classList.contains("profit-month-card")
+              ? rect(card.querySelector("button > :nth-child(2)")!).top - rect(card.querySelector("button > :first-child")!).bottom
+              : 0,
+          })),
+          years: [...document.querySelectorAll(".fd-year")].map((card) => ({
+            height: rect(card).height,
+            blank: rect(card).bottom - rect(card.querySelector(".fd-year-foot")!).bottom,
+          })),
+        };
+      });
+      for (const month of cards.months) {
+        // iPad month cards use a compact five-column row, so their height floor is 68px.
+        expect(Math.round(month.height)).toBeGreaterThanOrEqual(width === 834 ? 68 : 140);
+        expect(Math.round(month.height)).toBeLessThanOrEqual(200);
+        expect(month.blank).toBeLessThan(40);
+        if (width === 834) {
+          expect(month.height).toBeLessThanOrEqual(120);
+          expect(month.contentGap).toBeLessThan(40);
+        }
+      }
+      if (width === 834) {
+        for (const row of new Set(cards.months.map(({ y }) => y))) {
+          expect(new Set(cards.months.filter((card) => card.y === row).map((card) => card.height)).size).toBe(1);
+        }
+        mkdirSync("/tmp/summary-card-height", { recursive: true });
+        await page.screenshot({ path: "/tmp/summary-card-height/summary-834-dark.png", fullPage: true });
+      }
+      for (const year of cards.years) {
+        expect(year.height).toBeLessThanOrEqual(200);
+        expect(year.blank).toBeLessThan(40);
+      }
+      expect(cards.months[0].y).toBe(cards.months[1].y);
+      if (width === 390) expect(cards.years.length).toBeGreaterThan(0);
+      else {
+        await page.locator(".profit-summary-card").getByRole("radio", { name: "Y" }).click();
+        const years = page.locator(".profit-summary-card .profit-period-grid > div");
+        await expect(years).toHaveCount(2);
+        for (const year of await years.all()) {
+          const gap = await year.evaluate((card) =>
+            card.getBoundingClientRect().bottom - card.lastElementChild!.getBoundingClientRect().bottom);
+          expect(gap).toBeLessThan(40);
+        }
+      }
+    } finally { await context.close(); }
+  });
+}
 
 test("summary keeps the approved layout when history has month gaps", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
@@ -15,6 +89,122 @@ test("summary keeps the approved layout when history has month gaps", async ({ b
     await page.goto("/#/summary");
     await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
     await expect(page.locator(".fd-summary > .fd-card")).toHaveCount(6);
+  } finally { await context.close(); }
+});
+
+test("phone By year pages twelve years three at a time", async ({ browser }) => {
+  test.setTimeout(90_000);
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
+    isMobile: true, hasTouch: true, timezoneId: "UTC" });
+  try {
+    const page = await context.newPage();
+    await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
+    await installTauriBridge(page, { fidelitySample: "full" });
+    await page.goto("/#/summary");
+    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
+    const twoYearMonthHeight = (await page.locator(".fd-month").first().boundingBox())!.height;
+    await seedSummaryYears(page, 2024);
+    await page.reload();
+    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
+    await expect(page.locator(".fd-years .fd-year")).toHaveCount(3);
+    const threeYearHeight = (await page.locator(".fd-years").boundingBox())!.height;
+    await seedSummaryYears(page, 2015);
+    await page.reload();
+    const section = page.locator(".fd-years");
+    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
+    await expect(section.locator(".fd-year")).toHaveCount(3);
+    expect(Math.abs((await section.boundingBox())!.height - threeYearHeight)).toBeLessThanOrEqual(2);
+    expect((await page.locator(".fd-month").first().boundingBox())!.height).toBe(twoYearMonthHeight);
+    await expect(section.locator(".fd-year").first()).toContainText("2026");
+    await expect(section.getByRole("navigation", { name: "By year" })).toContainText("Showing 1-3 of 12");
+    await section.getByRole("button", { name: "Next" }).click();
+    await expect(section.locator(".fd-year").first()).toContainText("2023");
+    await section.getByRole("button", { name: "Previous" }).click();
+    await expect(section.locator(".fd-year").first()).toContainText("2026");
+  } finally { await context.close(); }
+});
+
+test("phone Top coins preview caps a populated group at four rows", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
+    isMobile: true, hasTouch: true, timezoneId: "UTC" });
+  try {
+    const page = await context.newPage();
+    await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
+    await installTauriBridge(page, { fidelitySample: "full" });
+    await page.evaluate(async () => {
+      for (let index = 0; index < 6; index++) {
+        for (const [uuid, date, value] of [
+          ["fidelity-start", "2025-07-01T09:41:00.000Z", 100],
+          ["fidelity-day-30", "2026-10-31T09:41:00.000Z", 100_000 + index * 1000],
+        ] as const) {
+          await (window as any).__e2eInvoke("plugin:sql|execute", {
+            query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+              VALUES (?, ?, ?, 'crypto', ?, 1, ?, ?)`,
+            values: [uuid, date, `preview-${index}`, `GAIN${index}`, value, value],
+          });
+        }
+      }
+    });
+    await page.goto("/#/summary");
+    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
+    const profitRows = page.locator(".fd-top-coins .summary-top-list").first().locator(".summary-top-row");
+    await expect(profitRows).toHaveCount(4);
+    await expect(profitRows.first()).toContainText("GAIN5");
+  } finally { await context.close(); }
+});
+
+test("iPad year picker reaches the oldest year with the keyboard", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 834, height: 1024 }, userAgent: phone,
+    isMobile: true, hasTouch: true, timezoneId: "UTC" });
+  try {
+    const page = await context.newPage();
+    await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
+    await installTauriBridge(page, { fidelitySample: "full" });
+    await seedSummaryYears(page, 2015);
+    await page.goto("/#/summary");
+    await expect(page.locator(".profit-summary-card .profit-month-card").first()).toBeVisible({ timeout: 50_000 });
+    const summary = page.locator(".profit-summary-card");
+    await summary.getByRole("radio", { name: "Y" }).click();
+    const yearCards = summary.locator(".profit-period-grid > div");
+    await expect(yearCards).toHaveCount(4);
+    await expect(summary.getByRole("navigation")).toContainText("Showing 1-4 of 12");
+    const positions = await yearCards.evaluateAll((cards) => cards.map((card) => {
+      const { x, y } = card.getBoundingClientRect();
+      return { x, y };
+    }));
+    expect(new Set(positions.map(({ x }) => x)).size).toBe(4);
+    expect(new Set(positions.map(({ y }) => y)).size).toBe(1);
+    await summary.getByRole("radio", { name: "M" }).click();
+    await summary.getByRole("combobox", { name: "Select Year 2026" }).click();
+    await expect(page.getByRole("option")).toHaveCount(12);
+    await expect(page.getByRole("listbox").getByRole("navigation")).toHaveCount(0);
+    await page.keyboard.press("End");
+    await expect(page.getByRole("option", { name: "2015" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".profit-summary-card").getByRole("combobox", { name: "Select Year 2015" })).toBeVisible();
+  } finally { await context.close(); }
+});
+
+test("iPhone Returns year picker reaches the oldest year with the keyboard", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
+    isMobile: true, hasTouch: true, timezoneId: "UTC" });
+  try {
+    const page = await context.newPage();
+    await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
+    await installTauriBridge(page, { fidelitySample: "full" });
+    await seedSummaryYears(page, 2015);
+    await page.goto("/#/summary");
+    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
+    await page.locator(".mobile-tab-bar").getByRole("link", { name: "Analytics" }).click();
+    await page.getByRole("dialog", { name: "Analytics" }).getByRole("button", { name: /Returns/ }).click();
+    const sheet = page.getByRole("dialog", { name: "Returns" });
+    await expect(sheet.locator(".d2-profit-sheet")).toBeVisible();
+    await sheet.getByRole("combobox", { name: "Select Year 2026" }).click();
+    await expect(page.getByRole("option")).toHaveCount(12);
+    await page.keyboard.press("End");
+    await expect(page.getByRole("option", { name: "2015" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(sheet.getByRole("combobox", { name: "Select Year 2015" })).toBeVisible();
   } finally { await context.close(); }
 });
 
@@ -33,7 +223,7 @@ test("Summary uses the same profit for All and 1Y when both cover every snapshot
     await expect(main.locator(".fd-primary-stat strong")).toHaveText("+$4,368.50");
     await expect(main.locator(".fd-month").filter({ hasText: "Aug" })).toContainText("−$9,598");
     await expect(main.locator(".fd-summary-chart")).toContainText("$4,369");
-    const topTotal = (await main.locator(".fd-top-row strong").allTextContents())
+    const topTotal = (await main.locator(".summary-top-row strong").allTextContents())
       .reduce((sum, text) => sum + Number(text.replace("−", "-").replace(/[^0-9.-]/g, "")), 0);
     expect(Math.abs(topTotal - 4_368.50)).toBeLessThan(5);
   } finally { await context.close(); }
@@ -122,15 +312,28 @@ test("summary full state follows the approved card order and captures at 390px",
     mkdirSync("/tmp/fidelity/summary", { recursive: true });
     await expect(page.locator(".fd-primary-stat")).toContainText("+$188,809.27");
     await expect(page.locator(".fd-page-head p strong")).toHaveText("+$188,809");
+    await page.evaluate(() => document.fonts.ready);
+    const textWidths = await page.evaluate(() => {
+      const width = (selector: string) => {
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector(selector)!);
+        return range.getBoundingClientRect().width;
+      };
+      return { title: width(".fd-page-head h1"), value: width(".fd-primary-stat strong") };
+    });
+    expect(textWidths.title).toBeCloseTo(97.46875, 1);
+    expect(textWidths.value).toBeCloseTo(205.328125, 1);
     await expect(page.locator(".fd-page-head p")).toContainText("$265,000");
     await expect(page.locator(".fd-kpis")).toContainText("+32.84%");
     await expect(page.locator(".fd-kpis")).toContainText("$575,000");
     expect((await page.locator(".fd-three>div:first-child small").boundingBox())!.y).toBe(382);
     expect((await page.locator(".fd-chart-caption").boundingBox())!.y).toBe(436);
+    expect((await page.locator(".fd-chart-caption").boundingBox())!.height).toBe(36);
+    expect((await page.locator(".fd-ath").boundingBox())!.y).toBe(697);
     await expect(page.locator(".fd-year").first()).toContainText("+$60,109");
     await expect(page.locator(".fd-year").first()).toContainText("+$105,000");
-    await expect(page.locator(".fd-top-row").filter({ hasText: "SOL" }).locator("strong")).toHaveText("−$9,300");
-    await expect(page.locator(".fd-top-coins .fd-top-row").nth(6).locator("b")).toHaveText("USDT");
+    await expect(page.locator(".summary-top-row").filter({ hasText: "SOL" }).locator("strong")).toHaveText("−$9,300");
+    await expect(page.locator(".fd-top-coins .summary-top-row").nth(6).locator("b")).toHaveText("USDT");
     await expect(page.locator(".fd-attribution .fd-attr-row").first()).toContainText("Quantity +$38,000");
     const totalRange = page.locator(".fd-attr-total > span").first();
     await expect(totalRange).toHaveText("$310K → $764K");
@@ -155,7 +358,7 @@ test("summary full state follows the approved card order and captures at 390px",
       .evaluate((node) => parseFloat((node as HTMLElement).style.width))).toBeCloseTo(50, 0);
     await expect(page.locator(".fd-month").filter({ hasText: "Feb" }).locator(".fd-month-foot span").first()).toHaveCSS("color", "rgb(155, 157, 163)");
     await page.locator("#app-main-content").evaluate((node) => { node.scrollTop = 0; });
-    expect(Math.round((await page.locator(".fd-top-coins").boundingBox())!.y)).toBe(3147);
+    expect(Math.round((await page.locator(".fd-top-coins").boundingBox())!.y)).toBe(3165);
     await expect(page.locator(".fd-month").last()).toContainText("Oct");
     await expect(page.locator(".fd-month").last()).toContainText("up");
     await expect(page.locator(".fd-month").last()).toContainText("down");
@@ -272,7 +475,7 @@ test("summary and coin detail use the light palette when Light is selected", asy
     for (const route of ["summary", "coins/BTC"]) {
       await page.goto(`/#/${route}`);
       await expect(page.locator(route.startsWith("coins") ? ".fd-coin" : ".fd-summary"))
-        .toHaveAttribute("data-state", "ready");
+        .toHaveAttribute("data-state", "ready", { timeout: 30_000 });
       expect(await page.locator(".fd-page").evaluate((node) => getComputedStyle(node).backgroundColor)).not.toBe("rgb(13, 13, 14)");
       expect(await page.locator(".fd-card").first().evaluate((node) => getComputedStyle(node).color)).not.toBe("rgb(255, 255, 255)");
       expect(await page.locator(".mobile-tab-bar").evaluate((node) => getComputedStyle(node).backgroundColor)).not.toBe("rgb(13, 13, 14)");
@@ -346,7 +549,7 @@ test("summary P&L chart exposes the value and month while scrubbing", async ({ b
     await installTauriBridge(page, { fidelitySample: "full" });
     await page.goto("/#/summary");
     const chart = page.locator(".fd-summary-chart");
-    await expect(chart).toBeVisible();
+    await expect(chart).toBeVisible({ timeout: 30_000 });
     await chart.scrollIntoViewIfNeeded();
     const box = (await chart.boundingBox())!;
     await page.mouse.move(box.x + box.width * .35, box.y + box.height * .5);
