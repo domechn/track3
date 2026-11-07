@@ -170,15 +170,16 @@ test("the desktop rule column header stays visible while rules scroll", async ({
   await seedGoals(page, 25, 0);
   await page.goto("/#/goals");
   const list = page.locator(".t3-fidelity-rule-list");
-  const header = list.locator(".t3-fidelity-table-head");
   await expect(list.locator(".t3-fidelity-goal-row:not(.t3-fidelity-table-head)")).toHaveCount(20);
-  const before = (await header.boundingBox())!.y;
   const scroll = await list.evaluate((element) => {
     element.scrollTop = 120;
     return element.scrollTop;
   });
   expect(scroll).toBeGreaterThan(0);
-  expect(Math.abs((await header.boundingBox())!.y - before)).toBeLessThanOrEqual(1);
+  const headerOffset = await list.evaluate((element) =>
+    element.querySelector(".t3-fidelity-table-head")!.getBoundingClientRect().top
+      - element.getBoundingClientRect().top);
+  expect(Math.abs(headerOffset)).toBeLessThanOrEqual(0.5);
 });
 
 test("a coin with no transactions has substantial lots and transaction states", async ({ page }) => {
