@@ -88,7 +88,9 @@ for (const width of [820, 1024]) {
       await expect(page.locator(".comparison-movers li").first()).toBeVisible();
       await expect(page.locator(".comparison-movers li")).toHaveCount(20);
       await expect(page.locator(".comparison-movers > section").first().locator("li").first()).toContainText("+$7,433,476.36");
-      await expect(page.locator(".comparison-movers > section").last().locator("li").first()).toContainText("+3611.22%");
+      const largestPercent = page.locator(".comparison-movers > section").last().locator("li").first().locator("span").last();
+      await expect(largestPercent).toHaveText(">999%");
+      await expect(largestPercent).toHaveAttribute("title", "+3611.22%");
       await expect(page.locator(".comparison-movers-more").first()).toHaveText("and 1 more");
       await expectMoverGeometry(page, ".d2-comparison .comparison-movers > section", "li", ".comparison-mover-track", 44);
       await expect(page.locator(".comparison-movers-more").first()).toHaveText("Show less");

@@ -174,15 +174,25 @@ test("390px CNY phone keeps top coin amounts on one line", async ({ browser }) =
     });
     await page.goto("/#/summary");
     await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 40_000 });
-    const rows = await amountGeometry(page, ".fd-top-coins .fd-top-row", "strong");
+    const rows = await amountGeometry(page, ".fd-top-coins .summary-top-row", "strong");
     expect(rows).toHaveLength(12);
     for (const row of rows) {
       expect(row.cells[0].text).toContain("¥");
       expect(row.cells[0].height).toBeLessThanOrEqual(row.cells[0].lineHeight * 1.2);
     }
-    const clipping = await page.locator(".fd-top-coins .fd-top-row > strong")
+    const clipping = await page.locator(".fd-top-coins .summary-top-row > strong")
       .evaluateAll((elements) => elements.map((element) => element.scrollWidth - element.clientWidth));
     for (const clipped of clipping) expect(clipped).toBeLessThanOrEqual(1);
+    const layout = await page.locator(".fd-top-coins .summary-top-row").evaluateAll((elements) =>
+      elements.map((row) => {
+        const track = row.querySelector(".summary-top-track")!.getBoundingClientRect();
+        const percent = row.querySelector("small")!.getBoundingClientRect();
+        return { track: track.width, percentRight: percent.right, rowRight: row.getBoundingClientRect().right };
+      }));
+    for (const row of layout) {
+      expect(row.track).toBeGreaterThanOrEqual(80);
+      expect(row.percentRight).toBeLessThanOrEqual(row.rowRight + 1);
+    }
     mkdirSync("/tmp/attribution-layout", { recursive: true });
     await page.locator(".fd-top-coins").screenshot({ path: "/tmp/attribution-layout/phone-top-coins-390-cny.png" });
   } finally { await context.close(); }
