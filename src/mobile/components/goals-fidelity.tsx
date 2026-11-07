@@ -6,6 +6,10 @@ import {
 } from "@/middlelayers/alerts";
 import type { AlertDraft } from "@/middlelayers/ui-state/alert-draft";
 import { alertDraftFromRule, alertRuleFromDraft } from "@/middlelayers/ui-state/alert-draft";
+import { alertTemplateDraft, alertTemplates } from "@/components/goals-alert-templates";
+import { BellIcon, TargetIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
+import { AttributionPager, useAttributionPage } from "@/components/attribution-pager";
 import type { RebalanceProfile } from "@/middlelayers/rebalance";
 import { useTranslation } from "@/mobile/i18n";
 import { ConfirmSheet, ModalPage } from "@/mobile/components/mobile/overlays";
@@ -27,7 +31,7 @@ type Props = {
   draft: AlertDraft;
   editorOpen: boolean;
   onDraft: (draft: AlertDraft) => void;
-  onOpenEditor: (rule?: AlertRule) => void;
+  onOpenEditor: (rule?: AlertRule, draft?: AlertDraft) => void;
   onCloseEditor: () => void;
   onSave: () => Promise<void>;
   onToggle: (rule: AlertRule, enabled: boolean) => void;
@@ -93,6 +97,8 @@ export default function GoalsFidelity({
   const [setupOpen, setSetupOpen] = useState(false);
   const [invalid, setInvalid] = useState(false);
   const orderedRules = [...rules].sort((a, b) => a.id - b.id);
+  const rulePaging = useAttributionPage(orderedRules, orderedRules.map((rule) => rule.id).join(","), 20);
+  const historyPaging = useAttributionPage(history, history.map((alert) => alert.id).join(","), 20);
   const lastAt = snapshots[0]?.at;
   const lastTime = hour(lastAt);
   const onCount = rules.filter((rule) => rule.enabled).length;
@@ -379,7 +385,7 @@ export default function GoalsFidelity({
         {kpi(t("fidelity.goals.lastCheck"), lastTime, t("fidelity.goals.todayRefresh"),
           lastAt && rules.length ? "" : "pf-zero")}
       </section>
-      <section className="pf-card pf-rules-list"><div className="pf-card-head"><h2 aria-label={t("fidelity.goals.rules")}><button className="pf-heading-action"
+      <section className={`pf-card pf-rules-list${rules.length > 7 ? " pf-scroll-list" : ""}`}><div className="pf-card-head"><h2 aria-label={t("fidelity.goals.rules")}><button className="pf-heading-action"
         aria-label={t("fidelity.goals.options")} aria-expanded={setupOpen}
         aria-controls="pf-rules-links" onClick={() => setSetupOpen(!setupOpen)}>
         {t("fidelity.goals.rules")}</button></h2>
@@ -391,7 +397,7 @@ export default function GoalsFidelity({
           <button onClick={() => { setSetupOpen(false); navigate("/goals?view=kinds"); }}>{t("fidelity.goals.ruleKinds")}</button>
           {onAdvanced && <button onClick={() => { setSetupOpen(false); onAdvanced(); }}>{t("fidelity.goals.advanced")}</button>}
         </div>}
-        {loading ? <div role="status">{t("goals.loading")}</div> : rules.length ? orderedRules.map((rule) => {
+        {loading ? <div role="status">{t("goals.loading")}</div> : rules.length ? rulePaging.rows.map((rule) => {
           const measured = measureRule(rule, snapshots, prices, targets);
           const progress = progressFor(rule, measured.value);
           const cooldownMinutes = Number(alertDraftFromRule(rule).cooldownMinutes);
@@ -439,15 +445,19 @@ export default function GoalsFidelity({
             <div className="pf-goal-actions"><button aria-label={t("fidelity.goals.editNamed").replace("{rule}", titleFor(rule))} onClick={() => openEdit(rule)}><PlanIcon name="edit" /></button>
               <button aria-label={t("fidelity.goals.deleteNamed").replace("{rule}", titleFor(rule))} onClick={() => setDeleteRule(rule)}><PlanIcon name="trash" /></button></div>
           </div>;
-        }) : <div className="pf-empty"><b>{t("fidelity.goals.noRules")}</b><span>{t("fidelity.goals.noRulesHelp")}</span>
-          <button className="pf-add" onClick={openAdd}><PlanIcon name="plus" />{t("fidelity.goals.addRule")}</button></div>}
+        }) : <EmptyState icon={TargetIcon} title={t("goals.empty.title")} hint={t("goals.empty.hint")} className="pf-empty">
+          <button className="pf-add" onClick={openAdd}><PlanIcon name="plus" />{t("goals.newRule")}</button>
+          <div className="t3-empty-state-chips">{alertTemplates.map((template) => <button key={template}
+            onClick={() => { setInvalid(false); onOpenEditor(undefined, alertTemplateDraft(template, snapshots[0])); }}>{t(`goals.template.${template}`)}</button>)}</div>
+        </EmptyState>}
+        <AttributionPager count={rules.length} {...rulePaging} t={t} ariaLabel={t("goals.rules")} />
       </section>
-      <section className="pf-card pf-history"><div className="pf-card-head"><h2>{t("fidelity.goals.triggered")}</h2>
+      <section className={`pf-card pf-history${history.length > 5 ? " pf-scroll-list" : ""}`}><div className="pf-card-head"><h2>{t("fidelity.goals.triggered")}</h2>
         {!!unreadCount && <span className="pf-badge">{unreadCount}</span>}
-        {!!history.length && <div className="pf-history-actions"><button onClick={onAckAll} disabled={!unreadCount}>{t("goals.ackAll")}</button>
-          <button onClick={() => setClearOpen(true)}>{t("fidelity.goals.clear")}</button></div>}</div>
+        <div className="pf-history-actions"><button onClick={onAckAll} disabled={!unreadCount}>{t("goals.ackAll")}</button>
+          <button onClick={() => setClearOpen(true)} disabled={!history.length}>{t("fidelity.goals.clear")}</button></div></div>
         {history.length ? <>
-          <div className="pf-history-list">{history.map((alert) => {
+          <div className="pf-history-list">{historyPaging.rows.map((alert) => {
             const text = alertText(alert, t, locale, rules.find((rule) => rule.id === alert.ruleId),
               { snapshots, prices, targets });
             return <div className={`pf-alert-row ${alert.acknowledgedAt ? "" : "pf-unread"}`} key={alert.id}>
@@ -456,9 +466,9 @@ export default function GoalsFidelity({
               <div className="pf-alert-action">{alert.acknowledgedAt ? <span><PlanIcon name="check" />{t("fidelity.goals.read")}</span>
                 : <button onClick={() => onAck(alert)}>{t("goals.ack")}</button>}</div>
             </div>;
-          })}</div>
+          })}</div><AttributionPager count={history.length} {...historyPaging} t={t} ariaLabel={t("goals.history")} />
           <div className="pf-foot"><PlanIcon name="info" />{t("fidelity.goals.ackNote")}</div>
-        </> : <div className="pf-empty"><span>{t("fidelity.goals.noAlerts")}</span></div>}
+        </> : <EmptyState icon={BellIcon} title={t("goals.noHistory")} hint={t("goals.history.empty.hint")} className="pf-empty" />}
       </section>
     </>}
     {edit}{deleteOverlay}{clearOverlay}

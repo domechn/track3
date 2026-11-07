@@ -4,6 +4,8 @@ import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
 import { useDarkTheme } from "./common/theme";
+import { TargetIcon } from "@radix-ui/react-icons";
+import EmptyState from "./empty-state";
 import {
   calculateRebalance,
   deleteRebalanceProfile,
@@ -431,7 +433,8 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down", 
           </details>
           <p className="t3-rebalance-sync-note">{t("rebalance.syncNote")}</p>
           {!optionsValid && <p role="alert" className="text-xs text-destructive">{t("rebalance.validationOptions")}</p>}
-          {!targets.length && <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">{t("rebalance.empty")}</p>}
+          {!targets.length && <EmptyState icon={TargetIcon} title={t("rebalance.empty")}
+            hint={t("rebalance.fidelity.emptySubtitle")} />}
           {result && (
             <>
               <RebalanceCharts result={result} quoteColor={quoteColor} tolerancePercent={tolerance} />

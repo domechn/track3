@@ -73,6 +73,9 @@ for (const state of sourceStates) {
       const card = await page.getByTestId("source-table").boundingBox();
       expect(card?.y).toBe(160);
       expect(card?.height).toBe(188);
+      await expect(page.getByTestId("source-table")).toHaveCSS("border-top-style", "solid");
+      await expect(page.locator(".t3-fidelity-source-empty-inner")).toHaveCSS("border-top-style", "dashed");
+      await expect(page.locator(".t3-fidelity-source-empty-inner .t3-empty-state-icon")).toBeVisible();
     }
     await shot(page, `sources-${state}`);
     if (state === "default") {

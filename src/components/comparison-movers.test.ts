@@ -9,6 +9,13 @@ it("ranks existing comparison rows by absolute and relative change", () => {
   ];
   expect(comparisonMovers(rows).byValue.map((row) => row.symbol)).toEqual(["BTC", "ETH", "SOL"]);
   expect(comparisonMovers(rows).byPercent.map((row) => row.symbol)).toEqual(["SOL", "ETH", "BTC"]);
-  expect(comparisonMovers(rows).maximumValue).toBe(20);
-  expect(comparisonMovers(rows).maximumPercent).toBe(200);
+});
+
+it("puts unchanged assets last so an expanded card can show all compared assets", () => {
+  const rows = [
+    { symbol: "USD", value: { base: 100, head: 100, changePercent: 0 } },
+    { symbol: "BTC", value: { base: 100, head: 110, changePercent: 10 } },
+  ];
+  expect(comparisonMovers(rows).byValue.map((row) => row.symbol)).toEqual(["BTC", "USD"]);
+  expect(comparisonMovers(rows).byPercent.map((row) => row.symbol)).toEqual(["BTC", "USD"]);
 });

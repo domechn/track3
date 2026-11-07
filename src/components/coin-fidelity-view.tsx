@@ -23,6 +23,8 @@ import { CoinSourceSummary } from "./coin-source-summary";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { Pager, usePager } from "./ui/pager";
 import { CoinLotsTable, CoinSourcesTable, useStickyCoinChart, type CoinLotRow } from "./coin-detail-sections";
+import { ArchiveIcon, BackpackIcon, ClockIcon } from "@radix-ui/react-icons";
+import EmptyState from "./empty-state";
 
 type Props = {
   symbol: string;
@@ -294,13 +296,15 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
         <div className="coin-fidelity-xlabels">{xDates.map(({ timestamp, index }, tick) => <span key={index} style={{ left: `${index / Math.max(1, (series?.timestamps.length ?? 1) - 1) * 100}%`, transform: tick === 0 ? "none" : tick === xDates.length - 1 ? "translateX(-100%)" : "translateX(-50%)" }}>{tickDate(timestamp)}</span>)}</div>
         <div className="coin-fidelity-chart-stats">{metric(t("coin.fidelity.high"), money(high), values.length ? tickDate(series!.timestamps[values.indexOf(high)]) : "–")}{metric(t("coin.fidelity.low"), money(low), values.length ? tickDate(series!.timestamps[values.indexOf(low)]) : "–")}{metric(t("coin.fidelity.since").replace("{date}", tickDate(series?.timestamps[0])), startValue && endValue ? money(endValue-startValue, true) : "–", startValue && endValue ? `${endValue >= startValue ? "+" : "−"}${num(Math.abs((endValue/startValue-1)*100),2)}%` : "–")}</div>
       </section>}
-      <CoinLotsTable rows={displayLots} labels={tableLabels} lotCount={t("coin.fidelity.lotsCount").replace("{count}", String(lotRows.length))} expanded={lotsExpanded} onExpandedChange={setLotsExpanded} />
+      <CoinLotsTable rows={displayLots} labels={tableLabels} lotCount={t("coin.fidelity.lotsCount").replace("{count}", String(lotRows.length))} expanded={lotsExpanded} onExpandedChange={setLotsExpanded}
+        emptyState={<EmptyState icon={ArchiveIcon} title={t("coin.lots.empty.title")} hint={t("coin.lots.empty.hint")} />} />
       </div>
       <div ref={sideColumnRef} className="coin-fidelity-side-column">
       <CoinSourcesTable sources={sources.map((row) => ({ id: row.wallet, label: sourceName(row.wallet),
         kind: assetType === "stock" ? t("coin.fidelity.broker") : isExchangeSource(row.walletType) ? t("coin.fidelity.exchange") : t("coin.fidelity.wallet"),
         amount: row.amount, value: row.value }))} labels={tableLabels} money={(value) => money(value)}
-        quantity={(value) => num(value, custom ? 2 : assetType === "stock" ? 0 : 4)} sectionRef={sideRef} />
+        quantity={(value) => num(value, custom ? 2 : assetType === "stock" ? 0 : 4)} sectionRef={sideRef}
+        emptyState={<EmptyState icon={BackpackIcon} title={t("coin.sources.empty.title")} hint={t("coin.sources.empty.hint")} />} />
       </div>
     </div>
     <section className="coin-fidelity-card coin-fidelity-transactions">
@@ -309,9 +313,10 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
         return <button type="button" key={key} aria-pressed={filter === key} className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>{t(`coin.fidelity.${key}`)} {count}</button>;
       })}</div></div>
       <div ref={transactionScrollArea} className="coin-fidelity-transaction-scroll" role="region" tabIndex={0} aria-label={t("coin.fidelity.transactions")} aria-busy={transactionsLoading} style={rows.length > paging.pageSize ? { height: Math.min(640, 24.5 + paging.pageSize * 52) } : undefined}>
-        <table><thead><tr><th>{t("coin.fidelity.date")}</th><th>{t("coin.fidelity.type")}</th><th>{t("coin.fidelity.quantity")}</th><th>{t("coin.fidelity.price")}</th><th>{t("coin.fidelity.value")}</th><th>{t("coin.fidelity.source")}</th><th>{t("coin.fidelity.note")}</th><th /></tr></thead>
+        {!transactionsLoading && rows.length === 0 ? <EmptyState icon={ClockIcon} title={t("coin.transactions.empty.title")} hint={t("coin.transactions.empty.hint")} />
+          : <table><thead><tr><th>{t("coin.fidelity.date")}</th><th>{t("coin.fidelity.type")}</th><th>{t("coin.fidelity.quantity")}</th><th>{t("coin.fidelity.price")}</th><th>{t("coin.fidelity.value")}</th><th>{t("coin.fidelity.source")}</th><th>{t("coin.fidelity.note")}</th><th /></tr></thead>
         <tbody>{transactionsLoading ? Array.from({ length: paging.pageSize }, (_, index) => <tr key={index}><td colSpan={8}><span className="coin-fidelity-row-skeleton" /></td></tr>)
-          : paging.rows.map((row) => <tr key={row.id}><td><button className="coin-fidelity-detail-link" onClick={() => setSheet(row)}><span className="sr-only">{t("coin.fidelity.detail").replace("{date}", date(row.txnCreatedAt)).replace("{type}", t(`coin.fidelity.${row.txnType}`))}</span>{date(row.txnCreatedAt)}<small>{format(new Date(row.txnCreatedAt), "HH:mm")}</small></button></td><td><span className="coin-fidelity-pill">{t(`coin.fidelity.${row.txnType}`)}</span></td><td>{num(row.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td className={row.txnType === "deposit" || row.txnType === "withdraw" ? "zero" : ""}>{row.txnType === "deposit" || row.txnType === "withdraw" ? "–" : money(row.price, false, custom ? 4 : 2)}</td><td className={row.txnType === "deposit" || row.txnType === "withdraw" ? "zero" : ""}>{row.txnType === "deposit" || row.txnType === "withdraw" ? "–" : money(row.price * row.amount)}</td><td>{sourceName(row.wallet ?? "")}</td><td className="zero">–</td><td><button className="coin-fidelity-edit-button" aria-label={t("coin.fidelity.editFor").replace("{date}", date(row.txnCreatedAt))} onClick={() => openEdit(row)}><FidelityPencil /></button></td></tr>)}</tbody></table>
+          : paging.rows.map((row) => <tr key={row.id}><td><button className="coin-fidelity-detail-link" onClick={() => setSheet(row)}><span className="sr-only">{t("coin.fidelity.detail").replace("{date}", date(row.txnCreatedAt)).replace("{type}", t(`coin.fidelity.${row.txnType}`))}</span>{date(row.txnCreatedAt)}<small>{format(new Date(row.txnCreatedAt), "HH:mm")}</small></button></td><td><span className="coin-fidelity-pill">{t(`coin.fidelity.${row.txnType}`)}</span></td><td>{num(row.amount, custom ? 2 : assetType === "stock" ? 0 : 4)}</td><td className={row.txnType === "deposit" || row.txnType === "withdraw" ? "zero" : ""}>{row.txnType === "deposit" || row.txnType === "withdraw" ? "–" : money(row.price, false, custom ? 4 : 2)}</td><td className={row.txnType === "deposit" || row.txnType === "withdraw" ? "zero" : ""}>{row.txnType === "deposit" || row.txnType === "withdraw" ? "–" : money(row.price * row.amount)}</td><td>{sourceName(row.wallet ?? "")}</td><td className="zero">–</td><td><button className="coin-fidelity-edit-button" aria-label={t("coin.fidelity.editFor").replace("{date}", date(row.txnCreatedAt))} onClick={() => openEdit(row)}><FidelityPencil /></button></td></tr>)}</tbody></table>}
       </div>
       <Pager count={rows.length} {...paging} pageSizes={[25, 50, 100]} t={t} labelPrefix="coin.fidelity" />
       <p>{t("coin.fidelity.editNote")}</p>

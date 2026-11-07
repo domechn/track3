@@ -49,7 +49,9 @@ describe("WalletSection", () => {
   it("shows empty state when no wallets", () => {
     render(<WalletSection {...baseProps} wallets={[]} visibleWallets={[]} />);
 
-    expect(screen.getByText(/No wallet found/)).toBeInTheDocument();
+    const state = screen.getByRole("heading", { name: "No wallets yet" }).closest("[data-empty-state]")!;
+    expect(state).toHaveTextContent("Add one to start reading balances");
+    expect(state).not.toHaveTextContent("Add your first wallet address");
   });
 
   it("has an add button", () => {

@@ -235,10 +235,10 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 ## Captured comparison
 
-- App capture: `/tmp/fidelity/coin-btc/coin-btc-phone-long.png`.
-- Reference render: `/tmp/rev-fa3/design/records-coin-btc-long.png`.
-- Fresh 390 × 844 first-screen pixel difference: **0.26%** (RGB difference >20/255 in any channel).
-- Full-page overlap pixel difference: **5.13%** (source 2,506px; app 2,506px high).
+- App capture: `/tmp/wui18-final-screens/coin-btc-phone.png`.
+- Reference render: `/tmp/wui18-source/coin-btc-phone-viewport.png`.
+- 6 Nov 390 × 844 first-screen pixel difference at DPR 2: **3.262%** (any RGB channel differs by more than 20); **1.894%** at a 40-channel threshold.
+- A full-page PNG comparison is not equivalent because the app scrolls inside its main landmark and the source scrolls the document.
 
 ## Real-data limits
 
@@ -248,3 +248,4 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 - The source full-page capture is 392px wide despite its 390px viewport; the app remains 390px wide to avoid horizontal scrolling.
 - The production cost-basis calculator differs from the invented reference by one cent for one lot and two cents for Unrealized P&L.
+- The product's scroll container preserves route scroll position; Chromium antialiases small text in that layer differently from the standalone source page.

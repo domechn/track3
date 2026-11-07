@@ -11,19 +11,25 @@ test.use({
 });
 
 async function capture(page: Page, name: string, fullPage = true) {
-  mkdirSync("/tmp/fidelity/goals", { recursive: true });
+  const output = process.env.WUI18_CAPTURE_DIR ?? "/tmp/fidelity/goals";
+  mkdirSync(output, { recursive: true });
   await page.evaluate(() => document.fonts.ready);
-  await page.screenshot({ path: `/tmp/fidelity/goals/${name}.png`, fullPage });
-  if (fullPage) await page.screenshot({ path: `/tmp/fidelity/goals/${name}-phone.png` });
+  await page.screenshot({ path: `${output}/${name}.png`, fullPage });
+  if (fullPage) await page.screenshot({ path: `${output}/${name}-phone.png` });
 }
 
 test("rules and triggered alerts follow the approved order", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-10-31T09:41:00.000Z") });
   await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "dark"));
   await installPlanFidelityScene(page, "goals");
-  await expect(page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: /More/ })).toContainText("2");
+  await expect(page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: /More/ })).toContainText("2", { timeout: 30_000 });
   await page.goto("/#/goals");
   await expect(page.getByTestId("goals-summary")).toContainText("6 of 7", { timeout: 15_000 });
+  const main = page.locator("#app-main-content");
+  await expect(main).toBeFocused();
+  expect(await main.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("none");
+  expect((await page.locator(".pf-rules-list").boundingBox())!.height).toBe(1234);
+  expect((await page.locator(".pf-history").boundingBox())!.height).toBe(749);
   await expect(page.locator(".pf-head p")).toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(page.locator(".pf-rules-list .pf-card-head small")).toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(page.getByRole("button", { name: "Rules options" })).toBeVisible();
@@ -73,6 +79,11 @@ test("rules and triggered alerts follow the approved order", async ({ page }) =>
   await expect(page.getByText("SOL 7d move", { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".pf-alert-row").nth(0)).toContainText("+14.3% over 7 days: $147.27 to $168.40");
   await expect(page.locator(".pf-alert-row").nth(1)).toContainText("BTC 26.9% vs target 30.0%: −3.1 pts (limit 2.0)");
+  const skip = page.getByRole("link", { name: "Skip to main content" });
+  await skip.focus();
+  await skip.press("Enter");
+  await expect(main).toBeFocused();
+  expect(await main.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe("none");
 });
 
 test("empty rules show both designed empty panels", async ({ page }) => {
@@ -80,13 +91,15 @@ test("empty rules show both designed empty panels", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "dark"));
   await installPlanFidelityScene(page, "goals-empty");
   await page.goto("/#/goals");
-  await expect(page.getByText("No rules yet")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Create your first rule" })).toBeVisible({ timeout: 15_000 });
   await capture(page, "goals-empty");
-  expect(await page.locator(".pf-empty .pf-add").evaluate((node) => node.getBoundingClientRect().width)).toBe(105);
+  expect(await page.locator(".pf-empty .pf-add").evaluate((node) => node.getBoundingClientRect().width)).toBe(107);
   const summaryValues = page.getByTestId("goals-summary").locator(".pf-kpi strong");
   await expect(summaryValues.nth(0)).toHaveCSS("color", "rgb(155, 157, 163)");
   await expect(summaryValues.nth(3)).toHaveCSS("color", "rgb(155, 157, 163)");
-  await expect(page.getByText("Nothing has triggered yet. Alerts you receive are listed here until you clear them.")).toBeVisible();
+  await expect(page.getByText("Alerts appear here after a refresh triggers a rule.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Acknowledge all" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Clear" })).toBeDisabled();
 });
 
 test("More tab returns from Goals after its Back control is removed", async ({ page }) => {

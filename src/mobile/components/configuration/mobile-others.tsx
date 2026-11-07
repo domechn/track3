@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/mobile/i18n";
 import { ConfirmSheet, ModalPage } from "@/mobile/components/mobile/overlays";
 import { ActionSheet } from "@/mobile/components/mobile";
-import { Cross2Icon, DotsHorizontalIcon, Link2Icon, LockClosedIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
+import { BackpackIcon, Cross2Icon, DotsHorizontalIcon, Link2Icon, LockClosedIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
+import EmptyState from "@/components/empty-state";
 import { getWalletLogo } from "@/lib/utils";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import type { OtherRow } from "@/components/configuration/types";
@@ -101,7 +102,8 @@ export function MobileOthers(props: {
   }).format(inBaseCurrency ? value : value * (props.baseCurrency?.rate ?? 1));
   if (props.fidelityLayout) return <section className="fidelity-custom">
     <div className="fidelity-custom-group">
-      {props.others.length === 0 && <div className="fidelity-custom-empty">{t("mobile.others.empty")}</div>}
+      {props.others.length === 0 && <EmptyState icon={BackpackIcon} className="fidelity-custom-empty"
+        title={t("mobile.others.empty")} hint={t("fidelity.settings.sources.emptyHint")} />}
       {props.others.map((other, index) => <div key={`${other.symbol}-${index}`} className="fidelity-custom-row">
         <div className="fidelity-custom-identity"><button type="button" className="fidelity-custom-avatar"
           aria-labelledby={`fidelity-custom-more-${index}`} onClick={() => setMenu(index)}>
@@ -217,7 +219,8 @@ export function MobileOthers(props: {
       <Button variant="ghost" className="ios-d3-text-action min-h-11" onClick={() => open(null)}>{t("config.addSymbol")}</Button>
     </div>}
     {!props.hideEmpty && <div className="ios-d3-others-group overflow-hidden rounded-2xl bg-card">
-      {props.others.length === 0 && !props.hideEmpty && <p className="px-4 py-5 text-sm text-muted-foreground">{t("mobile.others.empty")}</p>}
+      {props.others.length === 0 && !props.hideEmpty && <EmptyState icon={BackpackIcon}
+        title={t("mobile.others.empty")} hint={t("fidelity.settings.sources.emptyHint")} />}
       {props.others.map((other, index) => <div key={`${other.symbol}-${index}`} className="ios-d3-others-row flex min-w-0 items-center gap-2 px-4 py-2">
         <span className="ios-d3-source-avatar" aria-hidden="true">
           {getWalletLogo(other.symbol) === UnknownLogo ? other.symbol.slice(0, 2).toUpperCase() : <img src={getWalletLogo(other.symbol)} alt="" />}

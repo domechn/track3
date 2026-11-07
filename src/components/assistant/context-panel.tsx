@@ -133,4 +133,3 @@ export default function AssistantContextPanel({ config, sessions, baseCurrency, 
     <Link to="/settings/assistant">{t("fidelity.assistant.settings")}<ChevronRightIcon aria-hidden="true" /></Link>
   </aside>;
 }
-

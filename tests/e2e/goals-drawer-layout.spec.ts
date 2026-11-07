@@ -6,7 +6,7 @@ for (const width of [1440, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     await installTauriBridge(page);
     await page.goto("/#/goals");
-    await expect(page.getByText("No rules yet")).toBeVisible();
+    await expect(page.getByText("Create your first rule")).toBeVisible();
     await page.getByRole("spinbutton", { name: "Threshold" }).fill("100");
     await page.getByRole("button", { name: "Save rule" }).click();
     await expect(page.getByRole("button", { name: "Edit" })).toBeVisible();

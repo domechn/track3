@@ -156,13 +156,13 @@ test("empty tax year retains open lots and chart empty state", async ({ page }) 
   await page.getByRole("button", { name: /Dispositions/ }).click();
   await page.getByRole("heading", { name: "Cost basis" }).click();
   const chartEmpty = (await page.locator(".fidelity-cost-chart .fidelity-empty").boundingBox())!;
-  expect(chartEmpty.height).toBeCloseTo(64, 0);
+  expect(chartEmpty.height).toBeCloseTo(276.5, 0);
   const tableEmpty = (await page.locator(".fidelity-cost-empty").boundingBox())!;
-  expect(tableEmpty.height).toBeCloseTo(140, 0);
+  expect(tableEmpty.height).toBeCloseTo(218.5, 0);
   expect(tableEmpty.y).toBeGreaterThan(chartEmpty.y);
-  expect((await page.getByRole("button", { name: "Show open lots" }).boundingBox())!.y).toBeCloseTo(934.5, 0);
-  expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(1094);
-  expect((await page.getByTestId("cost-desktop-table").boundingBox())!.height).toBeCloseTo(230, 0);
+  expect((await page.getByRole("button", { name: "Show open lots" }).boundingBox())!.y).toBeCloseTo(1015, 0);
+  expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(1172);
+  expect((await page.getByTestId("cost-desktop-table").boundingBox())!.height).toBeCloseTo(308.5, 0);
   await capture(page, "cost-basis-empty");
   await expect.poll(() => page.evaluate(() =>
     JSON.parse(localStorage.getItem("track3-cost-basis-settings") ?? "{}").from)).toBe("2025-01-01");

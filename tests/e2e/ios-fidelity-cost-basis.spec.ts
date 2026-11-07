@@ -2,6 +2,16 @@ import { expect, test } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { executeSceneSql, installFidelityRecords } from "./fidelity-records-scenes";
 
+const longPageCaptureStyle = `
+  html, body, #root { height: auto !important; overflow: visible !important; }
+  #root > .min-h-dvh, #root > .min-h-dvh > div:last-child, .t3-mobile-app,
+  .app-layout, .app-layout .app-content, .app-layout #app-main-content {
+    height: auto !important; min-height: 0 !important; overflow: visible !important;
+  }
+  .app-layout #app-main-content { flex: none !important; }
+  .mobile-tab-bar { display: none !important; }
+`;
+
 test.use({
   viewport: { width: 390, height: 844 },
   userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
@@ -142,18 +152,14 @@ test("the empty year actions match the source's text hierarchy and position", as
   await page.goto("/#/cost-basis");
   await page.getByLabel("Tax year").selectOption("2025");
   const empty = page.locator(".fidelity-no-lots");
-  await expect(empty.locator("strong")).toHaveCSS("font-size", "13px");
+  await expect(empty.getByRole("heading", { name: "No sales in 2025" })).toHaveCSS("font-size", "15px");
   await expect(empty.getByRole("button", { name: "Choose another year" })).toHaveCSS("color", "rgb(155, 157, 163)");
   const emptyBox = (await empty.boundingBox())!;
-  expect([Math.round(emptyBox.y), Math.round(emptyBox.height)]).toEqual([1728, 184]);
-  const y = await empty.evaluate((node) => {
-    const text = document.createRange();
-    text.selectNodeContents(node.querySelector("strong")!);
-    return Math.round(text.getBoundingClientRect().y);
-  });
-  expect(y).toBe(1758);
+  expect([Math.round(emptyBox.y), Math.round(emptyBox.height)]).toEqual([1846, 230]);
+  const y = (await empty.getByRole("heading", { name: "No sales in 2025" }).boundingBox())!.y;
+  expect(Math.round(y)).toBe(1907);
   const actionY = (await empty.getByRole("button", { name: "Show open lots" }).boundingBox())!.y;
-  expect(Math.round(actionY + 4)).toBe(1847);
+  expect(Math.round(actionY + 4)).toBe(2016);
 });
 
 test("data gaps pager captures a second page of stored warning events", async ({ page }) => {
@@ -256,7 +262,7 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
     [2737, 40], [2777, 83], [2860, 83], [2947, 40], [2987, 83], [3070, 64],
   ]);
   await page.screenshot({ path: `${dir}/cost-basis-phone-long.png`, fullPage: true,
-    style: ".mobile-tab-bar { display: none !important; }" });
+    style: longPageCaptureStyle });
   await page.screenshot({ path: `${dir}/cost-basis-phone.png` });
   await page.getByRole("button", { name: /^Export$/ }).click();
   expect((await page.locator(".fidelity-cost-export").boundingBox())!.y).toBe(601);
@@ -281,7 +287,7 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
   await expect(page.locator(".fidelity-price-row").filter({ hasText: "AAPL" })).toContainText("Bought – · sold 30");
   await page.screenshot({ path: `${dir}/cost-basis-avg-phone.png` });
   await page.screenshot({ path: `${dir}/cost-basis-avg-phone-long.png`, fullPage: true,
-    style: ".mobile-tab-bar { display: none !important; }" });
+    style: longPageCaptureStyle });
   await page.getByRole("button", { name: "Open lots 6" }).click();
   await expect(page.locator(".fidelity-lot-row")).toHaveCount(6);
   await expect(page.locator(".fidelity-lot-row").first()).toContainText("Pooled");
@@ -333,7 +339,7 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
   expect(subtitleLayout.usingTop).toBe(subtitleLayout.firstLineTop);
   await page.screenshot({ path: `${dir}/cost-basis-custom-phone.png` });
   await page.screenshot({ path: `${dir}/cost-basis-custom-phone-long.png`, fullPage: true,
-    style: ".mobile-tab-bar { display: none !important; }" });
+    style: longPageCaptureStyle });
   await page.getByRole("button", { name: "Tax year" }).click();
   await page.getByRole("button", { name: "FIFO", exact: true }).click();
   await page.getByRole("button", { name: /Open lots/ }).click();
@@ -347,7 +353,7 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
   await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
   await page.screenshot({ path: `${dir}/cost-basis-open-phone.png` });
   await page.screenshot({ path: `${dir}/cost-basis-open-phone-long.png`, fullPage: true,
-    style: ".mobile-tab-bar { display: none !important; }" });
+    style: longPageCaptureStyle });
   await page.getByRole("button", { name: /Dispositions/ }).click();
   await page.getByLabel("Tax year").selectOption("2025");
   await expect(page.getByRole("button", { name: /^Export$/ })).toBeEnabled();
@@ -369,7 +375,7 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
     .toEqual(["BTC", "ETH", "SOL", "BNB", "AAPL", "NVDA"]);
   await page.screenshot({ path: `${dir}/cost-basis-empty-phone.png` });
   await page.screenshot({ path: `${dir}/cost-basis-empty-phone-long.png`, fullPage: true,
-    style: ".mobile-tab-bar { display: none !important; }" });
+    style: longPageCaptureStyle });
 });
 
 test("phone keeps the holding days control and describes a custom threshold accurately", async ({ page }) => {
@@ -606,7 +612,7 @@ test("empty tax year has both recovery actions and a centered by-asset empty box
   const buttons = await page.locator(".fidelity-no-lots-actions button").evaluateAll((nodes) =>
     nodes.map((node) => node.getBoundingClientRect().y));
   expect(buttons[0]).toBe(buttons[1]);
-  expect(Math.round((await page.locator(".fidelity-no-lots").boundingBox())!.height)).toBe(184);
+  expect(Math.round((await page.locator(".fidelity-no-lots").boundingBox())!.height)).toBe(230);
   expect((await page.getByRole("button", { name: "Show open lots" }).boundingBox())!.height).toBe(44);
   await expect(page.getByRole("button", { name: "Show open lots" })).toHaveCSS("font-size", "12px");
   await page.getByRole("button", { name: "Choose another year" }).click();

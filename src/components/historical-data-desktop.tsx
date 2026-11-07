@@ -27,6 +27,8 @@ import { FidelityDateInput } from "./fidelity-date-input";
 import { sourceDisplayNames } from "./source-display-name";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { toast } from "./ui/use-toast";
+import { ClockIcon } from "@radix-ui/react-icons";
+import EmptyState from "./empty-state";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -340,14 +342,14 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
       <button type="button" onClick={() => setReload((value) => value + 1)}>{t("history.fidelity.retry")}</button>
     </section> : !loading && count === 0 ? <section className="fidelity-card fidelity-history-empty">
       <h2>{t("history.fidelity.snapshots")}</h2>
-      <div className="fidelity-empty"><b>{t(noSnapshots ? "history.fidelity.noSnapshots" : "history.fidelity.noResults")}</b>
-        {noSnapshots && <><span>{t("history.fidelity.noSnapshotsHint")}</span>
-          <button type="button" onClick={() => {
+      <EmptyState icon={ClockIcon} className="fidelity-empty"
+        title={t(noSnapshots ? "history.fidelity.noSnapshots" : "history.fidelity.noResults")}
+        hint={t(noSnapshots ? "history.fidelity.noSnapshotsHint" : "history.empty.filter.hint")}
+        action={noSnapshots && <button type="button" onClick={() => {
             window.dispatchEvent(new Event("records-controls-open"));
             document.querySelector<HTMLButtonElement>(".t3-refresh-button")?.click();
           }}>
-            <ReloadIcon aria-hidden="true" />{t("history.fidelity.refreshNow")}</button></>}
-      </div>
+            <ReloadIcon aria-hidden="true" />{t("history.fidelity.refreshNow")}</button>} />
       {noSnapshots && <p><InfoCircledIcon aria-hidden="true" /><span>{richHint("history.fidelity.localHintRich")}</span></p>}
     </section> : <div className="fidelity-history-grid">
       <section className="fidelity-card fidelity-history-list">
@@ -435,7 +437,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
               const restoredAsset = (edits ?? []).find((edit) => edit.symbol === asset.symbol &&
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "restore");
               return <tr key={`${asset.assetType}:${asset.symbol}`}><td>{asset.symbol}
-                <button type="button" aria-label={t("history.fidelity.deleteAsset").replace("{asset}", asset.symbol)}
+                <button type="button" className="t3-icon-button" aria-label={t("history.fidelity.deleteAsset").replace("{asset}", asset.symbol)}
                   disabled={isDeletingAsset} onClick={() => setDeleteAssetId(asset.id)}><TrashIcon aria-hidden="true" /></button></td>
               <td>{restoredAsset ? <><span className="fidelity-edited-value">{quantity(asset.assetType === "crypto" &&
                 stablecoins.has(asset.symbol.toUpperCase()) ? "stablecoin" : asset.assetType, asset.amount)}</span>

@@ -83,10 +83,10 @@ export function coinTransactionPaginationTests() {
       await expect(ipad).toContainText("Showing 1-25 of 301");
       await ipad.getByRole("button", { name: "Next" }).click();
       await expect(ipad).toContainText("Showing 26-50 of 301");
-      const ipadHeight = (await ipad.boundingBox())!.height;
+      const ipadHeight = await ipad.evaluate((element) => (element as HTMLElement).offsetHeight);
       await ipad.getByRole("button", { name: "Last" }).click();
       await expect(ipad).toContainText("Showing 301-301 of 301");
-      expect((await ipad.boundingBox())!.height).toBe(ipadHeight);
+      expect(await ipad.evaluate((element) => (element as HTMLElement).offsetHeight)).toBe(ipadHeight);
       await ipad.getByRole("button", { name: "First" }).click();
       await ipad.getByRole("button", { name: "Next" }).click();
       await ipad.locator("nav").scrollIntoViewIfNeeded();

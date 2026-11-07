@@ -120,7 +120,9 @@ describe("ExchangeSection", () => {
       <ExchangeSection {...baseProps} exchanges={[]} visibleExchanges={[]} />,
     );
 
-    expect(screen.getByText(/No exchange found/)).toBeInTheDocument();
+    const state = screen.getByRole("heading", { name: "No exchanges yet" }).closest("[data-empty-state]")!;
+    expect(state).toHaveTextContent("Add one to start reading balances");
+    expect(state).not.toHaveTextContent("Add your first CEX API key");
   });
 
   it('has an "Add Exchange Configuration" button', () => {

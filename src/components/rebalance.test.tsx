@@ -190,7 +190,7 @@ describe("Rebalance page", () => {
   });
   it("guides an empty profile into a current holdings preset that can be saved", async () => {
     render(<Rebalance currency={currency} />);
-    expect(await screen.findByText("Set targets to see suggestions.")).toBeInTheDocument();
+    expect((await screen.findByText("Set targets to see suggestions.")).closest("[data-empty-state]")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Current holdings" }));
     expect(screen.getByLabelText("Target percentage for BTC")).toHaveValue(75);
     expect(screen.getByLabelText("Target percentage for ETH")).toHaveValue(25);

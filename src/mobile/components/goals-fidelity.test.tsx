@@ -39,6 +39,22 @@ it("shows partial progress for a price or value goal above an at-most threshold"
     .toHaveAttribute("aria-valuenow", "78.3");
 });
 
+it("opens a prefilled template from the empty phone Rules panel", async () => {
+  const onOpenEditor = vi.fn();
+  render(<MemoryRouter><GoalsFidelity
+    rules={[]} history={[]} unreadCount={0} snapshots={[]} prices={{}}
+    loading={false} error="" status="" draft={draft} editorOpen={false}
+    onDraft={vi.fn()} onOpenEditor={onOpenEditor} onCloseEditor={vi.fn()} onSave={vi.fn()}
+    onToggle={vi.fn()} onDelete={vi.fn()} onAck={vi.fn()} onAckAll={vi.fn()} onClear={vi.fn()}
+  /></MemoryRouter>);
+  await userEvent.click(screen.getByRole("button", { name: "BTC above a price" }));
+  expect(onOpenEditor).toHaveBeenCalledWith(undefined, expect.objectContaining({
+    kind: "asset_price_target", symbol: "BTC", threshold: "70000",
+  }));
+  expect(screen.getByRole("button", { name: "Acknowledge all" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Clear" })).toBeDisabled();
+});
+
 it("previews the selected kind without invented asset or threshold examples", async () => {
   renderGoals({ editorOpen: true });
   const preview = screen.getByText("Preview").closest(".pf-preview")!;

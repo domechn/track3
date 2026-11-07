@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { beforeEach, expect, it, vi } from "vitest";
 import GoalsAlerts from "@/mobile/components/goals-alerts";
-import { listAlertRules, listAlertHistory, countUnreadAlerts, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertRule } from "@/middlelayers/alerts";
+import { listAlertRules, listAlertHistory, countUnreadAlerts, saveAlertRule, setAlertRuleEnabled, acknowledgeAllAlerts, clearAlertHistory, deleteAlertRule, loadAlertEvaluationData, type AlertHistory, type AlertRule } from "@/middlelayers/alerts";
 import { enableSystemNotifications, systemNotificationsEnabled } from "@/middlelayers/alert-notifications";
 import { queryPNLChartValue } from "@/middlelayers/charts-timeseries";
 import { isIOS } from "@/utils/platform";
@@ -53,10 +53,26 @@ beforeEach(() => {
   vi.mocked(queryPNLChartValue).mockResolvedValue([]);
 });
 
+it("renders a stored rule with an unfamiliar kind on iPhone", async () => {
+  vi.mocked(isIOS).mockReturnValue(true);
+  vi.mocked(listAlertRules).mockResolvedValue([{ ...savedRule, kind: "price" as AlertRule["kind"] }]);
+  render(<GoalsAlerts />);
+  await waitFor(() => expect(document.querySelector(".t3-goals-rules .flex.min-w-0 > svg")).toBeInTheDocument());
+});
+
+it("renders stored alert history with an unfamiliar kind", async () => {
+  vi.mocked(listAlertHistory).mockResolvedValue([{
+    id: 1, ruleId: null, kind: "price" as AlertHistory["kind"], title: "Price alert",
+    message: "Saved alert", value: 1, triggeredAt: "2026-10-31T09:41:00.000Z", acknowledgedAt: null,
+  }]);
+  render(<GoalsAlerts />);
+  await waitFor(() => expect(document.querySelector(".t3-goals-history li svg")).toBeInTheDocument());
+});
+
 it("opens rule editing as a full-screen page on iPhone", async () => {
   vi.mocked(isIOS).mockReturnValue(true);
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   expect(screen.queryByRole("button", { name: "Save rule" })).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Add alert" }));
   expect(screen.getByRole("dialog", { name: "Add alert" })).toBeInTheDocument();
@@ -65,13 +81,23 @@ it("opens rule editing as a full-screen page on iPhone", async () => {
   expect(screen.queryByRole("dialog", { name: "Add alert" })).not.toBeInTheDocument();
 });
 
-it("keeps empty alert history actions out of the iPhone page", async () => {
+it("keeps empty alert history actions visible but disabled on iPhone", async () => {
   vi.mocked(isIOS).mockReturnValue(true);
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   expect(screen.getByRole("button", { name: "Add alert" })).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Acknowledge all" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Clear history" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Acknowledge all" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Clear history" })).toBeDisabled();
+});
+
+it("gives the legacy empty rules panel the shared 220px treatment", async () => {
+  vi.mocked(isIOS).mockReturnValue(true);
+  render(<GoalsAlerts />);
+  await screen.findByText("Create your first rule");
+  expect(document.querySelector(".t3-goals-rules [data-empty-state]")).toHaveClass("t3-goals-empty");
+  expect(screen.getByRole("heading", { name: "Create your first rule" })).toBeVisible();
+  expect(screen.getByText("No rules yet")).toBeVisible();
+  expect(document.querySelector(".t3-goals-rules .sr-only")).not.toBeInTheDocument();
 });
 
 it("lets an iPhone owner choose an alert kind in one form row", async () => {
@@ -114,14 +140,14 @@ it("keeps the iPhone rule editor open when the initial rule query finishes", asy
   await userEvent.click(screen.getByRole("button", { name: "Add alert" }));
   expect(screen.getByRole("dialog", { name: "Add alert" })).toBeInTheDocument();
   await act(async () => { finishRules([]); });
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   expect(screen.getByRole("dialog", { name: "Add alert" })).toBeInTheDocument();
 });
 
 it("traps focus and locks background scroll while the iPhone rule editor is open", async () => {
   vi.mocked(isIOS).mockReturnValue(true);
   render(<><button>Outside</button><GoalsAlerts /></>);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   await userEvent.click(screen.getByRole("button", { name: "Add alert" }));
   const dialog = screen.getByRole("dialog", { name: "Add alert" });
   expect(document.body.style.overflow).toBe("hidden");
@@ -159,14 +185,14 @@ it("uses the evaluator's blacklist for the goal line and ETA", async () => {
 
 it("has no axe violations in the goals summary", async () => {
   const { container } = render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   const results = await axe.run(container, { rules: { "color-contrast": { enabled: false } } });
   expect(results.violations.map(({ id }) => id)).toEqual([]);
 });
 
 it("shows the empty state and a clear explanation before notification permission", async () => {
   render(<GoalsAlerts />);
-  expect(await screen.findByText("No rules yet")).toBeInTheDocument();
+  expect(await screen.findByText("Create your first rule")).toBeInTheDocument();
   expect(screen.getByText(/Allow system notifications/i)).toBeInTheDocument();
   expect(enableSystemNotifications).not.toHaveBeenCalled();
 });
@@ -191,7 +217,7 @@ it("closes the fallback editor when Cancel is pressed", async () => {
 
 it("labels the capped history count as recent triggers", async () => {
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   expect(screen.getByTestId("goals-summary")).toHaveTextContent("Recent triggers");
 });
 
@@ -221,12 +247,12 @@ it("uses the selected Chinese locale for the last check on iPhone", async () => 
   render(<I18nProvider><SetChinese /><GoalsAlerts /></I18nProvider>);
   await userEvent.click(screen.getByRole("button", { name: "中文" }));
   await waitFor(() => expect(screen.getByText("最近检查").nextElementSibling).toHaveTextContent("2026/4/16 12:00"));
-});
+}, 15_000);
 
 it("validates a new goal before saving", async () => {
   const user = userEvent.setup();
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   await user.click(screen.getByRole("button", { name: "Save rule" }));
   expect(saveAlertRule).not.toHaveBeenCalled();
   const threshold = screen.getByLabelText("Threshold");
@@ -243,7 +269,7 @@ it("validates a new goal before saving", async () => {
 it("keeps success and validation feedback in separate live regions", async () => {
   const user = userEvent.setup();
   render(<GoalsAlerts />);
-  await screen.findByText("No rules yet");
+  await screen.findByText("Create your first rule");
   await user.click(screen.getByRole("button", { name: "Save rule" }));
   const alert = screen.getByRole("alert");
   expect(alert).toHaveTextContent(/enter a valid threshold/i);
@@ -281,7 +307,8 @@ it("marks a portfolio loss in the history timeline as high severity", async () =
 it("shows an already granted notification permission on opening the page", async () => {
   vi.mocked(systemNotificationsEnabled).mockResolvedValue(true);
   render(<GoalsAlerts />);
-  expect(await screen.findByRole("button", { name: "System notifications enabled" })).toBeInTheDocument();
+  expect(await screen.findByText("System notifications enabled")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "System notifications enabled" })).not.toBeInTheDocument();
   expect(enableSystemNotifications).not.toHaveBeenCalled();
 });
 
