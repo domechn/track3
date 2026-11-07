@@ -83,11 +83,11 @@ test("Overview range controls stay above the scrolling pane", async ({ page }) =
     .toBeLessThanOrEqual((await main.boundingBox())!.y);
 });
 
-test("History keeps Settings available alongside Records controls", async ({ page }) => {
+test("History keeps Settings available alongside History filters", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 560 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/history");
-  await expect(page.getByRole("button", { name: "Records controls" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "History filters" })).toBeVisible();
   const settings = page.locator("aside a[href='#/settings']");
   await expect(settings).toBeVisible();
   const before = await settings.boundingBox();

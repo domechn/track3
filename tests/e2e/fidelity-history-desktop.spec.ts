@@ -300,7 +300,7 @@ test("empty history offers refresh", async ({ page }) => {
   await expect(page.locator(".fidelity-history-filters .fidelity-segment").first()).toHaveCSS("gap", "0px");
   await expect(page.locator(".fidelity-history-filters .fidelity-filter-group:nth-child(2) > span"))
     .toHaveCSS("color", "rgb(154, 156, 162)");
-  await expect(page.locator("aside").getByRole("button", { name: "Records controls" })).toBeVisible();
+  await expect(page.locator("aside").getByRole("button", { name: "History filters" })).toBeVisible();
   await expect(page.locator("aside").getByRole("link", { name: "Settings" })).toBeVisible();
   const emptyCard = (await page.locator(".fidelity-history-empty").boundingBox())!;
   expect(emptyCard.height).toBeCloseTo(466, 0);
@@ -349,7 +349,7 @@ test("empty History exposes sync unlock and refresh feedback controls", async ({
   await page.goto("/#/history");
   await expect(page.getByText("No snapshots yet")).toBeVisible();
   await expect(page.locator(".fidelity-page-head .desktop-sync-status-indicator")).toBeVisible();
-  await page.getByRole("button", { name: "Records controls" }).click();
+  await page.getByRole("button", { name: "History filters" }).click();
   await expect(page.locator(".t3-records-toolbar-panel").getByRole("button", { name: "Refresh" })).toBeVisible();
 });
 
@@ -478,7 +478,7 @@ test("the empty History card returns after visiting Settings", async ({ page }) 
   await installTauriBridge(page, { fidelityRecords: "history-empty" });
   await page.goto("/#/history");
   await expect(page.getByText("No snapshots yet")).toBeVisible();
-  await page.getByRole("button", { name: "Records controls" }).click();
+  await page.getByRole("button", { name: "History filters" }).click();
   await page.locator(".t3-records-settings-link").click();
   await expect(page).toHaveURL(/#\/settings\/configuration/);
   await page.getByRole("link", { name: "History" }).click();
