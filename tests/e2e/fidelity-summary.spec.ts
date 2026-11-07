@@ -33,7 +33,7 @@ test("Summary uses the same profit for All and 1Y when both cover every snapshot
     await expect(main.locator(".fd-primary-stat strong")).toHaveText("+$4,368.50");
     await expect(main.locator(".fd-month").filter({ hasText: "Aug" })).toContainText("−$9,598");
     await expect(main.locator(".fd-summary-chart")).toContainText("$4,369");
-    const topTotal = (await main.locator(".fd-top-row strong").allTextContents())
+    const topTotal = (await main.locator(".summary-top-row strong").allTextContents())
       .reduce((sum, text) => sum + Number(text.replace("−", "-").replace(/[^0-9.-]/g, "")), 0);
     expect(Math.abs(topTotal - 4_368.50)).toBeLessThan(5);
   } finally { await context.close(); }
@@ -129,8 +129,8 @@ test("summary full state follows the approved card order and captures at 390px",
     expect((await page.locator(".fd-chart-caption").boundingBox())!.y).toBe(436);
     await expect(page.locator(".fd-year").first()).toContainText("+$60,109");
     await expect(page.locator(".fd-year").first()).toContainText("+$105,000");
-    await expect(page.locator(".fd-top-row").filter({ hasText: "SOL" }).locator("strong")).toHaveText("−$9,300");
-    await expect(page.locator(".fd-top-coins .fd-top-row").nth(6).locator("b")).toHaveText("USDT");
+    await expect(page.locator(".summary-top-row").filter({ hasText: "SOL" }).locator("strong")).toHaveText("−$9,300");
+    await expect(page.locator(".fd-top-coins .summary-top-row").nth(6).locator("b")).toHaveText("USDT");
     await expect(page.locator(".fd-attribution .fd-attr-row").first()).toContainText("Quantity +$38,000");
     const totalRange = page.locator(".fd-attr-total > span").first();
     await expect(totalRange).toHaveText("$310K → $764K");

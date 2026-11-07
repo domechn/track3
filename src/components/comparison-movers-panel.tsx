@@ -4,6 +4,7 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import { positiveNegativeTextClass, positiveNegativeTone } from "@/utils/color";
 import { comparisonMovers } from "./comparison-movers";
 import { barGeometry, divergingScale } from "./comparison-fidelity-movers";
+import { boundedPercentText } from "./profit-percentage";
 
 type Row = {
   symbol: string;
@@ -32,6 +33,7 @@ export default function ComparisonMoversPanel({ rows, currency, quoteColor, t, s
       const bar = barGeometry(value, scale);
       const label = shouldMaskValue ? "***" : kind === "value" ? money(difference) :
         `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
+      const shown = kind === "percent" && !shouldMaskValue ? boundedPercentText(value, label) : { text: label, exact: label };
       const barTone = positiveNegativeTone(value, quoteColor);
       return <li key={`${row.assetType}:${row.symbol}`}>
         <strong>{row.symbol}</strong>
@@ -43,7 +45,9 @@ export default function ComparisonMoversPanel({ rows, currency, quoteColor, t, s
               right: bar.right === undefined ? undefined : `${bar.right}%`,
             }} />}
         </span>
-        <span className={positiveNegativeTextClass(value, quoteColor, 500)}>{label}</span>
+        <span className={positiveNegativeTextClass(value, quoteColor, 500)}
+          title={kind === "percent" && !shouldMaskValue ? shown.exact : undefined}
+          aria-label={kind === "percent" && !shouldMaskValue ? shown.exact : undefined}>{shown.text}</span>
         {kind === "percent" && <small>{shouldMaskValue ? "***" : money(difference)}</small>}
       </li>;
     })}</ol>;

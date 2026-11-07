@@ -77,6 +77,7 @@ test("a source with one asset keeps a content-height balance table", async ({ pa
   const mover = page.locator(".t3-wallet-side .t3-wallet-movers > div").first();
   await expect(mover).toBeVisible();
   expect((await mover.boundingBox())!.height).toBeLessThan(80);
+  expect((await mover.locator(".t3-wallet-mover-track").boundingBox())!.width).toBeGreaterThanOrEqual(60);
 });
 
 test("Goals side card ends after its last alert", async ({ page }) => {

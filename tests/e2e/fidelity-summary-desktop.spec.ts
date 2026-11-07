@@ -239,7 +239,7 @@ test("Summary leaders and attribution footer follow the source spacing", async (
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".fidelity-group-label").first().boundingBox())!.y).toBeCloseTo(1143, 0);
+  expect((await page.locator(".summary-top-heading").first().boundingBox())!.y).toBeCloseTo(1145, 0);
   expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1609, 0);
   expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1627, 0);
   const totalRange = page.locator(".fidelity-attribution-row.total > span:nth-child(2)");
