@@ -1543,9 +1543,10 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
 .d2-summary .profit-summary-card { border: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
 .d2-summary .profit-summary-card > :first-child { padding: 16px 16px 8px; }
 .d2-summary .profit-summary-card > :last-child { padding: 4px 16px 16px; }
+.d2-summary .profit-period-grid, .d2-profit-sheet .profit-period-grid { align-items: start; }
 .d2-summary .profit-period-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.d2-summary .profit-period-grid:has(> .profit-month-card) { align-items: stretch; }
 .d2-summary .profit-period-grid > .profit-month-card {
-  min-height: 104px;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
   background: hsl(var(--sunken));
@@ -1624,6 +1625,7 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
 }
 @media (min-width: 760px) {
   .d2-summary .profit-period-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .d2-summary .profit-year-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .d2-cost .cost-dashboard-secondary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (min-width: 1024px) {

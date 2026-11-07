@@ -587,7 +587,12 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
 .t3-total-overview .t3-pnl-compact-card > div > div > div { padding-right: 16px !important; padding-left: 16px !important; }
 .t3-total-overview > .t3-hero-card:not(.mobile-hero-card) .t3-hero-chart { grid-column: 1 / -1; grid-row: 3; min-height: 190px; margin-top: 12px; border-top: 1px solid hsl(var(--border)); padding-top: 8px; }
 .t3-total-overview > .t3-hero-card:not(.mobile-hero-card) .t3-ath-note { grid-column: 1 / -1; grid-row: 4; }
-.t3-grid-insights > [data-ui-card] { height: 100%; }
+.t3-grid-insights > [data-ui-card] { height: auto; max-height: 100%; }
+.t3-grid-insights > .t3-insights-off { height: 100%; }
+.t3-grid-coins > .t3-top-coins { height: auto; max-height: 100%; }
+body:not(:has(.app-layout)) .t3-grid-holdings > .t3-overview-panel,
+body:not(:has(.app-layout)) .t3-grid-moved > .t3-overview-panel { height: auto; max-height: 100%; }
+body:not(:has(.app-layout)) .t3-grid-moved .t3-moved-list { height: auto; align-content: start; }
 .t3-insights-card { display: flex; flex-direction: column; }
 .t3-grid-insights > .t3-insights-card:not(.t3-insights-summary):not(.t3-insights-off) { overflow-y: auto; }
 @media (max-width: 900px) {
@@ -1201,15 +1206,17 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-facts > div > span:first-child { color: #b4b6bc; }
 .fidelity-facts > div > span:last-child { text-align: right; }
 .fidelity-period-card { display: flex; flex-direction: column; min-height: 454px; padding: 0; }
+.fidelity-period-card:has(.fidelity-month-grid) { align-self: start; min-height: 0; }
 .fidelity-period-card > div:first-child { padding: 20px 20px 0; }
 .fidelity-period-card > div:first-child > div { align-items: baseline; }
 .fidelity-period-card > div:first-child h3 { font-size: 15px; font-weight: 600; }
 .fidelity-period-card > div:last-child { display: flex; flex: 1; flex-direction: column; gap: 0; padding: 14px 20px 20px; }
+.fidelity-period-card:has(.fidelity-month-grid) > div:last-child { flex: none; }
 .fidelity-period-card .fidelity-caption { margin: auto 0 0; padding-top: 0; color: #9b9da3; line-height: 18px; }
 .fidelity-period-card > .space-y-3 > .fidelity-caption { margin-top: 14px; }
-.fidelity-month-grid { display: grid; flex: 1; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.fidelity-month-grid { display: grid; flex: none; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: minmax(167px, auto); align-content: start; gap: 12px; }
 .fidelity-month-card { position: relative; min-width: 0; border: 1px solid #222224; border-radius: 6px; background: #0d0d0e; }
-.fidelity-month-main { display: flex; flex-direction: column; gap: 2px; width: 100%; height: 100%; padding: 14px 14px 12px; text-align: left; font-variant-numeric: inherit; }
+.fidelity-month-main { display: flex; flex-direction: column; gap: 2px; width: 100%; height: auto; min-height: 150px; padding: 14px 14px 12px; text-align: left; font-variant-numeric: inherit; }
 .fidelity-month-main:focus-visible, .fidelity-year-card:focus-visible { outline: 2px solid #4a8ad6; outline-offset: 2px; }
 .fidelity-month-head, .fidelity-year-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; width: 100%; }
 .fidelity-month-card[data-partial="true"] .fidelity-month-head { padding-right: 22px; }
@@ -1226,7 +1233,9 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-month-count { display: block; width: 100%; margin-top: 6px; padding-top: 8px; border-top: 1px solid #1b1a1f; color: #9b9da3; font-size: 12px; }
 .fidelity-month-gap { color: #9b9da3; font-size: 12px; }
 .fidelity-summary .fidelity-zero { color: #9b9da3; }
-.fidelity-year-stack { display: grid; flex: 1; grid-auto-rows: minmax(150px, 1fr); gap: 12px; }
+.fidelity-year-stack { display: grid; flex: none; grid-auto-rows: minmax(181px, auto); align-content: start; gap: 12px; }
+.fidelity-year-stack[data-paged="true"] { min-height: 760px; }
+.fidelity-year-pager { min-height: 44px; margin-top: 12px; }
 .fidelity-year-item { position: relative; display: grid; grid-template-columns: minmax(0,1fr) 40px; min-width: 0; }
 .fidelity-year-card { display: flex; grid-column: 1/-1; grid-row: 1; flex-direction: column; gap: 2px; min-width: 0; padding: 14px 14px 12px; border: 1px solid #222224; border-radius: 6px; background: #0d0d0e; text-align: left; font-variant-numeric: inherit; }
 .fidelity-year-badge { grid-column: 2; grid-row: 1; align-self: start; justify-self: center; margin-top: 6px; }
@@ -3356,7 +3365,8 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .t3-wallet-balances, .t3-wallet-side { height: 409px; }
   .t3-wallet-balances { display: flex; flex-direction: column; }
   .t3-wallet-grid:not(:has(.t3-wallet-matrix)) .t3-wallet-balances, .t3-wallet-grid:not(:has(.t3-wallet-matrix)) .t3-wallet-side { height: 406px; }
-  .t3-wallet-matrix, .t3-wallet-moved { min-height: 483px; }
+  .t3-wallet-matrix { min-height: 483px; }
+  .t3-wallet-moved { align-self: start; }
   .t3-wallet-card-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
   .t3-wallet-card-head h2 { margin: 0; font-size: 15px; line-height: 20px; font-weight: 600; }
   .t3-wallet-card-head > span { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; color: hsl(var(--faint)); font-size: 12px; white-space: nowrap; }
@@ -3421,7 +3431,8 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .t3-wallet-matrix .t3-wallet-table-scroll tbody :is(th,td) { height: 42px; }
   .t3-wallet-matrix .t3-wallet-table-scroll tbody th { font-weight: 600; }
   .t3-wallet-side { display: flex; flex-direction: column; }
-  .t3-wallet-status-list { flex: 1; display: grid; grid-auto-rows: auto; }
+  .t3-wallet-grid:has(.t3-wallet-matrix) .t3-wallet-side { height: auto; align-self: start; }
+  .t3-wallet-status-list { flex: none; display: grid; grid-auto-rows: auto; }
   .t3-wallet-status-list > div { border-top: 1px solid hsl(var(--rule)); min-height: 52px; }
   .t3-wallet-status-list > div:first-child { border-top: 0; }
   .t3-wallet-status-list > div > div:first-child { display: flex; align-items: center; gap: 8px; min-height: 34px; }
@@ -3436,7 +3447,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .t3-wallet-status-retry button { height: 28px; padding: 0 11px; font-size: 12px; }
   .t3-wallet-status-retry span { color: hsl(var(--faint)); font-size: 12px; }
   .t3-wallet-moved, .t3-wallet-grid:not(:has(.t3-wallet-matrix)) .t3-wallet-side { display: flex; flex-direction: column; }
-  .t3-wallet-movers { flex: 1; display: grid; grid-auto-rows: 1fr; }
+  .t3-wallet-movers { display: grid; grid-auto-rows: auto; }
   .t3-wallet-movers > div { display: grid; grid-template-columns: 44px minmax(0,1fr) 84px; align-items: center; gap: 12px; min-height: 40px; }
   .t3-wallet-movers strong { font-weight: 600; }
   .t3-wallet-movers > div > span:last-child { text-align: right; }
@@ -3757,7 +3768,8 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .fidelity-summary-grid > :nth-child(n) { grid-column: 1 / -1; }
   .fidelity-kpis { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .fidelity-kpis > div:nth-child(odd) { border-left: 0; padding-left: 0; }
-  .fidelity-month-grid, .fidelity-skeleton-months { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto; }
+  .fidelity-month-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fidelity-skeleton-months { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto; }
   .fidelity-period-card, .fidelity-summary-pnl { min-height: 0; }
   .fidelity-attribution-row, .fidelity-attribution-axis { min-width: 820px; }
   .fidelity-attribution-row > :first-child { position: sticky; left: 0; z-index: 1; background: #131217; }

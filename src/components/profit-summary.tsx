@@ -35,6 +35,7 @@ import { PartialProfitHint, PnlPercentHint } from "./profit-summary-hints";
 import { HintPopover } from "./ui/hint-popover";
 import { attributionCompactAmount } from "./attribution-amount";
 import { FittingAttributionAmount } from "./fitting-attribution-amount";
+import { Pager, usePager } from "./ui/pager";
 
 type SummaryType = "month" | "year";
 type UnknownCoins = Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"];
@@ -189,6 +190,11 @@ const App = ({
       [...new Set(listAllFirstAndLastDays(dateRange.start, dateRange.end).map((d) => d.firstDay.getFullYear()))],
     [rangeKey]
   );
+  useEffect(() => {
+    if (availableYears.length && !availableYears.includes(selectedYear)) {
+      setSelectedYear(availableYears.at(-1)!);
+    }
+  }, [availableYears, selectedYear]);
 
   useEffect(() => {
     if (summaryType !== "year") {
@@ -419,7 +425,7 @@ const App = ({
   }, [monthlyProfitsMap, loadedMonthlyKey, monthlyKey, selectedYear, dateRange.start, dateRange.end]);
 
   const yearCards = useMemo(() => {
-    return (fidelity ? [...availableYears].sort((a, b) => b - a) : availableYears).map((year) => ({
+    return [...availableYears].sort((a, b) => b - a).map((year) => ({
         year,
         total: yearlyProfitsMap[year] ? yearlyProfitsMap[year].total : 0,
         knownTotal: yearlyProfitsMap[year]?.knownTotal ?? null,
@@ -429,7 +435,12 @@ const App = ({
         count: yearlyProfitsMap[year]?.count,
         deposits: yearlyProfitsMap[year]?.deposits,
       }));
-  }, [availableYears, yearlyProfitsMap, fidelity]);
+  }, [availableYears, yearlyProfitsMap]);
+  const yearPaging = usePager(yearCards, rangeKey, 4);
+  useEffect(() => {
+    const index = yearCards.findIndex((item) => item.year === selectedYear);
+    if (index >= 0) yearPaging.goTo(Math.floor(index / yearPaging.pageSize) + 1);
+  }, [selectedYear, rangeKey, summaryType]);
 
   const visibleSummaryStats = useMemo(() => {
     const data = summaryType === "month" ? monthCards.filter((item) => item.inRange) : yearCards;
@@ -572,7 +583,8 @@ const App = ({
   }
 
   function renderYearSummary() {
-    if (fidelity) return oneSnapshot ? <div className="fidelity-empty fidelity-period-empty">{t("summary.fidelity.yearEmpty")}</div> : <div className="fidelity-year-stack">{yearCards.map((item) => {
+    if (fidelity) return oneSnapshot ? <div className="fidelity-empty fidelity-period-empty">{t("summary.fidelity.yearEmpty")}</div> : <>
+      <div className="fidelity-year-stack" data-paged={yearCards.length > 2}>{yearPaging.rows.map((item) => {
       const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
       const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
       const span = yearSpan(item.year, dateRange.start, dateRange.end);
@@ -586,11 +598,15 @@ const App = ({
         <span className="fidelity-year-deposits"><span>{t("summary.fidelity.deposits")}</span><span>{item.deposits == null ? "–" : fidelityAmount(item.deposits)}</span></span>
         <span className="fidelity-year-foot"><span><span className={countTone(item.count?.up ?? 0, true, quoteColor)}>{item.count?.up ?? 0} {t("summary.fidelity.up")}</span> · <span className={countTone(item.count?.down ?? 0, false, quoteColor)}>{item.count?.down ?? 0} {t("summary.fidelity.down")}</span></span><span>{span.last - span.first + 1} {t("summary.fidelity.months")}</span></span>
       </button>{partial && renderPartialInfo(item.unknownCoins, String(item.year), true)}</div>;
-    })}</div>;
+    })}</div>
+      {yearCards.length > 2 && <div className="fidelity-year-pager"><Pager count={yearCards.length} {...yearPaging} t={t}
+        ariaLabel={t("summary.fidelity.byYear")} /></div>}
+    </>;
 
     return (
+      <>
       <div className="analyze-period-grid grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2">
-        {yearCards.map((item) => {
+        {yearPaging.rows.map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
           const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
           return (
@@ -616,6 +632,9 @@ const App = ({
           );
         })}
       </div>
+      <Pager count={yearCards.length} {...yearPaging} t={t}
+        ariaLabel={t("profitSummary.years")} />
+      </>
     );
   }
 
@@ -645,12 +664,12 @@ const App = ({
                 }}
               >
                 <SelectTrigger aria-label={`${t("profitSummary.selectYear")} ${selectedYear}`} className="h-8 w-[110px] text-sm font-medium border-border/40">
-                  <SelectValue placeholder={t("profitSummary.selectYear")} />
+                  <SelectValue placeholder={t("profitSummary.selectYear")}>{selectedYear}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className="overflow-y-auto max-h-[20rem]">
                   <SelectGroup>
                     <SelectLabel>{t("profitSummary.years")}</SelectLabel>
-                    {availableYears.map((s) => (
+                    {yearCards.map(({ year: s }) => (
                       <SelectItem key={s} value={"" + s}>
                         {s}
                       </SelectItem>

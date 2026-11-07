@@ -30,6 +30,8 @@ import { Button } from "@/components/ui/button";
 import { SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
 import { PartialProfitHint } from "@/components/profit-summary-hints";
 import { HintPopover } from "@/components/ui/hint-popover";
+import { Pager, usePager } from "@/components/ui/pager";
+import { usePhoneWidth } from "@/mobile/components/mobile/size-class";
 
 type SummaryType = "month" | "year";
 type UnknownCoins = Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"];
@@ -85,11 +87,14 @@ const App = ({
     }[]
   >([]);
   const [selectedYear, setSelectedYear] = useState(dateRange.end.getFullYear());
+  const [yearSelectOpen, setYearSelectOpen] = useState(false);
+  const yearSelectTriggerRef = useRef<HTMLButtonElement>(null);
   const [summaryType, setSummaryType] = useState<SummaryType>("month");
   const [clickedMonth, setClickedMonth] = useState<number | null>(null);
   const [monthChartRange, setMonthChartRange] = useState<"week" | "month">("month");
   const { t, locale } = useTranslation();
   const isMobile = useIsMobile();
+  const phoneWidth = usePhoneWidth();
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
   const monthlyCacheRef = useRef<
@@ -365,7 +370,7 @@ const App = ({
   }, [monthlyProfitsMap, loadedMonthlyKey, monthlyKey, selectedYear, dateRange.start, dateRange.end]);
 
   const yearCards = useMemo(() => {
-    return availableYears.map((year) => ({
+    return [...availableYears].reverse().map((year) => ({
         year,
         total: yearlyProfitsMap[year] ? yearlyProfitsMap[year].total : 0,
         knownTotal: yearlyProfitsMap[year]?.knownTotal ?? null,
@@ -373,6 +378,15 @@ const App = ({
         hasData: Boolean(yearlyProfitsMap[year]?.hasData),
       }));
   }, [availableYears, yearlyProfitsMap]);
+  const yearPageSize = phoneWidth ? 3 : 4;
+  const yearPaging = usePager(yearCards, rangeKey, yearPageSize);
+  useEffect(() => {
+    if (yearPaging.pageSize !== yearPageSize) yearPaging.setPageSize(yearPageSize);
+  }, [yearPageSize, yearPaging.pageSize]);
+  useEffect(() => {
+    const index = yearCards.findIndex((item) => item.year === selectedYear);
+    if (index >= 0) yearPaging.goTo(Math.floor(index / yearPaging.pageSize) + 1);
+  }, [selectedYear, rangeKey, summaryType, yearPaging.pageSize]);
 
   const visibleSummaryStats = useMemo(() => {
     const data = summaryType === "month" ? monthCards.filter((item) => item.inRange) : yearCards;
@@ -486,8 +500,9 @@ const App = ({
 
   function renderYearSummary() {
     return (
-      <div className="profit-period-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
-        {yearCards.map((item) => {
+      <div className="space-y-3">
+      <div className="profit-period-grid profit-year-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+        {yearPaging.rows.map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
           const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
           return (
@@ -513,6 +528,9 @@ const App = ({
           );
         })}
       </div>
+      <Pager count={yearCards.length} {...yearPaging} t={t}
+        ariaLabel={t("profitSummary.years")} />
+      </div>
     );
   }
 
@@ -527,17 +545,19 @@ const App = ({
             {summaryType === "month" && (
               <Select
                 value={selectedYear + ""}
+                onOpenChange={setYearSelectOpen}
                 onValueChange={(v) => {
                   setSelectedYear(parseInt(v, 10));
                 }}
               >
-                <SelectTrigger aria-label={`${t("profitSummary.selectYear")} ${selectedYear}`} className="h-8 w-[110px] text-sm font-medium border-border/40">
-                  <SelectValue placeholder={t("profitSummary.selectYear")} />
+                <SelectTrigger ref={yearSelectTriggerRef} aria-label={`${t("profitSummary.selectYear")} ${selectedYear}`} className="h-8 w-[110px] text-sm font-medium border-border/40">
+                  <SelectValue placeholder={t("profitSummary.selectYear")}>{selectedYear}</SelectValue>
                 </SelectTrigger>
-                <SelectContent className="overflow-y-auto max-h-[20rem]">
+                <SelectContent portalContainer={yearSelectOpen ? yearSelectTriggerRef.current?.closest<HTMLElement>(".mobile-sheet") : undefined}
+                  className="overflow-y-auto max-h-[20rem]">
                   <SelectGroup>
                     <SelectLabel>{t("profitSummary.years")}</SelectLabel>
-                    {availableYears.map((s) => (
+                    {yearCards.map(({ year: s }) => (
                       <SelectItem key={s} value={"" + s}>
                         {s}
                       </SelectItem>
