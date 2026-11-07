@@ -9,6 +9,15 @@ const rows = [
 ];
 
 describe("ComparisonMoversPanel", () => {
+  it("bounds a large mover percentage and exposes the exact value", () => {
+    const { container } = render(<ComparisonMoversPanel rows={[
+      { symbol: "BIG", assetType: "crypto", value: { base: 1, head: 37.1122, changePercent: 3611.22 } },
+    ]} currency={currency} quoteColor="green-up-red-down" t={(key) => key} shouldMaskValue={false} />);
+    const percent = container.querySelector(".comparison-movers-percent li > span:nth-child(3)");
+    expect(percent).toHaveTextContent(">999%");
+    expect(percent).toHaveAttribute("title", "+3611.22%");
+    expect(percent).toHaveAttribute("aria-label", "+3611.22%");
+  });
   it("shows no amounts or percentages when values are hidden", () => {
     const { container } = render(<ComparisonMoversPanel rows={rows} currency={currency}
       quoteColor="green-up-red-down" t={(key) => key} shouldMaskValue />);

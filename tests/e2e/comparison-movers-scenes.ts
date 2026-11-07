@@ -152,7 +152,7 @@ export async function expectMoverGeometry(page: Page, cardSelector: string, rowS
       expect(Math.abs(row.height - geometry[0].row.height)).toBeLessThan(0.1);
       expect(row.y).toBeGreaterThanOrEqual(cardBox.y - 1);
       expect(row.y + row.height).toBeLessThanOrEqual(cardBox.y + cardBox.height + 1);
-      expect(plot.width).toBeGreaterThan(0);
+      expect(plot.width).toBeGreaterThanOrEqual(60);
       expect(Math.abs(plot.x - geometry[0].plot.x), `${symbol} plot starts at a different x`).toBeLessThan(0.5);
       expect(Math.abs(plot.width - geometry[0].plot.width), `${symbol} plot has a different width`).toBeLessThan(0.5);
       expect(plot.x).toBeGreaterThanOrEqual(label.x + label.width - 1);

@@ -17,12 +17,13 @@ import { PartialProfitHint, PnlPercentHint } from "@/components/profit-summary-h
 import { attributionAmount, attributionCompactAmount, attributionRange } from "@/components/attribution-amount";
 import { FittingAttributionAmount } from "@/components/fitting-attribution-amount";
 import { useFittingAttributionTicks } from "@/components/use-fitting-attribution-ticks";
+import { SummaryTopList } from "@/components/summary-top-list";
+import { marketProfitPercentage } from "@/components/profit-percentage";
 import "@/mobile/components/mobile/fidelity.css";
 import { directionColorVar, directionTone } from "@/utils/color";
 import { splitDirectionLine } from "@/components/direction-line";
 
 type Profit = Awaited<ReturnType<typeof calculateTotalProfit>>;
-type ProfitCoin = Profit["coins"][number];
 type ChartProfit = Pick<Profit, "total" | "knownTotal" | "unknownCoins">;
 type Month = { date: Date; end: number; profit: number | null; knownTotal: number | null; percentage: number | null | undefined; flow: number; up: number; down: number; flat: number; hasData: boolean; gapDate?: Date; unknownCoins: Profit["unknownCoins"] };
 type Year = { year: number; profit: Profit; start: Date; end: Date; endingValue: number; months: number; flow: number | null };
@@ -283,10 +284,6 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
   const positionCounts = { up: moving.filter((coin) => coin.value !== null && coin.value > .005).length,
     down: moving.filter((coin) => coin.value !== null && coin.value < -.005).length,
     flat: Math.max(0, (display?.assets ?? 0) - moving.filter((coin) => coin.value === null || Math.abs(coin.value) > .005).length) };
-  const marketMax = Math.max(1, ...moving.map((coin) => Math.abs(coin.value ?? 0)));
-  const negativeMax = Math.max(0, ...moving.map((coin) => -(coin.value ?? 0)));
-  const zeroPercent = negativeMax / marketMax * 30 + 2;
-  const marketUnit = (100 - zeroPercent - 2) / marketMax;
   const yearsLabel = String(lastDate.getFullYear());
   const pnlText = pnl === null ? dash : cash(pnl, 0, true);
   const sub = loading ? t("fidelity.summary.loading") : empty ? t("fidelity.summary.oneSnapshot") :
@@ -299,17 +296,6 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
     <PartialProfitHint names={coins.map((coin) => coin.symbol)} period={period} t={t}
       className={`fd-partial-badge${year ? " fd-year-badge" : ""}`} />;
   const emptyCopy = t("fidelity.summary.oneSnapshot.rich").split("**");
-  const topRow = (coin: ProfitCoin) => {
-    const stable = display?.stableSymbols.includes(coin.symbol) ?? false;
-    const value = stable ? 0 : coin.value;
-    const invested = (display?.coinValues[`${coin.assetType}:${coin.symbol}`] ?? 0) - (coin.value ?? 0);
-    const coinReturn = stable ? 0 : coin.value === null || invested <= 0 ? null : coin.value / invested;
-    return <div className="fd-top-row" key={`${coin.assetType}:${coin.symbol}`}><b>{coin.symbol}</b>
-      <span className="fd-attr-track" style={{ "--fd-zero": `${zeroPercent}%` } as React.CSSProperties}>{!stable && value !== null && <i data-tone={tone(value)} style={value < 0 ? { right: `calc(100% - ${zeroPercent}%)`, width: `${-value * marketUnit}%` } : { left: `${zeroPercent}%`, width: `${value * marketUnit}%` }} />}</span>
-      <strong data-tone={tone(value)}>{value === null ? dash : cash(value,0,true)}</strong>
-      <small data-tone={tone(coinReturn)}>{coinReturn === null ? dash : percent(coinReturn,1)}</small>
-    </div>;
-  };
   const card = (children: React.ReactNode, className = "") => <section className={`fd-card ${className}`}>{children}</section>;
   const placeholder = (text: string, height: number) => <div className="fd-empty" style={{ minHeight: height }}>{text}</div>;
   return <div className="fd-page fd-summary d2-summary" data-state={status} data-empty={empty} data-quote-color={quoteColor} aria-busy={loading}>
@@ -375,12 +361,16 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
       })}</div>}
     </>,"fd-years")}
     {card(<><Heading title={title("attribution")} right={empty?title("attributionDateOnly").replace("{date}",dateLabel(lastDate)).replace("{currency}",currency.currency):title("attributionDateRange").replace("{start}",dateLabel(firstDate)).replace("{end}",dateLabel(lastDate)).replace("{currency}",currency.currency)} />{loading ? <div className="fd-row-skeleton">{Array.from({length:8},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="55%" height={8}/></div>)}</div> : empty ? placeholder(title("attributionNeedsSecond"),260) : <><div className="fd-key"><span><i />{title("marketMove")}</span><span><i />{title("quantityChange")}</span></div>{attributionPaging.rows.map(([symbol,row])=><div className="fd-attr-row" key={symbol}><b>{symbol}</b><span className="fd-attr-track" style={{ "--fd-zero": `${attrScale(0)}%` } as React.CSSProperties}><i className="fd-attr-market" style={{left:`${attrScale(Math.min(0,row.market))}%`,width:`${attrScale(Math.max(0,row.market))-attrScale(Math.min(0,row.market))}%`}} /><i className="fd-attr-flow" style={{left:`${attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`,width:`${attrScale(Math.max(flowStart(row),flowStart(row)+row.flow))-attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`}} /></span><strong data-tone={tone(row.total)} title={attributionAmount(row.total, currency, true)}><FittingAttributionAmount full={attributionAmount(row.total, currency)} compact={attributionCompactAmount(row.total, currency, locale)} /></strong><small className="sr-only"><span>{title("market")} <span data-tone={tone(row.market)}>{cash(row.market,0,true)}</span></span><span>{title("quantity")} {cash(row.flow,0,true)}</span></small></div>)}<div ref={axisRef} className="fd-axis"><span />{attrTicks.map(tick=><span key={tick} data-axis-tick="" data-value={tick} style={{left:`${attrScale(tick)}%`}}>{tick<0?"−":""}{currency.symbol}{new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Math.abs(currencyWrapper(currency)(tick))).replace("K","k")}</span>)}</div><div className="fd-attr-row fd-attr-total"><b>{title("total")}</b><span title={attrRange.full}><FittingAttributionAmount full={attrRange.text} compact={attrRange.compact} /></span><strong title={attributionAmount(gain, currency, true)}><FittingAttributionAmount full={attributionAmount(gain, currency)} compact={attributionCompactAmount(gain, currency, locale)} /></strong><small className="sr-only"><span>{title("market")} {cash(full?.totals.priceEffect??0,0,true)}</span><span>{title("quantity")} {cash((full?.totals.flowEffect??0)+(full?.totals.residual??0),0,true)}</span></small></div><AttributionPager count={grouped.length} {...attributionPaging} t={t} /></>}</>,"fd-attribution")}
-    {card(<><div className="fd-card-heading"><button className="fd-top-dialog-trigger" type="button" disabled={checking} onClick={() => setRankOpen(true)}>{title("topCoins")}</button><span>{title("allTime")}</span></div>{loading ? <div className="fd-row-skeleton">{Array.from({length:6},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="50%" height={8}/></div>)}</div> : empty ? placeholder(title("topNeedsSecond"),260) : <>{([
+    {card(<><div className="fd-card-heading"><button className="fd-top-dialog-trigger" type="button" disabled={checking} onClick={() => setRankOpen(true)}>{title("topCoins")}</button><span>{title("allTime")}</span></div>{loading ? <div className="fd-row-skeleton">{Array.from({length:6},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="50%" height={8}/></div>)}</div> : empty ? placeholder(title("topNeedsSecond"),260) : <><div role="table" aria-label={title("topCoins")} className="summary-top-collection"><div role="row" className="sr-only"><span role="columnheader">{title("assets")}</span><span role="columnheader">{title("market")}</span><span role="columnheader">%</span></div>{([
       [title("topProfit"), moving.filter((coin)=>coin.value !== null && coin.value > 0).sort((a,b)=>(b.value??0)-(a.value??0))],
       [title("topLoss"), moving.filter((coin)=>coin.value !== null && coin.value < 0).sort((a,b)=>(a.value??0)-(b.value??0))],
       [title("noMarketPnl"), (display?.profit.coins??[]).filter((coin)=>display?.stableSymbols.includes(coin.symbol))
         .sort((a,b)=>(display?.coinValues[`${b.assetType}:${b.symbol}`]??0)-(display?.coinValues[`${a.assetType}:${a.symbol}`]??0))],
-    ] as const).map(([heading,items])=><div key={heading}><h4 className="fd-list-heading">{heading}</h4>{items.map(topRow)}</div>)}<p className="fd-footnote">{title("topNote.market").replace("{date}",dateLabel(firstDate)).replace("{one}",cash(1,0))}</p></>}</>,"fd-top-coins")}
+    ] as const).map(([heading,items])=><SummaryTopList key={heading} heading={heading}
+      rows={items.map((coin) => ({ ...coin, stable: display?.stableSymbols.includes(coin.symbol) ?? false,
+        percentage: display?.stableSymbols.includes(coin.symbol) ? 0
+          : marketProfitPercentage(coin.value, display?.coinValues[`${coin.assetType}:${coin.symbol}`]) }))}
+      scaleValues={moving.map((coin) => coin.value ?? 0)} amount={(value) => cash(value,0,true)} tone={tone} />)}</div><p className="fd-footnote">{title("topNote.market").replace("{date}",dateLabel(firstDate)).replace("{one}",cash(1,0))}</p></>}</>,"fd-top-coins")}
     <BottomSheet open={rankOpen} onOpenChange={setRankOpen} title={t("analytics.rank")} detents={["large"]} initialDetent="large">
       <div className="d2-rank-sheet"><TopCoinsRank dateRange={dateRange} currency={currency} /></div>
     </BottomSheet>

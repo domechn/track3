@@ -1249,7 +1249,7 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-attribution-table.has-residual .fidelity-attribution-row, .fidelity-attribution-table.has-residual .fidelity-attribution-axis { grid-template-columns: minmax(96px,.75fr) minmax(185px,1fr) repeat(4,minmax(max-content,1fr)); }
 .fidelity-attribution-row { display: grid; align-items: center; height: 52px; border-top: 1px solid #1b1a1f; }
 .fidelity-attribution-row.head { height: 28px; margin-top: 12px; border: 0; color: #9b9da3; font-size: 12px; }
-.fidelity-attribution-row b, .fidelity-leader-row b { font-weight: 600; }
+.fidelity-attribution-row b { font-weight: 600; }
 .fidelity-attribution-row > b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fidelity-attribution-row > span:nth-child(n+3) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fidelity-attribution-row.head > span { white-space: nowrap; }
@@ -1275,17 +1275,40 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .fidelity-summary-chart-empty button, .fidelity-attribution-options summary, .fidelity-attribution-options button { min-height: 44px; }
   .fidelity-attribution-options button { min-width: 44px; }
 }
-.fidelity-group-label { margin: 14px 0 6px; color: #9b9da3; font-size: 12px; }
-.fidelity-leaders .fidelity-card-head + [role="table"] > .fidelity-group-label:nth-child(2) { margin-top: 28px; }
-.fidelity-leaders .fidelity-leader-row + .fidelity-group-label { margin-top: 18px; }
-.fidelity-leader-row { display: grid; grid-template-columns: 48px minmax(0,1fr) max-content 68px; gap: 12px; align-items: center; height: 42px; border-top: 1px solid #1b1a1f; }
-.fidelity-leader-row .number { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fidelity-leader-track { position: relative; height: 12px; }
-.fidelity-leader-track b { position: absolute; top: -5px; bottom: -5px; width: 1px; background: #3a3a3e; }
-.fidelity-leader-track i { position: absolute; top: 2px; height: 8px; }
-.fidelity-leader-track i.positive { background: hsl(var(--gain)); }
-.fidelity-leader-track i.negative { background: hsl(var(--loss)); }
 .fidelity-leaders .fidelity-caption { margin: 12px 0 0; color: #9b9da3; line-height: 18px; }
+.summary-top-collection { display:grid; grid-template-columns:minmax(64px,max-content) minmax(80px,1fr) max-content minmax(64px,max-content); column-gap:6px; min-width:0; }
+.summary-top-list { display:grid; grid-column:1/-1; grid-template-columns:subgrid; column-gap:6px; min-width:0; }
+.summary-top-list + .summary-top-list { margin-top:8px; }
+.summary-top-heading { grid-column:1/-1; margin:16px 0 6px; color:#9b9da3; font-size:12px; font-weight:400; }
+.summary-top-heading h4 { margin:0; font:inherit; }
+.summary-top-list .summary-top-row { display:grid; grid-column:1/-1; grid-template-columns:subgrid; column-gap:6px; align-items:center; height:36px; min-height:36px; min-width:0; border-top:1px solid hsl(var(--border)); }
+.summary-top-row > b { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.summary-top-row > :is(strong,small) { min-width:0; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.summary-top-row > strong { font-weight:400; }
+.summary-top-row > small { font-size:13px; }
+.summary-top-track { display:block; min-width:0; padding-inline:12px; }
+.summary-top-track > span { position:relative; display:block; width:100%; height:8px; overflow:hidden; }
+.summary-top-track i { position:absolute; top:0; display:block; height:8px; background:currentColor; }
+.summary-top-axis { grid-column:2; position:relative; margin-inline:12px; pointer-events:none; }
+.summary-top-axis::before { position:absolute; top:0; bottom:0; left:var(--summary-zero); width:1px; background:hsl(var(--control)); content:""; }
+@supports not (grid-template-columns: subgrid) {
+  .summary-top-list, .summary-top-list .summary-top-row { display:contents; }
+  .summary-top-list + .summary-top-list .summary-top-heading { margin-top:24px; }
+  .summary-top-axis { display:none; }
+  .summary-top-row > * { align-self:center; height:36px; border-top:1px solid hsl(var(--border)); }
+  .summary-top-row > :is(b,strong,small) { display:flex; align-items:center; }
+  .summary-top-row > :is(strong,small) { justify-content:flex-end; }
+  .summary-top-track > span { height:36px; }
+  .summary-top-track > span::before { position:absolute; top:0; bottom:0; left:var(--summary-zero); width:1px; background:hsl(var(--control)); content:""; }
+  .summary-top-track i { top:14px; }
+}
+@media (pointer: coarse) {
+  .summary-top-list .summary-top-row { height:44px; min-height:44px; }
+  @supports not (grid-template-columns: subgrid) {
+    .summary-top-row > *, .summary-top-track > span { height:44px; }
+    .summary-top-track i { top:18px; }
+  }
+}
 :where(.fidelity-summary) .fidelity-skeleton { min-height: 395px; }
 :where(.fidelity-summary) .fidelity-skeleton.pnl, :where(.fidelity-summary) .fidelity-skeleton.ath { min-height: 399px; }
 :where(.fidelity-summary) .fidelity-skeleton.months, :where(.fidelity-summary) .fidelity-skeleton.years { min-height: 388px; }
@@ -3723,7 +3746,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 .light .coin-fidelity .coin-fidelity-pill { background: hsl(var(--raised)); color: hsl(var(--foreground)); }
 .light .coin-fidelity-crumb, .light .coin-fidelity-position-header > div { color: hsl(var(--muted-foreground)); }
 .light .t3-fidelity-ranges button { color: hsl(var(--foreground)); }
-.light .fidelity-summary :is(span, small, p, summary, button, .fidelity-label, .fidelity-group-label) { color: hsl(var(--muted-foreground)); }
+.light .fidelity-summary :is(span, small, p, summary, button, .fidelity-label) { color: hsl(var(--muted-foreground)); }
 .light .fidelity-summary :is(.positive, .text-positive) { color: hsl(var(--positive)); }
 .light .fidelity-summary :is(.negative, .text-negative) { color: hsl(var(--negative)); }
 .light :where(.fidelity-summary) .fidelity-empty button { color: hsl(var(--primary-foreground)); }
