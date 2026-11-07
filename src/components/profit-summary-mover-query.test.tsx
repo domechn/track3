@@ -38,3 +38,38 @@ it("shares the full-range mover query between month and year hints", async () =>
   fireEvent.click(screen.getAllByRole("button", { name: "How P&L % is calculated" })[1]);
   await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("BTC"));
 });
+
+it("jumps to the page containing the selected year", async () => {
+  function YearSummary() {
+    const [year, setYear] = useState(2026);
+    const [start, setStart] = useState(2015);
+    return <SummaryFidelityYearContext.Provider value={{ year, setYear, moverNames: [], setMoverNames: () => {} }}>
+      <button onClick={() => setYear(2017)}>Select 2017</button>
+      <button onClick={() => setStart(2024)}>Start at 2024</button>
+      <ProfitSummary fidelity initialType="year"
+        dateRange={{ start: new Date(start, 0, 1), end: new Date(2026, 9, 31) }}
+        currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+        quoteColor="green-up-red-down" />
+    </SummaryFidelityYearContext.Provider>;
+  }
+  const { container } = render(<YearSummary />);
+  const years = () => [...container.querySelectorAll(".fidelity-year-head b")].map((node) => node.textContent);
+  expect(years()).toEqual(["2026", "2025", "2024", "2023"]);
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  expect(years()).toEqual(["2022", "2021", "2020", "2019"]);
+  fireEvent.click(screen.getByRole("button", { name: "Select 2017" }));
+  await waitFor(() => expect(years()).toEqual(["2018", "2017", "2016", "2015"]));
+  expect(container.querySelector(".fidelity-year-card.selected")).toHaveTextContent("2017");
+  fireEvent.click(screen.getByRole("button", { name: "Start at 2024" }));
+  await waitFor(() => expect(years()).toEqual(["2026", "2025", "2024"]));
+  expect(container.querySelector(".fidelity-year-card.selected")).toHaveTextContent("2026");
+});
+
+it("shows the most recent year first in the desktop year view", () => {
+  const { container } = render(<ProfitSummary
+    dateRange={{ start: new Date(2015, 0, 1), end: new Date(2026, 9, 31) }}
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+    quoteColor="green-up-red-down" />);
+  fireEvent.click(screen.getByRole("radio", { name: "Y" }));
+  expect(container.querySelector(".analyze-period-grid > div")).toHaveTextContent("2026");
+});

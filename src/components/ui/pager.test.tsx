@@ -53,6 +53,16 @@ it("pages 26 rows and resets when the key changes", async () => {
   expect(onPageChange).toHaveBeenCalledTimes(1);
 });
 
+it("jumps to the page holding a selected row", async () => {
+  function Jump() {
+    const paging = usePager(Array.from({ length: 12 }, (_, index) => 2026 - index), "years", 4);
+    return <><output>{paging.rows.join(",")}</output><button onClick={() => paging.goTo(3)}>Select 2017</button></>;
+  }
+  render(<Jump />);
+  await userEvent.click(screen.getByRole("button", { name: "Select 2017" }));
+  expect(screen.getByText("2018,2017,2016,2015")).toBeInTheDocument();
+});
+
 it("changes page size and clamps when the last page shrinks", async () => {
   const user = userEvent.setup();
   const rows = Array.from({ length: 312 }, (_, i) => i + 1);

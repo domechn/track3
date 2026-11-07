@@ -33,7 +33,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-three>div:first-child { padding-left:0; border-left:0; }
 .fd-three strong { display:block; margin-top:10px; font:500 17px/22px "Public Sans Variable","Public Sans",sans-serif; white-space:nowrap; }
 .fd-three small { display:block; }
-.fd-chart-caption { margin:0 0 6px; color:var(--fd-faint); font-size:12px; }
+.fd-chart-caption { max-width:300px; margin:0 0 6px; color:var(--fd-faint); font-size:12px; }
 .fd-summary-chart { width:100%; height:190px; font-family:"Public Sans Variable","Public Sans",sans-serif; }
 .fd-empty { display:grid; place-content:center; justify-items:center; gap:10px; min-height:190px; padding:24px; border:1px dashed var(--fd-control); border-radius:6px; color:var(--fd-muted); text-align:center; }
 .fd-empty p { max-width:44ch; margin:0; }
@@ -74,6 +74,7 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-footnote { margin:14px 0 0; color:var(--fd-faint); font-size:12px; }
 .fd-profit-hint { margin:-8px 0 10px; }
 .fd-year-list { display:grid; gap:12px; }
+.fd-year-pager { min-height:44px; margin-top:12px; }
 .fd-year { display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:auto auto auto auto 1fr; min-height:183px; }
 .fd-year>.fd-month-top { grid-column:1/-1; grid-row:1; align-self:start; }
 .fd-year[data-partial="true"]>.fd-month-top { grid-column:1; min-width:0; }

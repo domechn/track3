@@ -391,7 +391,7 @@ test("Summary month cards and calculation hint follow the source row spacing", a
     .getByRole("button", { name: "How P&L % is calculated" }).boundingBox())!;
   expect(card.y).toBe(572);
   expect(months.y).toBe(663);
-  expect(months.height).toBe(374);
+  expect(months.height).toBe(346);
   expect(hint.y).toBe(621);
 });
 

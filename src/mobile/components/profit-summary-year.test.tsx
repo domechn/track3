@@ -70,6 +70,33 @@ it("shows a dash for a year without a snapshot", async () => {
   expect(screen.getByText("Periods 0 of 1")).toBeInTheDocument();
 });
 
+it("pages twelve years by three on a phone and resets when the range changes", async () => {
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query === "(max-width: 760px)",
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+  const currency = { currency: "USD", symbol: "$", rate: 1, alias: "USD" };
+  const { rerender, container } = render(<ProfitSummary
+    dateRange={{ start: new Date(2015, 0, 1), end: new Date(2026, 9, 31) }}
+    currency={currency} quoteColor="green-up-red-down"
+  />);
+  fireEvent.click(screen.getByRole("radio", { name: "Y" }));
+  await waitFor(() => expect(container.querySelectorAll(".profit-period-grid > div")).toHaveLength(3));
+  expect(container.querySelector(".profit-period-grid")).toHaveTextContent("2026");
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  expect(container.querySelector(".profit-period-grid")).toHaveTextContent("2023");
+  rerender(<ProfitSummary dateRange={{ start: new Date(2024, 0, 1), end: new Date(2026, 9, 31) }}
+    currency={currency} quoteColor="green-up-red-down" />);
+  expect(container.querySelector(".profit-period-grid")).toHaveTextContent("2026");
+  expect(container.querySelector(".profit-period-grid")).not.toHaveTextContent("2023");
+});
+
 it("lets the phone narrow a month's P&L chart to seven days", async () => {
   vi.mocked(calculateTotalProfit).mockResolvedValue({
     total: 0,
