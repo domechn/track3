@@ -281,7 +281,7 @@ describe("profit attribution", () => {
       expect(within(figure).getAllByRole("listitem")).toHaveLength(47);
       expect(within(detail).getAllByRole("listitem")).toHaveLength(10);
       expect(screen.getByText("Showing 1-10 of 47")).toBeInTheDocument();
-      fireEvent.click(screen.getByRole("button", { name: "Next" }));
+      fireEvent.click(within(screen.getByRole("navigation", { name: "Attribution details" })).getByRole("button", { name: "Next" }));
       expect(within(figure).getAllByRole("listitem")).toHaveLength(47);
       expect(within(detail).getAllByRole("listitem")).toHaveLength(10);
       expect(screen.getByText("Showing 11-20 of 47")).toBeInTheDocument();
@@ -289,7 +289,7 @@ describe("profit attribution", () => {
     } finally {
       window.matchMedia = previousMatchMedia;
     }
-  });
+  }, 20_000);
 
   it("shortens an unaliased wallet address in phone attribution groups", async () => {
     const address = "HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH";

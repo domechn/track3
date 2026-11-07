@@ -456,9 +456,10 @@ it("keeps the iPad transaction page while refreshed rows load and clamps after a
   const scrollArea = document.querySelector(".coin-ipad-transactions .overflow-auto") as HTMLElement;
   expect(scrollArea).toHaveAttribute("role", "region");
   scrollArea.scrollTop = 300;
-  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  fireEvent.click(within(screen.getByRole("navigation", { name: "History" })).getByRole("button", { name: "Next" }));
   expect(scrollArea.scrollTop).toBe(0);
-  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  expect(screen.getByText("Showing 26-50 of 51")).toBeInTheDocument();
+  fireEvent.click(within(screen.getByRole("navigation", { name: "History" })).getByRole("button", { name: "Next" }));
   expect(screen.getByText("Showing 51-51 of 51")).toBeInTheDocument();
   const pending = deferred<Transaction[]>();
   mocks.queryTransactionsBySymbolAndDateRange.mockReturnValue(pending.promise);
