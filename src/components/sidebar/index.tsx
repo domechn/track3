@@ -37,6 +37,11 @@ const recordsIcons: Record<string, ReactNode> = {
   "/assistant": <path d="M3 4h12v8H8l-3.5 3v-3H3z" />,
   "/settings": settingsCog,
 };
+const recordsControlsSliders = <>
+  <path d="M2.5 5h2m4 0h7M2.5 13h8m4 0h1" />
+  <circle cx="6.5" cy="5" r="2" />
+  <circle cx="12.5" cy="13" r="2" />
+</>;
 
 function NavItem({ item, collapsed, unread, fidelity }: { item: NavEntry; collapsed: boolean; unread?: number; fidelity?: boolean }) {
   const { t } = useTranslation();
@@ -86,6 +91,18 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
   const unread = useAlertBadge();
   const { pathname } = useLocation();
   const records = pathname === "/history" || pathname === "/cost-basis";
+  const recordsControlLabel = t(pathname === "/history" ? "records.historyFilters" : "records.controls");
+  const recordsControl = records && <button type="button" aria-label={recordsControlLabel} aria-haspopup="true"
+    aria-expanded={recordsToolsOpen} aria-pressed={recordsToolsOpen} aria-controls="t3-records-toolbar-panel"
+    onClick={() => window.dispatchEvent(new Event("records-controls-toggle"))}
+    className={cn("group relative flex h-9 w-full touch:min-h-11 items-center gap-3 rounded-md px-[9px] text-[13px] font-medium whitespace-nowrap text-muted-foreground hover:bg-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      collapsed && "justify-center px-0")}>
+    <svg aria-hidden="true" className="h-[18px] w-[18px] shrink-0" viewBox="0 0 18 18"
+      fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      {recordsControlsSliders}
+    </svg>
+    {!collapsed && <span>{recordsControlLabel}</span>}
+  </button>;
   return <aside style={{ width: collapsed ? "var(--sidebar-collapsed-width)" : "var(--sidebar-width)" }}
     aria-keyshortcuts="Alt+ArrowRight Alt+ArrowLeft"
     onKeyDown={(event) => {
@@ -109,18 +126,9 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
       <NavGroup label={t("nav.analyze", "Analyze")} items={analyze} collapsed={collapsed} unread={unread} fidelity={fidelity} />
       <NavGroup label={t("nav.manage", "Manage")} items={isProUser ? manage : manage.slice(0, -1)} collapsed={collapsed} unread={unread} fidelity={fidelity} />
     </nav><div className={cn("shrink-0 border-t border-border px-[10px] touch:px-[5px] pt-2 pb-2",
-      collapsed && "-mx-[10px] px-[5px] touch:-mx-[5px]")}>{records &&
-        <button type="button" aria-label={t("records.controls")} aria-haspopup="true"
-          aria-expanded={recordsToolsOpen} aria-controls="t3-records-toolbar-panel"
-          onClick={() => window.dispatchEvent(new Event("records-controls-toggle"))}
-          className={cn("group relative flex h-9 w-full touch:min-h-11 items-center gap-3 rounded-md px-[9px] text-[13px] font-medium whitespace-nowrap text-muted-foreground hover:bg-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            collapsed && "justify-center px-0")}>
-          <svg aria-hidden="true" className="h-[18px] w-[18px] shrink-0" viewBox="0 0 18 18"
-            fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            {recordsIcons["/settings"]}
-          </svg>
-          {!collapsed && <span>{t("records.controls")}</span>}
-        </button>}
+      collapsed && "-mx-[10px] px-[5px] touch:-mx-[5px]")}>
+      {collapsed && recordsControl ? <Tooltip><TooltipTrigger asChild>{recordsControl}</TooltipTrigger>
+        <TooltipContent side="right" sideOffset={10}>{recordsControlLabel}</TooltipContent></Tooltip> : recordsControl}
       <NavItem item={settings} collapsed={collapsed} fidelity={fidelity} />
     </div></TooltipProvider>
     <button type="button" aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")}

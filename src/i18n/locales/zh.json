@@ -1868,6 +1868,7 @@
   "sync.status.syncedAt": "已同步 {time}",
   "cost.fidelity.title": "成本基础",
   "records.controls": "记录控制",
+  "records.historyFilters": "历史筛选",
   "cost.fidelity.subtitle": "{period}（{from} – {to}）的卖出收益，采用{method}。未实现收益按今日价格计算。",
   "cost.fidelity.taxYearNumber": "{year} 纳税年度",
   "cost.fidelity.customRangeLower": "自定义区间",
