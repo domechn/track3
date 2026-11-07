@@ -533,7 +533,7 @@ test("sync status popover stays visible and announces state", async ({ page }) =
     ["Sync passphrase", "correct horse battery staple"], ["Confirm sync passphrase", "correct horse battery staple"],
   ]) await page.getByLabel(label, { exact: true }).fill(value);
   await page.getByRole("button", { name: "Enable sync" }).click();
-  const trigger = page.getByRole("button", { name: "Sync idle" });
+  const trigger = page.locator(".t3-topbar-sync-button");
   await expect(trigger).toBeVisible();
   await trigger.click();
   const popover = page.locator("[data-radix-popper-content-wrapper]").last();

@@ -189,18 +189,22 @@ const App = ({
       <Popover onOpenChange={onPopoverOpenChange}>
         <PopoverTrigger asChild>
           <button type="button" aria-label={t(recordsLabel ? "realtime.open" : "realtime.design.live")}
+            title={t(`realtime.price.${liveTotal.state}`)}
             aria-description={recordsLabel ? undefined : t("realtime.open")}
             className="t3-live-trigger flex min-h-9 touch:min-h-11 items-center justify-center gap-2 rounded-md text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <LightningBoltIcon aria-hidden="true" height={16} width={16} />
             <span className="sr-only">{t("realtime.title")}</span>
             <span className="t3-live-label">{t("realtime.design.live")}</span>
-            <strong className="t3-live-amount t3-live-label" data-state={liveTotal.state}
-              data-first={liveTotal.firstReveal || undefined} aria-hidden="true">
-              {liveTotal.value === undefined
-                ? liveTotal.state === "connecting" ? <span className="t3-live-skeleton" /> : null
-                : currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(liveTotal.animatedValue ?? realtimeTotalValue))}
-            </strong>
-            <i className="t3-live-dot" data-state={liveTotal.state} aria-hidden="true" />
+            <span className="t3-live-value">
+              <strong className="t3-live-amount t3-live-label" data-state={liveTotal.state}
+                data-first={liveTotal.firstReveal || undefined} aria-hidden="true">
+                {liveTotal.value === undefined
+                  ? liveTotal.state === "connecting" ? <span className="t3-live-skeleton" /> : null
+                  : currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(liveTotal.animatedValue ?? realtimeTotalValue))}
+              </strong>
+              <i className="t3-live-dot" data-state={liveTotal.state} role="img"
+                aria-label={t(`realtime.price.${liveTotal.state}`)} title={t(`realtime.price.${liveTotal.state}`)} />
+            </span>
           </button>
         </PopoverTrigger>
         <span role="status" aria-live="polite" className="sr-only"
@@ -209,6 +213,7 @@ const App = ({
               : `${t("realtime.design.live")}: ${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(liveTotal.announcedValue))}`}
         </span>
         <PopoverContent className="t3-live-popover w-[calc(100vw-1rem)] max-w-80 p-4" collisionPadding={8}>
+          <p className="mb-2 text-xs text-muted-foreground">{t(`realtime.price.${liveTotal.state}`)}</p>
           <div className="relative min-h-[110px]" aria-busy={liveTotal.value === undefined && liveTotal.state !== "error"}>
             {liveTotal.value === undefined
               ? liveTotal.state === "error" ? <div className="flex min-h-[110px] items-center justify-center text-sm text-muted-foreground">

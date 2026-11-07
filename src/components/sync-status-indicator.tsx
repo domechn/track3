@@ -80,6 +80,7 @@ type Props = {
 export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = false, overviewFidelity = false, ConfirmDialog = ConfirmDeleteDialog }: Props) {
   const status = useSyncExternalStore(syncRuntime.subscribe, syncRuntime.status);
   const wide = useWideDesktop() && !mobile;
+  const [online, setOnline] = useState(navigator.onLine);
   const [passphrase, setPassphrase] = useState("");
   const [error, setError] = useState("");
   const [disableError, setDisableError] = useState("");
@@ -99,33 +100,66 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
   }, [status.mode]);
 
   useEffect(() => {
-    if (status.sync.phase !== "syncing") return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [status.sync.phase]);
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
 
-  if (status.mode === "loading" || status.mode === "disabled") return null;
+  useEffect(() => {
+    if (status.sync.phase !== "syncing" && status.sync.lastSync === undefined) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), status.sync.phase === "syncing" ? 1000 : 60_000);
+    return () => clearInterval(timer);
+  }, [status.sync.phase, status.sync.lastSync]);
+
+  if (status.mode === "loading" || (status.mode === "disabled" &&
+    !syncRuntime.getSettings?.().endpoint && !syncRuntime.getSettings?.().bucket)) return null;
 
   const report = status.sync.report;
   const diagnostics = status.sync.diagnostics;
   const never = status.sync.phase === "idle" && status.sync.lastSync === undefined;
   const muted = status.mode === "locked" && status.skipped;
+  const locked = status.mode === "locked";
   const phase = status.mode === "unreadable" ? "unreadable" :
     status.mode === "locked" ? (muted ? "skipped" : "locked") :
-      status.sync.phase === "idle" && report?.conflicts.length ? "conflict" : status.sync.phase;
+      status.sync.phase === "idle" && report?.conflicts.length ? "conflict" :
+        status.sync.phase === "idle" && report?.errors.length ? "error" : status.sync.phase;
   const syncedAt = recordsStamp && phase === "idle" && status.sync.lastSync !== undefined
     ? t("sync.status.syncedAt").replace("{time}", new Date(status.sync.lastSync).toLocaleTimeString("en-GB", {
       hour: "2-digit", minute: "2-digit", hourCycle: "h23",
     })) : undefined;
   const statusLabel = syncedAt ?? t(`sync.status.${phase}`);
+  const syncState = status.mode === "disabled" ? "off"
+    : !online ? "offline"
+      : phase === "error" || phase === "unreadable" ? "error"
+        : phase === "conflict" ? "conflict"
+          : locked || phase === "skipped" ? "locked"
+            : phase === "syncing" ? "syncing"
+              : status.sync.lastSync !== undefined ? "synced" : "ready";
+  const minutesSinceSync = status.sync.lastSync === undefined ? 0
+    : Math.max(0, Math.floor((now - status.sync.lastSync) / 60_000));
+  const controlLabel = syncState === "synced"
+    ? minutesSinceSync < 1 ? t("sync.control.syncedNow")
+      : minutesSinceSync < 60 ? t("sync.control.syncedMinutes").replace("{count}", String(minutesSinceSync))
+        : minutesSinceSync < 1440 ? t("sync.control.syncedHours").replace("{count}", String(Math.floor(minutesSinceSync / 60)))
+          : t("sync.control.syncedDays").replace("{count}", String(Math.floor(minutesSinceSync / 1440)))
+    : t(`sync.control.${muted ? "skipped" : syncState}`);
+  const syncTone = syncState === "error" ? "text-destructive"
+    : syncState === "conflict" || syncState === "offline" || syncState === "locked" ? "text-warning"
+      : "text-muted-foreground";
+  const syncIcon = syncState === "synced" ? "check"
+    : syncState === "syncing" || syncState === "ready" ? "sync"
+      : syncState === "error" || syncState === "conflict" ? "alert" : "off";
   const changed = !!report && (report.pulled > 0 || report.pushed > 0 || report.conflicts.length > 0 || report.errors.length > 0);
   const counts = report && t("sync.status.counts")
     .replace("{pulled}", String(report.pulled))
     .replace("{pushed}", String(report.pushed))
     .replace("{conflicts}", String(report.conflicts.length))
     .replace("{errors}", String(report.errors.length));
-  const locked = status.mode === "locked";
   const fidelityLocked = locked && overviewFidelity && !mobile && window.innerWidth >= 1400;
   const fidelityReady = overviewFidelity && status.mode === "ready" && status.sync.phase === "idle" &&
     !!report && !report.conflicts.length && !report.errors.length && status.sync.lastSync !== undefined;
@@ -145,6 +179,22 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
     : wide && status.sync.retryStopped ? t("fidelity.settingsB.sync.pop.stopped")
     : wide && phase === "error" ? t("fidelity.settingsB.sync.pop.failedTitle")
     : t(`sync.status.${phase}`);
+  const buttonStatusLabel = syncState === "offline" ? t("sync.control.shortOffline")
+    : syncState === "off" ? t("sync.control.shortOff")
+      : syncState === "ready" ? t("sync.control.shortReady")
+        : syncState === "synced" ? t(mobile ? "fidelity.b.sync.syncedAt" : "overview.fidelity.syncedAt").replace("{time}", syncedTime)
+          : wide ? displayLabel : statusLabel;
+  const buttonAccessibleLabel = syncState === "synced"
+    ? (minutesSinceSync < 1 ? t("sync.control.syncedAtNow")
+      : minutesSinceSync < 60 ? t("sync.control.syncedAtMinutes")
+        : minutesSinceSync < 1440 ? t("sync.control.syncedAtHours")
+          : t("sync.control.syncedAtDays"))
+      .replace("{time}", syncedTime)
+      .replace("{count}", String(minutesSinceSync < 60 ? minutesSinceSync
+        : minutesSinceSync < 1440 ? Math.floor(minutesSinceSync / 60) : Math.floor(minutesSinceSync / 1440)))
+    : controlLabel;
+  const announcedStatusLabel = syncState === "offline" || syncState === "off" || syncState === "ready"
+    ? controlLabel : wide ? displayLabel : statusLabel;
   const remaining = status.sync.progress ? Math.max(0, status.sync.progress.total - progressCompleted) : 0;
   const speed = elapsedSeconds > 0 ? progressCompleted / elapsedSeconds : 0;
   const minutesLeft = speed > 0 ? Math.round(remaining / speed / 60) : 0;
@@ -210,7 +260,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
   return (
     <div className={mobile ? "ios-d3-sync-indicator t3-topbar-sync" : "desktop-sync-status-indicator t3-topbar-sync"}>
       <span role="status" aria-live="polite" className="sr-only">
-        {busy ? t("common.loading") : wide ? displayLabel : statusLabel}
+        {busy ? t("common.loading") : announcedStatusLabel}
       </span>
       {fidelityLocked && open && createPortal(<div className="t3-sync-lock-scrim" aria-hidden="true" />, document.body)}
       {recoveryExportOpen && createPortal(<div className="t3-sync-recovery-fullscrim" aria-hidden="true" />, document.body)}
@@ -224,24 +274,29 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
         <div className="fidelity-sync-sheet-backdrop" aria-hidden="true" onClick={() => setOpen(false)} />,
         document.body,
       )}
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={(next) => {
+        if (next && syncState === "off") {
+          window.location.hash = "#/settings/sync";
+          return;
+        }
+        setOpen(next);
+      }}>
         <PopoverTrigger asChild>
-          <button type="button" aria-label={wide ? displayLabel : statusLabel} title={muted ? t("sync.status.skipped") : undefined}
+          <button type="button" aria-label={buttonAccessibleLabel} title={controlLabel}
             data-synced={syncedAt ? "true" : undefined}
+            data-sync-state={syncState}
             className={muted
-              ? "t3-topbar-sync-button flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-full border border-border bg-background/70 text-muted-foreground opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              : "t3-topbar-sync-button flex min-h-9 touch:min-h-11 items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"}>
-            {muted ? <LockClosedIcon aria-hidden="true" /> : <>
-              <span aria-hidden="true" className={`h-2 w-2 rounded-full ${phase === "error" || phase === "unreadable" ? "bg-destructive" : phase === "conflict" ? "bg-amber-500" : fidelityReady ? "bg-positive" : phase === "syncing" ? "bg-primary animate-pulse motion-reduce:animate-none" : "bg-muted-foreground"}`} />
-              {mobile && <svg className="fd-sync-cloud-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-                <path d="M5.3 14.5h9a3.4 3.4 0 0 0 .2-6.8 4.8 4.8 0 0 0-9.1-1.2 4 4 0 0 0-.1 8z" />
-              </svg>}
-              {fidelityReady ? t("overview.fidelity.syncedAt").replace("{time}", syncedTime) : wide ? displayLabel : statusLabel}
-              {fidelityReady && <svg aria-hidden="true" className="h-3.5 w-3.5" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5.5 18h12a4 4 0 0 0 .5-7.97A6.5 6.5 0 0 0 5.37 9.1 4.5 4.5 0 0 0 5.5 18Z" />
-              </svg>}
-            </>}
+              ? `t3-topbar-sync-button flex h-9 w-9 touch:h-11 touch:w-11 items-center justify-center rounded-full border border-border bg-background/70 ${syncTone} opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`
+              : `t3-topbar-sync-button flex min-h-9 touch:min-h-11 items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-xs ${syncTone} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}>
+            <svg className="fd-sync-cloud-icon h-4 w-4 shrink-0" data-icon={syncIcon} viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5.5 18h12a4 4 0 0 0 .5-7.97A6.5 6.5 0 0 0 5.37 9.1 4.5 4.5 0 0 0 5.5 18Z" />
+              {syncIcon === "check" && <path d="m9 13 2 2 4-4" />}
+              {syncIcon === "sync" && <><path d="M9 12a3 3 0 0 1 5-2l1 1" /><path d="M15 12a3 3 0 0 1-5 2l-1-1" /></>}
+              {syncIcon === "alert" && <><path d="M12 10v3" /><path d="M12 15.5h.01" /></>}
+              {syncIcon === "off" && <path d="m4 4 16 16" />}
+            </svg>
+            {!muted && buttonStatusLabel}
           </button>
         </PopoverTrigger>
         {wide && open && !fidelityReady && <div className="t3-b-sync-scrim" aria-hidden="true" onClick={() => setOpen(false)} />}
@@ -255,6 +310,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
           }}
           data-locked={mobile && locked && !compactLocked}
           className={`t3-sync-popover max-h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-[520px] overflow-y-auto space-y-3 text-sm ${mobile ? `ios-d3-sync-popover${fidelitySheet ? " is-fidelity-sheet" : ""}${compactLocked ? " is-locked" : status.sync.retryStopped && fidelitySheet ? " is-stopped" : status.sync.phase === "error" && fidelitySheet ? " is-error" : ""}` : ""} ${fidelityLocked ? "t3-sync-lock-dialog" : ""} ${wide && !fidelityReady ? "t3-b-sync-popover" : ""}`}>
+          {mobile && !locked && <p className="text-xs text-muted-foreground">{controlLabel}</p>}
           {fidelityReady ? <div className="t3-sync-fidelity">
             <header><h2>{t("overview.fidelity.backupSync")}</h2>
               <span>{t("overview.fidelity.upToDate")}</span></header>

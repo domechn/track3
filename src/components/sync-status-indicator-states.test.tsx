@@ -29,7 +29,9 @@ vi.mock("@/middlelayers/sync/runtime", () => ({
     disable: vi.fn(async () => publish({ mode: "disabled", sync: { phase: "idle" } })),
     unlock: vi.fn(async () => "ok"),
     syncNow: vi.fn(),
-    getSettings: vi.fn(() => ({ endpoint: "https://fixture.r2.cloudflarestorage.com", bucket: "sync-fixture" })),
+    getSettings: vi.fn(() => state.current.mode === "disabled"
+      ? { endpoint: "", bucket: "" }
+      : { endpoint: "https://fixture.r2.cloudflarestorage.com", bucket: "sync-fixture" }),
   },
 }));
 
@@ -56,7 +58,7 @@ describe.each([
 ])("%s sync indicator", (_platform, Indicator) => {
   it("shows no counts before the first sync", () => {
     render(<Indicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Sync idle" }));
+    fireEvent.click(screen.getByRole("button", { name: /Not synced yet - open Backup & sync/ }));
     expect(screen.getByText("Not synced yet")).toBeInTheDocument();
     expect(screen.queryByText(/Pulled 0/)).not.toBeInTheDocument();
   });
@@ -64,7 +66,7 @@ describe.each([
   it("shows the running start and elapsed time while disabling only the active run", () => {
     publish({ mode: "ready", sync: { phase: "syncing", startedAt: Date.now() - 5000 } });
     render(<Indicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Syncing" }));
+    fireEvent.click(screen.getByRole("button", { name: /Syncing\.\.\./ }));
     expect(screen.getByText("Syncing…")).toBeInTheDocument();
     expect(screen.getByText(/Elapsed: 5s/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Sync now" })).toBeDisabled();
@@ -78,7 +80,7 @@ describe.each([
       progress: { phase: "push", completed: 1240, total: 4567 },
     } });
     render(<Indicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Syncing" }));
+    fireEvent.click(screen.getByRole("button", { name: /Syncing\.\.\./ }));
     const upload = screen.getByText("Uploading 1,240 / 4,567");
     const started = screen.getByText(/Started:/);
     expect(started.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -96,7 +98,7 @@ describe.each([
       phase: "syncing", progress: { phase: "pull", completed: 12, total: 10 },
     } });
     render(<Indicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Syncing" }));
+    fireEvent.click(screen.getByRole("button", { name: /Syncing\.\.\./ }));
     expect(screen.getByText("Downloading 10 / 10")).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "10");
   });
@@ -104,7 +106,7 @@ describe.each([
   it("shows the error reason and last successful time without made-up counts", () => {
     publish({ mode: "ready", sync: { phase: "error", error: "bucket", lastSync: previous } });
     render(<Indicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
     const reason = screen.getByText("Bucket not found. Check the bucket name and endpoint.");
     const lastSync = screen.getByText(/Last successful sync:/);
     expect(reason.compareDocumentPosition(lastSync) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -114,7 +116,7 @@ describe.each([
   it("shows when an error happened before any successful sync", () => {
     publish({ mode: "ready", sync: { phase: "error", error: "bucket" } });
     render(<Indicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
     expect(screen.getByText("Bucket not found. Check the bucket name and endpoint.")).toBeInTheDocument();
     expect(screen.getByText("Not synced yet")).toBeInTheDocument();
   });
@@ -122,7 +124,7 @@ describe.each([
   it("summarizes an unchanged successful round and shows its time", () => {
     publish({ mode: "ready", sync: { phase: "idle", report: zeroReport, lastSync: previous } });
     render(<Indicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Sync idle" }));
+    fireEvent.click(screen.getByRole("button", { name: /Synced .* ago$/ }));
     expect(screen.getByText("Everything is up to date")).toBeInTheDocument();
     expect(screen.getByText(/Last synced:/)).toBeInTheDocument();
     expect(screen.queryByText(/Pulled 0/)).not.toBeInTheDocument();
@@ -131,7 +133,7 @@ describe.each([
   it("shows counts when the last round changed data", () => {
     publish({ mode: "ready", sync: { phase: "idle", report: { ...zeroReport, pulled: 2, pushed: 1 }, lastSync: previous } });
     render(<Indicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Sync idle" }));
+    fireEvent.click(screen.getByRole("button", { name: /Synced .* ago$/ }));
     expect(screen.getByText("Pulled 2, pushed 1, conflicts 0, errors 0")).toBeInTheDocument();
   });
 
@@ -141,10 +143,10 @@ describe.each([
     expect(await screen.findByRole("button", { name: "Skip for now" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
     expect(screen.queryByLabelText("Sync passphrase")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sync locked — tap to unlock" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sync locked - tap to unlock" })).toBeInTheDocument();
     publish({ mode: "locked", sync: { phase: "idle" } });
     expect(screen.queryByLabelText("Sync passphrase")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Sync locked" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sync locked - unlock sync" }));
     expect(screen.getByLabelText("Sync passphrase")).toBeInTheDocument();
     expect(syncRuntime.skip).toHaveBeenCalledTimes(1);
   });
@@ -155,7 +157,7 @@ describe.each([
     expect(await screen.findByLabelText("Sync passphrase")).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByLabelText("Sync passphrase")).not.toBeInTheDocument());
-    expect(screen.getByRole("button", { name: "Sync locked" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Sync locked - unlock sync" })).toHaveFocus();
     publish({ mode: "locked", sync: { phase: "idle" } });
     expect(screen.queryByLabelText("Sync passphrase")).not.toBeInTheDocument();
   });
@@ -172,7 +174,7 @@ describe.each([
     fireEvent.click(screen.getByRole("button", { name: /^Turn off sync$/ }));
     await waitFor(() => expect(syncRuntime.disable).toHaveBeenCalledTimes(1));
     expect(syncRuntime.disable).toHaveBeenCalledWith(true);
-    expect(screen.queryByRole("button", { name: "Sync locked" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sync locked - unlock sync" })).not.toBeInTheDocument();
   });
 
   it("announces a failed turn-off separately from the passphrase field", async () => {
@@ -200,7 +202,7 @@ it("shows the phone first-sync sheet with its status and settings action", () =>
   publish({ mode: "ready", sync: { phase: "idle", report: { ...zeroReport,
     devices: [{ id: "remote", name: "iPhone", lastUpload: "2026-10-30T22:07:00Z" }] } } });
   render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
-  fireEvent.click(screen.getByRole("button", { name: "Sync idle" }));
+  fireEvent.click(screen.getByRole("button", { name: /Not synced yet - open Backup & sync/ }));
   expect(screen.getByRole("dialog")).toHaveTextContent("Never synced");
   expect(screen.getByRole("dialog")).toHaveTextContent("Nothing has been uploaded from this device yet.");
   expect(screen.getByRole("dialog").querySelector("a[href='#/settings/sync']")).toHaveTextContent("Settings");
@@ -213,7 +215,7 @@ it("shows phone upload progress with elapsed time and remaining items", () => {
     progress: { phase: "push", completed: 1240, total: 4567 },
   } });
   render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
-  fireEvent.click(screen.getByRole("button", { name: "Syncing" }));
+  fireEvent.click(screen.getByRole("button", { name: /Syncing\.\.\./ }));
   const sheet = screen.getByRole("dialog");
   expect(sheet).toHaveTextContent("Uploading");
   expect(sheet).toHaveTextContent("Uploading 1,240 / 4,567");
@@ -229,7 +231,8 @@ it("shows the phone successful sheet with last upload and inline details", () =>
   publish({ mode: "ready", sync: { phase: "idle", report: { ...zeroReport, pushed: 312,
     devices: [{ id: "remote", name: "iPhone", lastUpload: "2026-10-28T12:00:00Z" }] }, lastSync: previous } });
   render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
-  fireEvent.click(screen.getByRole("button", { name: "Sync idle" }));
+  expect(screen.getByRole("button", { name: /Synced .* ago$/ })).toHaveTextContent(/Synced \d\d:\d\d/);
+  fireEvent.click(screen.getByRole("button", { name: /Synced .* ago$/ }));
   const sheet = screen.getByRole("dialog");
   expect(sheet).toHaveTextContent("Last upload");
   expect(sheet).toHaveTextContent("Cloudflare R2 · sync-fixture");
@@ -241,7 +244,7 @@ it("shows the known failure in expanded phone diagnostics", () => {
   window.location.hash = "#/settings/sync";
   publish({ mode: "ready", sync: { phase: "error", error: "bucket", report: zeroReport } });
   render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
-  fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
+  fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
   const details = screen.getByRole("dialog").querySelector("details");
   expect(details).toHaveAttribute("open");
   expect(details).toHaveTextContent("Bucket not found");

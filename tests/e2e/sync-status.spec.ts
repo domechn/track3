@@ -14,7 +14,7 @@ test("desktop locked prompt dismisses and turn-off requires confirmation", async
   await page.setViewportSize({ width: 1280, height: 800 });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
-  const pill = page.getByRole("button", { name: "Sync locked" });
+  const pill = page.getByRole("button", { name: "Sync locked - unlock sync" });
   await expect(page.getByLabel("Sync passphrase")).toBeVisible();
   await expect(page.getByLabel("Sync passphrase")).toBeFocused();
   await page.getByLabel("Sync passphrase").press("Escape");

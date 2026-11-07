@@ -232,7 +232,7 @@ export function registerSyncFeedbackScenes(platform: "desktop" | "mobile") {
             await expect(page.locator(".t3-topbar-sync button")).toBeVisible({ timeout: 15000 });
           }
           if (!mobile) {
-            await expect(page.getByRole("button", { name: locale === "en" ? "Sync idle" : "同步空闲" })).toBeVisible({ timeout: 15000 });
+            await expect(page.locator(".t3-topbar-sync-button")).toHaveAttribute("data-sync-state", "ready", { timeout: 15000 });
           }
           const nowWidth = (await now.boundingBox())!.width;
           const nowBackground = await now.evaluate((node) => getComputedStyle(node).backgroundColor);

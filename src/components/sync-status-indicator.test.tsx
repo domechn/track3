@@ -29,7 +29,7 @@ vi.mock("@/middlelayers/sync/runtime", () => ({
 describe("SyncStatusIndicator", () => {
   it("keeps its desktop height and expands the touch target", () => {
     render(<SyncStatusIndicator />);
-    expect(screen.getByRole("button", { name: "Sync error" })).toHaveClass("min-h-9", "touch:min-h-11");
+    expect(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ })).toHaveClass("min-h-9", "touch:min-h-11");
   });
 
   afterEach(() => {
@@ -54,28 +54,28 @@ describe("SyncStatusIndicator", () => {
   it("points to sync settings when saved credentials are unreadable", async () => {
     state.current.mode = "unreadable";
     render(<SyncStatusIndicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Sync settings unreadable" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
     expect(screen.getByRole("link", { name: /re.enter sync settings/i })).toHaveAttribute("href", "#/settings/sync");
   });
 
   it("shows sync errors and last round counts in an accessible details popover", async () => {
     render(<SyncStatusIndicator />);
     expect(screen.getByRole("status")).toHaveTextContent("Sync error");
-    fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
     expect(await screen.findByText(/Pulled 2, pushed 1, conflicts 1, errors 1/)).toBeInTheDocument();
     expect(screen.getByText("Some sync data could not be processed. Track3 will retry automatically.")).toBeInTheDocument();
   });
 
   it("shows why a missing remote header stopped automatic sync", async () => {
     render(<SyncStatusIndicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
     expect(await screen.findByText("The sync header is damaged or unsupported.")).toBeInTheDocument();
   });
   it("shows no invented counts before the first sync", async () => {
     state.current.sync.phase = "idle";
     Object.assign(state.current.sync, { report: undefined, error: undefined });
     render(<SyncStatusIndicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Sync idle" }));
+    fireEvent.click(screen.getByRole("button", { name: /Not synced yet - open Backup & sync/ }));
     expect(await screen.findByText("Not synced yet")).toBeInTheDocument();
     expect(screen.queryByText(/Pulled 0, pushed 0/)).not.toBeInTheDocument();
   });
@@ -89,7 +89,7 @@ describe("SyncStatusIndicator", () => {
     });
     render(<SyncStatusIndicator recordsStamp />);
     expect(screen.getByRole("status")).toHaveTextContent("Synced 09:41");
-    fireEvent.click(screen.getByRole("button", { name: "Synced 09:41" }));
+    fireEvent.click(screen.getByRole("button", { name: /Synced .* ago$/ }));
     expect(await screen.findByText(/Last synced:/)).toBeInTheDocument();
   });
 
@@ -97,14 +97,14 @@ describe("SyncStatusIndicator", () => {
     state.current.sync.error = "sync";
     Object.assign(state.current.sync, { report: undefined, retryStopped: true });
     render(<SyncStatusIndicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Sync error" }));
+    fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
     expect(await screen.findByText(/retry.*stopped/i)).toBeInTheDocument();
   });
 
   it("shows a distinct conflict state with a translated summary", async () => {
     state.current.sync.phase = "idle";
     render(<SyncStatusIndicator />);
-    fireEvent.click(screen.getByRole("button", { name: "Sync conflicts" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sync conflicts - open Backup & sync" }));
     expect(await screen.findByText(/1 conflict needs review/i)).toBeInTheDocument();
     expect(screen.queryByText("a")).not.toBeInTheDocument();
   });

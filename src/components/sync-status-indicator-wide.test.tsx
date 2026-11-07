@@ -48,7 +48,7 @@ it("does not call a finished sync up to date when conflicts need review", async 
   wide();
   current.value = { mode: "ready", sync: { phase: "idle", report, lastSync: Date.now() } };
   render(<SyncStatusIndicator />);
-  fireEvent.click(screen.getByRole("button", { name: "Sync conflicts" }));
+  fireEvent.click(screen.getByRole("button", { name: "Sync conflicts - open Backup & sync" }));
   expect(await screen.findByText(/1 conflict needs review/i)).toBeInTheDocument();
   expect(screen.queryByText("Up to date")).not.toBeInTheDocument();
 });
@@ -57,7 +57,7 @@ it("keeps the connection error and error report alongside wide diagnostics", asy
   wide();
   current.value = { mode: "ready", sync: { phase: "error", error: "timeout", report, diagnostics, lastSync: Date.now() } };
   render(<SyncStatusIndicator />);
-  fireEvent.click(screen.getByRole("button", { name: "Sync failed" }));
+  fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
   expect(await screen.findByText("Sync timed out. Check your connection and try again.")).toBeInTheDocument();
   expect(screen.getByText("Error details")).toBeInTheDocument();
   expect(screen.getAllByText("Phase timings")).toHaveLength(2);

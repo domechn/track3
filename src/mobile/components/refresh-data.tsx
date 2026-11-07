@@ -15,7 +15,7 @@ import { ToastAction } from "@/mobile/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import {
   ArchiveIcon, BackpackIcon, CheckIcon, CrossCircledIcon, CubeIcon,
-  ExclamationTriangleIcon, GlobeIcon, UpdateIcon,
+  ExclamationTriangleIcon, GlobeIcon, InfoCircledIcon, UpdateIcon,
 } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "@/mobile/components/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
@@ -344,15 +344,14 @@ const App = ({
           variant="outline"
           size="sm"
           className="t3-refresh-source-trigger"
+          title={t("refresh.sourceStatus")}
           aria-label={t("refresh.sourceStatus")}
           data-tone={hasFailure ? "err" : hasPartial ? "warn" : "ok"}
           onClick={() => setStatusDialogOpen(true)}
           disabled={preflightPending}
         >
           {!hasFailure && hasPartial && <ExclamationTriangleIcon aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}
-          <svg className="t3-refresh-source-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-            <path d="M5.3 14.5h9a3.4 3.4 0 0 0 .2-6.8 4.8 4.8 0 0 0-9.1-1.2 4 4 0 0 0-.1 8z" />
-          </svg>
+          <InfoCircledIcon className="t3-refresh-source-icon" data-icon="source-info" aria-hidden="true" />
           <span className="t3-refresh-source-label">{t("refresh.sourceStatus")}</span>
         </Button>
       )}

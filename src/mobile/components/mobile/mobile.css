@@ -203,7 +203,8 @@
   .mobile-more-hub .mobile-list-label svg { width: 22px; height: 22px; flex: none; color: hsl(var(--primary)); }
   .mobile-header-total-label { display: none; }
   .mobile-header-total-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  .mobile-header-total-value.t3-live-amount { min-width: 10ch; }
+  .mobile-header-total-reading { max-width: 100%; }
+  .mobile-header-total-value.t3-live-amount { display: block; min-width: 12ch; }
   .mobile-header-total-value .t3-live-skeleton { width: 9ch; }
   #app-top-bar .mr-4 { display: none; }
   #app-top-bar .ml-auto { gap: .25rem; }
@@ -1180,9 +1181,8 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
   .overview-sections .t3-total-overview .mobile-hero-header { display: block; }
   .overview-sections .t3-total-overview .mobile-hero-tools { margin-top: 4px; }
   .overview-sections .t3-top-head, .overview-sections .t3-top-row { grid-template-columns: minmax(62px, 1fr) 42px 56px 76px; }
-  #app-top-bar .t3-topbar-sync-button { display: grid; width: 44px; min-width: 44px; height: 44px; padding: 0; place-content: center; font-size: 0; }
-  #app-top-bar .t3-topbar-sync-button > span { width: 9px; height: 9px; }
-  #app-top-bar .fd-sync-cloud-icon { display: none; }
+  #app-top-bar .t3-topbar-sync-button { display: grid; width: 44px; min-width: 44px; height: 44px; gap: 0; padding: 0; place-content: center; font-size: 0; }
+  #app-top-bar .fd-sync-cloud-icon { display: block; width: 16px; height: 16px; }
 }
 
 @container (min-width: 700px) {

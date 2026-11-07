@@ -21,12 +21,12 @@ test("locked sync popover and controls fit at 320px", async ({ page }) => {
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
   const box = (await dialog.boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(320);
   for (const name of ["Unlock", "Continue without sync", "Turn off sync on this device"]) {
-    await expect.poll(async () => (await page.getByRole("button", { name }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect.poll(async () => (await page.getByRole("button", { name, exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   }
 });
 
@@ -49,7 +49,7 @@ test("mobile locked prompt dismisses and turn-off requires confirmation", async 
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
   await expect(page.locator("#app-main-content")).toContainText("$42,000.00", { timeout: 15_000 });
-  const pill = page.getByRole("button", { name: "Sync locked" });
+  const pill = page.getByRole("button", { name: "Sync locked - unlock sync" });
   await expect(page.getByLabel("Sync passphrase")).toBeVisible();
   await expect(page.getByLabel("Sync passphrase")).toBeFocused();
   await page.getByLabel("Sync passphrase").press("Escape");

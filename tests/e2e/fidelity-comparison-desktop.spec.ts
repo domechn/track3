@@ -37,7 +37,7 @@ async function openComparison(page: Page) {
   }, undefined, { timeout: 60_000 });
   await expect(page.locator(".t3-cmp-actions .desktop-sync-status-indicator button"))
     .toContainText("Synced 09:41", { timeout: 60_000 });
-  await expect(page.locator(".t3-cmp-actions .t3-topbar-sync-button svg")).toBeHidden();
+  await expect(page.locator(".t3-cmp-actions .t3-topbar-sync-button svg[data-icon='check']")).toBeVisible();
 }
 
 test.describe("Comparison desktop fidelity", () => {

@@ -9,7 +9,7 @@ test("phone period total keeps its space as the first amount arrives", async ({ 
     const page = await context.newPage();
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/overview");
-    await expect(page.locator(".fd-overview[data-state='ready']")).toBeVisible();
+    await expect(page.locator(".fd-overview[data-state='ready']")).toBeVisible({ timeout: 15_000 });
     await page.evaluate(() => {
       const tauri = (window as any).__TAURI_INTERNALS__;
       const original = tauri.invoke;

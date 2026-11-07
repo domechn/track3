@@ -27,15 +27,28 @@ Numbers use commas and two USD decimals except explanatory whole dollars, chart 
 
 The segmented controls, rank sort buttons, and insight dismiss icon have at least 44px touch boxes. The selected sort pill and dismiss glyph keep the source's visible dimensions within those boxes.
 
-## Original capture and pixel difference
+## Capture and pixel difference
 
-App: `/tmp/fidelity/overview/overview-phone.png`. Source: `/tmp/fidelity/overview/design-overview.png`. 390px dark, full page. Pixel difference: **2.27%** of pixels differ by more than 20 in at least one RGB channel; mean maximum-channel difference 2.27/255. Source/app heights 844/844px. Compared with `/tmp/fidelity/calc-ratios.mjs` using the authoritative Chromium HTML render. This numerical threshold does not waive any visible difference.
+App: `/tmp/fidelity/overview/overview-phone.png`. Source: `/tmp/fidelity/overview/design-overview.png`. The current 390px dark viewport comparison differs by **6.30%** at the threshold of 20 in any RGB channel; both captures are 844px high. The earlier 2.27% measurement used a prior app capture. The authoritative Chromium HTML render governs both comparisons.
 
-Long capture: `/tmp/fidelity/overview/overview-phone-long.png` vs `/tmp/fidelity/overview/design-overview-long.png`; **7.02%** pixel difference by the same threshold, heights 3299/3299px.
+Earlier long capture: `/tmp/fidelity/overview/overview-phone-long.png` vs `/tmp/fidelity/overview/design-overview-long.png`; **7.02%** pixel difference by the same threshold, heights 3299/3299px.
 
 ## Remaining differences
 
-- Current 390px viewport pixel diff: **2.81%** (any RGB channel differs by more than 20).
-- Current 390px full-page pixel diff: **9.76%** with the same threshold.
+- The refreshed 7 Nov 2026 390px viewport capture differs by **6.30%** from the saved
+  source-page render (any RGB channel differs by more than 20). The source
+  assumes configured sync; the base app fixture has never configured sync, so
+  it hides that control. The top status uses a lightning bolt and a source
+  information icon in its place. This is the required configured versus
+  unconfigured product behavior.
+- The selected date range displays the saved snapshot in the phone header, so
+  the price-stream dot is grey for its actual off state while the source
+  sample shows a connected green dot. Tapping the header reading displays
+  that state. A long amount reduces its font size on narrow phones so the
+  amount and dot remain visible at 320, 375 and 390 px, including a
+  trillion-unit amount without configured sync. The source has no
+  corresponding long-amount state.
+- The earlier 390px full-page comparison was **9.76%** with the same threshold;
+  UI27 remeasured the affected viewport.
 - Viewport: chart strokes, tab and header glyphs, and font rasterization differ slightly in the touch webview.
 - Full page: the reference invents three AI observations, market-cap ranks, and configured Cloudflare R2 devices. The stored fixture has no saved AI observations, market-cap rank, or sync bucket; the app shows its real empty insight, portfolio ranks, and local sync state. Those data differences also shift later cards.

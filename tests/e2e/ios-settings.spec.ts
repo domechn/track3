@@ -201,7 +201,7 @@ test("locked sync status stays clear of the More tab and tab bar", async ({ page
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
   await expect(page.locator(".fd-overview-hero")).toBeVisible();
-  const pill = page.getByRole("button", { name: "Sync locked" });
+  const pill = page.getByRole("button", { name: "Sync locked - unlock sync" });
   await expect(pill).toBeVisible();
   const pillBox = (await pill.boundingBox())!;
   const tabBox = (await page.locator(".mobile-tab-bar").boundingBox())!;
