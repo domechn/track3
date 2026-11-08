@@ -162,7 +162,10 @@ export default function RebalanceDesktop(props: Props) {
           <span>{t("rebalance.fidelity.asset")}</span><span>{t("rebalance.fidelity.currentVsTarget")}</span>
           <span>{t("rebalance.fidelity.current")}</span><span>{t("rebalance.fidelity.target")}</span><span>{t("rebalance.fidelity.drift")}</span>
         </div>
-        {props.loading ? <div className="t3-fidelity-empty" role="status">{t("rebalance.fidelity.loading")}</div> : allocation.map((row) => {
+        {props.loading ? <div className="t3-fidelity-empty" role="status">{t("rebalance.fidelity.loading")}</div>
+          : allocation.length === 0 ? <div className="t3-fidelity-empty t3-fidelity-allocation-empty">
+            <b>{t("rebalance.fidelity.noAssets")}</b><span>{t("rebalance.fidelity.addSourceHint")}</span>
+          </div> : allocation.map((row) => {
           const targetIndex = targets.indexOf(row.target!);
           return <div className="t3-fidelity-allocation-row" key={`${row.assetType}:${row.symbol}`}>
             <div className="t3-fidelity-asset"><b>{row.symbol}</b><small>{t(`rebalance.${row.assetType}`)}</small></div>

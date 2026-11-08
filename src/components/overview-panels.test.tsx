@@ -52,6 +52,21 @@ describe("overview panels", () => {
     expect(screen.getByText("+$40.00")).toBeInTheDocument();
     expect(screen.getByText("−$25.00")).toBeInTheDocument();
   });
+  it("pages through desktop movers without stretching the chart row", () => {
+    const rows = Array.from({ length: 11 }, (_, index) => ({
+      symbol: `ASSET${index}`, assetType: "crypto" as const, value: 100 - index,
+    }));
+    render(<MemoryRouter><WhatMovedCard currency={usd} count={2} rows={rows} desktopFidelity /></MemoryRouter>);
+    expect(document.querySelectorAll(".t3-moved-list li")).toHaveLength(8);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(document.querySelectorAll(".t3-moved-list li")).toHaveLength(3);
+    expect(screen.getByText("9–11 of 11")).toBeInTheDocument();
+    expect(screen.queryByText("ASSET7")).not.toBeInTheDocument();
+    expect(screen.getByText("ASSET10")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(screen.queryByText("ASSET10")).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".t3-moved-list li")).toHaveLength(8);
+  });
   it("uses shared direction tokens for What moved bars and coin changes", () => {
     render(<MemoryRouter>
       <WhatMovedCard currency={usd} count={2} quoteColor="red-up-green-down" rows={[
@@ -153,6 +168,15 @@ describe("overview panels", () => {
     expect(screen.getByText("Binance")).toBeInTheDocument();
     expect(screen.getByText("OKX")).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
+  });
+
+  it("keeps a source action at the bottom when few sources fill the desktop card", () => {
+    render(<SourceStatusCard variant="card" desktopFidelity sources={[{
+      wallet: "Ledger", walletAlias: "Ledger", value: 100, percentage: 100, amount: 1, chartColor: "#000",
+    }]} statuses={[
+      { sourceId: "wallet:1", label: "Ledger", status: "ok" },
+    ]} />);
+    expect(screen.getByRole("link", { name: "Manage sources" })).toHaveAttribute("href", "#/settings/configuration");
   });
 
   it("shows three rankings first on phone and expands them without changing sorting", () => {

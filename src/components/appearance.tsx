@@ -97,7 +97,7 @@ const App = ({
           {t("appearance.subtitle")}
         </p>
       </div>
-      {section === "theme" && <AppearanceDesign
+      {showTheme && <AppearanceDesign
         selectedTheme={selectedTheme}
         quoteColor={quoteColor}
         onThemeChange={handleThemeValueChange}

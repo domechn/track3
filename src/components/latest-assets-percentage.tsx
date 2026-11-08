@@ -61,6 +61,7 @@ const App = ({
   const { needResize } = useContext(ChartResizeContext);
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const [dataPage, setDataPage] = useState<number>(0);
+  const [holdingsPage, setHoldingsPage] = useState(0);
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
     useState<LatestAssetsPercentageData>([]);
   const [weekChanges, setWeekChanges] = useState<Record<string, number>>({});
@@ -368,7 +369,12 @@ const App = ({
     );
   }
 
-  if (holdings) return (
+  if (holdings) {
+    const holdingsPageSize = latestAssetsPercentageData.length > 8 ? 7 : 8;
+    const holdingsPageCount = Math.max(1, Math.ceil(latestAssetsPercentageData.length / holdingsPageSize));
+    const currentHoldingsPage = Math.min(holdingsPage, holdingsPageCount - 1);
+    const holdingsStart = currentHoldingsPage * holdingsPageSize;
+    return (
     <Card className="t3-overview-panel t3-holdings-panel">
       <header className="t3-overview-panel-heading">
         <h2>{t("overview.design.holdings")}</h2>
@@ -376,7 +382,7 @@ const App = ({
       </header>
       <div className="t3-holdings-head"><span>{t("overview.design.asset")}</span><span>{t("overview.design.value")}</span><span>{t("overview.fidelity.sevenDays")}</span></div>
       <div className="t3-holdings-body">
-        {latestAssetsPercentageData.map((asset) => <Link key={getAssetLogoKey({ symbol: asset.coin, assetType: asset.assetType })}
+        {latestAssetsPercentageData.slice(holdingsStart, holdingsStart + holdingsPageSize).map((asset) => <Link key={getAssetLogoKey({ symbol: asset.coin, assetType: asset.assetType })}
           to={buildAssetDetailsPath({ symbol: asset.coin, assetType: asset.assetType })}
           className="t3-holdings-row">
           <span><span className="sr-only">{t("common.openAssetDetails").replace("{asset}", formatAssetLabel({ symbol: asset.coin, assetType: asset.assetType }))} </span><strong>{asset.coin}</strong><small>{asset.percentage.toFixed(1)}%</small></span>
@@ -386,8 +392,19 @@ const App = ({
           </span>
         </Link>)}
       </div>
+      {holdingsPageCount > 1 && <nav className="t3-holdings-pager" aria-label={t("overview.design.holdings")}>
+        <span>{t("overview.design.holdingsShowing")
+          .replace("{start}", String(holdingsStart + 1))
+          .replace("{end}", String(Math.min(holdingsStart + holdingsPageSize, latestAssetsPercentageData.length)))
+          .replace("{count}", String(latestAssetsPercentageData.length))}</span>
+        <button type="button" disabled={currentHoldingsPage === 0}
+          onClick={() => setHoldingsPage(currentHoldingsPage - 1)}>{t("common.prev")}</button>
+        <button type="button" disabled={currentHoldingsPage === holdingsPageCount - 1}
+          onClick={() => setHoldingsPage(currentHoldingsPage + 1)}>{t("common.next")}</button>
+      </nav>}
     </Card>
-  );
+    );
+  }
 
   return (
     <div>
