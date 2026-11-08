@@ -61,10 +61,13 @@ The source depicts the **wallets** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
-- The design uses separate refresh times per source. The existing snapshot stores one shared refresh time, so the app shows the available snapshot time and a dash for paused Kraken.
-- Source logo artwork, some row icon strokes, and sheet spacing still differ from the approved render.
+- The approved source is dark only. In light mode the live page and rename dialog use the selected light theme; their colours cannot match that dark reference.
+- The static source uses its pencil for the full address editor and has no Rename flow. The live pencil opens Rename; the labeled source name opens the full editor, and the avatar retains its action menu.
+- The design shows 09:40 for wallets, while the existing snapshot stores one shared refresh time and the app shows the available 09:41. The design quota is 14 of 60; the live entitlement is 20 of 600 and must retain the real value.
+- Source logo artwork, some row icon strokes, value alignment, and sheet spacing still differ slightly; they could be matched but are not worth another round. The phone Sources page uses "Public Sans" to match the design CSS.
+- The live back control and bottom tabs preserve the app's routes and 44px targets; their icon shapes and text rendering differ from the static source. Row text has small glyph and vertical alignment differences with matching 356×181 first-row bounds.
 
 ## Pixel difference
 
-- Difference ratio: **5.810%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel.
-- Design viewport: `/tmp/fidelity/settings-a/design-sources-wallets.png` (top 780×1688); app viewport: `/tmp/fidelity/settings-a/sources-wallets.png` (780×1688).
+- Last captured matched-fixture difference: **7.528% dark** and **99.134% light** at 390 × 844 CSS px, threshold 16 in any RGB channel. The light ratio compares the selected light theme with the dark-only source. The dark overage includes the live shell, shared refresh time, and real quota. A subsequent scoped font and value-position correction awaits recapture under the one-run limit.
+- Current measurements and screenshots: `/tmp/track3-source-rename/phone-dark-measure.json`, `phone-light-measure.json`, and `/tmp/track3-source-rename/phone-{dark,light}-{design,sample}-wallets.png`. Both dark rows begin at y=233.

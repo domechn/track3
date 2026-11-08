@@ -31,6 +31,15 @@ const baseProps = {
 };
 
 describe("WalletSection", () => {
+  it("allows an empty alias to restore the wallet's default name", () => {
+    const onRename = vi.fn();
+    render(<WalletSection {...baseProps} onRename={onRename} />);
+    fireEvent.click(screen.getByRole("button", { name: "Rename Cold Storage" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Alias" }), { target: { value: " " } });
+    expect(screen.getByRole("dialog")).toHaveTextContent("Shown elsewhere as 1abc");
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Alias" }), { key: "Enter" });
+    expect(onRename).toHaveBeenCalledWith("btc", "1abc", "");
+  });
   it("renders wallet table with data", () => {
     render(<WalletSection {...baseProps} />);
 

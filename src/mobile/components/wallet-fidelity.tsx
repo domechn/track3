@@ -17,6 +17,7 @@ import { requestRefreshSource } from "@/mobile/components/refresh-progress-event
 import { sourceDisplayNames } from "@/components/source-display-name";
 import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import { matchSourceStatus } from "@/components/source-status-match";
+import { useCurrentSourceStatuses } from "@/components/use-current-source-statuses";
 import "@/mobile/components/mobile/fidelity.css";
 import { directionTone } from "@/utils/color";
 import AssetLabel from "@/components/common/asset-label";
@@ -71,6 +72,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
   const walletOrdinals = useLatestWalletOrdinals();
   const retry = useSyncExternalStore(refreshRetryScheduler.subscribe, refreshRetryScheduler.status);
   const [statuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const currentStatuses = useCurrentSourceStatuses(statuses);
   const [range, setRange] = useState(() => rangeLabel(dateRange));
   const [selected, setSelected] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -110,7 +112,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
         const rows = groupRows(current, id);
         const baseRows = groupRows(prior, id);
         const label = labels[index];
-        const status = matchSourceStatus(sourceLabels[index], aliases, sourceLabels, statuses);
+        const status = matchSourceStatus(sourceLabels[index], aliases, sourceLabels, currentStatuses);
         const provider = status?.provider ?? aliases[id]?.type;
         const kind = status?.kind ?? (sourceIconKind(provider) === "exchange" ? "exchange" :
           rows.every((row) => row.assetType === "stock") ? "broker" : "wallet");
@@ -127,7 +129,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
       .catch(() => { if (active) setView(null); })
       .finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
-  }, [dateRange.start.getTime(), dateRange.end.getTime(), range, version, statuses, t, walletOrdinals]);
+  }, [dateRange.start.getTime(), dateRange.end.getTime(), range, version, currentStatuses, t, walletOrdinals]);
 
   const sources = view?.sources ?? [];
   const chosen = sources.find((source) => source.id === selected) ?? null;

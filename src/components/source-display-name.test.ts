@@ -1,5 +1,15 @@
 import { expect, it } from "vitest";
-import { previewSourceNames, sourceDisplayNames } from "./source-display-name";
+import { previewSourceNames, sourceAliasFallback, sourceDisplayNames } from "./source-display-name";
+
+it("uses the portfolio source names when a config alias is cleared", () => {
+  expect(sourceAliasFallback("exchange", "binance")).toBe("Binance");
+  expect(sourceAliasFallback("exchange", "okex")).toBe("Okex");
+  expect(sourceAliasFallback("exchange", "future-exchange")).toBe("future-exchange");
+  expect(sourceAliasFallback("broker", "ibkr")).toBe("IBKR");
+  expect(sourceAliasFallback("wallet", "btc", "1BoatSLRHtKNngkdXEeobR76b53LETtpyT")).toBe("1BoatS…tpyT");
+  expect(sourceAliasFallback("custom", "GOLD")).toBe("GOLD");
+  expect(sourceAliasFallback("custom", "NOVA")).toBe("NOVA");
+});
 
 it("coin preview keeps three names and counts the hidden sources", () => {
   expect(previewSourceNames(["A very long wallet alias", "Binance", "Ledger cold wallet", "OKX"])).toEqual({

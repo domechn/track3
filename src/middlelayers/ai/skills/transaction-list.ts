@@ -3,6 +3,7 @@ import type { Skill, ToolResult } from "./types";
 import { trace } from "./functions/trace";
 import { getTransactions, getTransactionStats } from "./functions/transactions";
 import { getAssetType } from "../../datafetch/utils/coins";
+import { WalletAnalyzer } from "../../wallet";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 500;
@@ -79,22 +80,30 @@ const skill: Skill = {
     }
 
     const rate = ctx.baseCurrency.rate || 1;
+    const aliases: Record<string, { alias: string; wallet: string } | undefined> = await new WalletAnalyzer(async () => []).listWalletAliases(
+      [...new Set(transactions.map((transaction) => transaction.wallet).filter((wallet): wallet is string => !!wallet))],
+    ).catch(() => ({}));
 
     return {
       data: {
         count: transactions.length,
-        transactions: transactions.map((t) => ({
-          id: t.id,
-          symbol: t.symbol,
-          assetType: getAssetType(t),
-          wallet: t.wallet,
-          txnType: t.txnType,
-          amount: t.amount,
-          price: t.price,
-          value: t.amount * t.price,
-          valueInBase: t.amount * t.price * rate,
-          txnCreatedAt: t.txnCreatedAt,
-        })),
+        transactions: transactions.map((t) => {
+          const source = t.wallet && aliases[t.wallet];
+          const sourceName = source && source.alias !== source.wallet ? source.alias : undefined;
+          return {
+            id: t.id,
+            symbol: t.symbol,
+            assetType: getAssetType(t),
+            wallet: t.wallet,
+            ...(sourceName ? { sourceName } : {}),
+            txnType: t.txnType,
+            amount: t.amount,
+            price: t.price,
+            value: t.amount * t.price,
+            valueInBase: t.amount * t.price * rate,
+            txnCreatedAt: t.txnCreatedAt,
+          };
+        }),
       },
       text: `Returned ${transactions.length} transaction(s).`,
     };

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import md5 from "md5";
 import {
-  BackpackIcon, CheckIcon, Cross2Icon, ExclamationTriangleIcon, Link2Icon, MagnifyingGlassIcon, Pencil1Icon,
+  BackpackIcon, CheckIcon, Cross2Icon, ExclamationTriangleIcon, Link2Icon, MagnifyingGlassIcon,
   PlusIcon, ReloadIcon, TrashIcon,
 } from "@radix-ui/react-icons";
 import { queryHistoricalData } from "@/middlelayers/charts-history";
@@ -14,6 +14,11 @@ import { LicenseCenter, type ProUsage } from "@/middlelayers/license";
 import type { ExchangeDraft, ExchangeRow, OtherRow, StockBrokerDraft, StockBrokerRow, WalletDraft, WalletRow } from "./types";
 import { SourceEditorDesign } from "./source-editor-design";
 import EmptyState from "@/components/empty-state";
+import { AliasRename } from "./alias-rename";
+import { sourceAliasFallback } from "@/components/source-display-name";
+import { matchSourceStatus } from "@/components/source-status-match";
+import { currentSourceStatusLabels, sourceStatusMatches } from "@/middlelayers/source-status-labels";
+import { configurationFromForm } from "@/middlelayers/ui-state/config-form";
 import AssetLabel from "@/components/common/asset-label";
 import { Tag } from "@/components/ui/tag";
 
@@ -46,6 +51,10 @@ type Props = {
   onSaveWallet: (draft: WalletDraft) => Promise<boolean>;
   onSaveBroker: (draft: StockBrokerDraft) => Promise<boolean>;
   onSaveCustom: (row: OtherRow) => boolean;
+  onExchangeRename?: (type: string, key: string, alias: string) => void;
+  onWalletRename?: (type: string, address: string, alias: string) => void;
+  onBrokerRename?: (type: string, queryId: string, alias: string) => void;
+  onOtherRename?: (index: number, alias: string) => void;
 };
 
 const usd = (value: number) => `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -64,12 +73,16 @@ export function SourceDesign({
   onExchangeRemove, onWalletRemove, onBrokerRemove, onOtherRemove, onOtherAttach,
   onExchangeQuickLook, onWalletQuickLook, onBrokerQuickLook,
   onSaveExchange, onSaveWallet, onSaveBroker, onSaveCustom,
+  onExchangeRename, onWalletRename, onBrokerRename, onOtherRename,
 }: Props) {
   const { t } = useTranslation();
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [holdingsLoading, setHoldingsLoading] = useState(true);
   const [refreshedAt, setRefreshedAt] = useState<string>();
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const displayStatuses = useMemo(() => currentSourceStatusLabels(sourceStatuses, configurationFromForm({
+    exchanges, wallets, stockBrokers: brokers, others, groupUSD: false, hideInactive: false,
+  })), [sourceStatuses, exchanges, wallets, brokers, others]);
   const [usage, setUsage] = useState<ProUsage>();
   useEffect(() => { void LicenseCenter.getInstance().getUsage().then(setUsage).catch(() => {}); }, []);
   const [overlay, setOverlay] = useState<
@@ -120,6 +133,39 @@ export function SourceDesign({
       : tab === "brokers"
         ? brokers.map((row) => ({ kind: "broker" as const, row, name: row.alias || "Interactive Brokers", identity: brokerIdentity(row), active: row.active }))
         : [], [tab, exchanges, wallets, brokers]);
+  const renameNames = [
+    ...exchanges.map((row) => row.alias || sourceAliasFallback("exchange", row.type, row.apiKey)),
+    ...wallets.map((row) => row.alias || sourceAliasFallback("wallet", row.type, row.address)),
+    ...brokers.map((row) => row.alias || sourceAliasFallback("broker", row.type, row.queryId)),
+    ...others.map((row) => row.alias || sourceAliasFallback("custom", row.symbol)),
+  ];
+  const renameOffset = tab === "wallets" ? exchanges.length
+    : tab === "brokers" ? exchanges.length + wallets.length
+      : tab === "custom" ? exchanges.length + wallets.length + brokers.length : 0;
+  const aliasFallback = (entry: SourceEntry) => sourceAliasFallback(entry.kind, entry.row.type,
+    entry.kind === "exchange" ? entry.row.apiKey : entry.kind === "wallet" ? entry.row.address : entry.row.queryId);
+  const statusSource = (entry: SourceEntry) => ({ kind: entry.kind, type: entry.row.type,
+    identifier: entry.kind === "exchange" ? entry.row.apiKey
+      : entry.kind === "wallet" ? entry.row.address : entry.row.queryId });
+  const statusSources = rows.map((entry, index) => ({
+    ...statusSource(entry),
+    ordinal: entry.kind === "broker" && entry.active
+      ? rows.slice(0, index + 1).filter((item) =>
+        item.kind === "broker" && item.active && item.row.type === entry.row.type).length
+      : undefined,
+  }));
+  const statusIdentities = Object.fromEntries(rows.map((entry) => [
+    entry.identity, { wallet: statusSource(entry).identifier, type: entry.row.type },
+  ]));
+  const statusPeers = rows.map((entry) => ({ id: entry.identity, label: entry.name }));
+  const rowStatuses = statusSources.map((entry, index) => {
+    const matches = displayStatuses.filter((status) =>
+      sourceStatusMatches(status, entry) &&
+      statusSources.filter((source) => sourceStatusMatches(status, source)).length === 1);
+    return matches.length === 1 ? matches[0] : matches.length === 0
+      ? matchSourceStatus(statusPeers[index], statusIdentities, statusPeers,
+        displayStatuses.filter((status) => !status.hint)) : undefined;
+  });
   const names: Record<Tab, string> = {
     exchanges: t("fidelity.source.exchanges"), wallets: t("fidelity.source.wallets"),
     brokers: t("fidelity.source.brokers"), custom: t("fidelity.source.custom"),
@@ -178,9 +224,10 @@ export function SourceDesign({
       </> : rows.length ? <>
         <div className="t3-fidelity-source-head"><span>{t("fidelity.source.source")}</span><span>{t("fidelity.source.status")}</span>
           <span>{t("fidelity.source.lastRefresh")}</span><span>{t("fidelity.source.value")}</span><span>{t("fidelity.source.active")}</span><span /></div>
-        {rows.map(({ kind, row, name, identity, active }) => {
+        {rows.map((entry, rowIndex) => {
+          const { kind, row, name, identity, active } = entry;
           const value = sourceValue(identity);
-          const sourceStatus = sourceStatuses.find((status) => status.label === name);
+          const sourceStatus = rowStatuses[rowIndex];
           const stale = active && (sourceStatus?.status === "stale" || sourceStatus?.status === "failed");
           const latestGood = sourceStatus?.lastSuccessAt
             ? new Date(sourceStatus.lastSuccessAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })
@@ -198,7 +245,7 @@ export function SourceDesign({
           const toggle = () => kind === "exchange" ? onExchangeToggle(row.type, row.apiKey)
             : kind === "wallet" ? onWalletToggle(row.type, row.address) : onBrokerToggle(row.type, row.queryId);
           return <div className={`t3-fidelity-source-row ${stale ? "error" : ""}`} key={`${kind}:${identity}`}>
-            <div className="t3-fidelity-source-id"><AssetLabel kind={kind} type={row.type} name={name} size={24} secondary={<>{metadata}{kind === "wallet" && row.type === "erc20" && <Tag tone="accent">Pro</Tag>}</>} /></div>
+            <div className="t3-fidelity-source-id"><button type="button" className="t3-fidelity-source-name" aria-label={`${t("fidelity.source.edit")} ${name}`} onClick={() => setEditor(tab)}><AssetLabel kind={kind} type={row.type} name={name} size={24} secondary={<>{metadata}{kind === "wallet" && row.type === "erc20" && <Tag tone="accent">Pro</Tag>}</>} /></button></div>
             <div><span className="t3-tag" data-tone={stale ? "negative" : active ? "positive" : "neutral"}><i />{stale ? t("fidelity.source.error") : active ? t("fidelity.source.active") : t("fidelity.source.paused")}</span></div>
             <div className={stale ? "t3-fidelity-source-warning" : active ? "" : "t3-fidelity-source-faint"}>{stale && latestGood ? `${t("fidelity.source.lastGood")} ${latestGood}` : active && latestGood ? `${t("fidelity.source.today")} ${latestGood}` : !active && sourceStatus?.lastSuccessAt
               ? new Date(sourceStatus.lastSuccessAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).replace(" at ", ", ")
@@ -207,25 +254,34 @@ export function SourceDesign({
             <div className="t3-fidelity-source-switch"><button type="button" role="switch" aria-label={`${t("fidelity.source.active")} ${name}`} aria-checked={active} onClick={toggle}><i /></button></div>
             <div className="t3-fidelity-source-actions">
               <button type="button" className="t3-fidelity-source-quick" data-testid={`source-quicklook-${name}`} disabled={!active} onClick={() => setOverlay({ kind: "quicklook", name, identity, refresh })}><MagnifyingGlassIcon />{t("fidelity.source.quickLook")}</button>
-              <button type="button" aria-label={`${t("fidelity.source.edit")} ${name}`} onClick={() => setEditor(tab)}><Pencil1Icon /></button>
+              <AliasRename alias={row.alias} name={name}
+                fallback={aliasFallback(entry)}
+                names={renameNames} index={renameOffset + rowIndex}
+                onRename={(alias) => {
+                  if (kind === "exchange") onExchangeRename?.(row.type, row.apiKey, alias);
+                  else if (kind === "wallet") onWalletRename?.(row.type, row.address, alias);
+                  else onBrokerRename?.(row.type, row.queryId, alias);
+                }} />
               <button type="button" aria-label={`${t("fidelity.source.remove")} ${name}`} data-testid={`source-remove-${name}`}
                 onClick={() => setOverlay({ kind: "remove", name, sourceKind: kind, apply: remove })}><TrashIcon /></button>
             </div>
             {stale && <div className="t3-fidelity-source-error"><ExclamationTriangleIcon /><span>{sourceStatus?.category === "auth" ? t("fidelity.source.authError") : sourceStatus?.detail || t("fidelity.source.genericError")}</span><button type="button" onClick={refresh}><ReloadIcon />{t("fidelity.source.retry")}</button></div>}
           </div>;
         })}
-        <div className="t3-fidelity-source-foot"><span>{activeCount} {t("fidelity.source.activeLower")}{rows.length - activeCount ? `, ${rows.length - activeCount} ${t("fidelity.source.pausedLower")}` : ""}{sourceStatuses.filter((status) => status.status === "stale" && rows.some((item) => item.name === status.label)).map((status) => ` · ${t("fidelity.source.staleNote").replace("{name}", status.label).replace("{time}", status.lastSuccessAt ? new Date(status.lastSuccessAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : "—")}`).join("")}</span><b>{usd(total)}</b></div>
+        <div className="t3-fidelity-source-foot"><span>{activeCount} {t("fidelity.source.activeLower")}{rows.length - activeCount ? `, ${rows.length - activeCount} ${t("fidelity.source.pausedLower")}` : ""}{rowStatuses.flatMap((status, index) => status?.status === "stale" && rows[index].active ? [` · ${t("fidelity.source.staleNote").replace("{name}", rows[index].name).replace("{time}", status.lastSuccessAt ? new Date(status.lastSuccessAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : "—")}`] : []).join("")}</span><b>{usd(total)}</b></div>
       </> : emptySource : !others.length ? emptySource : <>
         <div className="t3-fidelity-source-head custom"><span>{t("fidelity.source.asset")}</span><span>{t("fidelity.source.price")}</span><span>{t("fidelity.source.attachedTo")}</span><span>{t("fidelity.source.value")}</span><span>{t("fidelity.source.active")}</span><span /></div>
         {others.map((row, index) => <div className="t3-fidelity-source-row custom" key={`${row.symbol}:${index}`}>
-          <div className="t3-fidelity-source-id"><AssetLabel kind="custom" symbol={row.symbol} size={24}
-            secondary={`${row.alias || row.symbol} · ${amount(row.amount)}`} /></div>
+          <div className="t3-fidelity-source-id"><button type="button" className="t3-fidelity-source-name" aria-label={`${t("fidelity.source.edit")} ${row.symbol}`} onClick={() => setEditor(tab)}><AssetLabel kind="custom" symbol={row.symbol} size={24}
+            secondary={`${row.alias || row.symbol} · ${amount(row.amount)}`} /></button></div>
           <div className="t3-fidelity-source-custom-price">{row.price?.kind === "manual" ? `${t("fidelity.source.manual")} · ${usd(row.price.usd)}` : row.price?.kind === "follow" ? `${t("fidelity.source.follows")} ${row.price.symbol} · ${Number.isFinite(otherPrice(row)) ? usd(otherPrice(row)) : "—"}` : "—"}<small>{t("fidelity.source.attachedTo")} {row.attachTo ? row.attachTo.identity : t("fidelity.source.standalone")}</small></div>
           <div className="t3-fidelity-source-value">{Number.isFinite(otherPrice(row)) ? usd(otherPrice(row) * row.amount) : "—"}</div>
           <div className="t3-fidelity-source-switch"><span className="t3-fidelity-source-switch-static"><i /></span></div>
           <div className="t3-fidelity-source-actions">
             <button className="t3-fidelity-source-quick" type="button" data-testid={`source-attach-${row.symbol}`} onClick={() => { setSelectedAttachment(row.attachTo); setOverlay({ kind: "attach", index }); }}><Link2Icon />{t("fidelity.source.attach")}</button>
-            <button type="button" aria-label={`${t("fidelity.source.edit")} ${row.symbol}`} onClick={() => setEditor(tab)}><Pencil1Icon /></button>
+            <AliasRename alias={row.alias} name={row.alias || row.symbol} fallback={sourceAliasFallback("custom", row.symbol)}
+              names={renameNames} index={renameOffset + index}
+              onRename={(alias) => onOtherRename?.(index, alias)} />
             <button type="button" aria-label={`${t("fidelity.source.remove")} ${row.symbol}`} onClick={() => setOverlay({ kind: "remove", name: row.symbol, sourceKind: "custom", apply: () => onOtherRemove(index) })}><TrashIcon /></button>
           </div>
         </div>)}

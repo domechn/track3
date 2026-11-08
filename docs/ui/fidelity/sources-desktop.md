@@ -4,7 +4,7 @@ See [Settings A shell](settings-a-shell-desktop.md) for shared geometry, type, t
 
 ## Structure and sample data
 
-Heading: **Data sources**; subtitle “Everything Track3 reads: **3 exchanges**, **2 wallets**, **1 broker** and 2 custom assets.” The white Add button changes to Add exchange, Add wallet, Add broker, or Add custom asset with the active tab. Tabs are Exchanges 3, Wallets 2, Brokers 1, Custom assets 2. Each row has a 28px letter logo; bold name, 12px metadata; Active green, Paused gray, or Error red pill; last refresh; right-aligned USD value or em dash; blue/gray switch; and Quick look, edit, remove actions. Count and total sit in the table footer. Quick look and attach are modal dialogs, remove is a destructive confirmation. The status note is a full-width blue information banner below the table.
+Heading: **Data sources**; subtitle “Everything Track3 reads: **3 exchanges**, **2 wallets**, **1 broker** and 2 custom assets.” The white Add button changes to Add exchange, Add wallet, Add broker, or Add custom asset with the active tab. Tabs are Exchanges 3, Wallets 2, Brokers 1, Custom assets 2. Each row has a 28px letter logo; bold name, 12px metadata; Active green, Paused gray, or Error red pill; last refresh; right-aligned USD value or em dash; blue/gray switch; and Quick look, rename, remove actions. The name opens the existing editor. Count and total sit in the table footer. Quick look and attach are modal dialogs, remove is a destructive confirmation. The status note is a full-width blue information banner below the table.
 
 | State | Exact visible content and order |
 | --- | --- |
@@ -23,6 +23,16 @@ Source names, aliases, wallet addresses, broker IDs, prices, source inclusion, e
 
 ## Remaining differences
 
+The approved source is dark only. The live page honors the selected light theme, so its light colours cannot match that reference.
+
+The approved static page uses its pencil for the full source editor and has no Rename flow. The live page uses that pencil for the requested Rename dialog; the visible source name opens the full editor. Both actions remain keyboard reachable.
+
+Existing custom asset aliases may be 41–100 characters long. The new Rename dialog enforces the requested 40-character limit, so opening one of those older aliases shows a length error until it is shortened; the original custom asset table still accepts up to 100 characters.
+
+The visible source name opens the existing configuration editor. The iPhone avatar also offers its action menu.
+
+The new alias screenshots use actual source data, so their text and values differ from the fixed design fixture. The capture table below is the earlier matched-fixture baseline.
+
 UI42 uses the approved website-style neutral tile for exchange, wallet, broker and custom marks. The older Sources page design renders those marks differently.
 
 The wide empty Sources card keeps the design's 188px outer height; its dashed inner state has a 146px minimum. This is shorter than the shared component's 200px default because the approved source page uses the compact card.
@@ -40,6 +50,8 @@ The pixel ratios and screenshots for all ten states are recorded in the capture 
 The source design gives ERC20 refresh usage as 14 of 60. The e2e bridge's real license response provides 12 of 300, and the UI displays that actual entitlement. The reference attaches NVDA-RSU to Interactive Brokers; the current `OtherAttachment` data type allows exchange and wallet identities only, so the broker option is disabled. The reference labels GOLD as “4 oz,” but the custom asset record stores an amount without a unit. The custom asset banner explains actual portfolio inclusion because the source design's statement that these are excluded placeholders contradicts product behaviour. The exact long allowlist error sentence in `sources-error` is unavailable after the existing source-status normalizer keeps only its safe error category and detail. Blacklist and source controls remain bound to real configuration values.
 
 The `sources-loading` fixture now delays the source query after the initial portfolio load, so the capture shows three table skeleton rows and the footer without the global portfolio overlay. The ratios below include this correction.
+
+The current matched-fixture capture at 1600 × 900 CSS pixels, dark theme, RGB threshold 24 gives **2.459% Exchanges**, **2.519% Wallets**, **2.204% Brokers**, and **2.537% Custom**. The first row's bounds match the design exactly at x=321, y=197, 1250×64. The measured geometry and images are in `/tmp/track3-source-rename/desktop-dark-measure.json` and `/tmp/track3-source-rename/desktop-dark-{design,sample}-<state>.png`. The light app against the dark-only source differs by 99.886%, 99.886%, 99.895%, and 99.890%, respectively; these light ratios reflect the selected product theme.
 
 ## Capture results
 

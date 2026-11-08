@@ -3,6 +3,7 @@ import type { Skill, ToolResult } from "./types";
 import { trace } from "./functions/trace";
 import { getAssetDetail } from "./functions/assets";
 import { getAssetType } from "../../datafetch/utils/coins";
+import { WalletAnalyzer } from "../../wallet";
 
 const skill: Skill = {
   name: "asset_detail",
@@ -51,7 +52,7 @@ const skill: Skill = {
     const avgPrice = totalAmount > 0 ? totalValue / totalAmount : 0;
 
     // Per-wallet breakdown
-    const wallets = Object.entries(
+    const walletsById = Object.entries(
       records.reduce(
         (acc, r) => {
           const wallet = r.wallet ?? "unknown";
@@ -62,12 +63,21 @@ const skill: Skill = {
         },
         {} as Record<string, { amount: number; value: number }>,
       ),
-    ).map(([wallet, w]) => ({
-      wallet,
-      amount: w.amount,
-      valueUsd: w.value,
-      value: w.value * rate,
-    }));
+    );
+    const aliases: Record<string, { alias: string; wallet: string } | undefined> = await new WalletAnalyzer(async () => []).listWalletAliases(
+      walletsById.map(([wallet]) => wallet),
+    ).catch(() => ({}));
+    const wallets = walletsById.map(([wallet, w]) => {
+      const source = aliases[wallet];
+      const sourceName = source && source.alias !== source.wallet ? source.alias : undefined;
+      return {
+        wallet,
+        ...(sourceName ? { sourceName } : {}),
+        amount: w.amount,
+        valueUsd: w.value,
+        value: w.value * rate,
+      };
+    });
 
     const resolvedType = getAssetType(records[0]!);
 

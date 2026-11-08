@@ -24,6 +24,14 @@ it("normalizes refresh statuses before writing", async () => {
   expect(localStorage.getItem("track3-refresh-source-statuses")).toBe('[{"sourceId":"cex:0","label":"Main","status":"failed"}]');
 });
 
+it("does not persist wallet IDs derived for the current status view", () => {
+  const status = { sourceId: "cex:0", label: "Trading", status: "ok" as const,
+    walletId: "6dc645ac1a4f4c8bc7e3779674befa05" };
+  writeStoredStatuses([status]);
+  expect(localStorage.getItem("track3-refresh-source-statuses"))
+    .toBe('[{"sourceId":"cex:0","label":"Trading","status":"ok"}]');
+});
+
 it("rewrites stored statuses when a saved row has unsafe extra fields", () => {
   localStorage.setItem("track3-refresh-source-statuses", '[{"sourceId":"cex:0","label":"Main","status":"failed","secret":"omit"}]');
   expect(readStoredStatuses()).toEqual([{ sourceId: "cex:0", label: "Main", status: "failed" }]);

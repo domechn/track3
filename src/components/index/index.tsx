@@ -448,7 +448,7 @@ type AppRoutesProps = {
   ) => void;
   lastRefreshAt?: string;
   onDataChanged: () => void;
-  handleConfigurationSave: () => void;
+  handleConfigurationSave: (aliasChanged?: boolean) => void;
 };
 
 function AppRoutes({
@@ -985,9 +985,10 @@ const App = () => {
     return true;
   }
 
-  const handleConfigurationSave = useCallback(() => {
+  const handleConfigurationSave = useCallback((aliasChanged?: boolean) => {
     handleQuerySizeWhenConfigurationChange();
     loadConfiguration();
+    if (aliasChanged) setDataChangedVersion((version) => version + 1);
   }, [originalQuerySize]);
 
   const handleSidebarToggle = useCallback(() => {

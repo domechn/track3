@@ -35,12 +35,12 @@ test("custom price screens work in both shells, themes, and languages", async ({
     await page.goto("/#/settings/configuration?section=sources");
     if (mobile) await page.getByRole("tab").last().click();
     else await page.locator(".t3-settings-source-tabs button").last().click();
-    const editNova = page.getByRole("button", { name: locale === "en"
-      ? /^(?:Edit NOVA|Set price for NOVA)/
-      : /^(?:编辑 NOVA|设置 NOVA 的价格)/ });
-    await expect(editNova).toBeVisible();
+    const editPrice = mobile
+      ? page.locator(".fidelity-custom").getByRole("button", { name: locale === "en" ? "Edit NOVA" : "编辑 NOVA", exact: true })
+      : page.getByRole("button", { name: locale === "en" ? /^Set price for NOVA,/ : /^设置 NOVA 的价格,/ });
+    await expect(editPrice).toBeVisible();
     await capture(page, `${prefix}-sources.png`);
-    await editNova.click();
+    await editPrice.click();
     await expect(page.getByRole("radio", { name: locale === "en" ? "Your price" : "自行设定价格" })).toBeVisible();
     await capture(page, `${prefix}-manual.png`);
     await page.getByRole("radio", { name: locale === "en" ? "Follow a listed asset" : "跟随已上市资产" }).click();

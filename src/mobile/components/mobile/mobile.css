@@ -2949,7 +2949,13 @@ body:has(.fidelity-history, .fidelity-history-detail) {
 
 /* Settings A source list follows the 390px approved source geometry. */
 @media (max-width: 699px) {
-  body:has(.fidelity-settings-sources) { background: hsl(var(--background)); }
+  body:has(.fidelity-settings-sources) {
+    background: hsl(var(--background));
+    font-family: "Public Sans", Inter, system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app-layout:has(.fidelity-settings-sources) { font-family: "Public Sans", sans-serif; }
   body:has(.fidelity-settings-sources) #app-top-bar.mobile-topbar-back {
     height: 38px; min-height: 38px; border: 0; background: var(--mobile-topbar-background); box-shadow: none;
   }
@@ -3122,6 +3128,53 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .fidelity-source-info summary > svg { flex: none; width: 18px; height: 18px; }
   .fidelity-source-info strong { display: block; font-size: 13px; font-weight: 600; }
   .fidelity-source-info summary > span > span { display: block; margin-top: 1px; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 17px; }
+  .light body:has(.fidelity-settings-sources),
+  .light body:has(.fidelity-settings-sources) #app-top-bar.mobile-topbar-back {
+    background: hsl(var(--background));
+  }
+  .light .ios-d3-settings:has(.fidelity-settings-sources) .mobile-split-detail > header h1,
+  .light .fidelity-settings-sources,
+  .light .fidelity-settings-source-summary strong,
+  .light .fidelity-settings-sources .t3-mobile-source-tabs button[aria-selected="true"],
+  .light .fidelity-source-value,
+  .light .fidelity-source-foot strong,
+  .light .fidelity-source-actions button.fidelity-source-quick {
+    color: hsl(var(--foreground));
+  }
+  .light .fidelity-settings-source-summary,
+  .light .fidelity-source-foot { color: hsl(var(--muted-foreground)); }
+  .light .fidelity-settings-add {
+    border-color: hsl(var(--primary)); background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+  }
+  .light .fidelity-settings-sources .t3-mobile-source-tabs,
+  .light .fidelity-source-group,
+  .light .fidelity-source-foot { border-color: hsl(var(--border)); }
+  .light .fidelity-source-group { background: hsl(var(--card)); }
+  .light .fidelity-source-row { border-color: hsl(var(--rule)); }
+  .light .fidelity-settings-sources .t3-mobile-source-tabs button,
+  .light .fidelity-source-identity small,
+  .light .fidelity-source-refresh,
+  .light .fidelity-source-money small { color: hsl(var(--muted-foreground)); }
+  .light .fidelity-source-identity .ios-d3-source-avatar,
+  .light .fidelity-source-status { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+  .light .fidelity-source-status.is-active { background: hsl(var(--positive) / .12); color: hsl(var(--positive)); }
+  .light .fidelity-source-status.is-error { background: hsl(var(--negative) / .12); color: hsl(var(--negative)); }
+  .light .fidelity-source-actions button { border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); }
+  .light .fidelity-source-actions button.is-danger { border-color: hsl(var(--negative) / .25); color: hsl(var(--negative)); }
+  .light .fidelity-source-info { border-color: hsl(var(--accent-data) / .28); background: hsl(var(--accent-data) / .09); }
+  .light .fidelity-source-info summary > span > span { color: hsl(var(--muted-foreground)); }
+  .light .fidelity-source-error-panel { border-color: hsl(var(--negative) / .25); background: hsl(var(--negative) / .09); color: hsl(var(--negative)); }
+  .light .fidelity-source-error-panel button { border-color: hsl(var(--negative) / .25); color: hsl(var(--foreground)); }
+  .light .fidelity-custom { color: hsl(var(--foreground)); }
+  .light .fidelity-custom-group { border-color: hsl(var(--border)); background: hsl(var(--card)); }
+  .light .fidelity-custom-row { border-color: hsl(var(--rule)); }
+  .light .fidelity-custom-avatar { background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+  .light .fidelity-custom-identity small,
+  .light .fidelity-custom-details :is(span, small),
+  .light .fidelity-custom-empty { color: hsl(var(--muted-foreground)); }
+  .light .fidelity-custom-actions button { border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); }
+  .light .fidelity-custom-actions button:first-child { color: hsl(var(--foreground)); }
+  .light .fidelity-custom-actions button.is-danger { border-color: hsl(var(--negative) / .25); color: hsl(var(--negative)); }
   body:has(.fidelity-blacklist) .ios-d3-toast-viewport {
     top: auto; right: 0; bottom: 70px; left: 0; flex-direction: column; max-height: none;
   }
@@ -3568,13 +3621,14 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .fidelity-custom-empty { padding: 20px; color: hsl(var(--muted-foreground)); }
   .fidelity-custom-row { display: grid; gap: 8px; border-top: 1px solid hsl(var(--rule)); padding: 14px 16px; }
   .fidelity-custom-row:first-child { border-top: 0; }
-  .fidelity-custom-identity { display: flex; align-items: center; gap: 12px; }
-  .fidelity-custom-avatar { display: flex; align-items: center; min-width: 0; min-height: 44px; text-align: left; }
-
-  .fidelity-custom-avatar:not(:has(.t3-asset-label)) { display: grid; flex: none; width: 28px; height: 28px; place-items: center; border-radius: 7px; background: var(--custom-asset-avatar); color: var(--custom-asset-avatar-ink); font-size: 10px; font-weight: 700; }
+  .fidelity-custom-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .fidelity-custom-identity > div { min-width: 0; }
+  .fidelity-custom-name { display: block; max-width: 100%; border: 0; background: transparent; padding: 14px 0; margin-block: -14px; color: inherit; text-align: left; }
+  .fidelity-custom-name:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+  .fidelity-custom-avatar { display: grid; flex: none; width: 44px; min-height: 44px; place-items: center; border: 0; background: transparent; padding: 0; }
   .fidelity-custom-identity strong, .fidelity-custom-identity small { display: block; }
   .fidelity-custom-identity strong { font-size: 13px; font-weight: 600; }
-  .fidelity-custom-identity small { color: hsl(var(--faint)); font-size: 12px; }
+  .fidelity-custom-identity small { color: hsl(var(--faint)); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fidelity-custom-details { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .fidelity-custom-details span, .fidelity-custom-details small { display: block; }
   .fidelity-custom-details span { color: hsl(var(--muted-foreground)); font-size: 12px; }
