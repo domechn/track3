@@ -297,7 +297,7 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
               const status = statusFor(source);
               const bad = status?.status === "failed" || status?.status === "stale";
               return <div key={source.id} className={bad ? "failed" : ""}><div><i className={bad ? "err" : ""} /><strong>{source.label}</strong>
-                {bad ? <b>{t("wallets.fidelity.failed")}</b> : <time>{formatTime(status?.finishedAt)}</time>}</div>
+                {bad ? <b className="t3-tag" data-tone="negative">{t("wallets.fidelity.failed")}</b> : <time>{formatTime(status?.finishedAt)}</time>}</div>
                 {bad ? <><p>{!status?.detail && status?.category === "rateLimit" && status.lastSuccessAt
                   ? t("wallets.fidelity.rateLimitWithLastGood").replace("{time}", formatTime(status.lastSuccessAt))
                   : <>{status?.detail || t(`wallets.failure.${status?.category ?? "other"}`)}

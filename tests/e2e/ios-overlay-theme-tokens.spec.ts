@@ -115,4 +115,3 @@ for (const [device, width, height] of [["phone", 390, 844], ["ipad", 820, 1112]]
     });
   }
 }
-

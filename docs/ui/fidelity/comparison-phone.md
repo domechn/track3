@@ -21,6 +21,25 @@ Fresh 390 px dark full-page renders of the source HTML and app with the source's
 
 ## Remaining differences
 
+- The one permitted browser run measured the dark 390 × 844 viewport
+  at **10.64%** different from `analyze-comparison.html` with an
+  RGB-channel threshold of 20. Its first card bounds and computed
+  background, text colour and size match exactly: x=16, y=124,
+  358 × 531px, RGB (19, 18, 23), 13px. The capture exposed a
+  padded-versus-unpadded date mismatch that left the fixture at
+  30 Oct versus 31 Oct; desktop and phone now have regression tests
+  and use the assistant's 1 Oct versus 31 Oct selection. The ratio
+  predates that fix because the browser spec is limited to one run.
+  The app also keeps its Back and masking controls, computed mover
+  attribution, and the owner-required active tab style. Captures and
+  bounds are in `.local/tag-theme/phone-comparison-*`.
+
+- The earlier 8 Nov source-page and dark app first-screen captures at 390 × 844
+  differ by **7.996%** at an RGB-channel threshold of 20. The live
+  comparison keeps its 44 px Back and masking controls and computed
+  attribution, while the static source omits or fixes those values.
+  Small picker and text positions remain visible; they could be matched
+  but do not change the required data behavior.
 - The source ranks mover rows by signed change, uses 40–42 px rows and fixed 435/469 px cards, and puts its zero axis and value columns at different positions. The product ranks by absolute size, uses 44 px rows, one diverging scale and shared columns per card, and grows the cards for up to ten rows plus expansion. Matching the source here would break the required behavior.
 - Below 480 px the product hides the percentage card's absolute-change column to keep the plot and signed percentage readable. The source shows that column in its static render.
 - The source's fixed attribution and stablecoin note cannot describe the 11-asset fixture. The product computes both notes from stored assets.

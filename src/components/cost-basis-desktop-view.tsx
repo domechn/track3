@@ -120,7 +120,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
     return rows.map((row, index) => ({ row, index, groupLength: rows.length }));
   });
   const pagedRows = flatRows.slice(tablePage * pageSize, (tablePage + 1) * pageSize);
-  const term = (value: "short" | "long") => isAverage ? "–" : <span className="fidelity-pill">{t(value === "long" ? "cost.fidelity.long" : "cost.fidelity.short")}</span>;
+  const term = (value: "short" | "long") => isAverage ? "–" : <span className="t3-tag">{t(value === "long" ? "cost.fidelity.long" : "cost.fidelity.short")}</span>;
   const held = (value: string) => {
     const days = Math.max(0, Math.round((Date.now() - Date.parse(value)) / 86_400_000));
     return days >= 365 ? t("cost.fidelity.heldYears").replace("{n}", (days / 365.25).toFixed(1))
@@ -263,7 +263,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
             const terms = known.map((entry) => "term" in entry ? entry.term
               : (Date.now() - Date.parse(entry.acquiredAt)) / 86_400_000 > holdingPeriodDays ? "long" : "short");
             const groupTerm = isAverage || !terms.length ? null : terms.every((value) => value === terms[0])
-              ? term(terms[0]) : <span className="fidelity-pill">{t("cost.fidelity.mixed")}</span>;
+              ? term(terms[0]) : <span className="t3-tag">{t("cost.fidelity.mixed")}</span>;
             return <tr className="fidelity-subtotal"><td colSpan={3}>{row.symbol} {t("cost.fidelity.subtotal")}
               {rows.some(isWarning) ? <span className="fidelity-subtotal-warning"> ⚠</span> : tab === "open" &&
                 unknown.some((warning) => warning.symbol === row.symbol)

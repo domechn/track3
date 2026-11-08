@@ -47,6 +47,14 @@ it("keeps cents in the phone Top coins tooltip", async () => {
   expect(screen.getByRole("tooltip")).toHaveTextContent("+$1,234.56");
 });
 
+it("shows the snapshot count with the baseline while retaining the Positions movement counts", async () => {
+  const { container } = render(<SummaryFidelity currency={currency} dateRange={range} quoteColor="green-up-red-down" />);
+  await screen.findByRole("table", { name: "Top profit and loss coins" });
+  expect(container.querySelector(".fd-primary-stat small")).toHaveTextContent("in 2 snapshots");
+  expect(container.querySelector(".fd-three > div:last-child small")).toHaveTextContent("1 up · 0 down");
+  expect(container.querySelector(".fd-three > div:last-child small")).toHaveTextContent("0 flat");
+});
+
 it("keeps the first available month in the Tab order after a month without data", async () => {
   const { container } = render(<SummaryFidelity currency={currency} dateRange={range} quoteColor="green-up-red-down" />);
   await screen.findByRole("table", { name: "Top profit and loss coins" });

@@ -290,8 +290,8 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 - App capture: `/tmp/fidelity/summary/summary-phone-long.png`.
 - Reference render: `/tmp/rev-fa3/design/analyze-summary-long.png`.
-- Fresh 390 × 844 first-screen pixel difference: **1.09%** (RGB difference >20/255 in any channel).
-- Full-page overlap pixel difference: **1.78%** (source 3,633px; app 3,633px high).
+- Earlier aligned 390 × 844 first-screen pixel difference: **1.09%** (RGB difference >20/255 in any channel).
+- Earlier full-page overlap pixel difference: **1.78%** (source 3,633px; app 3,633px high).
 
 ## Real-data limits
 
@@ -301,7 +301,27 @@ The chart and month cards request profit for each calendar month, and year cards
 
 ## Remaining differences
 
-- UI24 re-rendered `ds/pages/analyze-summary.html` at 390 × 844 after merging #835. The first viewport differs by **6.807%** (maximum RGB channel difference over 20): `/tmp/ui24-current/source-390.png` versus `/tmp/fidelity/summary/summary-phone.png`. Both first cards now measure x=16, y=168, width=358, height=517; the chart starts at y=478 and the ATH card at y=697 in both. Most remaining pixels are text rasterization: the source loads Public Sans through Google's per-weight stylesheet, while Track3 bundles the same WOFF2 bytes for offline use. Applying the source stylesheet in a probe gave **2.143%**; equivalent local font-face declarations still gave **6.807%**. The app also draws the positive P&L chart line green under the global gain/loss colour rule from #835; the static source draws it blue. For a longer date range, the app shows three year cards per page and a pager; the static source shows its two sample years only.
+- The app's banner names net funding and the residual separately so its four displayed amounts add up; the static design sentence combines them as money added. The app's chart note includes the best month and signed amount, centered inside the chart so the full amount stays visible; the source note says only `Best month`. The Net P&L note counts snapshots in the selected range as required by `fix_ui44.md`; the Positions note retains the source's up, down, and flat counts.
+- Fresh 8 Nov 2026 renders at 390 × 844 differ by **7.822%** (maximum RGB channel difference over 20): `/tmp/fidelity/summary/ui44-source-phone.png` versus `/tmp/fidelity/summary/summary-phone.png`. `getBoundingClientRect()` and `getComputedStyle()` measurements are in `/tmp/fidelity/summary/ui44-measure.json`: both first cards measure x=16, y=168, width=358, height=517 with the same surface color; both charts start at x=33, y=478 and measure 324 × 190. The required accounting banner, complete Best month note, snapshot count, and product gain color explain the visible content difference. The source loads Public Sans through Google's stylesheet, while Track3 bundles the same font for offline use. For a longer date range, the app shows three year cards per page and a pager; the static source shows its two sample years only.
+- The latest dark 390 × 844 viewport capture differs by **12.87%**
+  from the full-data source at an RGB-channel threshold of 20. The
+  app card is x=16, y=150, 358 × 517px and the source card is x=16,
+  y=168, 358 × 517px; their computed surface and text sizes match.
+  This tag fixture contains partial history, so the app must show
+  unknown P&L, two known positions and a shorter chart instead of
+  the source's complete illustrative figures. That short heading
+  also places the card 18px higher. The owner-required Analytics
+  tile remains visible. Captures and bounds are in
+  `.local/tag-theme/phone-summary-*`.
+
+- The earlier 8 Nov source-page and dark partial-history tag-theme fixture
+  first-screen captures at 390 × 844 differ by **8.889%** at an
+  RGB-channel threshold of 20. The fixture has partial saved history
+  and missing profit, while the static source prints a complete
+  illustrative P&L. The app must show the saved unknown values. The
+  Partial marker uses the shared warning tag, which has a small border
+  and 11 px text instead of the source's static pill.
+- UI24 re-rendered `ds/pages/analyze-summary.html` at 390 × 844 after merging #835. The first viewport differs by **6.807%** (maximum RGB channel difference over 20): `/tmp/ui24-current/source-390.png` versus `/tmp/fidelity/summary/summary-phone.png`. Both first cards now measure x=16, y=168, width=358, height=517; the chart starts at y=478 and the ATH card at y=697 in both. Most remaining pixels are text rasterization: the source loads Public Sans through Google's per-weight stylesheet, while Track3 bundles the same WOFF2 bytes for offline use. Applying the source stylesheet in a probe gave **2.143%**; equivalent local font-face declarations still gave **6.807%**. The app also draws the positive P&L chart line green under the global gain/loss colour rule from #835; the static source draws it blue.
 - Re-rendered the source HTML and app on 6 Nov 2026 at 390 × 844. The first viewport differs by **1.15%** (maximum RGB-channel difference over 20). The isolated **Profit attribution** card differs by **9.74%** over the common 358 × 473 px area because the task requires 56 px tap rows instead of the source's 39 px rows, 16 px bars instead of 8 px bars, and a visible total amount column. Its Total range uses `$310K → $764K` when the source's full range would clip; the exact range is in the title. The **Top profit and loss coins** card differs by **1.95%** over 358 × 574 px after sizing the amount column to keep large CNY values on one line. Source and app card captures are in `/tmp/ui13-design-phone-*.png` and `/tmp/ui13-app-phone-*.png`.
 - At 320 px, the smaller layout uses a narrower chart track and compact amount strings so full asset names, month P&L, and the Total row remain readable. The full amounts remain in titles. The design specification uses 390 px.
 - The source and app heading and first card bounds match. The 47-group fixture displays a ten-row pager; the source page illustrates eight groups and has no equivalent large-data capture.

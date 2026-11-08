@@ -7,9 +7,9 @@ import { contrast } from "./overlay-theme-scenes";
 
 const output = "/tmp/fidelity-desktop/comparison";
 
-async function openComparison(page: Page) {
+async function openComparison(page: Page, theme: "light" | "dark" = "dark") {
   await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
-  await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "dark"));
+  await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
   const syncPassphrase = "local fidelity comparison passphrase";
   const s3 = new FakeS3();
   const { header } = await createSyncHeader(syncPassphrase);
@@ -63,6 +63,31 @@ test.describe("Comparison desktop fidelity", () => {
       });
       expect(contrast(...colors)).toBeGreaterThanOrEqual(4.5);
     } finally { await context.close(); }
+  });
+
+  test("light Comparison subtitle and info callout remain readable", async ({ browser }) => {
+    test.setTimeout(120_000);
+    const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, colorScheme: "light" });
+    try {
+      const page = await context.newPage();
+      await openComparison(page, "light");
+      await expect(page.locator(".t3-cmp-heading p b")).toBeVisible();
+      await expect(page.locator(".t3-cmp-info")).toBeVisible();
+      const luminance = await page.evaluate(() => {
+        const value = (selector: string, property: "color" | "backgroundColor") => {
+          const css = getComputedStyle(document.querySelector(selector) as Element)[property];
+          const channels = [...css.matchAll(/[\d.]+/g)]
+            .slice(0, 3).map(([number]) => Number(number) / (css.startsWith("color(srgb ") ? 1 : 255));
+          return channels.reduce((sum, channel, index) => sum + [0.2126, 0.7152, 0.0722][index] *
+            (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4), 0);
+        };
+        return { subtitle: value(".t3-cmp-heading p b", "color"), callout: value(".t3-cmp-info", "backgroundColor") };
+      });
+      expect(luminance.subtitle).toBeLessThan(0.18);
+      expect(luminance.callout).toBeGreaterThan(0.7);
+    } finally {
+      await context.close();
+    }
   });
 
   test("1001px CNY legacy table keeps each amount on one line", async ({ browser }, testInfo) => {

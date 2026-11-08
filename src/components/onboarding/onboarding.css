@@ -89,7 +89,7 @@
 .ob-points li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.45; }
 .ob-points svg { width: 18px; height: 18px; flex: none; margin-top: 1px; color: var(--ill-1); }
 .ob-note { margin: 16px 0 0; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.5; }
-.ob-pro { display: inline-block; margin-right: 6px; padding: 0 6px; border: 1px solid hsl(var(--border)); border-radius: 999px; color: hsl(var(--foreground)); font-size: 11px; font-weight: 600; line-height: 16px; vertical-align: 1px; }
+.ob-pro { margin-right: 6px; vertical-align: 1px; }
 .ob-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 20px; }
 .ob-dots { display: flex; align-items: center; gap: 6px; }
 .ob-dots span { width: 6px; height: 6px; border-radius: 999px; background: hsl(var(--muted-foreground) / .35); transition: width .24s cubic-bezier(.2,.8,.2,1), background-color .24s; }

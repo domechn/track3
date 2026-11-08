@@ -48,7 +48,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
     await page.keyboard.press("Escape");
     await expect(initialStatus).toHaveCount(0);
   } else if (phoneLayout) {
-    await expect(page.locator(".fd-partial-pill")).toHaveText("Partial", { timeout: 30_000 });
+    await expect(page.locator(".fd-partial-total + .t3-tag")).toHaveText("Partial", { timeout: 30_000 });
     await expect(page.locator(".fd-partial-chart")).toBeVisible();
     await capture("overview");
     await expect(page.locator(".fd-partial-total")).toHaveText("$49,898.45");
@@ -110,7 +110,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   await expect(useLastKnown).toBeVisible();
   if (phoneLayout) {
     await expect(page.locator(".fd-partial-total")).toHaveText("$84,000.00");
-    await expect(page.locator(".fd-partial-pill")).toHaveText("Partial");
+    await expect(page.locator(".fd-partial-total + .t3-tag")).toHaveText("Partial");
   } else {
     await expect(page.locator(".overview-loading")).toBeHidden();
     await expect(page.locator(".t3-hero-value")).not.toContainText("$75,048.19");

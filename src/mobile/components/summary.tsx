@@ -16,16 +16,19 @@ import { useLayoutEffect } from "react";
 import { useTranslation } from "@/mobile/i18n";
 import SummaryFidelity from "@/mobile/components/summary-fidelity";
 import { useIsMobile, useSizeClass } from "@/mobile/components/mobile";
+import { selectSummaryRange, summaryPresetRange, type SummaryPreset } from "@/middlelayers/summary-range";
 const SUMMARY_COMPONENT_COUNT = 4;
 
 const App = ({
   currency,
   dateRange,
   quoteColor,
+  availableDates = [dateRange.start, dateRange.end],
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
+  availableDates?: Date[];
 }) => {
   const { t } = useTranslation();
   const [pageLoading, setPageLoading] = useState(true);
@@ -35,6 +38,9 @@ const App = ({
     [dateRange.start, dateRange.end]
   );
   const dataChangedVersion = useDataChangedVersion();
+  const [rangePreset, setRangePreset] = useState<SummaryPreset>("All");
+  const selectedDateRange = summaryPresetRange(availableDates, rangePreset) ?? dateRange;
+  const selectedRange = selectSummaryRange(availableDates, selectedDateRange);
   const hasValidRange = useMemo(
     () =>
       dateRange.start.getTime() > new Date("1970-01-01").getTime() &&
@@ -68,10 +74,13 @@ const App = ({
               <FadeUp className="summary-hero-metrics analyze-summary-hero grid gap-3 grid-cols-1 xl:grid-cols-2">
                 <Profit
                   currency={currency}
-                  dateRange={dateRange}
+                  dateRange={selectedDateRange}
                   quoteColor={quoteColor}
                   showCoinsProfitPercentage={true}
                   showRangeControl={true}
+                  rangeValue={rangePreset}
+                  onRangeValueChange={setRangePreset}
+                  summaryRange={selectedRange}
                 />
                 <AthValue
                   currency={currency}
@@ -82,8 +91,10 @@ const App = ({
               <FadeUp>
                 <ProfitSummary
                   currency={currency}
-                  dateRange={dateRange}
+                  dateRange={selectedDateRange}
                   quoteColor={quoteColor}
+                  clipToRange={rangePreset !== "All"}
+                  oneSnapshot={selectedRange.databaseCount < 2}
                 />
               </FadeUp>
               <FadeUp>
@@ -120,6 +131,7 @@ export default function Summary(props: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
+  availableDates?: Date[];
 }) {
   const isMobile = useIsMobile();
   const compact = useSizeClass().width === "compact";

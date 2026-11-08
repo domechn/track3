@@ -370,7 +370,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
             <td><button type="button" onClick={() => setSelectedId(row.id)}
               aria-label={`${dateShort(row.createdAt)} · ${t("history.viewSnapshot").replace("{date}", dateLong(row.createdAt))}`}>
               {dateDay(row.createdAt)} <span className="fidelity-history-row-time">{dateTime(row.createdAt)}</span>
-              {row.edited && <span className="fidelity-edit-pill">{t("history.editLog.edited")}</span>}
+              {row.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}
             </button></td>
             <td>{money(row.total)}</td>
             <td style={{ color: row.change === null ? undefined : color(row.change) }}>
@@ -407,7 +407,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
         </div>)}
       </section> : <section className="fidelity-card fidelity-history-detail" data-testid="history-desktop-detail">
         {selected && detail && <>
-          <h2>{dateLong(selected.createdAt)} {selected.edited && <span className="fidelity-edit-pill">{t("history.editLog.edited")}</span>}</h2>
+          <h2>{dateLong(selected.createdAt)} {selected.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}</h2>
           <div className="fidelity-history-detail-kpis">
             <div><span>{t("history.fidelity.totalValue")}</span><strong>{money(valueTotal)}</strong>
               <small>{edits?.length ? t("history.fidelity.includesEdits").replace("{count}", String(edits.length)) : t("history.fidelity.asOfRefresh")}</small></div>

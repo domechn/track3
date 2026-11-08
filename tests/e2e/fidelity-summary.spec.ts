@@ -243,6 +243,21 @@ test("Chinese Summary keeps attribution dates in one translated phrase", async (
   } finally { await context.close(); }
 });
 
+test("Chinese full Summary banner stays within three lines at 390px", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
+    isMobile: true, hasTouch: true, timezoneId: "UTC" });
+  try {
+    const page = await context.newPage();
+    await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
+    await page.addInitScript(() => localStorage.setItem("track3-ui-locale", "zh"));
+    await installTauriBridge(page, { fidelitySample: "full" });
+    await page.goto("/#/summary");
+    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+    await expect(page.locator(".fd-page-head p")).toContainText("净转入");
+    expect((await page.locator(".fd-page-head p").boundingBox())!.height).toBeLessThanOrEqual(54);
+  } finally { await context.close(); }
+});
+
 test("Summary shows a near-midnight snapshot on the viewer's local day", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
     isMobile: true, hasTouch: true, timezoneId: "Asia/Shanghai" });
@@ -313,6 +328,14 @@ test("summary full state follows the approved card order and captures at 390px",
     await expect(page.locator(".fd-primary-stat")).toContainText("+$188,809.27");
     await expect(page.locator(".fd-page-head p strong")).toHaveText("+$188,809");
     await page.evaluate(() => document.fonts.ready);
+    const bestMonthBounds = await page.locator(".fd-summary-chart text").filter({ hasText: /^Best month,/ })
+      .evaluate((node) => {
+        const note = node.getBoundingClientRect();
+        const chart = node.closest("svg")!.getBoundingClientRect();
+        return { left: note.left - chart.left, right: note.right - chart.left, width: chart.width };
+      });
+    expect(bestMonthBounds.left).toBeGreaterThanOrEqual(0);
+    expect(bestMonthBounds.right).toBeLessThanOrEqual(bestMonthBounds.width);
     const textWidths = await page.evaluate(() => {
       const width = (selector: string) => {
         const range = document.createRange();
@@ -323,7 +346,7 @@ test("summary full state follows the approved card order and captures at 390px",
     });
     expect(textWidths.title).toBeCloseTo(97.46875, 1);
     expect(textWidths.value).toBeCloseTo(205.328125, 1);
-    await expect(page.locator(".fd-page-head p")).toContainText("$265,000");
+    await expect(page.locator(".fd-page-head p")).toContainText("$453,809 since Jul 2025: +$188,809 market P&L, $138,463 net funding, $126,537 other (fees, transfers)");
     await expect(page.locator(".fd-kpis")).toContainText("+32.84%");
     await expect(page.locator(".fd-kpis")).toContainText("$575,000");
     expect((await page.locator(".fd-three>div:first-child small").boundingBox())!.y).toBe(382);
@@ -377,6 +400,30 @@ test("summary full state follows the approved card order and captures at 390px",
     })), null, 2));
     await page.screenshot({ path: "/tmp/fidelity/summary/summary-phone-long.png", fullPage: true });
     await page.screenshot({ path: "/tmp/fidelity/summary/summary-phone.png" });
+    if (process.env.UI44_DESIGN_SOURCE) {
+      const designPage = await context.newPage();
+      await designPage.goto(`file://${process.env.UI44_DESIGN_SOURCE}`);
+      await designPage.locator(".card").first().waitFor();
+      await designPage.evaluate(() => document.fonts.ready);
+      const measure = (selectors: string[]) => (selectors.map((selector) => {
+        const node = document.querySelector(selector);
+        if (!node) return { selector, missing: true };
+        const rect = node.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        return { selector, x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+          font: style.font, color: style.color, background: style.backgroundColor };
+      }));
+      const design = await designPage.evaluate(measure, [".head", ".card", ".kpis", "#c1"]);
+      const app = await page.evaluate(measure, [".fd-page-head", ".fd-profit-loss", ".fd-kpis", ".fd-summary-chart"]);
+      writeFileSync("/tmp/fidelity/summary/ui44-measure.json", JSON.stringify({ design, app }, null, 2));
+      await designPage.screenshot({ path: "/tmp/fidelity/summary/ui44-source-phone.png" });
+      for (const state of ["empty", "loading"]) {
+        await designPage.goto(`file://${process.env.UI44_DESIGN_SOURCE.replace(".html", `-${state}.html`)}`);
+        await designPage.locator(".card").first().waitFor();
+        await designPage.screenshot({ path: `/tmp/fidelity/summary/ui44-source-${state}-phone.png` });
+      }
+      await designPage.close();
+    }
     await page.locator(".fd-month").last().click();
     await expect(page.locator(".fd-summary-chart [data-chart-mark]").last()).toHaveAttribute("aria-label", /Oct 2026/);
     await expect(page.locator("[data-chart-tooltip]")).toContainText("Oct 2026");
