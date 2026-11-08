@@ -1,9 +1,31 @@
 import { expect, test } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { installTauriBridge } from "./fidelity-desktop-scenes";
 import AxeBuilder from "@axe-core/playwright";
 
 test.use({ viewport: { width: 1600, height: 1000 }, colorScheme: "dark", reducedMotion: "reduce", timezoneId: "UTC" });
+
+test("coin design source provides the comparison bounds", async ({ page }) => {
+  const path = "/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/records-coin-btc.html";
+  test.skip(!existsSync(path), "local design source is unavailable");
+  await page.goto(pathToFileURL(path).href, { waitUntil: "domcontentloaded" });
+  const metrics = page.locator(".kp6").first();
+  await expect(metrics).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const measurements = await metrics.evaluate((strip) => ({
+    strip: strip.getBoundingClientRect().toJSON(),
+    columns: [...strip.children].map((cell) => ({
+      box: cell.getBoundingClientRect().toJSON(),
+      padding: getComputedStyle(cell).padding,
+      fontSize: getComputedStyle(cell.querySelector(".v")!).fontSize,
+    })),
+  }));
+  expect(measurements.columns).toHaveLength(6);
+  mkdirSync("/tmp/history-kpi-overflow", { recursive: true });
+  writeFileSync("/tmp/history-kpi-overflow/design-coin-btc-bounds.json", JSON.stringify(measurements, null, 2));
+  await page.screenshot({ path: "/tmp/history-kpi-overflow/design-coin-btc-1600.png", fullPage: true });
+});
 
 test("coin toolbar stays opaque and separate from scrolled content at 1440px", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -58,7 +80,7 @@ for (const state of ["btc", "btc-edit", "btc-price", "btc-sheet", "nvda", "nova"
       .toHaveCount(symbol === "BTC" ? 3 : 2, { timeout: 40_000 });
     if (state.startsWith("nova")) await expect(page.locator(".coin-fidelity-custom")).toBeVisible();
     if (state === "nova") {
-      expect((await page.locator(".coin-fidelity-crumb").boundingBox())!.y).toBe(69);
+      expect((await page.locator(".coin-fidelity-crumb").boundingBox())!.y).toBe(67.859375);
       expect((await page.locator(".coin-fidelity-hero").boundingBox())!.y).toBe(159);
       expect((await page.locator(".coin-fidelity-hero").boundingBox())!.width).toBe(1473);
     }
@@ -81,14 +103,14 @@ for (const state of ["btc", "btc-edit", "btc-price", "btc-sheet", "nvda", "nova"
       const transactionCard = await page.locator(".coin-fidelity-transactions").boundingBox();
       expect(sourceHeader?.x).toBeCloseTo(973.58, 0);
       expect(await page.locator(".coin-fidelity-sources table").first().evaluate((node) => getComputedStyle(node).tableLayout)).toBe("auto");
-      expect(sourceHeader?.width).toBeGreaterThan(223);
-      expect(sourceHeader?.width).toBeLessThan(224);
+      expect(sourceHeader?.width).toBeGreaterThan(208);
+      expect(sourceHeader?.width).toBeLessThan(209);
       expect(sourceRow?.y).toBeCloseTo(517.5, 0);
       expect(lotsHeading?.y).toBeCloseTo((lotsCard?.y ?? 0) + 32, 0);
       expect(lotsCard?.x).toBeCloseTo(sourceHeader?.x ?? 0, 0);
       expect((lotsHeading?.y ?? 0) - ((sourcesCard?.y ?? 0) + (sourcesCard?.height ?? 0))).toBeGreaterThanOrEqual(31);
       expect(chartHeading?.y).toBeCloseTo(466, 0);
-      expect(coinHeading?.y).toBeCloseTo(91, 0);
+      expect(coinHeading?.y).toBeCloseTo(90, 0);
       expect(secondLabel?.x).toBeCloseTo(362.5, 0);
       expect(secondValue?.y).toBeCloseTo(200, 0);
       expect(secondNote?.y).toBeCloseTo(228, 0);
@@ -651,7 +673,7 @@ test("coin heading type tag uses a light surface in light theme", async ({ page 
   await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "light"));
   await installTauriBridge(page, { fidelityDesktop: "full" });
   await page.goto("/#/coins/BTC");
-  const tag = page.locator(".coin-fidelity-heading h1 b");
+  const tag = page.locator(".coin-fidelity-heading h1 .t3-asset-tag");
   await expect(tag).toBeVisible({ timeout: 40_000 });
   await expect(tag).toHaveClass(/t3-tag/);
   const background = await tag.evaluate((node) =>
@@ -731,7 +753,7 @@ test("Coin subtitle and cost basis action follow the source heading grid", async
   await installTauriBridge(page, { fidelityDesktop: "full" });
   await page.goto("/#/coins/BTC");
   await expect(page.locator(".coin-fidelity-heading")).toBeVisible({ timeout: 40_000 });
-  expect((await page.locator(".coin-fidelity-heading p").boundingBox())!.y).toBeCloseTo(125, 0);
+  expect((await page.locator(".coin-fidelity-heading p").boundingBox())!.y).toBeCloseTo(126, 0);
   const action = (await page.locator(".coin-fidelity-heading > button").boundingBox())!;
   expect(action.y).toBeCloseTo(109, 0);
   expect(action.x).toBeCloseTo(1408, 0);
@@ -781,6 +803,17 @@ test("Coin chart, tables and transaction heading use the source geometry", async
   expect(label.y).toBeCloseTo(550, 0);
 });
 
+test("short coin chart stats stay in three columns at 1280px", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await installTauriBridge(page, { fidelityDesktop: "full" });
+  await page.goto("/#/coins/BTC");
+  const stats = page.locator(".coin-fidelity-chart-stats .coin-fidelity-metric");
+  await expect(stats).toHaveCount(3);
+  await expect(stats.first().locator("strong")).toBeVisible();
+  const tops = await stats.evaluateAll((cells) => cells.map((cell) => cell.getBoundingClientRect().top));
+  expect(new Set(tops).size).toBe(1);
+});
+
 test("NOVA zero figures, final price row and price suffix match the source", async ({ page }) => {
   await installTauriBridge(page, { fidelityDesktop: "nova" });
   await page.goto("/#/coins/NOVA");
@@ -825,7 +858,9 @@ test("Coin chart controls and source tags match source positioning", async ({ pa
     return { background: css.backgroundColor, border: css.borderColor, radius: css.borderRadius, padding: css.padding };
   })).toEqual({ background: "rgb(10, 10, 11)", border: "rgb(59, 59, 63)", radius: "6px", padding: "0px 28px 0px 12px" }); // --control RGB.
   await expect(page.locator(".coin-fidelity-sources tbody tr").first()).toContainText("Ledger cold wallet");
-  await expect(page.locator(".coin-fidelity-sources td small").first()).toHaveCSS("margin-left", "5px");
+  const name = await page.locator(".coin-fidelity-sources .t3-asset-label-name").first().boundingBox();
+  const secondary = await page.locator(".coin-fidelity-sources .t3-asset-label-secondary").first().boundingBox();
+  expect(Math.abs((name?.x ?? 0) - (secondary?.x ?? 0))).toBeLessThanOrEqual(1);
 });
 
 test("NVDA chart reserves the smaller axis and end-label widths", async ({ page }) => {
@@ -868,7 +903,7 @@ test("NVDA gridlines follow the compact stock plot", async ({ page }) => {
   expect(rows).toEqual([524, 559, 593, 628, 663]);
 });
 
-for (const [symbol, sourceQuantityX] of [["BTC", 1197.1], ["NVDA", 1206.6], ["NOVA", 1156.9]] as const) {
+for (const [symbol, sourceQuantityX] of [["BTC", 1182], ["NVDA", 1190], ["NOVA", 1138]] as const) {
   test(`${symbol} source columns size themselves to their content`, async ({ page }) => {
     await installTauriBridge(page, { fidelityDesktop: symbol === "NOVA" ? "nova" : "full" });
     await page.goto(`/#/coins/${symbol}${symbol === "NVDA" ? "?assetType=stock" : ""}`);

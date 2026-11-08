@@ -6,6 +6,7 @@ import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import FidelityIcon from "./fidelity-icon";
+import AssetLabel from "./common/asset-label";
 import "./rebalance-desktop.css";
 import { useChartHitArea } from "./chart-tooltip";
 
@@ -172,7 +173,7 @@ export default function RebalanceDesktop(props: Props) {
             <div>{t("rebalance.fidelity.drift")} {row.drift === undefined ? "–"
               : t("rebalance.fidelity.pts").replace("{value}", `${row.drift > 0 ? "+" : row.drift < 0 ? "−" : ""}${fixed(Math.abs(row.drift), 2)}`)}</div></div>;
           return <div className="t3-fidelity-allocation-row" key={`${row.assetType}:${row.symbol}`}>
-            <div className="t3-fidelity-asset"><b>{row.symbol}</b><small>{t(`rebalance.${row.assetType}`)}</small></div>
+            <div className="t3-fidelity-asset"><AssetLabel asset={row} size={20} quiet secondary={t(`rebalance.${row.assetType}`)} /></div>
             <div className="t3-fidelity-allocation-bar" role="button"
               {...chart.markProps(index, t("rebalance.fidelity.chartMark").replace("{asset}", row.symbol)
                 .replace("{current}", `${fixed(row.current, 2)}%`)
@@ -247,7 +248,7 @@ export default function RebalanceDesktop(props: Props) {
           {tradeRows.map((row, index) => <Fragment key={`${row.assetType}:${row.symbol}`}>
             {index === sells.length && <tr className="subtotal" key="sells"><td /><td colSpan={2}>{t("rebalance.fidelity.totalSells")}</td><td className="t3-fidelity-amount">{money(sellTotal)}</td><td colSpan={3} /></tr>}
             <tr key={`${row.assetType}:${row.symbol}`}><td>{index + 1}</td><td><span className="t3-tag" data-tone={row.tradeValue > 0 ? "accent" : "neutral"}>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}</span></td>
-              <td><b>{row.symbol}</b></td><td>{money(Math.abs(row.tradeValue))}</td><td>{unit(row.tradeQuantity)}</td><td>{money(row.price)}</td><td>{fixed(row.currentPercent)}% <span className="t3-fidelity-share-arrow">→</span> {fixed(row.targetPercent)}%</td></tr>
+              <td><AssetLabel asset={row} size={20} quiet /></td><td>{money(Math.abs(row.tradeValue))}</td><td>{unit(row.tradeQuantity)}</td><td>{money(row.price)}</td><td>{fixed(row.currentPercent)}% <span className="t3-fidelity-share-arrow">→</span> {fixed(row.targetPercent)}%</td></tr>
           </Fragment>)}
           {sells.length > 0 && buys.length === 0 && <tr className="subtotal"><td /><td colSpan={2}>{t("rebalance.fidelity.totalSells")}</td><td className="t3-fidelity-amount">{money(sellTotal)}</td><td colSpan={3} /></tr>}
           <tr className="subtotal"><td /><td colSpan={2}>{t("rebalance.fidelity.totalBuys")}</td><td className="t3-fidelity-amount">{money(buyTotal)}</td><td colSpan={3} /></tr>

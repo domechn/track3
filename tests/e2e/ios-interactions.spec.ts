@@ -399,7 +399,7 @@ for (const width of [320, 375, 390, 430]) {
       await page.goto("/#/overview");
       await page.locator(".fd-overview-more").click();
       for (const shortRow of await page.locator(".fd-overview-rank .fd-overview-row").all()) {
-        const symbol = shortRow.locator("span:first-child b");
+        const symbol = shortRow.locator(".t3-asset-label-name");
         const text = (await symbol.textContent())?.trim() ?? "";
         if (text.length > 4) continue;
         const bounds = await symbol.evaluate((node) => {

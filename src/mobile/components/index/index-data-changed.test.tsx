@@ -1,4 +1,5 @@
 import React from "react";
+import { Outlet } from "react-router-dom";
 import { act, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/mobile/components/index";
@@ -44,7 +45,7 @@ vi.mock("@/mobile/components/ui/use-toast", async (importOriginal) => ({
 }));
 
 vi.mock("@/mobile/components/settings", () => ({
-  default: () => <div>settings</div>,
+  default: () => <div>settings<Outlet /></div>,
 }));
 
 vi.mock("@/mobile/components/refresh-data", async () => {
@@ -143,7 +144,8 @@ vi.mock("@/mobile/components/summary", () => ({
 }));
 
 vi.mock("@/mobile/components/configuration", () => ({
-  default: () => <div>configuration</div>,
+  default: ({ onConfigurationSave }: { onConfigurationSave?: (aliasChanged: boolean) => void }) =>
+    <button data-testid="trigger-alias-save" onClick={() => onConfigurationSave?.(true)}>configuration</button>,
 }));
 vi.mock("@/mobile/components/data-management", () => ({
   default: () => <div>data management</div>,
@@ -275,6 +277,15 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
+  it("publishes a saved source alias to other phone views", async () => {
+    window.location.hash = "#/settings/configuration";
+    const view = renderApp();
+    fireEvent.click(await view.findByTestId("trigger-alias-save"));
+    window.location.hash = "#/summary";
+    await view.findByTestId("summary-range");
+    expect(lastDataChangedVersion).toBe(1);
+  });
+
   it("keeps the refresh runner mounted while moving from Overview to Wallets and back", async () => {
     vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     window.location.hash = "#/overview";

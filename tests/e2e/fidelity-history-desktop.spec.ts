@@ -141,7 +141,7 @@ test("populated history shows the selected snapshot beside the list", async ({ p
   await expect(page.getByTestId("history-desktop-detail").locator("tbody tr").first().locator("td").first()
     .getByRole("button", { name: "Delete BTC from snapshot" })).toBeAttached();
   await expect(page.getByTestId("history-desktop-detail")).toContainText("5 of 5 sources");
-  await expectDetailHeadersInsidePane(page, [973.58, 1045.58, 1179.06, 1301.05, 1434.53]);
+  await expectDetailHeadersInsidePane(page, [973.58, 1097.58, 1216.45, 1325.09, 1443.97]);
   const editAction = page.locator(".fidelity-history-actions button").nth(1);
   expect((await editAction.boundingBox())!.width).toBeCloseTo(61, 0);
   expect((await editAction.locator("svg").boundingBox())!.width).toBeCloseTo(14, 0);
@@ -174,7 +174,7 @@ test("populated history shows the selected snapshot beside the list", async ({ p
   await expect(page.locator(".fidelity-history-list tbody tr:first-child td:first-child button"))
     .toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(page.locator(".fidelity-history-detail-kpis strong").first())
-    .toHaveCSS("font-variant-numeric", "normal");
+    .toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(page.locator(".t3-records-toolbar-panel")).toBeHidden();
   await expect(page.getByTestId("history-desktop-detail")).toContainText("$752,642.71");
   await expect(page.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -230,7 +230,7 @@ test("delete confirmation and undo show the designed overlays", async ({ page })
   await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("border", "1px solid rgb(59, 59, 63)");
   await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("color", "rgb(154, 156, 162)");
   expect((await page.locator(".fidelity-history-list th").first().boundingBox())!.width).toBeCloseTo(145.22, 0);
-  await expectDetailHeadersInsidePane(page, [973.58, 1045.58, 1170.61, 1295.64, 1432.41]);
+  await expectDetailHeadersInsidePane(page, [973.58, 1097.58, 1208.94, 1320.30, 1442.09]);
   await capture(page, "history-undo");
 });
 
@@ -247,6 +247,7 @@ test("a transient tiny viewport preserves the selected desktop snapshot", async 
 
 test("history detail keeps every value distinct inside its card at narrow desktop widths", async ({ page }) => {
   test.setTimeout(120_000);
+  await mkdir("/tmp/history-kpi-overflow", { recursive: true });
   await page.setViewportSize({ width: 1100, height: 1024 });
   await installSampleBridge(page, { fidelitySample: "full" });
   await page.goto("/#/history");
@@ -296,6 +297,24 @@ test("history detail keeps every value distinct inside its card at narrow deskto
       return failures;
     });
     allCollisions.push(...collisions.map((collision) => `${width}px ${collision}`));
+    const assetAlignment = await detail.evaluate((card) => {
+      const header = card.querySelector<HTMLTableCellElement>("table thead th:first-child")!;
+      const cell = card.querySelector<HTMLTableCellElement>("table tbody tr:first-child td:first-child")!;
+      const button = cell.querySelector("button")!;
+      button.focus();
+      const cardBounds = card.getBoundingClientRect();
+      const buttonBounds = button.getBoundingClientRect();
+      button.blur();
+      return {
+        headerPadding: getComputedStyle(header).paddingLeft,
+        cellPadding: getComputedStyle(cell).paddingLeft,
+        buttonLeft: buttonBounds.left,
+        cardLeft: cardBounds.left,
+      };
+    });
+    expect(assetAlignment.cellPadding).toBe(assetAlignment.headerPadding);
+    expect(assetAlignment.buttonLeft - assetAlignment.cardLeft).toBeGreaterThanOrEqual(2);
+    await detail.screenshot({ path: `/tmp/history-kpi-overflow/history-detail-table-${width}.png` });
   }
   expect(allCollisions).toEqual([]);
 });

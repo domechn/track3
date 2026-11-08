@@ -800,6 +800,26 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(localStorage.getItem("track3-refresh-source-statuses")).toContain("Cold vault");
   });
 
+  it("uses the current alias in a refresh failure notice", async () => {
+    const stored = { sourceId: "btc:0", label: "Cold", kind: "wallet", provider: "BTC",
+      hint: "bc1q-d…rage", status: "stale", category: "network" } as const;
+    writeStoredStatuses([stored]);
+    vi.mocked(getConfiguration).mockResolvedValue({
+      btc: { addresses: [{ address: "bc1q-demo-cold-storage", alias: "Vault" }] },
+    } as never);
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult, sourceStatuses: [stored],
+    } as never);
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
+    expect(await screen.findByText("Vault")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Vault refresh failed",
+    })));
+  });
+
   it("distinguishes four Main sources, sorts failures first, and retries all failed", async () => {
     const localLastSuccess = new Date(2026, 9, 17, 12, 30).toISOString();
     const sourceStatuses = [
@@ -912,7 +932,8 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(dialog).toHaveTextContent("不支持的交易所");
     expect(dialog).toHaveTextContent("数据源持仓无效");
     expect(dialog).not.toHaveTextContent("API key");
-    expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(6);
+    expect(dialog.querySelectorAll("[data-source-status-row] .t3-asset-icon")).toHaveLength(3);
+    expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(3);
   });
 
   it("carries the last successful time into a full refresh that fails without saved holdings", async () => {

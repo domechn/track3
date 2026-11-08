@@ -275,7 +275,7 @@ for (const width of [744, 1024]) test(`iPad Profit attribution ranks keep readab
     await expect(ranks.first()).toBeVisible();
     expect(await ranks.count()).toBeGreaterThan(1);
     await expect(ranks.first().locator(".tabular-nums")).toContainText(/,\d{3},\d{3}/);
-    const longLabel = ranks.first().locator(".truncate");
+    const longLabel = ranks.first().locator(".t3-asset-label-name");
     await longLabel.evaluate((element) => { element.textContent = "SupercalifragilisticexpialidociousLongAssetName"; });
     const labelLines = await longLabel.evaluate((element) => {
       const range = document.createRange();
@@ -290,14 +290,14 @@ for (const width of [744, 1024]) test(`iPad Profit attribution ranks keep readab
     await card.locator(".attribution-rank").first().screenshot({ path: `/tmp/attribution-layout/ipad-${width}-rank.png` });
     for (const rank of await ranks.all()) {
       const boxes = await rank.evaluate((element) => {
-        const label = element.querySelector<HTMLElement>(".truncate")!.getBoundingClientRect();
+        const label = element.querySelector<HTMLElement>(".t3-asset-label-name")!.getBoundingClientRect();
         const amount = element.querySelector<HTMLElement>(".tabular-nums")!.getBoundingClientRect();
         const bar = element.querySelector<HTMLElement>(".rounded-full")!.getBoundingClientRect();
         const row = element.getBoundingClientRect();
         return { height: row.height, labelRight: label.right, amountLeft: amount.left,
           amountRight: amount.right, rowRight: row.right, amountHeight: amount.height, barHeight: bar.height,
-          barWidth: bar.width, labelScrollWidth: element.querySelector<HTMLElement>(".truncate")!.scrollWidth,
-          labelClientWidth: element.querySelector<HTMLElement>(".truncate")!.clientWidth,
+          barWidth: bar.width, labelScrollWidth: element.querySelector<HTMLElement>(".t3-asset-label-name")!.scrollWidth,
+          labelClientWidth: element.querySelector<HTMLElement>(".t3-asset-label-name")!.clientWidth,
           lineHeight: parseFloat(getComputedStyle(element.querySelector<HTMLElement>(".tabular-nums")!).lineHeight) };
       });
       expect(boxes.height).toBeGreaterThanOrEqual(56);

@@ -356,7 +356,7 @@ test("summary full state follows the approved card order and captures at 390px",
     await expect(page.locator(".fd-year").first()).toContainText("+$60,109");
     await expect(page.locator(".fd-year").first()).toContainText("+$105,000");
     await expect(page.locator(".summary-top-row").filter({ hasText: "SOL" }).locator("strong")).toHaveText("−$9,300");
-    await expect(page.locator(".fd-top-coins .summary-top-row").nth(6).locator("b")).toHaveText("USDT");
+    await expect(page.locator(".fd-top-coins .summary-top-row").nth(6).locator(".t3-asset-label-name")).toHaveText("USDT");
     await expect(page.locator(".fd-attribution .fd-attr-row").first()).toContainText("Quantity +$38,000");
     const totalRange = page.locator(".fd-attr-total > span").first();
     await expect(totalRange).toHaveText("$310K → $764K");

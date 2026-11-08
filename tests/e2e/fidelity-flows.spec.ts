@@ -95,7 +95,7 @@ test("one configured source with no refresh shows the first snapshot state", asy
   expect((await page.locator(".fd-first-run-banner > div").boundingBox())?.x).toBe(61);
   await expect(page.locator(".fd-first-run-banner")).toHaveCSS("border-color", "rgb(31, 58, 92)");
   await expect(page.getByRole("button", { name: "Refresh now" })).toBeVisible();
-  await expect(page.locator(".fd-first-run-source small svg")).toHaveCount(1);
+  await expect(page.locator(".fd-first-run-source .t3-asset-icon[data-kind='exchange'] img")).toHaveCount(1);
   await expect(page.locator(".mobile-tab-bar")).toContainText("2");
   expect((await page.getByRole("heading", { name: "Overview" }).boundingBox())!.y).toBeLessThan(50);
   writeFileSync("/tmp/fidelity/flows/firstrun-one-geometry.json", JSON.stringify(await page.evaluate(() =>
@@ -181,7 +181,8 @@ test("partial snapshot excludes the failed source and keeps changes unknown", as
   await expect(page.locator(".fd-partial-table-head")).toHaveText("AssetValue7D");
   await expect(page.locator(".fd-partial-left-row").first()).toContainText("ETH");
   await expect(page.locator(".fd-partial-left-summary").first()).toContainText("Total excluding OKX");
-  await expect(page.locator(".fd-partial-source [aria-label='Ledger cold wallet wallet']")).toHaveText("Lg");
+  await expect(page.locator(".fd-partial-source").filter({ hasText: "Ledger cold wallet" })
+    .locator(".t3-asset-icon[data-kind='wallet'] img")).toHaveCount(1);
   expect((await page.locator(".fd-partial-banner > div").boundingBox())?.x).toBe(61);
   await expect(page.locator(".fd-partial-banner")).toHaveCSS("border-color", "rgb(74, 60, 24)");
   expect((await page.locator(".fd-partial-head .fd-range").boundingBox())?.width).toBe(260);
@@ -502,10 +503,11 @@ test("real Overview exposes idle, pull, and source progress on phone", async ({ 
   await expect.poll(() => sourceSheet.locator("[data-source-status-row]").evaluateAll((rows) =>
     rows.slice(0, 5).map((row) => row.getAttribute("aria-label"))))
     .toEqual(["Binance", "OKX", "Ledger cold wallet", "0x4f…a91c", "Interactive Brokers"]);
+  await expect(sourceSheet.locator('[data-source-status-row][aria-label="Ledger cold wallet"] .t3-asset-icon[data-kind="wallet"] img')).toHaveCount(1);
+  await expect(sourceSheet.locator('[data-source-status-row][aria-label="0x4f…a91c"] .t3-asset-icon[data-kind="wallet"] img')).toHaveCount(1);
+
   await expect(sourceSheet.getByRole("group", { name: "Binance" })).toContainText("Refreshing");
   await expect(sourceSheet.getByRole("group", { name: "OKX" })).toContainText("Refreshing");
-  await expect(sourceSheet.locator('[data-source-status-row][aria-label="Ledger cold wallet"] > span')).toHaveText("Lg");
-  await expect(sourceSheet.locator('[data-source-status-row][aria-label="0x4f…a91c"] > span')).toHaveText("0x");
   await expect(sourceSheet).toContainText("0 of 5 finished · 0 failed");
   await expect(sourceSheet.locator(".fd-refresh-progress-row small")).toHaveText([
     /Refreshing|Waiting/, /Refreshing|Waiting/, /Refreshing|Waiting/, /Refreshing|Waiting/, /Refreshing|Waiting/,

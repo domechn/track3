@@ -16,7 +16,7 @@ for (const width of [1440, 1100]) for (const sources of [3, 8, 16, 30]) {
     expect(rendered).not.toMatch(/[0-9a-f]{6,}…[0-9a-f]{4,}/i);
     const headers = scroll.locator("thead th");
     expect(await headers.allTextContents()).not.toContainEqual(expect.stringMatching(/[0-9a-f]{12,}/i));
-    const firstSourceName = await headers.nth(1).textContent();
+    const firstSourceName = await headers.nth(1).locator(".t3-asset-label-name").textContent();
     await expect(headers.nth(1)).toHaveAttribute("title", /^[0-9a-f]{32}$/i);
     await expect(headers.nth(1)).toHaveAttribute("aria-label", firstSourceName!);
     const boxes = await headers.evaluateAll((cells) => cells.map((cell) => {

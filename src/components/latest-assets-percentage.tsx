@@ -40,7 +40,6 @@ import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
-  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
@@ -324,31 +323,15 @@ const App = ({
                       "{asset}",
                       formatAssetLabel({ symbol: d.coin, assetType: d.assetType }),
                     )}</span>
-                    <img
-                      className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-                      src={resolveAssetLogoSrc(
-                        { symbol: d.coin, assetType: d.assetType },
-                        logoMap[
-                          getAssetLogoKey({
-                            symbol: d.coin,
-                            assetType: d.assetType,
-                          })
-                        ],
-                      )}
-                      alt=""
-                    />
-                    <div
-                      className="mr-1 font-medium text-sm"
-                      title={"" + d.amount}
-                    >
-                      {d.amount >= 1
-                        ? prettyNumberKeepNDigitsAfterDecimalPoint(d.amount, 4)
-                        : prettyPriceNumberToLocaleString(d.amount)}
-                    </div>
                     <AssetLabel
                       asset={{ symbol: d.coin, assetType: d.assetType }}
+                      src={logoMap[getAssetLogoKey({ symbol: d.coin, assetType: d.assetType })]}
+                      size={20}
+                      quiet
+                      secondary={String(d.amount >= 1
+                        ? prettyNumberKeepNDigitsAfterDecimalPoint(d.amount, 4)
+                        : prettyPriceNumberToLocaleString(d.amount))}
                       className="min-w-0"
-                      labelClassName="text-muted-foreground text-xs truncate"
                     />
                     <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block text-muted-foreground" />
                   </Link>
@@ -385,7 +368,10 @@ const App = ({
         {latestAssetsPercentageData.slice(holdingsStart, holdingsStart + holdingsPageSize).map((asset) => <Link key={getAssetLogoKey({ symbol: asset.coin, assetType: asset.assetType })}
           to={buildAssetDetailsPath({ symbol: asset.coin, assetType: asset.assetType })}
           className="t3-holdings-row">
-          <span><span className="sr-only">{t("common.openAssetDetails").replace("{asset}", formatAssetLabel({ symbol: asset.coin, assetType: asset.assetType }))} </span><strong>{asset.coin}</strong><small>{asset.percentage.toFixed(1)}%</small></span>
+          <span><span className="sr-only">{t("common.openAssetDetails").replace("{asset}", formatAssetLabel({ symbol: asset.coin, assetType: asset.assetType }))} </span>
+            <AssetLabel asset={{ symbol: asset.coin, assetType: asset.assetType }}
+              src={logoMap[getAssetLogoKey({ symbol: asset.coin, assetType: asset.assetType })]}
+              size={20} quiet secondary={`${asset.percentage.toFixed(1)}%`} /></span>
           <span>{currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(asset.value))}</span>
           <span className={weekChanges[`${asset.assetType}:${asset.coin}`] >= 0.05 ? "text-gain" : weekChanges[`${asset.assetType}:${asset.coin}`] <= -0.05 ? "text-loss" : "text-muted-foreground"}>
             {displayWeekPercent(weekChanges[`${asset.assetType}:${asset.coin}`])}

@@ -73,12 +73,12 @@ import { cn } from "@/lib/utils";
 import { StaggerContainer, FadeUp } from "./motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import AssetLabel from "./common/asset-label";
+import AssetIcon from "./ui/asset-icon";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
   parseAssetTypeSearchParam,
-  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import {
@@ -918,7 +918,7 @@ const App = ({
       <div className="analyze-coin relative min-h-[400px]">
         <div className="coin-page-heading">
           <div className="coin-page-identity">
-            <img src={resolveAssetLogoSrc({ symbol, assetType }, logo)} alt="" />
+            <AssetIcon kind={assetType === "stock" ? "stock" : "coin"} symbol={symbol} src={logo} size={32} decorative />
             <div>
               <h1>{formatAssetLabel({ symbol, assetType })}</h1>
               <span>{assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")}</span>
@@ -987,11 +987,6 @@ const App = ({
                 </CardHeader>
                 <CardContent>
                   <div className="flex">
-                    <img
-                      className="inline-block w-[32px] h-[32px] mr-2 rounded-full py-[2px]"
-                      src={resolveAssetLogoSrc({ symbol, assetType }, logo)}
-                      alt={formatAssetLabel({ symbol, assetType })}
-                    />
                     <div className="w-[100%] h-[32px] overflow-hidden">
                       <Popover
                         open={coinSelectOpen}
@@ -1008,6 +1003,8 @@ const App = ({
                             <div className="min-w-0">
                               <AssetLabel
                                 asset={{ symbol, assetType }}
+                                src={logo}
+                                size={32}
                                 className="max-w-full"
                                 labelClassName="truncate"
                               />

@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, EyeClosedIcon, EyeOpenIcon } from "@radix-ui/react-icons";
 import type { CoinComparison, DateOption } from "@/mobile/components/comparison";
@@ -157,7 +158,7 @@ export default function ComparisonFidelity({ currency, quoteColor, busy, dateOpt
         </section>
         <section className="fd-card fd-comparison-assets"><div className="fd-card-heading"><h3>{t("fidelity.comparison.perAsset")}</h3><span>{t("fidelity.comparison.assetSubtitle").replace("{from}", aDate).replace("{to}", bDate)}</span></div>
           {sorted.map(({ coin, change: value }, index) => <div key={`${coin.assetType}:${coin.symbol}`} className={`fd-comparison-asset${index < 2 ? " top" : ""}`}>
-            <b>{coin.symbol} <em>{numberText(coin.amount.head, coin.symbol === "USDT" || coin.symbol === "USDC" ? 2 : 0, 4, masked)}</em></b>
+            <b><AssetLabel asset={coin} size={20} quiet /> <em>{numberText(coin.amount.head, coin.symbol === "USDT" || coin.symbol === "USDC" ? 2 : 0, 4, masked)}</em></b>
             <strong data-tone={tone(value)}>{currencyValue(value, 2, true)}</strong>
             <span>{currencyText(coin.price.base, currency)} → {currencyText(coin.price.head, currency)}</span>
             <span>{percentText(coin.value.changePercent / 100, 2, true, masked)}</span>
@@ -170,7 +171,7 @@ export default function ComparisonFidelity({ currency, quoteColor, busy, dateOpt
             <div className="fd-comparison-mover-list" data-chart-group="">
               {movers.slice(0, expanded.value ? undefined : 10).map(({ coin, change: value }, index) => {
                 const detail = `${coin.symbol}: ${currencyValue(value, 2, true)} · ${percentText(coin.value.changePercent / 100, 2, true, masked)}`;
-                return <div key={coin.symbol} className="fd-comparison-mover"><b>{coin.symbol}</b>
+                return <div key={coin.symbol} className="fd-comparison-mover"><b><AssetLabel asset={coin} size={20} quiet /></b>
                   <span role="button" {...valueChart.markProps(index, detail, detail)}
                     style={{ "--fd-zero": `${valueBars.zero}%` } as CSSProperties}>{barGeometry(value, valueBars) && <i data-tone={tone(value)} style={barStyle(value, valueBars)} />}</span>
                   <strong data-tone={tone(value)}>{currencyValue(value, 0, true)}</strong></div>;
@@ -186,7 +187,7 @@ export default function ComparisonFidelity({ currency, quoteColor, busy, dateOpt
                 const exact = percentText(coin.value.changePercent / 100, 2, true, masked);
                 const shown = masked ? { text: exact, exact } : boundedPercentText(coin.value.changePercent, exact);
                 const detail = `${coin.symbol}: ${currencyValue(value, 2, true)} · ${exact}`;
-                return <div key={coin.symbol} className="fd-comparison-mover percent"><b>{coin.symbol}</b>
+                return <div key={coin.symbol} className="fd-comparison-mover percent"><b><AssetLabel asset={coin} size={20} quiet /></b>
                   <span role="button" {...percentChart.markProps(index, detail, detail)}
                     style={{ "--fd-zero": `${percentBars.zero}%` } as CSSProperties}>{barGeometry(coin.value.changePercent, percentBars) && <i data-tone={tone(coin.value.changePercent)} style={barStyle(coin.value.changePercent, percentBars)} />}</span>
                   <strong data-tone={tone(coin.value.changePercent)} title={masked ? undefined : shown.exact} aria-label={masked ? undefined : shown.exact}>{shown.text}</strong><small>{currencyValue(value, 0, true)}</small></div>;

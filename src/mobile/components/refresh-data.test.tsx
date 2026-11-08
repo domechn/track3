@@ -316,6 +316,22 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(rows[1]).not.toHaveTextContent("Waiting…");
   });
 
+  it("shows the current wallet alias on a pending refresh row", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    writeStoredStatuses([
+      { sourceId: "btc:0", label: "Cold", kind: "wallet", provider: "BTC", hint: "bc1q-d…rage", status: "ok" },
+    ]);
+    vi.mocked(getConfiguration).mockResolvedValue({
+      btc: { addresses: [{ address: "bc1q-demo-cold-storage", alias: "Vault" }] },
+    } as never);
+    vi.mocked(listPortfolioSources).mockReturnValue([{ sourceId: "btc:0", label: "Cold" }]);
+    vi.mocked(refreshAllData).mockImplementationOnce(() => new Promise(() => {}));
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await openRunningSourceStatus();
+    expect(await screen.findByRole("group", { name: /^Vault(?: \(BTC · bc1q-d…rage\))?$/ })).toHaveTextContent("Vault");
+  });
+
   it("gives each in-progress source one clear state", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
     vi.mocked(getConfiguration).mockResolvedValue({} as never);
@@ -853,7 +869,8 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(dialog).toHaveTextContent("不支持的交易所");
     expect(dialog).toHaveTextContent("数据源持仓无效");
     expect(dialog).not.toHaveTextContent("API key");
-    expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(6);
+    expect(dialog.querySelectorAll("[data-source-status-row] .t3-asset-icon")).toHaveLength(3);
+    expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(3);
   });
 
   it("carries the last successful time into a full refresh that fails without saved holdings", async () => {
@@ -941,11 +958,27 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const failed = screen.getByRole("group", { name: "OKX" });
     expect(dialog).toHaveTextContent("2 of 3 finished · 1 failed");
     expect(done).toHaveTextContent("Done in 3.1s");
+    expect(done.querySelector(".t3-asset-label-secondary")).toHaveTextContent("Done in 3.1s");
     expect(done.querySelector("small svg")).toBeInTheDocument();
     expect(failed).toHaveTextContent("Stale · Network or timeout");
     expect(failed.querySelector("small svg")).toBeInTheDocument();
     expect(failed.querySelector("small svg")).not.toHaveAttribute("class", done.querySelector("small svg")?.getAttribute("class"));
     expect(screen.getByRole("button", { name: "Retry OKX" })).toBeEnabled();
+  });
+
+  it("shows a configured exchange mark before its first refresh completes", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    vi.mocked(getConfiguration).mockResolvedValue({ exchanges: [{ name: "binance", active: true }] } as never);
+    vi.mocked(listPortfolioSources).mockReturnValue([
+      { sourceId: "cex:0", label: "Main account" },
+    ]);
+    vi.mocked(refreshAllData).mockImplementation(() => new Promise(() => {}));
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await openRunningSourceStatus();
+    const row = await screen.findByRole("group", { name: "Main account (binance)" });
+    expect(row.querySelector(".t3-asset-icon")).toHaveAttribute("data-kind", "exchange");
+    expect(row.querySelector(".t3-asset-icon img")).toHaveAttribute("src");
   });
 
   it("offers a full retry of failed sources after restarting", async () => {

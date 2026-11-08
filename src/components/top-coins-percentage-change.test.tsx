@@ -103,7 +103,7 @@ describe("TopCoinsPercentageChange", () => {
     }, 96);
 
     const rows = getAllByTestId("tcpc-row");
-    const labels = rows.map((r) => within(r).getByTestId("tcpc-symbol").textContent);
+    const labels = rows.map((r) => within(r).getByTestId("tcpc-symbol").querySelector(".t3-asset-label-name")?.textContent);
     expect(labels).toEqual(["PEPE", "BTC", "DOGE"]);
   });
 
@@ -313,20 +313,16 @@ describe("TopCoinsPercentageChange", () => {
 
     // Wait for the logo fetch effect to resolve and re-render.
     await waitFor(() => {
-      const logos = getAllByTestId("tcpc-logo");
-      expect(logos.every((l) => l.getAttribute("src"))).toBe(true);
+      const tiles = getAllByTestId("tcpc-row").map((row) => row.querySelector(".t3-asset-icon"));
+      tiles.forEach((tile) => {
+        expect(tile?.querySelector("img")?.getAttribute("src")).toMatch(/^asset:\/\/localhost\/cache\/assets\/coins\/|\/assets\/icons\//);
+      });
     });
 
-    const logos = getAllByTestId("tcpc-logo");
-    logos.forEach((logo) => {
-      const src = logo.getAttribute("src") ?? "";
-      // Either the cached asset path, or the default fallback bundled SVG
-      // (asset URL starts with `asset://localhost` or the inline SVGs shipped
-      // by Vite resolve to `/src/assets/icons/...`).
-      expect(
-        src.startsWith("asset://localhost/cache/assets/coins/") ||
-          src.includes("/assets/icons/"),
-      ).toBe(true);
+    const tiles = getAllByTestId("tcpc-row").map((row) => row.querySelector(".t3-asset-icon"));
+    tiles.forEach((tile) => {
+      expect(tile).toHaveAttribute("data-size", "20");
+      expect(tile?.querySelector("img")?.getAttribute("src")).toMatch(/^asset:\/\/localhost\/cache\/assets\/coins\/|\/assets\/icons\//);
     });
 
     // The downloader should be called with crypto-eligible coins.
@@ -608,7 +604,7 @@ describe("TopCoinsPercentageChange", () => {
 
     // Default sort: by value desc -> ALPHA, BETA.
     let symbols = getAllByTestId("tcpc-row").map((r) =>
-      within(r).getByTestId("tcpc-symbol").textContent,
+      within(r).getByTestId("tcpc-symbol").querySelector(".t3-asset-label-name")?.textContent,
     );
     expect(symbols).toEqual(["ALPHA", "BETA"]);
 
@@ -618,7 +614,7 @@ describe("TopCoinsPercentageChange", () => {
     // After price sort: BETA (+80.0), ALPHA (+1.0).
     await waitFor(() => {
       const next = getAllByTestId("tcpc-row").map((r) =>
-        within(r).getByTestId("tcpc-symbol").textContent,
+        within(r).getByTestId("tcpc-symbol").querySelector(".t3-asset-label-name")?.textContent,
       );
       expect(next).toEqual(["BETA", "ALPHA"]);
     });
@@ -631,7 +627,7 @@ describe("TopCoinsPercentageChange", () => {
     fireEvent.click(getByTestId("tcpc-sort-value"));
     await waitFor(() => {
       const next = getAllByTestId("tcpc-row").map((r) =>
-        within(r).getByTestId("tcpc-symbol").textContent,
+        within(r).getByTestId("tcpc-symbol").querySelector(".t3-asset-label-name")?.textContent,
       );
       expect(next).toEqual(["ALPHA", "BETA"]);
     });

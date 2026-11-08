@@ -1,3 +1,5 @@
+import AssetLabel from "@/components/common/asset-label";
+import AssetIcon from "@/components/ui/asset-icon";
 import { useEffect, useState } from "react";
 import md5 from "md5";
 import { Button } from "@/components/ui/button";
@@ -12,8 +14,6 @@ import { FidelityIcon } from "@/mobile/components/fidelity-icon";
 import { ActionSheet, useHaptics } from "@/mobile/components/mobile";
 import { ConfirmSheet, ModalPage } from "@/mobile/components/mobile/overlays";
 import { Switch } from "@/mobile/components/ui/switch";
-import { getWalletLogo } from "@/lib/utils";
-import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import type { ExchangeRow, StockBrokerRow, WalletRow, SelectOption } from "@/components/configuration/types";
 import { PublicIpInfo } from "@/components/configuration/public-ip-info";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
@@ -21,6 +21,11 @@ import { selectFromDatabaseWithSql } from "@/middlelayers/database";
 import { partialFromRow, type PartialSnapshot, type PartialRow } from "@/middlelayers/snapshot-partial";
 import { FidelitySourceEditor } from "@/mobile/components/configuration/fidelity-source-editor";
 import { AutoRetrySetting } from "@/components/configuration/auto-retry-setting";
+import { AliasRename } from "@/components/configuration/alias-rename";
+import { sourceAliasFallback } from "@/components/source-display-name";
+import { matchSourceStatus } from "@/components/source-status-match";
+import { sourceStatusesChangedEvent } from "@/components/source-status-event";
+import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 import { LicenseCenter, type ProUsage } from "@/middlelayers/license";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
@@ -33,6 +38,7 @@ function ShieldIcon() {
 }
 
 export type MobileSourcesProps = {
+  renameNames?: string[];
   fidelityLayout?: boolean;
   fromOnboarding?: boolean;
   baseCurrency?: CurrencyRateDetail;
@@ -47,6 +53,9 @@ export type MobileSourcesProps = {
   onSaveExchange: (value: ExchangeRow, original?: ExchangeRow) => Promise<void>;
   onSaveWallet: (value: WalletRow, original?: WalletRow) => Promise<void>;
   onSaveBroker: (value: StockBrokerRow, original?: StockBrokerRow) => Promise<void>;
+  onRenameExchange?: (value: ExchangeRow, alias: string) => void;
+  onRenameWallet?: (value: WalletRow, alias: string) => void;
+  onRenameBroker?: (value: StockBrokerRow, alias: string) => void;
   onRemoveExchange: (value: ExchangeRow) => void;
   onRemoveWallet: (value: WalletRow) => void;
   onRemoveBroker: (value: StockBrokerRow) => void;
@@ -74,6 +83,11 @@ const blank = {
 
 export function MobileSources(props: MobileSourcesProps) {
   const { t, locale } = useTranslation();
+  const renameNames = props.renameNames ?? [
+    ...props.exchanges.map((row) => row.alias || sourceAliasFallback("exchange", row.type, row.apiKey)),
+    ...props.wallets.map((row) => row.alias || sourceAliasFallback("wallet", row.type, row.address)),
+    ...props.brokers.map((row) => row.alias || sourceAliasFallback("broker", row.type, row.queryId)),
+  ];
   const haptic = useHaptics();
   const [editor, setEditor] = useState<Editor>();
   const [removal, setRemoval] = useState<PendingRemoval>();
@@ -85,7 +99,13 @@ export function MobileSources(props: MobileSourcesProps) {
   const [kindPickerOpen, setKindPickerOpen] = useState(false);
   const [snapshot, setSnapshot] = useState<{ at: string; values: Record<string, number> }>();
   const [missingSources, setMissingSources] = useState<PartialSnapshot["missing"]>([]);
+  const [sourceStatuses, setSourceStatuses] = useState(readStoredStatuses);
   const [usage, setUsage] = useState<ProUsage>();
+  useEffect(() => {
+    const update = () => setSourceStatuses(readStoredStatuses());
+    window.addEventListener(sourceStatusesChangedEvent, update);
+    return () => window.removeEventListener(sourceStatusesChangedEvent, update);
+  }, []);
   useEffect(() => {
     if (!props.fidelityLayout || props.selectedKind !== "wallet") return;
     let live = true;
@@ -225,6 +245,20 @@ export function MobileSources(props: MobileSourcesProps) {
     { kind: "wallet", label: t("mobile.sources.wallets"), add: t("mobile.sources.addWallet"), rows: props.wallets, options: props.walletOptions },
     { kind: "broker", label: t("mobile.sources.brokers"), add: t("mobile.sources.addBroker"), rows: props.brokers, options: props.brokerOptions },
   ];
+  const statusPeers = sections.flatMap(({ kind, rows }) => rows.map((row) => {
+    const identifier = kind === "exchange" ? (row as ExchangeRow).apiKey
+      : kind === "wallet" ? (row as WalletRow).address : (row as StockBrokerRow).queryId;
+    const identity = kind === "exchange" ? `${row.type}-${identifier}`
+      : kind === "wallet" ? identifier : `ibkr:${identifier}`;
+    return { id: md5(identity), label: row.alias || row.type, wallet: identifier, type: row.type };
+  }));
+  const statusIdentities = Object.fromEntries(statusPeers.map(({ id, wallet, type }) => [id, { wallet, type }]));
+  const statusSources = statusPeers.map(({ id, label }) => ({ id, label }));
+  const rename = (kind: Kind, row: Draft, alias: string) => {
+    if (kind === "exchange") props.onRenameExchange?.(row as ExchangeRow, alias);
+    if (kind === "wallet") props.onRenameWallet?.(row as WalletRow, alias);
+    if (kind === "broker") props.onRenameBroker?.(row as StockBrokerRow, alias);
+  };
   const providerOptions = sections.find((section) => section.kind === editor?.kind)?.options ?? [];
   const hasSources = props.exchanges.length + props.wallets.length + props.brokers.length > 0;
   const sourceValue = (kind: Kind, row: Draft) => {
@@ -291,16 +325,27 @@ export function MobileSources(props: MobileSourcesProps) {
                 : kind === "wallet" ? truncateAddress((row as WalletRow).address)
                 : maskSensitive((row as StockBrokerRow).queryId);
               const name = row.alias || options.find((option) => option.value === row.type)?.label || row.type;
+              const fallback = sourceAliasFallback(kind, row.type,
+                kind === "exchange" ? (row as ExchangeRow).apiKey : kind === "wallet" ? (row as WalletRow).address : (row as StockBrokerRow).queryId);
+              const renameIndex = index + (kind === "wallet" ? props.exchanges.length
+                : kind === "broker" ? props.exchanges.length + props.wallets.length : 0);
               if (props.fidelityLayout) {
                 const value = sourceValue(kind, row);
                 const sourceIdentity = kind === "exchange" ? `${row.type}-${(row as ExchangeRow).apiKey}`
                   : kind === "wallet" ? (row as WalletRow).address : `ibkr:${(row as StockBrokerRow).queryId}`;
                 const failure = missingSources.find((source) => source.wallet === md5(sourceIdentity));
+                const sourceStatus = matchSourceStatus({ id: md5(sourceIdentity), label: name },
+                  statusIdentities, statusSources, sourceStatuses.filter((status) => !status.hint));
+                const pausedAt = !row.active && sourceStatus?.lastSuccessAt
+                  ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
+                    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                    hour12: false, timeZone: "UTC",
+                  }).format(new Date(sourceStatus.lastSuccessAt)) : undefined;
                 const lastGood = failure?.lastSuccessAt ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
                   hour: "2-digit", minute: "2-digit", hour12: false,
                 }).format(new Date(failure.lastSuccessAt)) : undefined;
                 const ending = kind === "exchange" ? t("fidelity.settings.sources.exchangeEnding").replace("{ending}", (row as ExchangeRow).apiKey.slice(-4))
-                  : kind === "broker" ? t("fidelity.settings.sources.flexId").replace("{id}", (row as StockBrokerRow).queryId.length > 6
+                  : kind === "broker" ? t("fidelity.settings.sources.flexId").replace("{id}", (row as StockBrokerRow).queryId.length >= 6
                     ? `${(row as StockBrokerRow).queryId.slice(0, 3)}…${(row as StockBrokerRow).queryId.slice(-3)}` : (row as StockBrokerRow).queryId)
                   : row.type === "btc"
                     ? `${t("fidelity.settings.sources.bitcoin")} · ${(row as WalletRow).address.slice(0, 4)}...${(row as WalletRow).address.slice(-4)}`
@@ -309,13 +354,10 @@ export function MobileSources(props: MobileSourcesProps) {
                   <div className="fidelity-source-identity"><button type="button" className="fidelity-source-avatar-action"
                     aria-label={t("mobile.sources.moreActions").replace("{source}", name)}
                     onClick={() => { haptic("selection"); setMenu({ kind, value: row, name }); }}>
-                    <SourceAvatar type={row.type} label={kind === "exchange"
-                    ? ({ binance: "BN", okex: "OK", kraken: "KR", gate: "GT", coinbase: "CB", bitget: "BG",
-                      bybit: "BY", htx: "HT", mexc: "MX", backpack: "BP" } as Record<string, string>)[row.type] ?? row.type.slice(0, 2).toUpperCase()
-                    : kind === "broker" ? "IB" : row.type === "btc" ? "BTC" : "ETH"} />
+                    <AssetIcon kind={kind} type={row.type} name={name} size={24} decorative />
                     </button>
                     <button type="button" className="fidelity-source-name" onClick={() => start(kind, row)}
-                      aria-label={`${name} ${identity}`}><strong>{name}</strong><small>{ending}
+                      aria-label={`${t("goals.edit")} ${name}`} aria-describedby={`fidelity-source-detail-${kind}-${index}`}><strong title={name}>{name}</strong><small id={`fidelity-source-detail-${kind}-${index}`}>{ending}
                       {kind === "wallet" && row.type === "erc20" && props.isPro &&
                         <em className="t3-tag" data-tone="accent">{t("fidelity.settings.menu.pro")}</em>}</small></button>
                   </div>
@@ -328,7 +370,7 @@ export function MobileSources(props: MobileSourcesProps) {
                   <span className="t3-tag fidelity-source-status" data-tone={failure ? "negative" : row.active ? "positive" : "neutral"}><i />{t(failure
                     ? "fidelity.settings.sources.error" : row.active ? "fidelity.settings.sources.active" : "fidelity.settings.sources.paused")}</span>
                   <span className="fidelity-source-refresh">{failure ? lastGood
-                    ? t("fidelity.settings.sources.lastGood").replace("{time}", lastGood) : "—" : row.active ? refreshLabel : "—"}</span>
+                    ? t("fidelity.settings.sources.lastGood").replace("{time}", lastGood) : "—" : row.active ? refreshLabel : pausedAt ?? "—"}</span>
                   <div className="fidelity-source-money"><strong className="fidelity-source-value">{money(value)}</strong>
                     {failure && <small>{t("fidelity.settings.sources.stale")}</small>}</div>
                   {failure && <div className="fidelity-source-error-panel"><ExclamationTriangleIcon aria-hidden="true" />
@@ -343,17 +385,17 @@ export function MobileSources(props: MobileSourcesProps) {
                         if (kind === "wallet") props.onQuickLookWallet?.(row as WalletRow);
                         if (kind === "broker") props.onQuickLookBroker?.(row as StockBrokerRow);
                       }}><FidelityIcon name="search" />{t("mobile.sources.quickLook")}</button>
-                    <button type="button" aria-label={`${t("goals.edit")} ${name}`} onClick={() => start(kind, row)}><FidelityIcon name="edit" /></button>
+                    <AliasRename alias={row.alias} name={name} fallback={fallback} names={renameNames}
+                      index={renameIndex}
+                      onRename={(alias) => rename(kind, row, alias)} />
                     <button type="button" className="is-danger" aria-label={`${t("common.delete")} ${name}`}
                       onClick={() => setRemoval({ kind, value: row })}><FidelityIcon name="trash" /></button>
                   </div>
                 </div>;
               }
               return <div key={`${row.type}-${index}`} className="ios-d3-source-row flex min-w-0 items-center gap-2 px-4 py-2">
-                <SourceAvatar type={row.type} />
                 <button className="min-h-11 min-w-0 flex-1 text-left" onClick={() => start(kind, row)}>
-                  <span className="block truncate font-medium">{name}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{identity}</span>
+                  <AssetLabel kind={kind} type={row.type} name={name} size={24} secondary={identity} />
                 </button>
                 <Switch checked={row.active} aria-label={`${t("mobile.sources.toggle")} ${name}`} onCheckedChange={() => {
                   haptic("selection");
@@ -361,6 +403,9 @@ export function MobileSources(props: MobileSourcesProps) {
                   if (kind === "wallet") props.onToggleWallet(row as WalletRow);
                   if (kind === "broker") props.onToggleBroker(row as StockBrokerRow);
                 }} />
+                <AliasRename alias={row.alias} name={name} fallback={fallback} names={renameNames}
+                  index={renameIndex}
+                  onRename={(alias) => rename(kind, row, alias)} />
                 <button type="button" className="ios-d3-source-more" aria-label={t("mobile.sources.moreActions").replace("{source}", name)}
                   onClick={() => { haptic("selection"); setMenu({ kind, value: row, name }); }}><DotsHorizontalIcon aria-hidden="true" /></button>
               </div>;
@@ -427,10 +472,9 @@ export function MobileSources(props: MobileSourcesProps) {
             <Button variant="ghost" className="min-h-11" onClick={close}>{t("common.cancel")}</Button>
           </div>
           <div className="ios-d3-editor-intro">
-            {editor.step === 2 && <span className="ios-d3-source-avatar ios-d3-source-avatar-large" aria-hidden="true">
-              {getWalletLogo(editor.draft.type) !== UnknownLogo && <img src={getWalletLogo(editor.draft.type)} alt="" />}{getWalletLogo(editor.draft.type) === UnknownLogo && editor.draft.type.slice(0, 2).toUpperCase()}
-            </span>}
-            <div><h2 className="text-3xl font-bold">{editor.step === 2 ? providerOptions.find((option) => option.value === editor.draft.type)?.label ?? editor.draft.type : editor.original ? t("mobile.sources.edit") : sections.find((section) => section.kind === editor.kind)?.add}</h2>
+            <div><h2 className="text-3xl font-bold">{editor.step === 2 ? <AssetLabel kind={editor.kind}
+              type={editor.draft.type} name={providerOptions.find((option) => option.value === editor.draft.type)?.label ?? editor.draft.type}
+              size={32} /> : editor.original ? t("mobile.sources.edit") : sections.find((section) => section.kind === editor.kind)?.add}</h2>
             {editor.step === 2 && <p className="text-sm text-muted-foreground">{editor.original ? t("mobile.sources.edit") : sections.find((section) => section.kind === editor.kind)?.add}</p>}</div>
           </div>
           {editor.step === 1 ? <>
@@ -443,7 +487,7 @@ export function MobileSources(props: MobileSourcesProps) {
                 const { password: _password, passphrase: _passphrase, ...rest } = editor.draft as ExchangeRow;
                 setEditor({ ...editor, step: 2, draft: { ...rest, type } });
               } else setEditor({ ...editor, step: 2, draft: { ...editor.draft, type } });
-            }}><SourceAvatar type={option.value} /><span>{option.label}</span><ChevronRightIcon aria-hidden="true" /></button>)}
+            }}><AssetLabel kind={editor.kind} type={option.value} name={option.label} size={24} /><ChevronRightIcon aria-hidden="true" /></button>)}
             </div>
           </> : <>
             <div className="ios-d3-credential-group">
@@ -490,10 +534,6 @@ export function MobileSources(props: MobileSourcesProps) {
   );
 }
 
-function SourceAvatar({ type, label }: { type: string; label?: string }) {
-  const logo = getWalletLogo(type);
-  return <span className="ios-d3-source-avatar" aria-hidden="true">{label ?? (logo === UnknownLogo ? type.slice(0, 2).toUpperCase() : <img src={logo} alt="" />)}</span>;
-}
 
 function Field({ id, label, value, onChange, secret = false, onPaste, readOnly = false, invalid = false, error }: {
   id: string; label: string; value: string; onChange: (value: string) => void; secret?: boolean; onPaste?: () => void; readOnly?: boolean; invalid?: boolean; error?: string;

@@ -10,6 +10,7 @@ import {
   updateAllCurrencyRates,
 } from "@/middlelayers/configuration";
 import { useToast } from "@/mobile/components/ui/use-toast";
+import { ToastAction } from "@/mobile/components/ui/toast";
 import {
   Analyzer,
   OtherAttachment,
@@ -46,6 +47,7 @@ import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/r
 import { classifySourceError } from "@/middlelayers/datafetch/utils/source-failure";
 import { configurationFromForm, configurationToForm, initialConfiguration } from "@/middlelayers/ui-state/config-form";
 import { isIOS } from "@/utils/platform";
+import { sourceAliasFallback } from "@/components/source-display-name";
 import { useLocation, useSearchParams } from "react-router-dom";
 
 import { SummaryCards } from "@/components/configuration/summary-cards";
@@ -108,7 +110,7 @@ const App = ({
   onConfigurationSave,
   initialPreferCurrency,
 }: {
-  onConfigurationSave?: () => void;
+  onConfigurationSave?: (aliasChanged?: boolean) => void;
   initialPreferCurrency?: string;
 }) => {
   const { toast } = useToast();
@@ -176,6 +178,8 @@ const App = ({
   const [exchanges, setExchanges] = useState<ExchangeRow[]>([]);
   const [stockBrokers, setStockBrokers] = useState<StockBrokerRow[]>([]);
   const [others, setOthers] = useState<OtherRow[]>([]);
+  const pendingRename = useRef<{ name: string; undo: () => void } | undefined>(undefined);
+  const aliasUndoPending = useRef(false);
   const [addOtherRequest, setAddOtherRequest] = useState(0);
   const safeError = (error: unknown) => redactSecrets(
     error instanceof Error ? error.message : String(error),
@@ -395,16 +399,33 @@ const App = ({
     setFormChanged(true);
   }
 
-  function notifyConfigurationSaved() {
+  function notifyConfigurationSaved(aliasChanged = false) {
     if (!onConfigurationSave) return;
-    onConfigurationSave();
+    onConfigurationSave(aliasChanged);
   }
 
   function submitConfiguration() {
     const globalConfig = configurationFromForm({ exchanges, stockBrokers, wallets, groupUSD, hideInactive, others });
+    const rename = pendingRename.current;
+    pendingRename.current = undefined;
+    const aliasChanged = !!rename || aliasUndoPending.current;
+    aliasUndoPending.current = false;
     let saveError: Error | undefined;
     saveConfiguration(globalConfig)
-      .then(() => notifyConfigurationSaved())
+      .then(() => {
+        notifyConfigurationSaved(aliasChanged);
+        if (rename) {
+          const expiresAt = Date.now() + 5000;
+          toast({
+            type: "background",
+            description: t("config.renamedTo").replace("{name}", rename.name),
+            duration: 5000,
+            action: <ToastAction altText={t("common.undo")} onClick={() => {
+              if (Date.now() <= expiresAt) { aliasUndoPending.current = true; rename.undo(); }
+            }}>{t("common.undo")}</ToastAction>,
+          });
+        }
+      })
       .catch((e) => (saveError = e))
       .finally(() => {
         if (saveError) {
@@ -414,6 +435,50 @@ const App = ({
           });
         }
       });
+  }
+
+  function renameExchange(row: Pick<ExchangeRow, "type" | "apiKey">, alias: string) {
+    const original = exchanges.find((item) => item.type === row.type && item.apiKey === row.apiKey);
+    if (!original || original.alias === alias) return;
+    setExchanges((current) => current.map((item) => item.type === row.type && item.apiKey === row.apiKey ? { ...item, alias } : item));
+    pendingRename.current = { name: alias || sourceAliasFallback("exchange", row.type, row.apiKey), undo: () => {
+      setExchanges((current) => current.map((item) => item.type === row.type && item.apiKey === row.apiKey ? { ...item, alias: original.alias } : item));
+      markFormChanged();
+    } };
+    markFormChanged();
+  }
+
+  function renameWallet(row: Pick<WalletRow, "type" | "address">, alias: string) {
+    const original = wallets.find((item) => item.type === row.type && item.address === row.address);
+    if (!original || original.alias === alias) return;
+    setWallets((current) => current.map((item) => item.type === row.type && item.address === row.address ? { ...item, alias } : item));
+    pendingRename.current = { name: alias || sourceAliasFallback("wallet", row.type, row.address), undo: () => {
+      setWallets((current) => current.map((item) => item.type === row.type && item.address === row.address ? { ...item, alias: original.alias } : item));
+      markFormChanged();
+    } };
+    markFormChanged();
+  }
+
+  function renameBroker(row: Pick<StockBrokerRow, "type" | "queryId">, alias: string) {
+    const original = stockBrokers.find((item) => item.type === row.type && item.queryId === row.queryId);
+    if (!original || original.alias === alias) return;
+    setStockBrokers((current) => current.map((item) => item.type === row.type && item.queryId === row.queryId ? { ...item, alias } : item));
+    pendingRename.current = { name: alias || sourceAliasFallback("broker", row.type, row.queryId), undo: () => {
+      setStockBrokers((current) => current.map((item) => item.type === row.type && item.queryId === row.queryId ? { ...item, alias: original.alias } : item));
+      markFormChanged();
+    } };
+    markFormChanged();
+  }
+
+  function renameOther(index: number, alias: string) {
+    const original = others[index];
+    if (!original || original.alias === alias) return;
+    setOthers((current) => current.map((item, i) => i === index ? { ...item, alias } : item));
+    pendingRename.current = { name: alias || sourceAliasFallback("custom", original.symbol), undo: () => {
+      setOthers((current) => current.map((item, i) => i === index ? { ...item, alias: original.alias } : item));
+      markFormChanged();
+    } };
+    markFormChanged();
   }
 
   async function buildLogoMap(
@@ -1080,6 +1145,12 @@ const App = ({
     .replace("{wallets}", String(wallets.length))
     .replace("{brokers}", String(stockBrokers.length))
     .replace("{custom}", String(others.length));
+  const renameNames = [
+    ...exchanges.map((row) => row.alias || sourceAliasFallback("exchange", row.type, row.apiKey)),
+    ...wallets.map((row) => row.alias || sourceAliasFallback("wallet", row.type, row.address)),
+    ...stockBrokers.map((row) => row.alias || sourceAliasFallback("broker", row.type, row.queryId)),
+    ...others.map((row) => row.alias || sourceAliasFallback("custom", row.symbol)),
+  ];
   if (isIOS()) {
     return mobileSection === "currency" ? (
       <GeneralSettings
@@ -1123,6 +1194,7 @@ const App = ({
         </div>
       </>}
       {(mobileSection !== "sources" || sourceTab !== "custom") && <MobileSources
+        renameNames={renameNames}
         fidelityLayout={mobileSection === "sources"}
         fromOnboarding={Boolean((location.state as { fromOnboarding?: boolean } | null)?.fromOnboarding)}
         baseCurrency={preferredCurrencyDetail}
@@ -1138,6 +1210,9 @@ const App = ({
         onSaveExchange={saveMobileExchange}
         onSaveWallet={saveMobileWallet}
         onSaveBroker={saveMobileBroker}
+        onRenameExchange={renameExchange}
+        onRenameWallet={renameWallet}
+        onRenameBroker={renameBroker}
         onRemoveExchange={(item) => handleRemoveExchange(item.type, item.apiKey)}
         onRemoveWallet={(item) => handleRemoveWallet(item.type, item.address)}
         onRemoveBroker={(item) => handleRemoveStockBroker(item.type, item.queryId)}
@@ -1151,6 +1226,8 @@ const App = ({
         onAddCustomAsset={() => { setSourceTab("custom"); setAddOtherRequest((request) => request + 1); }}
       />}
       {(mobileSection !== "sources" || sourceTab === "custom" || exchanges.length + wallets.length + stockBrokers.length + others.length === 0) && <MobileOthers
+        renameNames={renameNames}
+        renameOffset={exchanges.length + wallets.length + stockBrokers.length}
         fidelityLayout={mobileSection === "sources" && sourceTab === "custom"}
         others={others}
         attachOptions={[...cexAttachOptions, ...walletAttachOptions]}
@@ -1167,6 +1244,7 @@ const App = ({
             markFormChanged();
           }
         }}
+        onRename={renameOther}
         onRemove={handleRemoveOther}
         onAttach={(index, fromMenu) => { setAttachModalTargetIdx(index); setAttachFromMenu(Boolean(fromMenu)); setAttachModalOpen(true); }}
       />}
@@ -1253,6 +1331,8 @@ const App = ({
 
       <StockBrokerSection
         stockBrokers={stockBrokers}
+        renameNames={renameNames}
+        renameOffset={exchanges.length + wallets.length}
         visibleStockBrokers={visibleStockBrokers}
         stockBrokerPage={stockBrokerPage}
         stockBrokerPageCount={stockBrokerPageCount}
@@ -1268,10 +1348,12 @@ const App = ({
         onToggleActive={handleActiveStockBroker}
         onRemove={handleRemoveStockBroker}
         onQuickLook={handleQuickLookStockBroker}
+        onRename={(type, queryId, alias) => renameBroker({ type, queryId }, alias)}
       />
 
       <ExchangeSection
         exchanges={exchanges}
+        renameNames={renameNames}
         visibleExchanges={visibleExchanges}
         exchangePage={exchangePage}
         exchangePageCount={exchangePageCount}
@@ -1287,10 +1369,13 @@ const App = ({
         onToggleActive={handleActiveExchange}
         onRemove={handleRemoveExchange}
         onQuickLook={handleQuickLookExchange}
+        onRename={(type, apiKey, alias) => renameExchange({ type, apiKey }, alias)}
       />
 
       <WalletSection
         wallets={wallets}
+        renameNames={renameNames}
+        renameOffset={exchanges.length}
         visibleWallets={visibleWallets}
         walletPage={walletPage}
         walletPageCount={walletPageCount}
@@ -1306,10 +1391,13 @@ const App = ({
         onToggleActive={handleActiveWallet}
         onRemove={handleRemoveWallet}
         onQuickLook={handleQuickLookWallet}
+        onRename={(type, address, alias) => renameWallet({ type, address }, alias)}
       />
 
       <OthersSection
         others={others}
+        renameNames={renameNames}
+        renameOffset={exchanges.length + wallets.length + stockBrokers.length}
         baseCurrency={customPriceCurrency}
         othersPage={othersPage}
         othersPageCount={othersPageCount}
@@ -1326,6 +1414,7 @@ const App = ({
         onCommitOtherAmountInput={commitOtherAmountInput}
         onOthersPageChange={setOthersPage}
         onRemove={handleRemoveOther}
+        onRename={renameOther}
         onOpenAttachModal={(idx) => {
           setAttachModalTargetIdx(idx);
           setAttachModalOpen(true);

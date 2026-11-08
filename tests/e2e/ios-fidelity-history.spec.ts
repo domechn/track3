@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { executeSceneSql, installFidelityRecords } from "./fidelity-records-scenes";
 import { installTauriBridge } from "./tauri-bridge";
 
@@ -13,6 +14,22 @@ test.use({
 });
 
 const dir = "/tmp/fidelity/history";
+test("phone History loading source provides comparison geometry", async ({ page }) => {
+  const path = "/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/records-history-loading.html";
+  test.skip(!existsSync(path), "local design source is unavailable");
+  await page.goto(pathToFileURL(path).href);
+  const list = page.locator(".plist");
+  await expect(list).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const geometry = await list.evaluate((node) => ({
+    bounds: node.getBoundingClientRect().toJSON(),
+    style: { font: getComputedStyle(node).font, background: getComputedStyle(node).backgroundColor },
+  }));
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(`${dir}/history-loading-source.json`, JSON.stringify(geometry, null, 2));
+  await page.screenshot({ path: `${dir}/history-loading-source.png` });
+});
+
 test("phone list aligns values and uses the source text hierarchy", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
   await installFidelityRecords(page);
@@ -345,6 +362,7 @@ test("empty state", async ({ page }) => {
   expect(card?.y).toBe(148);
   expect(card?.height).toBe(476);
   expect((await page.locator(".fidelity-history-empty").boundingBox())?.y).toBe(197);
+  await expect(page.locator(".fidelity-history-empty .t3-empty-state-icon")).toBeHidden();
   await page.screenshot({ path: `${dir}/history-empty-phone.png` });
   await page.getByRole("button", { name: "Refresh now" }).click();
   await expect(page).toHaveURL(/#\/settings\/configuration$/);

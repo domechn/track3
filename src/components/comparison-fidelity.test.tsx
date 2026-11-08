@@ -29,6 +29,12 @@ const moverRows = ([
 });
 
 describe("ComparisonFidelity", () => {
+  it("uses the shared accent tag for top movers", () => {
+    render(<ComparisonFidelity {...props} noTransactions={false} mask={false} />);
+    expect(document.querySelector(".t3-cmp-top-mover")).toHaveClass("t3-tag");
+    expect(document.querySelector(".t3-cmp-top-mover")).toHaveAttribute("data-tone", "accent");
+  });
+
   it("exposes exact mover values on hover, including values rounded in the chart labels", () => {
     const { container } = render(<ComparisonFidelity {...props} rows={[{ ...row,
       value: { base: 100, head: 120.37, changePercent: 20.37 } }]} noTransactions={false} mask={false} />);
@@ -66,12 +72,12 @@ describe("ComparisonFidelity", () => {
     expect(cards[0].querySelectorAll("li")).toHaveLength(10);
     expect(cards[1].querySelectorAll("li")).toHaveLength(10);
     expect(screen.getAllByRole("button", { name: /and 1 more/i })).toHaveLength(2);
-    expect([...cards[0].querySelectorAll("li strong")].map((node) => node.textContent))
+    expect([...cards[0].querySelectorAll("li .t3-asset-label-name")].map((node) => node.textContent))
       .toEqual(["BTC", "BNB", "USDT", "ETH", "SCHD", "VIG", "PLUME", "1211.HK", "QQQI", "XPL"]);
-    expect([...cards[1].querySelectorAll("li strong")].map((node) => node.textContent))
+    expect([...cards[1].querySelectorAll("li .t3-asset-label-name")].map((node) => node.textContent))
       .toEqual(["BNB", "PLUME", "ETH", "BTC", "1211.HK", "USDT", "SCHD", "VIG", "QQQI", "XPL"]);
-    expect(cards[0].querySelector("li span:last-of-type")?.textContent).toBe("−$318,305");
-    expect(cards[1].querySelector("li span:last-of-type")?.textContent).toBe("−6.92%");
+    expect(cards[0].querySelector("li > span:last-of-type")?.textContent).toBe("−$318,305");
+    expect(cards[1].querySelector("li > span:last-of-type")?.textContent).toBe("−6.92%");
     expect(cards[0].querySelector("p")?.textContent).toContain("BTC and BNB made 99%");
     expect(cards[1].querySelector("p")?.textContent).toContain("SCHD rose most");
     for (const button of screen.getAllByRole("button", { name: /and 1 more/i })) {
@@ -79,9 +85,9 @@ describe("ComparisonFidelity", () => {
       fireEvent.click(button);
       expect(button).toHaveAttribute("aria-expanded", "true");
     }
-    expect([...cards[0].querySelectorAll("li strong")].map((node) => node.textContent))
+    expect([...cards[0].querySelectorAll("li .t3-asset-label-name")].map((node) => node.textContent))
       .toEqual(["BTC", "BNB", "USDT", "ETH", "SCHD", "VIG", "PLUME", "1211.HK", "QQQI", "XPL", "USD"]);
-    expect([...cards[1].querySelectorAll("li strong")].map((node) => node.textContent))
+    expect([...cards[1].querySelectorAll("li .t3-asset-label-name")].map((node) => node.textContent))
       .toEqual(["BNB", "PLUME", "ETH", "BTC", "1211.HK", "USDT", "SCHD", "VIG", "QQQI", "XPL", "USD"]);
   });
 

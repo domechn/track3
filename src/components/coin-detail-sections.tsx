@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from "react";
+import AssetLabel from "./common/asset-label";
+import { sourceIconKind } from "./source-allocation-list";
 
-export type CoinSource = { id: string; label: string; kind: string; amount: number; value: number };
+export type CoinSource = { id: string; label: string; kind: string; logoType?: string; amount: number; value: number };
 export type CoinSourceRow = CoinSource & { share: number };
 export type CoinSourceGroups = { visible: CoinSourceRow[]; empty: CoinSource[]; totalAmount: number; totalValue: number };
 
@@ -47,9 +49,11 @@ export function CoinSourcesTable({ sources, labels, money, quantity, emptyState 
     {sources.length === 0 && emptyState ? emptyState : <div className="coin-fidelity-table-scroll" role="region" aria-label={labels.holdings} tabIndex={0}><table aria-label={labels.holdings}><thead><tr>
       <th>{labels.source}</th><th>{labels.quantity}</th><th>{labels.value}</th><th>{labels.share}</th>
     </tr></thead><tbody>
-      {visible.map((row) => <tr key={row.id}><td title={row.label}>{row.label} {row.kind && <small>{row.kind}</small>}</td><td>{quantity(row.amount)}</td><td>{money(row.value)}</td><td>{row.share.toFixed(1)}%</td></tr>)}
+      {visible.map((row) => <tr key={row.id}><td title={row.label}><AssetLabel kind={sourceIconKind(row.logoType)}
+        type={row.logoType} name={row.label} secondary={row.kind} size={20} /></td><td>{quantity(row.amount)}</td><td>{money(row.value)}</td><td>{row.share.toFixed(1)}%</td></tr>)}
       {empty.length > 0 && <><tr className="coin-fidelity-empty-sources"><td colSpan={4}><button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{labels.empty(empty.length)} <span aria-hidden="true">{expanded ? "⌃" : "⌄"}</span></button></td></tr>
-        {expanded && empty.map((row) => <tr key={row.id} className="coin-fidelity-zero-source"><td title={row.label}>{row.label} {row.kind && <small>{row.kind}</small>}</td><td>{quantity(row.amount)}</td><td>{money(row.value)}</td><td>0.0%</td></tr>)}</>}
+        {expanded && empty.map((row) => <tr key={row.id} className="coin-fidelity-zero-source"><td title={row.label}><AssetLabel kind={sourceIconKind(row.logoType)}
+          type={row.logoType} name={row.label} secondary={row.kind} size={20} /></td><td>{quantity(row.amount)}</td><td>{money(row.value)}</td><td>0.0%</td></tr>)}</>}
       <tr className="total"><td>{labels.total}</td><td>{quantity(totalAmount)}</td><td>{money(totalValue)}</td><td>{visible.length && totalValue > 0 ? "100.0%" : "0.0%"}</td></tr>
     </tbody></table></div>}
   </section>;

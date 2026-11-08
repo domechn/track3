@@ -39,6 +39,8 @@ The type face is Public Sans with tabular numbers. Tokens: `--ground #0d0d0e`, `
 
 ## Remaining differences
 
+UI42 uses the approved website-style neutral tile for asset and source marks. The older Overview page design renders those marks differently.
+
 The current dark 1440 × 900 saved-summary viewport differs from the
 `core-overview.html` source by **6.94%** at RGB-sum threshold 60.
 The source insight area begins at x=105, y=658 and is 390 × 296px;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
@@ -21,6 +21,7 @@ import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { addToBlacklist } from "@/middlelayers/configuration";
 import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
 import { useOptimisticDelete } from "./common/use-optimistic-delete";
+import AssetLabel from "./common/asset-label";
 import { HistoryPartialDetails } from "./history-partial";
 import SyncStatusIndicator from "./sync-status-indicator";
 import { FidelityDateInput } from "./fidelity-date-input";
@@ -53,6 +54,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<HistoricalData | null>(null);
   const [edits, setEdits] = useState<SnapshotEdit[] | null>(null);
+  const kpiRef = useRef<HTMLDivElement>(null);
   const [editLogError, setEditLogError] = useState(false);
   const [sourceAssets, setSourceAssets] = useState<AssetModel[]>([]);
   const [sourceIdentities, setSourceIdentities] = useState<Awaited<ReturnType<WalletAnalyzer["listWalletAliases"]>>>({});
@@ -245,6 +247,42 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   const sourceLabels = useMemo(() => sourceDisplayNames(sources.map(([id]) => ({ id, ...sourceIdentities[id] })),
     (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals), [sources, sourceIdentities, t, walletOrdinals]);
   const valueTotal = detail?.total ?? selected?.total ?? 0;
+  useLayoutEffect(() => {
+    const strip = kpiRef.current;
+    if (!strip) return;
+    let active = true;
+    let frame = 0;
+    const check = () => {
+      if (!active || !strip.clientWidth) return;
+      for (const fit of ["roomy", "tight", "compact"] as const) {
+        strip.dataset.fit = fit;
+        const widths = [...strip.children].map((cell) => {
+          const style = getComputedStyle(cell);
+          const textWidth = Math.max(...[...cell.children].map((text) => {
+            const range = document.createRange();
+            range.selectNodeContents(text);
+            return range.getBoundingClientRect().width;
+          }));
+          return textWidth + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) +
+            parseFloat(style.borderLeftWidth);
+        });
+        if (widths.reduce((sum, width) => sum + width, 0) <= strip.clientWidth + 1) {
+          if (fit === "roomy" && Math.max(...widths) * 3 <= strip.clientWidth + 1)
+            strip.dataset.fit = "spread";
+          return;
+        }
+      }
+      strip.dataset.fit = "stacked";
+    };
+    check();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(check);
+    });
+    if (strip.parentElement) observer?.observe(strip.parentElement);
+    document.fonts?.ready.then(check);
+    return () => { active = false; cancelAnimationFrame(frame); observer?.disconnect(); };
+  }, [detail, selected, edits, currency, locale, sources.length]);
   const pages = Math.ceil(count / PAGE_SIZE);
   const issueCount = statusCounts.partial;
   const editedCount = statusCounts.edited;
@@ -492,7 +530,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
             <button type="button" className="fidelity-history-back"
               onClick={returnToList}>{t("history.fidelity.backToSnapshots")}</button>
             <h2>{dateLong(selected.createdAt)} {selected.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}</h2>
-          <div className="fidelity-history-detail-kpis">
+          <div ref={kpiRef} className="fidelity-history-detail-kpis">
             <div><span>{t("history.fidelity.totalValue")}</span><strong>{money(valueTotal)}</strong>
               <small>{edits?.length ? t("history.fidelity.includesEdits").replace("{count}", String(edits.length)) : t("history.fidelity.asOfRefresh")}</small></div>
             <div><span>{t("history.fidelity.change")}</span><strong style={{ color: selected.change === null ? undefined : color(selected.change) }}>
@@ -528,7 +566,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "price");
               const restoredAsset = (edits ?? []).find((edit) => edit.symbol === asset.symbol &&
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "restore");
-              return <tr key={`${asset.assetType}:${asset.symbol}`}><td>{asset.symbol}
+              return <tr key={`${asset.assetType}:${asset.symbol}`}><td><AssetLabel asset={asset} size={20} quiet tag="" />
                 <button type="button" className="t3-icon-button" aria-label={t("history.fidelity.deleteAsset").replace("{asset}", asset.symbol)}
                   disabled={isDeletingAsset} onClick={() => setDeleteAssetId(asset.id)}><TrashIcon aria-hidden="true" /></button></td>
               <td>{restoredAsset ? <><span className="fidelity-edited-value">{quantity(asset.assetType === "crypto" &&

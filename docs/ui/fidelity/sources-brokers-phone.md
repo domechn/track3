@@ -57,10 +57,14 @@ The source depicts the **brokers** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
+- The approved source is dark only. The live page honors the selected light theme, so its light colours cannot match that reference.
+- The static source uses its pencil for the full Flex Query editor and has no Rename flow. The live pencil opens Rename; the labeled source name opens the full editor, and the avatar retains its action menu.
 - The design uses separate refresh times per source. The existing snapshot stores one shared refresh time, so the app shows the available snapshot time and a dash for paused Kraken.
-- Source logo artwork, some row icon strokes, and sheet spacing still differ from the approved render.
+- Source logo artwork, some row icon strokes, value alignment, and sheet spacing differ slightly; they could be matched but are not worth another round. The phone Sources page uses "Public Sans" to match the design CSS.
+- A six-character Flex Query ID uses the reference's `912…406` presentation. The separator is visual formatting: all six digits remain visible, while the Flex token stays in the credential editor.
+- The live back control and bottom tabs retain the app's route targets and 44px hit areas, with different icon shapes and text rendering. The first row's 356×181 bounds match the source, while glyph placement still varies slightly.
 
 ## Pixel difference
 
-- Difference ratio: **4.053%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel.
-- Design viewport: `/tmp/fidelity/settings-a/design-sources-brokers.png` (top 780×1688); app viewport: `/tmp/fidelity/settings-a/sources-brokers.png` (780×1688).
+- Last captured matched-fixture difference: **5.473% dark** and **99.460% light** at 390 × 844 CSS px, threshold 16 in any RGB channel. The light ratio compares the selected light theme with the dark-only source. The dark overage includes the app's live navigation and control rendering. A subsequent scoped font and value-position correction awaits recapture under the one-run limit.
+- Current measurements and screenshots: `/tmp/track3-source-rename/phone-dark-measure.json`, `phone-light-measure.json`, and `/tmp/track3-source-rename/phone-{dark,light}-{design,sample}-brokers.png`. Both dark rows begin at y=233.

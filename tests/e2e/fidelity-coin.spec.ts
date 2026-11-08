@@ -49,7 +49,7 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
       await expect(page.locator(".mobile-tab-badge")).toHaveText("2");
       const heroHeight = (await page.locator(".fd-coin-hero").boundingBox())!.height;
       expect(await page.locator(".fd-cost-link").evaluate((node) =>
-        node.getBoundingClientRect().y + parseFloat(getComputedStyle(node, "::before").top))).toBe(94);
+        node.getBoundingClientRect().y + parseFloat(getComputedStyle(node, "::before").top))).toBe(94.3125);
       expect(heroHeight).toBe(symbol === "NOVA" ? 600 : 586);
       if (symbol === "NOVA") {
         expect(Math.round((await page.locator(".fd-position-grid").boundingBox())!.y)).toBe(449);

@@ -15,6 +15,10 @@ import { FittingAttributionAmount } from "./fitting-attribution-amount";
 import { useFittingAttributionTicks } from "./use-fitting-attribution-ticks";
 import { SummaryTopList } from "./summary-top-list";
 import { marketProfitPercentage } from "./profit-percentage";
+import { classifyWalletType } from "@/utils/wallet-treemap";
+import AssetLabel from "./common/asset-label";
+import type { AssetIconKind } from "./ui/asset-icon";
+
 import { useChartHitArea } from "./chart-tooltip";
 
 type Result = Awaited<ReturnType<typeof queryAttribution>>;
@@ -122,8 +126,14 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
         <div className="fidelity-attribution-row head" role="row"><span role="columnheader">{t("summary.fidelity.asset")}</span><span role="columnheader"><span className="sr-only">{t("profit.attribution.chart")}</span></span><span role="columnheader">{t("summary.fidelity.market")}</span><span role="columnheader">{t("summary.fidelity.quantity")}</span>{hasResidual && <span role="columnheader">{t("profit.attribution.residual")}</span>}<span role="columnheader">{t("summary.fidelity.total")}</span></div>
         {paging.rows.map((group, index) => {
           const quantityStart = group.priceEffect * group.flowEffect < 0 ? 0 : group.priceEffect;
+          const name = group.label.split(" · ")[0];
+          const provider = dimension === "wallet" ? result.aliases[group.key]?.type : group.key;
+          const category = classifyWalletType(provider);
+          const kind: AssetIconKind = dimension === "coin" ? group.key.startsWith("stock:") ? "stock" : "coin"
+            : dimension === "assetType" ? "custom"
+              : category === "cex" ? "exchange" : category === "broker" ? "broker" : "wallet";
           return <div className="fidelity-attribution-row" role="row" key={group.key}>
-          <b role="rowheader">{group.label.split(" · ")[0]}</b>
+          <b role="rowheader"><AssetLabel kind={kind} symbol={name} type={provider} name={name} size={20} quiet tag={kind === "stock" ? "stock" : undefined} /></b>
           <span className="fidelity-attribution-track" role="cell"
             {...chart.markProps(index, `${group.label}: ${t("summary.fidelity.marketMove")} ${exactMoney(group.priceEffect)}, ${t("summary.fidelity.quantityChange")} ${exactMoney(group.flowEffect)}`,
               <><div>{group.label}</div><div className={tone(group.priceEffect)}>{t("summary.fidelity.marketMove")} {exactMoney(group.priceEffect)}</div><div>{t("summary.fidelity.quantityChange")} {exactMoney(group.flowEffect)}</div></>)}>

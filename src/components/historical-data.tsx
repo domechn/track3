@@ -60,7 +60,6 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { resolveAssetLogoSrc } from "@/utils/assets";
 import { positiveNegativeColor } from "@/utils/color";
 import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { useOptimisticDelete } from "./common/use-optimistic-delete";
@@ -692,10 +691,6 @@ const App = ({
                     <TableRow aria-hidden="true"><TableCell colSpan={6} style={{ height: detailOffsets[detailStart], padding: 0 }} /></TableRow>
                   ) : null}
                   {virtualRankData.map((item, virtualIndex) => {
-                    const apiPath = resolveAssetLogoSrc(
-                      item,
-                      logoMap[item.symbol],
-                    );
                     return (
                       <TableRow
                         key={"historical-data-detail-row-" + item.assetId}
@@ -708,14 +703,7 @@ const App = ({
                           # {item.rank}
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <div className="flex items-center gap-1 text-sm">
-                            <img
-                              className="inline-block w-[18px] h-[18px] rounded-full"
-                              src={apiPath}
-                              alt={item.symbol}
-                            />
-                            <AssetLabel asset={item} />
-                          </div>
+                          <AssetLabel asset={item} src={logoMap[item.symbol]} size={20} quiet />
                         </TableCell>
                         <TableCell className="py-1.5 text-right text-sm">
                           {currency.symbol}
@@ -1044,11 +1032,9 @@ const App = ({
                             <TableCell className="py-1.5">
                               <div className="flex items-center justify-between gap-2">
                                 <ImageStack
+                                  symbols={topAssets.map((asset) => asset.symbol)}
                                   imageSrcs={topAssets.map((asset) =>
-                                    resolveAssetLogoSrc(
-                                      asset,
-                                      logoMap[asset.symbol],
-                                    ),
+                                    logoMap[asset.symbol] ?? "",
                                   )}
                                   imageWidth={18}
                                   imageHeight={18}

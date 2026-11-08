@@ -23,6 +23,7 @@ import type { QuoteColor } from "@/middlelayers/types";
 import { MobileRecordList, useIsMobile, useSizeClass, type MobileRecord } from "@/mobile/components/mobile";
 import { ChevronDownIcon } from "@radix-ui/react-icons";
 import { PhoneCostBasis } from "@/mobile/components/cost-basis-phone";
+import AssetLabel from "@/components/common/asset-label";
 import { directionPhysicalTone } from "@/utils/color";
 
 const methods: CostBasisMethod[] = ["FIFO", "LIFO", "HIFO", "AVERAGE"];
@@ -342,7 +343,7 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
           <CardHeader><CardTitle>{t("cost.byAsset")}</CardTitle></CardHeader>
           <CardContent className="overflow-x-auto">
             <Table className="sticky-first-column"><TableHeader><TableRow><TableHead>{t("cost.asset")}</TableHead><TableHead className="text-right">{t("cost.proceeds")}</TableHead><TableHead className="text-right">{t("cost.costBasis")}</TableHead><TableHead className="text-right">{t("cost.gainLoss")}</TableHead></TableRow></TableHeader>
-              <TableBody>{report.assets.slice(pages.assets * pageSize, (pages.assets + 1) * pageSize).map((asset) => <TableRow key={`${asset.assetType}:${asset.symbol}`}><TableCell>{asset.symbol}</TableCell><TableCell className="text-right">{money(asset.proceeds)}</TableCell><TableCell className="text-right">{money(asset.costBasis)}</TableCell><TableCell className="text-right">{money(asset.gainLoss)}</TableCell></TableRow>)}</TableBody>
+              <TableBody>{report.assets.slice(pages.assets * pageSize, (pages.assets + 1) * pageSize).map((asset) => <TableRow key={`${asset.assetType}:${asset.symbol}`}><TableCell><AssetLabel asset={asset} size={20} quiet /></TableCell><TableCell className="text-right">{money(asset.proceeds)}</TableCell><TableCell className="text-right">{money(asset.costBasis)}</TableCell><TableCell className="text-right">{money(asset.gainLoss)}</TableCell></TableRow>)}</TableBody>
             </Table>
             {report.assets.length === 0 && <p className="py-4 text-sm text-muted-foreground">{t("cost.noDisposals")}</p>}
             <PageControls label={t("cost.byAsset")} page={pages.assets} count={report.assets.length}
@@ -351,14 +352,14 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
         </Card>
         <Card><CardHeader><CardTitle>{t("cost.realized")}</CardTitle></CardHeader><CardContent className="overflow-x-auto">
           <Table className="sticky-first-column"><TableHeader><TableRow>{["asset", "acquired", "disposed", "quantity", "proceeds", "costBasis", "gainLoss", "term", "lot"].map((key) => <TableHead key={key}>{t(`cost.${key}`)}</TableHead>)}</TableRow></TableHeader><TableBody>{report.disposals.slice(pages.disposals * pageSize, (pages.disposals + 1) * pageSize).map((row, index) => (
-            <TableRow key={`${row.eventId}:${row.lotId}:${index}`}><TableCell>{row.symbol}</TableCell><TableCell>{format(new Date(row.acquiredAt), "yyyy-MM-dd")}</TableCell><TableCell>{format(new Date(row.disposedAt), "yyyy-MM-dd")}</TableCell><TableCell>{qty(row.amount)}</TableCell><TableCell>{money(row.proceeds)}</TableCell><TableCell>{money(row.costBasis)}</TableCell><TableCell>{money(row.gainLoss)}</TableCell><TableCell>{t(`cost.term.${row.term}`)}</TableCell><TableCell>{row.lotId}</TableCell></TableRow>
+            <TableRow key={`${row.eventId}:${row.lotId}:${index}`}><TableCell><AssetLabel asset={row} size={20} quiet /></TableCell><TableCell>{format(new Date(row.acquiredAt), "yyyy-MM-dd")}</TableCell><TableCell>{format(new Date(row.disposedAt), "yyyy-MM-dd")}</TableCell><TableCell>{qty(row.amount)}</TableCell><TableCell>{money(row.proceeds)}</TableCell><TableCell>{money(row.costBasis)}</TableCell><TableCell>{money(row.gainLoss)}</TableCell><TableCell>{t(`cost.term.${row.term}`)}</TableCell><TableCell>{row.lotId}</TableCell></TableRow>
           ))}</TableBody></Table>
           <PageControls label={t("cost.realized")} page={pages.disposals} count={report.disposals.length}
             onPageChange={(page) => setPages((previous) => ({ ...previous, disposals: page }))} />
         </CardContent></Card>
         <Card><CardHeader><CardTitle>{t("cost.unrealized")}</CardTitle></CardHeader><CardContent className="overflow-x-auto">
           <Table className="sticky-first-column"><TableHeader><TableRow>{["asset", "lot", "acquired", "quantity", "costBasis", "marketValue", "gainLoss"].map((key) => <TableHead key={key}>{t(`cost.${key}`)}</TableHead>)}</TableRow></TableHeader><TableBody>{report.unrealized.slice(pages.unrealized * pageSize, (pages.unrealized + 1) * pageSize).map((asset) => (
-            <TableRow key={`${asset.assetType}:${asset.symbol}:${asset.id}`}><TableCell>{asset.symbol}</TableCell><TableCell>{asset.id}</TableCell><TableCell>{format(new Date(asset.acquiredAt), "yyyy-MM-dd")}</TableCell><TableCell>{qty(asset.amount)}</TableCell><TableCell>{money(asset.costBasis)}</TableCell><TableCell>{money(asset.marketValue)}</TableCell><TableCell>{money(asset.gainLoss)}</TableCell></TableRow>
+            <TableRow key={`${asset.assetType}:${asset.symbol}:${asset.id}`}><TableCell><AssetLabel asset={asset} size={20} quiet /></TableCell><TableCell>{asset.id}</TableCell><TableCell>{format(new Date(asset.acquiredAt), "yyyy-MM-dd")}</TableCell><TableCell>{qty(asset.amount)}</TableCell><TableCell>{money(asset.costBasis)}</TableCell><TableCell>{money(asset.marketValue)}</TableCell><TableCell>{money(asset.gainLoss)}</TableCell></TableRow>
           ))}</TableBody></Table>
           <PageControls label={t("cost.unrealized")} page={pages.unrealized} count={report.unrealized.length}
             onPageChange={(page) => setPages((previous) => ({ ...previous, unrealized: page }))} />

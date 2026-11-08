@@ -25,6 +25,7 @@ it("keeps ticker, bar, amount, and a bounded percentage in each row", () => {
   expect(screen.getByText("<-999%")).toHaveAttribute("title", "−1,840.4%");
   expect(screen.getByText("<-999%")).toHaveAttribute("aria-label", "−1,840.4%");
   expect(container.querySelectorAll(".summary-top-axis")).toHaveLength(1);
+  expect(container.querySelectorAll(".summary-top-row .t3-asset-icon[data-size='20']")).toHaveLength(2);
 });
 
 it("shows no market P&L for stablecoin rows", () => {

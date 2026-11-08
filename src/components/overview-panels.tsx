@@ -14,6 +14,7 @@ import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store"
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
 import { sourceDisplayNames } from "./source-display-name";
+import { useCurrentSourceStatuses } from "./use-current-source-statuses";
 import { matchSourceStatus } from "./source-status-match";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { buildAssetDetailsPath } from "@/utils/assets";
@@ -25,6 +26,7 @@ import { deriveContributions, deriveOverviewSeries, selectBestDayContributionSna
 import { overviewRefreshRequestedEvent, sourceStatusesChangedEvent } from "./source-status-event";
 import { niceStep } from "./overview-chart-scale";
 import { directionClass, directionColorVar } from "@/utils/color";
+import AssetLabel from "./common/asset-label";
 import type { QuoteColor } from "@/middlelayers/types";
 
 type Change = DailyChange;
@@ -43,7 +45,8 @@ export function useOverviewPanelsData(dateRange: TDateRange, allTimeRange: TDate
   const [weekBased, setWeekBased] = useState(false);
   const [coins, setCoins] = useState<CoinRow[]>([]);
   const [sources, setSources] = useState<WalletAssetsPercentageData>([]);
-  const [statuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const [storedStatuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const statuses = useCurrentSourceStatuses(storedStatuses);
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   const allKey = `${allTimeRange.start.getTime()}-${allTimeRange.end.getTime()}`;
 
@@ -137,14 +140,6 @@ const signedMoney0 = (value: number, currency: CurrencyRateDetail) =>
   `${value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${Math.abs(Math.round(currencyWrapper(currency)(value))).toLocaleString()}`;
 const dayLabel = (timestamp: number, locale: string) => new Date(timestamp).toLocaleDateString(
   locale === "zh" ? "zh-CN" : "en-GB", { month: "short", day: "numeric" });
-const sourceMonogram = (label: string) => {
-  if (/^binance$/i.test(label)) return "BN";
-  if (/^ledger\b/i.test(label)) return "LD";
-  if (/^interactive brokers$/i.test(label)) return "IB";
-  if (/^0x/i.test(label)) return "0x";
-  return label.slice(0, 2).toUpperCase();
-};
-
 export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = false, quoteColor = "green-up-red-down" }: {
   currency: CurrencyRateDetail; daily: Change[]; bestDay?: Change; desktopFidelity?: boolean; quoteColor?: QuoteColor;
 }) {
@@ -232,7 +227,7 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
         : t("overview.design.snapshotCount").replace("{count}", String(count))}</span>}</header>
     {rows.length ? <ol data-chart-group="" className={`t3-moved-list${desktopFidelity ? " t3-moved-diverging" : ""}`}>
       {orderedRows.slice(pageStart, pageStart + 8).map((row, index) => <li key={`${row.assetType}:${row.symbol}`}>
-        <Link to={buildAssetDetailsPath({ symbol: row.symbol, assetType: row.assetType })} className="t3-moved-symbol">{row.symbol}</Link>
+        <Link to={buildAssetDetailsPath({ symbol: row.symbol, assetType: row.assetType })} className="t3-moved-symbol"><AssetLabel asset={row} size={20} quiet /></Link>
         <span className="t3-moved-track" role="button"
           {...chart.markProps(index, `${row.symbol}: ${signedMoney(row.value, currency)}`,
             `${row.symbol}: ${signedMoney(row.value, currency)}`)}
@@ -335,11 +330,10 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
         const status = matchSourceStatus({ id: source.wallet, label }, identities, statusSources, statuses);
         const kind = status?.kind ?? (source.walletType === "ibkr" ? "broker" : source.walletType === "binance" || source.walletType === "okx" ? "exchange" : "wallet");
         return <div key={source.wallet} className="t3-source-row">
-          <span className="t3-source-logo" aria-hidden="true">{sourceMonogram(label)}</span>
-          <span className="t3-source-name" title={source.wallet}><strong>{label}</strong>
-            <small>{t(`overview.fidelity.kind.${kind}`)} · <span className={`t3-source-dot ${status?.status ?? ""}`} /> {status?.status === "ok" && status.finishedAt
+          <span className="t3-source-name" title={source.wallet}><AssetLabel kind={kind === "others" ? "custom" : kind} type={source.walletType ?? status?.provider ?? label} name={label} size={24}
+            secondary={<>{t(`overview.fidelity.kind.${kind}`)} · <span className={`t3-source-dot ${status?.status ?? ""}`} /> {status?.status === "ok" && status.finishedAt
               ? `${t("overview.fidelity.updated")} ${new Date(status.finishedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}`
-              : status?.status === "ok" ? t("refresh.status.ok") : !status ? t("overview.fidelity.snapshot") : null}</small>
+              : status?.status === "ok" ? t("refresh.status.ok") : !status ? t("overview.fidelity.snapshot") : null}</>} />
             {status && status.status !== "ok" && <small className="t3-source-last-good">{status.lastSuccessAt
               ? t(status.category === "quota" ? "overview.fidelity.quotaLastGood" : "overview.fidelity.failedLastGood")
                 .replace("{time}", new Date(status.lastSuccessAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }))
@@ -405,9 +399,7 @@ export function TopCoinsCard({ currency, rows, compact = false, overviewFidelity
         {visible.map((row) => <Link data-testid="overview-coin-row" key={`${row.assetType}:${row.symbol}`}
           to={buildAssetDetailsPath({ symbol: row.symbol, assetType: row.assetType })}
           className={`t3-top-row${overviewFidelity ? " t3-top-fidelity-grid" : ""}`}>
-          {overviewFidelity
-            ? <span><strong>{row.symbol}</strong>{assetNames[row.symbol] && <small>{assetNames[row.symbol]}</small>}</span>
-            : <strong>{row.symbol}</strong>}
+          <AssetLabel asset={row} size={20} secondary={overviewFidelity ? assetNames[row.symbol] : undefined} quiet />
           <span>{row.rank === undefined ? "—" : `#${row.rank}`}</span>
           <span>{row.amount ? money(row.value / row.amount, currency) : "—"}</span>
           {overviewFidelity && <span className={tone(row.dayChange)}>{percent(row.dayChange)}</span>}

@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import type { CostBasisMethod, CostBasisWarning } from "@/middlelayers/cost-basis";
@@ -348,7 +349,7 @@ export function PhoneCostBasis({
         <div className="fidelity-card-heading"><h2>{t("finance.realizedByAsset")}</h2>
           <span>{t("fidelity.cost.assetRange").replace("{range}", year || t("fidelity.cost.selectedRange"))}</span></div>
         {byAsset.length || chartUnknown.length ? byAsset.map((row, index) => <div className="fidelity-asset-bar" key={`${row.assetType}:${row.symbol}`}>
-          <strong>{row.symbol}</strong><span className="fidelity-bar-track" role="button"
+          <strong><AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /></strong><span className="fidelity-bar-track" role="button"
             {...chart.markProps(index, `${row.symbol}: ${signed(row.gainLoss)}`,
               <><span>{row.symbol}</span><div data-tone={tone(row.gainLoss)}>{signed(row.gainLoss)}</div></>)}
             style={{ "--z": `${zero}%` } as CSSProperties}>
@@ -362,7 +363,7 @@ export function PhoneCostBasis({
         </div>) : <EmptyState icon={BarChartIcon} className="fidelity-chart-empty"
           title={t("fidelity.cost.noChartSales")} hint={t("cost.chart.empty.hint")} />}
         {chartUnknown.map((row) => <div className="fidelity-asset-bar" key={`${row.assetType}:${row.symbol}:unknown`}>
-          <strong>{row.symbol}</strong><span className="fidelity-bar-track" style={{ "--z": "0%" } as CSSProperties} /><span className="cost-gain" data-tone="neutral">–</span>
+          <strong><AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /></strong><span className="fidelity-bar-track" style={{ "--z": "0%" } as CSSProperties} /><span className="cost-gain" data-tone="neutral">–</span>
         </div>)}
       </section>
       <section className="fidelity-cost-card fidelity-cost-prices">
@@ -370,7 +371,7 @@ export function PhoneCostBasis({
         {averageRows.length ? averageRows.map(({ symbol, assetType }) => {
           const average = priceAverages[`${assetType}:${symbol}`];
           return <div className="fidelity-price-row" key={`${assetType}:${symbol}`}>
-            <div><strong>{symbol}</strong><span>{average?.buyPrice == null
+            <div><strong><AssetLabel asset={{ symbol, assetType: assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /></strong><span>{average?.buyPrice == null
               ? <span className="fidelity-price-placeholder">–</span> : money(average.buyPrice)} <small>{t("cost.design.buy").toLowerCase()}</small>
               {" · "}{average?.sellPrice == null
                 ? <span className="fidelity-price-placeholder">–</span> : money(average.sellPrice)} <small>{t("cost.design.sell").toLowerCase()}</small></span></div>

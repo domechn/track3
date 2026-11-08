@@ -28,7 +28,7 @@ test("rules and triggered alerts follow the approved order", async ({ page }) =>
   const main = page.locator("#app-main-content");
   await expect(main).toBeFocused();
   expect(await main.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("none");
-  expect((await page.locator(".pf-rules-list").boundingBox())!.height).toBe(1234);
+  expect((await page.locator(".pf-rules-list").boundingBox())!.height).toBe(1248);
   expect((await page.locator(".pf-history").boundingBox())!.height).toBe(749);
   await expect(page.locator(".pf-head p")).toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(page.locator(".pf-rules-list .pf-card-head small")).toHaveCSS("font-variant-numeric", "tabular-nums");
@@ -51,8 +51,8 @@ test("rules and triggered alerts follow the approved order", async ({ page }) =>
         background: getComputedStyle(node).backgroundColor };
     }));
   expect(cards[0]).toEqual({ x: 16, y: 140, width: 358, height: 204, background: "rgb(19, 18, 23)" });
-  expect(cards[1]).toMatchObject({ x: 16, y: 356, width: 358, height: 1234 });
-  expect(cards[2]).toMatchObject({ x: 16, y: 1602, width: 358, height: 749 });
+  expect(cards[1]).toMatchObject({ x: 16, y: 356, width: 358, height: 1248 });
+  expect(cards[2]).toMatchObject({ x: 16, y: 1616, width: 358, height: 749 });
   await expect(page.locator("#app-top-bar .mobile-header-back")).toBeHidden();
   await expect(page.locator(".pf-history-actions button").first()).toHaveCSS("font-weight", "500");
   await expect(page.locator(".pf-history-actions button").last()).toHaveCSS("font-weight", "500");
@@ -155,7 +155,7 @@ test("light theme keeps rules and the editor readable", async ({ page }) => {
   const textColor = (selector: string) => page.locator(selector).first().evaluate((element) =>
     Number(getComputedStyle(element).color.match(/\d+/)?.[0] ?? 255));
   expect(await textColor(".pf-goals h1")).toBeLessThan(80);
-  expect(await textColor(".pf-goal-name b")).toBeLessThan(80);
+  expect(await textColor(".pf-goal-name .t3-asset-label-name")).toBeLessThan(80);
   expect(await textColor(".mobile-tab[aria-current='page']")).toBeLessThan(80);
   const tabContrast = await page.locator(".mobile-tab").first().evaluate((tab) => {
     const rgb = (color: string) => (color.match(/\d+/g) ?? []).slice(0, 3).map(Number);

@@ -2,6 +2,26 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { MobileOthers } from "@/mobile/components/configuration/mobile-others";
 
+it("renames a custom asset in place without editing its holding", () => {
+  const rename = vi.fn();
+  const save = vi.fn();
+  render(<MobileOthers fidelityLayout others={[{ symbol: "GOLD", alias: "Metal", amount: 2 }]}
+    onSave={save} onRename={rename} onRemove={vi.fn()} onAttach={vi.fn()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Rename Metal" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Alias" }), { target: { value: " Bullion " } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(rename).toHaveBeenCalledWith(0, "Bullion");
+  expect(save).not.toHaveBeenCalled();
+});
+
+it("opens the full custom asset editor from the symbol beside Rename", () => {
+  render(<MobileOthers fidelityLayout others={[{ symbol: "GOLD", alias: "Gold", amount: 4 }]}
+    onSave={vi.fn()} onRename={vi.fn()} onRemove={vi.fn()} onAttach={vi.fn()} />);
+  expect(screen.getAllByRole("button", { name: "Edit GOLD" })).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Edit GOLD" }));
+  expect(screen.getByRole("dialog", { name: "Edit custom asset" })).toBeVisible();
+});
+
 it("edits custom holdings on a phone and offers their source attachment", () => {
   const save = vi.fn();
   const attach = vi.fn();
@@ -16,6 +36,15 @@ it("edits custom holdings on a phone and offers their source attachment", () => 
   expect(attach).toHaveBeenCalledWith(0);
 });
 
+it("opens the custom editor from its visible symbol in the fidelity layout", () => {
+  render(<MobileOthers fidelityLayout others={[{ symbol: "GOLD", amount: 2 }]}
+    onSave={vi.fn()} onRemove={vi.fn()} onAttach={vi.fn()} />);
+  const edit = screen.getAllByRole("button", { name: "Edit GOLD" })[0];
+  expect(edit).toContainElement(screen.getByText("GOLD"));
+  fireEvent.click(edit);
+  expect(screen.getByRole("dialog", { name: "Edit custom asset" })).toBeVisible();
+});
+
 it("opens the legacy add-symbol editor", () => {
   render(<MobileOthers others={[]} onSave={vi.fn()} onRemove={vi.fn()} onAttach={vi.fn()} />);
   fireEvent.click(screen.getByRole("button", { name: "Add symbol" }));
@@ -28,7 +57,7 @@ it("quotes custom holding values in the selected base currency", () => {
   }]} baseCurrency={{ currency: "EUR", rate: 0.9 }}
   onSave={vi.fn()} onRemove={vi.fn()} onAttach={vi.fn()} />);
   expect(screen.getAllByText("€180.00").length).toBeGreaterThan(0);
-  fireEvent.click(screen.getByRole("button", { name: "Edit GOLD" }));
+  fireEvent.click(screen.getAllByRole("button", { name: "Edit GOLD" })[0]);
   fireEvent.click(screen.getByRole("radio", { name: "Your price" }));
   expect(screen.getAllByText(/€180\.00/).length).toBeGreaterThan(0);
 });
