@@ -899,7 +899,7 @@ for (const [name, width, height] of viewports) {
             } else {
               const columns = await page.locator(".profit-metrics-mobile").evaluate((node) =>
                 getComputedStyle(node).gridTemplateColumns.split(" ").length);
-              expect(columns).toBe(3);
+              expect(columns).toBe(width >= 700 && width <= 900 ? 2 : 3);
             }
             if (size === "wide") {
               const tiles = await page.locator(".analytics-tile-grid").evaluate((node) =>

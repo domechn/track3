@@ -163,7 +163,7 @@ test("populated history shows the selected snapshot beside the list", async ({ p
   await expect(page.locator(".fidelity-history-list tbody tr:first-child td:first-child button"))
     .toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(page.locator(".fidelity-history-detail-kpis strong").first())
-    .toHaveCSS("font-variant-numeric", "normal");
+    .toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(page.locator(".t3-records-toolbar-panel")).toBeHidden();
   await expect(page.getByTestId("history-desktop-detail")).toContainText("$752,642.71");
   await expect(page.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -237,6 +237,7 @@ test("a transient tiny viewport preserves the selected desktop snapshot", async 
 
 test("history detail keeps every value distinct inside its card at narrow desktop widths", async ({ page }) => {
   test.setTimeout(120_000);
+  await mkdir("/tmp/history-kpi-overflow", { recursive: true });
   await page.setViewportSize({ width: 1100, height: 1024 });
   await installSampleBridge(page, { fidelitySample: "full" });
   await page.goto("/#/history");
@@ -286,6 +287,24 @@ test("history detail keeps every value distinct inside its card at narrow deskto
       return failures;
     });
     allCollisions.push(...collisions.map((collision) => `${width}px ${collision}`));
+    const assetAlignment = await detail.evaluate((card) => {
+      const header = card.querySelector<HTMLTableCellElement>("table thead th:first-child")!;
+      const cell = card.querySelector<HTMLTableCellElement>("table tbody tr:first-child td:first-child")!;
+      const button = cell.querySelector("button")!;
+      button.focus();
+      const cardBounds = card.getBoundingClientRect();
+      const buttonBounds = button.getBoundingClientRect();
+      button.blur();
+      return {
+        headerPadding: getComputedStyle(header).paddingLeft,
+        cellPadding: getComputedStyle(cell).paddingLeft,
+        buttonLeft: buttonBounds.left,
+        cardLeft: cardBounds.left,
+      };
+    });
+    expect(assetAlignment.cellPadding).toBe(assetAlignment.headerPadding);
+    expect(assetAlignment.buttonLeft - assetAlignment.cardLeft).toBeGreaterThanOrEqual(2);
+    await detail.screenshot({ path: `/tmp/history-kpi-overflow/history-detail-table-${width}.png` });
   }
   expect(allCollisions).toEqual([]);
 });

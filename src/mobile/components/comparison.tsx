@@ -700,7 +700,7 @@ const App = ({
             </FadeUp>
 
             <FadeUp>
-              <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+              <div className="comparison-assets-grid grid gap-3 grid-cols-1 md:grid-cols-2">
                 {coinComparisons.map((coin) => (
                   <CoinCard
                     key={getAssetLogoKey(coin)}

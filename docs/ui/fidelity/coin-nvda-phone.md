@@ -213,10 +213,16 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
+- The merged 8 Nov DPR 2 viewport capture `/tmp/history-kpi-overflow/coin-nvda-phone-final.png` differs from `/tmp/wui18-source/coin-nvda-phone-viewport.png` by **5.50%** at RGB-sum threshold 48. The shared active Overview tab and AssetIcon mark, and the product's truthful price note in place of the source's unsupported NASDAQ delay claim, remain visible.
 - The 5.438% first-screen difference includes the owner's shared active Overview tile; the value-card comparison has different chart line and grid positions from dated stored snapshots.
 - The saved alias is “NVIDIA”; no separate “NVIDIA Corporation” name is stored for the subtitle.
+- The 390 × 844 DPR 2 viewport capture in `/tmp/fidelity/coin-nvda/` differs by **2.80%** from the saved source render in `/tmp/wui18-source/` at RGB-sum threshold 48. It predates the shared active-tab tint. The normal chart grid remains three columns and the page is 1,964 px high.
+- The app now uses the shared tinted Overview tab and indicator. The static coin source uses an untinted active icon; this contributes to newer same-base captures.
+- A fresh DPR 1 source render inside the mobile test context differed by 6.97%; its font raster and lower card position differ from the approved DPR 2 source capture. The matching DPR 2 pair above is the fidelity comparison.
+- At 390 px, chart-stat amounts use 14 px text to keep all three values inside their columns. The source uses larger text in that row.
 - The saved stock record has no exchange or quote-delay fields, so it cannot substantiate the source’s “NASDAQ · delayed 15 min” price caption. The chart uses dated stored snapshots.
 - With HKD conversion, long chart statistics can wrap to a second aligned row; the USD NVDA source page has shorter values and no wrapped variant.
 - The product's scroll container preserves route scroll position; Chromium antialiases small text in that layer differently from the standalone source page.
 - Selected chart and transaction filters use the owner's shared active tint; the older source uses a solid grey selected fill.
 - The owner's shared active navigation style paints an Overview tab tile and edge; the older Coin source highlights only the tab text.
+- Asset and broker rows use the current shared AssetIcon tiles. Their marks differ from the older source art so asset labels stay consistent across routes.

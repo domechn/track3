@@ -20,6 +20,8 @@ test("Comparison renders the October sample pair and ordered asset sections", as
     expect(heading.y).toBe(14);
     await expect(page.getByRole("heading", { name: "Snapshots" })).toBeVisible();
     await expect(page.getByText("$729,167.79").first()).toBeVisible();
+    await expect(page.locator(".fd-comparison-asset").filter({ hasText: "NVDA" })
+      .locator(".t3-asset-icon")).toHaveAttribute("data-kind", "stock");
     await expect(page.locator(".fd-comparison-field button b").first()).toHaveCSS("font-size", "13px");
     await expect(page.locator(".fd-comparison-kpis strong").first()).toHaveCSS("line-height", "22px");
     expect((await page.locator(".fd-comparison-snapshots").boundingBox())?.height).toBe(531);

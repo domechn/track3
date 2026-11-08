@@ -179,6 +179,8 @@ body:has(.fd-page), .app-layout:has(.fd-page) { background:hsl(var(--background)
 .fd-lot-header { height:30px; color:var(--fd-faint); font-size:11px; }
 .fd-lot-row { min-height:42px; border-top:1px solid var(--fd-rule); font-size:12px; }
 .fd-lot-header span:not(:first-child),.fd-lot-row span:not(:first-child) { text-align:right; }
+.fd-lots-scroll { overflow-x:auto; overflow-y:hidden; padding-bottom:3.5px; margin-bottom:-3.5px; }
+.fd-lot-row span:last-child { min-width:max-content; padding-left:8px; }
 .fd-coin-transactions .fd-card-heading { margin-bottom:10px; }
 .fd-tx-filters { position:relative; isolation:isolate; max-width:100%; height:44px; overflow-x:auto; overflow-y:hidden; margin:-6px 0 6px; padding:0 2px; background:transparent; }
 .fd-tx-filters::before { position:absolute; z-index:-1; inset:6px 0; border-radius:4px; background:var(--fd-raised); content:""; }
@@ -195,6 +197,7 @@ body:has(.fd-page), .app-layout:has(.fd-page) { background:hsl(var(--background)
 .fd-source-empty-toggle:focus-visible,.fd-lots-toggle:focus-visible { outline:2px solid var(--fd-accent); outline-offset:2px; }
 .fd-source-zero { color:var(--fd-faint); }
 .fd-lots-scroll.expanded { max-height:350px; overflow-y:auto; }
+.fd-lots-scroll.expanded .fd-lot-header { position:sticky; top:0; z-index:1; background:var(--fd-surface); }
 .fd-lots-toggle { display:block; margin:12px auto 0; color:var(--fd-accent); }
 .fd-manual-rows { margin-top:14px; }
 .fd-manual-rows>div { min-height:52px; display:grid; grid-template-columns:1fr auto; align-content:center; border-top:1px solid var(--fd-rule); }
@@ -1405,3 +1408,12 @@ body:has(.fd-overview, .fd-partial-overview) .ios-d3-toast-viewport [toast-close
 .fd-app-error-reload { margin-top: 20px; background: #fff; color: #0d0d0e; }
 .fd-app-error-copy { margin-top: 10px; border: 1px solid #3a3a3e; }
 .fd-app-error small { display: block; margin-top: 16px; color: #b4b6bc; font-size: 12px; line-height: 18px; }
+@media (max-width: 559px) {
+  .fd-coin-stats .fd-coin-metric strong { font-size: 14px; }
+  .fd-coin :is(.fd-coin-changes, .fd-position-grid, .fd-coin-stats).long-amount { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; }
+  .fd-coin .fd-coin-changes.long-amount:not(.manual) > .fd-coin-metric:nth-child(n) { grid-column: auto; }
+  .fd-coin :is(.fd-coin-changes, .fd-position-grid, .fd-coin-stats).long-amount > .fd-coin-metric:nth-child(n) {
+    min-height: 0; padding: 10px 0; border-left: 0; border-top: 1px solid var(--fd-border);
+  }
+  .fd-coin :is(.fd-coin-changes, .fd-position-grid, .fd-coin-stats).long-amount > .fd-coin-metric:first-child { padding-top: 0; border-top: 0; }
+}

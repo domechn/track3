@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { fittingDateTickIndices, needsMetricStack } from "./coin-metric-fit";
 import type { AssetModel, AssetReference, CurrencyRateDetail, HistoricalData, TDateRange, Transaction } from "@/middlelayers/types";
 import type { AssetType } from "@/middlelayers/datafetch/types";
 import { listAllowedSymbols, queryEditLog, queryHistoricalData, queryTransactionsBySymbolAndDateRange } from "@/middlelayers/charts";
@@ -70,6 +71,22 @@ function importedEdits(transactions: Transaction[], logs: SnapshotEdit[]): Recor
 function CoinChart({ points, mode, symbol, currency, shortDate, emptyText }: { points: Point[]; mode: "value" | "price"; symbol: string; currency: CurrencyRateDetail; shortDate: (value: string | Date) => string; emptyText: string }) {
   const { t } = useTranslation();
   const chart = useChartHitArea();
+  const chartRef = useRef<SVGSVGElement>(null);
+  const [visibleDates, setVisibleDates] = useState<number[] | null>(null);
+  useLayoutEffect(() => {
+    let active = true;
+    const measure = () => {
+      if (!active || !chartRef.current) return;
+      const dates = [...chartRef.current.querySelectorAll<SVGTextElement>("[data-date-index]")].map((node) => {
+        const box = node.getBoundingClientRect();
+        return { index: Number(node.dataset.dateIndex), left: box.left, right: box.right };
+      });
+      setVisibleDates(fittingDateTickIndices(dates));
+    };
+    measure();
+    document.fonts?.ready.then(measure);
+    return () => { active = false; };
+  }, [points, mode, shortDate, currency]);
   const values = points.map((point) => currencyWrapper(currency)(mode === "value" ? point.value : point.price));
   if (values.length === 0) return <EmptyState icon={ClockIcon} className="fd-empty fd-coin-chart-empty"
     title={t("coin.market.history.empty.title")} hint={emptyText} />;
@@ -95,7 +112,7 @@ function CoinChart({ points, mode, symbol, currency, shortDate, emptyText }: { p
   const labelIndices = (points.length <= 8 ? [0, 2, 4, points.length - 1] : [0, 10, 20, points.length - 1])
     .filter((index, position, indices) => index < points.length && indices.indexOf(index) === position);
   const axisDate = (i: number) => shortDate(points[i].date);
-  return <><svg viewBox="0 0 324 200" className="fd-coin-chart" role="group"
+  return <><svg ref={chartRef} viewBox="0 0 324 200" className="fd-coin-chart" role="group"
     data-chart-group="" aria-label={`${symbol} ${mode} chart`}>
     {ticks.map(n=><g key={n}><line x1={padL} y1={y(n)} x2="324" y2={y(n)} stroke="var(--fd-border)"/><text x={padL-8} y={y(n)+4} textAnchor="end" fill="var(--fd-faint)" fontSize="12">{tickLabel(n)}</text></g>)}
     {/* color-semantics: neutral this path shows price over time. */}
@@ -105,7 +122,10 @@ function CoinChart({ points, mode, symbol, currency, shortDate, emptyText }: { p
       return <circle key={index} role="button" {...chart.markProps(index, detail, detail)}
         cx={x(index)} cy={y(value)} r="10" fill="transparent" />;
     })}
-    {labelIndices.map(i=><text key={i} x={x(i)} y="192" fill="var(--fd-faint)" fontSize="12" textAnchor={i===0?"start":i===points.length-1?"end":"middle"}>{axisDate(i)}</text>)}
+    {labelIndices.map(index => {
+      const hidden = visibleDates !== null && !visibleDates.includes(index);
+      return <text key={index} data-date-index={index} x={x(index)} y="192" fill="var(--fd-faint)" fontSize="12" textAnchor={index===0?"start":index===points.length-1?"end":"middle"} opacity={hidden ? 0 : undefined} aria-hidden={hidden}>{axisDate(index)}</text>;
+    })}
     <text x={x(values.length-1)+6} y={y(values.at(-1)!)+4} fill="var(--fd-text)" fontSize="12" fontWeight="600">{endLabel}</text>
   </svg>{chart.tooltip}</>;
 }
@@ -150,6 +170,8 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
   const [emptySourcesExpanded, setEmptySourcesExpanded] = useState(false);
   const [lotsExpanded, setLotsExpanded] = useState(false);
   const [allowSymbols, setAllowSymbols] = useState<AssetReference[]>([]);
+  const coinRef = useRef<HTMLDivElement>(null);
+  const [longMetrics, setLongMetrics] = useState(0);
   useEffect(() => {
     let active = true;
     void listAllowedSymbols().then((symbols) => {
@@ -332,6 +354,44 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
       .replace("{direction}", label(editedPriceNumber < price * currency.rate ? "below" : "above"));
   const card = (children: React.ReactNode, cls="") => <section className={`fd-card ${cls}`}>{children}</section>;
   const cardHeading = (heading: string, right?: React.ReactNode) => <div className="fd-card-heading"><h3>{heading}</h3>{right && <span>{right}</span>}</div>;
+  useLayoutEffect(() => {
+    const root = coinRef.current;
+    if (!root || loading) return;
+    let active = true;
+    let frame = 0;
+    const check = () => {
+      if (!active || !root.clientWidth) return;
+      const grids = [...root.querySelectorAll<HTMLElement>(".fd-coin-changes, .fd-position-grid, .fd-coin-stats")];
+      grids.forEach((grid) => grid.classList.remove("long-amount"));
+      const overflowed = grids.reduce((mask, grid, index) => {
+        const boundary = grid.getBoundingClientRect();
+        const metrics = [...grid.querySelectorAll<HTMLElement>(":scope > .fd-coin-metric")];
+        const textBounds = (metric: HTMLElement, tag: "strong" | "small") => {
+          const text = metric.querySelector(tag);
+          if (!text) return undefined;
+          const range = document.createRange();
+          range.selectNodeContents(text);
+          return range.getBoundingClientRect();
+        };
+        const crowded = needsMetricStack(boundary, metrics.map((metric) => ({
+          strong: textBounds(metric, "strong"),
+          small: textBounds(metric, "small"),
+          contentRight: metric.getBoundingClientRect().right - parseFloat(getComputedStyle(metric).paddingRight),
+        })));
+        return mask | (crowded ? 1 << index : 0);
+      }, 0);
+      grids.forEach((grid, index) => grid.classList.toggle("long-amount", Boolean(overflowed & (1 << index))));
+      setLongMetrics(overflowed);
+    };
+    check();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(check);
+    });
+    if (root.parentElement) observer?.observe(root.parentElement);
+    document.fonts?.ready.then(check);
+    return () => { active = false; cancelAnimationFrame(frame); observer?.disconnect(); };
+  }, [loading, data, chartMode, chartRange, range, currency, method, locale]);
   if (loading) return <div className="fd-page fd-coin" data-state="loading" aria-busy="true">
     <div className="fd-coin-loading" role="status"><span className="sr-only">{t("common.loading")}</span>
       <span className="fd-skeleton" /><span className="fd-skeleton" /><span className="fd-skeleton" />
@@ -340,7 +400,7 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
       {Array.from({ length: transactionPaging.pageSize }, (_, index) => <div className="fd-tx-skeleton-row" key={index}><span className="fd-skeleton" /></div>)}
     </section>
   </div>;
-  return <div className="fd-page fd-coin d2-coin" data-state={loading?"loading":"ready"} data-asset-type={assetType} data-manual={Boolean(data?.manual)}>
+  return <div ref={coinRef} className="fd-page fd-coin d2-coin" data-state={loading?"loading":"ready"} data-asset-type={assetType} data-manual={Boolean(data?.manual)}>
     <header className="fd-page-head fd-coin-head"><nav aria-label={label("breadcrumbs")}><button type="button" onClick={goBack}>{label("overview")}</button><ChevronRightIcon aria-hidden="true" /><button type="button" aria-expanded={coinSelectOpen} onClick={() => setCoinSelectOpen(true)}>{label("coins")}</button><ChevronRightIcon aria-hidden="true" /><span>{symbol}</span></nav>
       <h1><AssetLabel kind={data?.manual ? "custom" : assetType === "stock" ? "stock" : "coin"} symbol={symbol}
         name={name === symbol ? name : `${name} ${symbol}`} size={32} tag={kind} /></h1>
@@ -350,10 +410,10 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
       <div className="mobile-coin-options">{filteredSymbols.slice(0, 200).map((item) => <button type="button" key={getAssetLogoKey(item)} className="mobile-coin-option" onClick={() => { setCoinSelectOpen(false); navigate(buildAssetDetailsPath(item)); }}><AssetLabel asset={item} size={20} /></button>)}</div>
     </BottomSheet>
     {card(<><div className="fd-coin-primary"><span className="fd-label">{data?.manual?label("manualPrice"):label("assetPrice").replace("{name}",name)}</span><strong>{point?moneyInCurrency(price,false,currentPriceDigits):dash}</strong><small>{data?.manual?label("setByYouOn").replace("{date}",date(data.manualSetAt??point?.date??new Date())):data?.followSymbol?t("coin.customPrice.follow").replace("{symbol}",data.followSymbol):assetType==="stock"?label("stockFeed.generic"):label("perAsset").replace("{symbol}",symbol)}</small></div>
-      <div className={`fd-coin-changes ${data?.manual?"manual":""}`}>{data?.manual?<Metric label={label("priceFeed")} value={label("none")} detail={label("changesUnavailable")} />:<>{[[assetType==="stock"?label("oneDay"):"24h",ch1],["7D",ch7],["30D",ch30]].map(([name,result])=>{const v=result as ReturnType<typeof change>;return <Metric key={name as string} label={name as string} value={v?pct(v.pct):dash} valueTone={tone(v?.pct)} detail={v?moneyInCurrency(v.dollars,true):dash} />})}</>}
+      <div className={`fd-coin-changes ${data?.manual?"manual":""}${longMetrics & 1 ? " long-amount" : ""}`}>{data?.manual?<Metric label={label("priceFeed")} value={label("none")} detail={label("changesUnavailable")} />:<>{[[assetType==="stock"?label("oneDay"):"24h",ch1],["7D",ch7],["30D",ch30]].map(([name,result])=>{const v=result as ReturnType<typeof change>;return <Metric key={name as string} label={name as string} value={v?pct(v.pct):dash} valueTone={tone(v?.pct)} detail={v?moneyInCurrency(v.dollars,true):dash} />})}</>}
       <Metric label={label("holdingsValue")} value={moneyInCurrency(value)} detail={`${quantity(held,assetType,Boolean(data?.manual))} ${symbol}`} />
       <Metric label={label("sharePortfolio")} value={data?.currentTotal?pct(value/data.currentTotal,1).replace("+",""):dash} detail={data?.currentTotal?label("ofTotal").replace("{amount}",moneyInCurrency(data.currentTotal)):label("notInTotal")} /></div>
-      <div className="fd-position"><div className="fd-card-heading"><h3>{label("position")}</h3><span>{method}<label className="fd-range-select">{label("rangePrefix")} <select aria-label={label("range")} value={range} onChange={e=>setRange(e.target.value)}><option value="all">{label("rangeAll")}</option><option value="1y">{label("rangeYear")}</option><option value="90d">{label("range90")}</option><option value="30d">{label("range30")}</option></select></label></span></div><div className="fd-position-grid">
+      <div className="fd-position"><div className="fd-card-heading"><h3>{label("position")}</h3><span>{method}<label className="fd-range-select">{label("rangePrefix")} <select aria-label={label("range")} value={range} onChange={e=>setRange(e.target.value)}><option value="all">{label("rangeAll")}</option><option value="1y">{label("rangeYear")}</option><option value="90d">{label("range90")}</option><option value="30d">{label("range30")}</option></select></label></span></div><div className={`fd-position-grid${longMetrics & 2 ? " long-amount" : ""}`}>
         <Metric label={label("positions")} value={`${quantity(held,assetType,Boolean(data?.manual))} ${symbol}`} detail={sourceCount(data?.sources.length??0)} />
         <Metric label={label("costPrice")} help={t("coin.costPriceHelp")} value={buyPrice===null?dash:moneyInCurrency(buyPrice,false,currentPriceDigits)} detail={<>{label("avgBuyRange")}{unknownBasis && <><br/><span className="fd-warning">{label("pricedBuysCount").replace("{priced}",fmt(held-unknownLots.reduce((sum,lot)=>sum+lot.amount,0),data?.manual?0:4)).replace("{total}",fmt(held,data?.manual?0:4))}</span></>}</>} />
         <Metric label={label("avgSellPrice")} value={sellPrice===null?dash:moneyInCurrency(sellPrice,false,currentPriceDigits)} detail={sellPrice===null?label("noSalesInRange"): saleCount(sells.length)} />
@@ -361,7 +421,7 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
         <Metric label={label("realizedPnl")} value={moneyInCurrency(realized,true)} valueTone={tone(realized)} detail={sells.length?saleCount(sells.length,true):label("nothingSold")} />
         <Metric label={label("unrealizedPnl")} value={unrealized===null?dash:moneyInCurrency(unrealized,true)} valueTone={tone(unrealized)} detail={unrealized===null?label("missingPriceFirst"):label("openLotsToday")} />
       </div></div></>,"fd-coin-hero")}
-    {data?.manual ? card(<>{cardHeading(label("price"),label("manual"))}<div className="fd-empty">{label("manualNoHistory").replaceAll("{symbol}",symbol)}</div><div className="fd-manual-rows"><div>{date(data.manualSetAt??new Date())}<strong>{moneyInCurrency(price,false,4)}</strong><small>{label("manualPrice")}</small></div>{manualPricePaging.rows.map(tx=><div key={tx.id}>{date(tx.txnCreatedAt)}<strong>{tx.price>0?moneyInCurrency(tx.price,false,4):dash}</strong><small>{tx.price>0?label("fromBuy").replace("{amount}",fmt(tx.amount,0)).replace("{symbol}",symbol):label("depositNoPrice")}</small></div>)}</div><Pager count={manualPriceRows.length} {...manualPricePaging} pageSizes={[15,25,50,100]} t={t} labelPrefix="fidelity.coin.pager" ariaLabel={label("price")} /><button className="fd-outline-pill" type="button" onClick={()=>navigate(`/settings/configuration?edit=${encodeURIComponent(symbol)}`)}><svg aria-hidden="true" width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M3 15l.8-3.5L12.5 3l2.5 2.5-8.7 8.7L3 15Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>{label("setCurrentPrice")}</button></>,"fd-coin-trend") : card(<>{cardHeading(chartMode==="value"?label("valueHoldings"):label("price"))}<p className="fd-sub">{chartMode==="value"?label("currentHoldingsEachDay").replace("{amount}",quantity(held,assetType,false)).replace("{symbol}",symbol):label("quoteInCurrency").replace("{symbol}",symbol).replace("{currency}",currency.currency)}</p><div className="fd-chart-controls"><div role="group" aria-label={label("chartMode")}>{(["value","price"] as const).map(mode=><button type="button" aria-pressed={chartMode===mode} key={mode} onClick={()=>{setChartMode(mode);setChartRange(mode==="price"?"7D":"30D")}}>{label(mode)}</button>)}</div><div role="group" aria-label={label("chartRange")}>{(["7D","30D"] as const).map(r=><button type="button" aria-pressed={chartRange===r} key={r} onClick={()=>setChartRange(r)}>{r}</button>)}</div></div><CoinChart points={chartPoints} mode={chartMode} symbol={symbol} currency={currency} shortDate={shortDate} emptyText={chartPoints.length ? label("notEnoughHistory") : label("noPriceHistory").replace("{symbol}", symbol)}/><div className="fd-coin-stats"><Metric label={label("high")} value={high===null?dash:moneyInCurrency(high,false,chartMode==="price"?2:2)} detail={high===null?"":shortDate(chartPoints[chartValues.indexOf(high)].date)} /><Metric label={label("low")} value={low===null?dash:moneyInCurrency(low)} detail={low===null?"":shortDate(chartPoints[chartValues.indexOf(low)].date)} /><Metric label={label("sinceDate").replace("{date}",chartPoints.length?shortDate(chartPoints[0].date):dash)} value={delta===null?dash:moneyInCurrency(delta,true)} valueTone={tone(delta)} detail={delta===null||!chartValues[0]?dash:pct(delta/chartValues[0])} /></div></>,"fd-coin-trend")}
+    {data?.manual ? card(<>{cardHeading(label("price"),label("manual"))}<div className="fd-empty">{label("manualNoHistory").replaceAll("{symbol}",symbol)}</div><div className="fd-manual-rows"><div>{date(data.manualSetAt??new Date())}<strong>{moneyInCurrency(price,false,4)}</strong><small>{label("manualPrice")}</small></div>{manualPricePaging.rows.map(tx=><div key={tx.id}>{date(tx.txnCreatedAt)}<strong>{tx.price>0?moneyInCurrency(tx.price,false,4):dash}</strong><small>{tx.price>0?label("fromBuy").replace("{amount}",fmt(tx.amount,0)).replace("{symbol}",symbol):label("depositNoPrice")}</small></div>)}</div><Pager count={manualPriceRows.length} {...manualPricePaging} pageSizes={[15,25,50,100]} t={t} labelPrefix="fidelity.coin.pager" ariaLabel={label("price")} /><button className="fd-outline-pill" type="button" onClick={()=>navigate(`/settings/configuration?edit=${encodeURIComponent(symbol)}`)}><svg aria-hidden="true" width="14" height="14" viewBox="0 0 18 18" fill="none"><path d="M3 15l.8-3.5L12.5 3l2.5 2.5-8.7 8.7L3 15Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>{label("setCurrentPrice")}</button></>,"fd-coin-trend") : card(<>{cardHeading(chartMode==="value"?label("valueHoldings"):label("price"))}<p className="fd-sub">{chartMode==="value"?label("currentHoldingsEachDay").replace("{amount}",quantity(held,assetType,false)).replace("{symbol}",symbol):label("quoteInCurrency").replace("{symbol}",symbol).replace("{currency}",currency.currency)}</p><div className="fd-chart-controls"><div role="group" aria-label={label("chartMode")}>{(["value","price"] as const).map(mode=><button type="button" aria-pressed={chartMode===mode} key={mode} onClick={()=>{setChartMode(mode);setChartRange(mode==="price"?"7D":"30D")}}>{label(mode)}</button>)}</div><div role="group" aria-label={label("chartRange")}>{(["7D","30D"] as const).map(r=><button type="button" aria-pressed={chartRange===r} key={r} onClick={()=>setChartRange(r)}>{r}</button>)}</div></div><CoinChart points={chartPoints} mode={chartMode} symbol={symbol} currency={currency} shortDate={shortDate} emptyText={chartPoints.length ? label("notEnoughHistory") : label("noPriceHistory").replace("{symbol}", symbol)}/><div className={`fd-coin-stats${longMetrics & 4 ? " long-amount" : ""}`}><Metric label={label("high")} value={high===null?dash:moneyInCurrency(high,false,chartMode==="price"?2:2)} detail={high===null?"":shortDate(chartPoints[chartValues.indexOf(high)].date)} /><Metric label={label("low")} value={low===null?dash:moneyInCurrency(low)} detail={low===null?"":shortDate(chartPoints[chartValues.indexOf(low)].date)} /><Metric label={label("sinceDate").replace("{date}",chartPoints.length?shortDate(chartPoints[0].date):dash)} value={delta===null?dash:moneyInCurrency(delta,true)} valueTone={tone(delta)} detail={delta===null||!chartValues[0]?dash:pct(delta/chartValues[0])} /></div></>,"fd-coin-trend")}
       {card(<>
         {cardHeading(label("holdingsSource"), sourceCount(data?.sources.length ?? 0))}
         {data?.sources.length ? <div className="fd-source-list">
@@ -385,8 +445,8 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
         <div className="fd-open-lots fd-coin-lots">
       {cardHeading(label("openLots"), lotCount(lotRows.length))}
       {lotRows.length ? <>
-      <div className="fd-lot-header"><span>{label("acquired")}</span><span>{label("quantity")}</span><span>{label("costPrice")}</span><span>{label("unrealized")}</span></div>
       <div className={lotsExpanded ? "fd-lots-scroll expanded" : "fd-lots-scroll"} role="region" aria-label={label("openLots")} tabIndex={0}>
+        <div className="fd-lot-header"><span>{label("acquired")}</span><span>{label("quantity")}</span><span>{label("costPrice")}</span><span>{label("unrealized")}</span></div>
         {(lotsExpanded ? lotRows : lotRows.slice(0, 8)).map(lot => <div className="fd-lot-row" key={lot.id}>
           <span>{date(lot.date)}</span><span>{quantity(lot.amount,assetType,Boolean(data?.manual))}</span>
           <span>{lot.cost === null ? dash : moneyInCurrency(lot.cost,false,currentPriceDigits)}</span>
