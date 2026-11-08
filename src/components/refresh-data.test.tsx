@@ -15,6 +15,7 @@ import { deliverAlerts } from "@/middlelayers/alert-notifications";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
 import axe from "axe-core";
 import { refreshRetryScheduler } from "@/middlelayers/refresh-retry-scheduler";
+import { writeStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 
 // Hoist mock fn references so they're available inside vi.mock factories
 const mockSetButtonLoading = vi.hoisted(() => vi.fn());
@@ -651,6 +652,26 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(await screen.findByText("Cold vault")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry Cold vault" })).toBeTruthy();
     expect(localStorage.getItem("track3-refresh-source-statuses")).toContain("Cold vault");
+  });
+
+  it("uses the current alias in a refresh failure notice", async () => {
+    const stored = { sourceId: "btc:0", label: "Cold", kind: "wallet", provider: "BTC",
+      hint: "bc1q-d…rage", status: "stale", category: "network" } as const;
+    writeStoredStatuses([stored]);
+    vi.mocked(getConfiguration).mockResolvedValue({
+      btc: { addresses: [{ address: "bc1q-demo-cold-storage", alias: "Vault" }] },
+    } as never);
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult, sourceStatuses: [stored],
+    } as never);
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
+    expect(await screen.findByText("Vault")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Vault refresh failed",
+    })));
   });
 
   it("distinguishes four Main sources, sorts failures first, and retries all failed", async () => {

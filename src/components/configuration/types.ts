@@ -122,6 +122,8 @@ export interface GeneralSettingsProps {
 
 export interface ExchangeSectionProps {
   exchanges: ExchangeRow[];
+  renameNames?: string[];
+  renameOffset?: number;
   visibleExchanges: ExchangeRow[];
   exchangePage: number;
   exchangePageCount: number;
@@ -137,12 +139,15 @@ export interface ExchangeSectionProps {
   onToggleActive: (type: string, apiKey: string) => void;
   onRemove: (type: string, apiKey: string) => void;
   onQuickLook: (ex: ExchangeRow) => void;
+  onRename?: (type: string, apiKey: string, alias: string) => void;
 }
 
 // --- Stock broker section props ---
 
 export interface StockBrokerSectionProps {
   stockBrokers: StockBrokerRow[];
+  renameNames?: string[];
+  renameOffset?: number;
   visibleStockBrokers: StockBrokerRow[];
   stockBrokerPage: number;
   stockBrokerPageCount: number;
@@ -158,12 +163,15 @@ export interface StockBrokerSectionProps {
   onToggleActive: (type: string, queryId: string) => void;
   onRemove: (type: string, queryId: string) => void;
   onQuickLook: (broker: StockBrokerRow) => void;
+  onRename?: (type: string, queryId: string, alias: string) => void;
 }
 
 // --- Wallet section props ---
 
 export interface WalletSectionProps {
   wallets: WalletRow[];
+  renameNames?: string[];
+  renameOffset?: number;
   visibleWallets: WalletRow[];
   walletPage: number;
   walletPageCount: number;
@@ -179,12 +187,15 @@ export interface WalletSectionProps {
   onToggleActive: (type: string, address: string) => void;
   onRemove: (type: string, address: string) => void;
   onQuickLook: (wallet: WalletRow) => void;
+  onRename?: (type: string, address: string, alias: string) => void;
 }
 
 // --- Others section props ---
 
 export interface OthersSectionProps {
   others: OtherRow[];
+  renameNames?: string[];
+  renameOffset?: number;
   baseCurrency?: Pick<CurrencyRateDetail, "currency" | "rate">;
   othersPage: number;
   othersPageCount: number;
@@ -202,6 +213,7 @@ export interface OthersSectionProps {
   onCommitOtherAmountInput: (idx: number) => void;
   onOthersPageChange: (page: number) => void;
   onRemove: (idx: number) => void;
+  onRename?: (idx: number, alias: string) => void;
   onOpenAttachModal: (idx: number) => void;
   getAttachDisplayLabel: (a: OtherAttachment) => string;
 }

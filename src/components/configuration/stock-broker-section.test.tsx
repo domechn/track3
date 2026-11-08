@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { StockBrokerSection } from "./stock-broker-section";
 import type { StockBrokerRow } from "./types";
@@ -33,6 +33,14 @@ const baseProps = {
 };
 
 describe("StockBrokerSection", () => {
+  it("cancels a broker rename with Escape", async () => {
+    const onRename = vi.fn();
+    render(<StockBrokerSection {...baseProps} onRename={onRename} />);
+    fireEvent.click(screen.getByRole("button", { name: "Rename Retirement" }));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Alias" }), { key: "Escape" });
+    expect(onRename).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Rename Retirement" })).toHaveFocus());
+  });
   it("renders broker table with data", () => {
     render(<StockBrokerSection {...baseProps} />);
 

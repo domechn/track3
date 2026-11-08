@@ -231,6 +231,21 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(rows[1]).not.toHaveTextContent("Waiting…");
   });
 
+  it("shows the current wallet alias on a pending refresh row", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    writeStoredStatuses([
+      { sourceId: "btc:0", label: "Cold", kind: "wallet", provider: "BTC", hint: "bc1q-d…rage", status: "ok" },
+    ]);
+    vi.mocked(getConfiguration).mockResolvedValue({
+      btc: { addresses: [{ address: "bc1q-demo-cold-storage", alias: "Vault" }] },
+    } as never);
+    vi.mocked(listPortfolioSources).mockReturnValue([{ sourceId: "btc:0", label: "Cold" }]);
+    vi.mocked(refreshAllData).mockImplementationOnce(() => new Promise(() => {}));
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByRole("group", { name: "Vault" })).toHaveTextContent("Vault");
+  });
+
   it("gives each in-progress source one clear state", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
     vi.mocked(getConfiguration).mockResolvedValue({} as never);

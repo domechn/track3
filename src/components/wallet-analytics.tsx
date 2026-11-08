@@ -17,6 +17,7 @@ import { sourceStatusesChangedEvent } from "./source-status-event";
 import { WalletStatusBanner } from "./wallet-status-banner";
 import WalletSourceChanges from "./wallet-source-changes";
 import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
+import { useCurrentSourceStatuses } from "./use-current-source-statuses";
 import WalletsFidelity from "./wallets-fidelity";
 import { useWindowSize } from "@/utils/hook";
 
@@ -40,6 +41,7 @@ const App = ({
   const [pageLoading, setPageLoading] = useState(true);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const currentStatuses = useCurrentSourceStatuses(statuses);
   const retrySchedule = useSyncExternalStore(refreshRetryScheduler.subscribe, refreshRetryScheduler.status);
   useEffect(() => {
     const onChanged = (event: Event) => setStatuses((event as CustomEvent<PortfolioSourceStatus[]>).detail);
@@ -70,7 +72,7 @@ const App = ({
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
       <div className="analyze-wallets relative min-h-[400px]" aria-busy={pageLoading}>
         {wide && <WalletsFidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor}
-          selectedSource={selectedSource} onSelectSource={setSelectedSource} statuses={statuses}
+          selectedSource={selectedSource} onSelectSource={setSelectedSource} statuses={currentStatuses}
           nextBySource={retrySchedule.nextBySource} availableDates={availableDates}
           onDatePickerValueChange={onDatePickerValueChange} onLoaded={onFidelityLoaded} />}
         {!wide && <div className="t3-wallet-legacy">

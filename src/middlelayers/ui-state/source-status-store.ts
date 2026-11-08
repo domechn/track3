@@ -22,7 +22,7 @@ export function readStoredStatuses(): PortfolioSourceStatus[] {
 }
 
 export function writeStoredStatuses(statuses: PortfolioSourceStatus[]): void {
-  localStorage.setItem(sourceStatusStorageKey, JSON.stringify(statuses));
+  localStorage.setItem(sourceStatusStorageKey, JSON.stringify(normalizeSourceStatuses(statuses)));
 }
 
 export async function retryRefresh<T>(fn: () => Promise<T>, times: number, interval: number, onRetry: (attempt: number) => void): Promise<T> {

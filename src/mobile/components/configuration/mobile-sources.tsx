@@ -21,6 +21,11 @@ import { selectFromDatabaseWithSql } from "@/middlelayers/database";
 import { partialFromRow, type PartialSnapshot, type PartialRow } from "@/middlelayers/snapshot-partial";
 import { FidelitySourceEditor } from "@/mobile/components/configuration/fidelity-source-editor";
 import { AutoRetrySetting } from "@/components/configuration/auto-retry-setting";
+import { AliasRename } from "@/components/configuration/alias-rename";
+import { sourceAliasFallback } from "@/components/source-display-name";
+import { matchSourceStatus } from "@/components/source-status-match";
+import { sourceStatusesChangedEvent } from "@/components/source-status-event";
+import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 import { LicenseCenter, type ProUsage } from "@/middlelayers/license";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
@@ -33,6 +38,7 @@ function ShieldIcon() {
 }
 
 export type MobileSourcesProps = {
+  renameNames?: string[];
   fidelityLayout?: boolean;
   fromOnboarding?: boolean;
   baseCurrency?: CurrencyRateDetail;
@@ -47,6 +53,9 @@ export type MobileSourcesProps = {
   onSaveExchange: (value: ExchangeRow, original?: ExchangeRow) => Promise<void>;
   onSaveWallet: (value: WalletRow, original?: WalletRow) => Promise<void>;
   onSaveBroker: (value: StockBrokerRow, original?: StockBrokerRow) => Promise<void>;
+  onRenameExchange?: (value: ExchangeRow, alias: string) => void;
+  onRenameWallet?: (value: WalletRow, alias: string) => void;
+  onRenameBroker?: (value: StockBrokerRow, alias: string) => void;
   onRemoveExchange: (value: ExchangeRow) => void;
   onRemoveWallet: (value: WalletRow) => void;
   onRemoveBroker: (value: StockBrokerRow) => void;
@@ -74,6 +83,11 @@ const blank = {
 
 export function MobileSources(props: MobileSourcesProps) {
   const { t, locale } = useTranslation();
+  const renameNames = props.renameNames ?? [
+    ...props.exchanges.map((row) => row.alias || sourceAliasFallback("exchange", row.type, row.apiKey)),
+    ...props.wallets.map((row) => row.alias || sourceAliasFallback("wallet", row.type, row.address)),
+    ...props.brokers.map((row) => row.alias || sourceAliasFallback("broker", row.type, row.queryId)),
+  ];
   const haptic = useHaptics();
   const [editor, setEditor] = useState<Editor>();
   const [removal, setRemoval] = useState<PendingRemoval>();
@@ -85,7 +99,13 @@ export function MobileSources(props: MobileSourcesProps) {
   const [kindPickerOpen, setKindPickerOpen] = useState(false);
   const [snapshot, setSnapshot] = useState<{ at: string; values: Record<string, number> }>();
   const [missingSources, setMissingSources] = useState<PartialSnapshot["missing"]>([]);
+  const [sourceStatuses, setSourceStatuses] = useState(readStoredStatuses);
   const [usage, setUsage] = useState<ProUsage>();
+  useEffect(() => {
+    const update = () => setSourceStatuses(readStoredStatuses());
+    window.addEventListener(sourceStatusesChangedEvent, update);
+    return () => window.removeEventListener(sourceStatusesChangedEvent, update);
+  }, []);
   useEffect(() => {
     if (!props.fidelityLayout || props.selectedKind !== "wallet") return;
     let live = true;
@@ -225,6 +245,20 @@ export function MobileSources(props: MobileSourcesProps) {
     { kind: "wallet", label: t("mobile.sources.wallets"), add: t("mobile.sources.addWallet"), rows: props.wallets, options: props.walletOptions },
     { kind: "broker", label: t("mobile.sources.brokers"), add: t("mobile.sources.addBroker"), rows: props.brokers, options: props.brokerOptions },
   ];
+  const statusPeers = sections.flatMap(({ kind, rows }) => rows.map((row) => {
+    const identifier = kind === "exchange" ? (row as ExchangeRow).apiKey
+      : kind === "wallet" ? (row as WalletRow).address : (row as StockBrokerRow).queryId;
+    const identity = kind === "exchange" ? `${row.type}-${identifier}`
+      : kind === "wallet" ? identifier : `ibkr:${identifier}`;
+    return { id: md5(identity), label: row.alias || row.type, wallet: identifier, type: row.type };
+  }));
+  const statusIdentities = Object.fromEntries(statusPeers.map(({ id, wallet, type }) => [id, { wallet, type }]));
+  const statusSources = statusPeers.map(({ id, label }) => ({ id, label }));
+  const rename = (kind: Kind, row: Draft, alias: string) => {
+    if (kind === "exchange") props.onRenameExchange?.(row as ExchangeRow, alias);
+    if (kind === "wallet") props.onRenameWallet?.(row as WalletRow, alias);
+    if (kind === "broker") props.onRenameBroker?.(row as StockBrokerRow, alias);
+  };
   const providerOptions = sections.find((section) => section.kind === editor?.kind)?.options ?? [];
   const hasSources = props.exchanges.length + props.wallets.length + props.brokers.length > 0;
   const sourceValue = (kind: Kind, row: Draft) => {
@@ -291,16 +325,27 @@ export function MobileSources(props: MobileSourcesProps) {
                 : kind === "wallet" ? truncateAddress((row as WalletRow).address)
                 : maskSensitive((row as StockBrokerRow).queryId);
               const name = row.alias || options.find((option) => option.value === row.type)?.label || row.type;
+              const fallback = sourceAliasFallback(kind, row.type,
+                kind === "exchange" ? (row as ExchangeRow).apiKey : kind === "wallet" ? (row as WalletRow).address : (row as StockBrokerRow).queryId);
+              const renameIndex = index + (kind === "wallet" ? props.exchanges.length
+                : kind === "broker" ? props.exchanges.length + props.wallets.length : 0);
               if (props.fidelityLayout) {
                 const value = sourceValue(kind, row);
                 const sourceIdentity = kind === "exchange" ? `${row.type}-${(row as ExchangeRow).apiKey}`
                   : kind === "wallet" ? (row as WalletRow).address : `ibkr:${(row as StockBrokerRow).queryId}`;
                 const failure = missingSources.find((source) => source.wallet === md5(sourceIdentity));
+                const sourceStatus = matchSourceStatus({ id: md5(sourceIdentity), label: name },
+                  statusIdentities, statusSources, sourceStatuses.filter((status) => !status.hint));
+                const pausedAt = !row.active && sourceStatus?.lastSuccessAt
+                  ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
+                    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                    hour12: false, timeZone: "UTC",
+                  }).format(new Date(sourceStatus.lastSuccessAt)) : undefined;
                 const lastGood = failure?.lastSuccessAt ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", {
                   hour: "2-digit", minute: "2-digit", hour12: false,
                 }).format(new Date(failure.lastSuccessAt)) : undefined;
                 const ending = kind === "exchange" ? t("fidelity.settings.sources.exchangeEnding").replace("{ending}", (row as ExchangeRow).apiKey.slice(-4))
-                  : kind === "broker" ? t("fidelity.settings.sources.flexId").replace("{id}", (row as StockBrokerRow).queryId.length > 6
+                  : kind === "broker" ? t("fidelity.settings.sources.flexId").replace("{id}", (row as StockBrokerRow).queryId.length >= 6
                     ? `${(row as StockBrokerRow).queryId.slice(0, 3)}…${(row as StockBrokerRow).queryId.slice(-3)}` : (row as StockBrokerRow).queryId)
                   : row.type === "btc"
                     ? `${t("fidelity.settings.sources.bitcoin")} · ${(row as WalletRow).address.slice(0, 4)}...${(row as WalletRow).address.slice(-4)}`
@@ -315,7 +360,7 @@ export function MobileSources(props: MobileSourcesProps) {
                     : kind === "broker" ? "IB" : row.type === "btc" ? "BTC" : "ETH"} />
                     </button>
                     <button type="button" className="fidelity-source-name" onClick={() => start(kind, row)}
-                      aria-label={`${name} ${identity}`}><strong>{name}</strong><small>{ending}
+                      aria-label={`${t("goals.edit")} ${name}`} aria-describedby={`fidelity-source-detail-${kind}-${index}`}><strong title={name}>{name}</strong><small id={`fidelity-source-detail-${kind}-${index}`}>{ending}
                       {kind === "wallet" && row.type === "erc20" && props.isPro &&
                         <em className="fidelity-source-pro">{t("fidelity.settings.menu.pro")}</em>}</small></button>
                   </div>
@@ -328,7 +373,7 @@ export function MobileSources(props: MobileSourcesProps) {
                   <span className={`fidelity-source-status${failure ? " is-error" : row.active ? " is-active" : ""}`}><i />{t(failure
                     ? "fidelity.settings.sources.error" : row.active ? "fidelity.settings.sources.active" : "fidelity.settings.sources.paused")}</span>
                   <span className="fidelity-source-refresh">{failure ? lastGood
-                    ? t("fidelity.settings.sources.lastGood").replace("{time}", lastGood) : "—" : row.active ? refreshLabel : "—"}</span>
+                    ? t("fidelity.settings.sources.lastGood").replace("{time}", lastGood) : "—" : row.active ? refreshLabel : pausedAt ?? "—"}</span>
                   <div className="fidelity-source-money"><strong className="fidelity-source-value">{money(value)}</strong>
                     {failure && <small>{t("fidelity.settings.sources.stale")}</small>}</div>
                   {failure && <div className="fidelity-source-error-panel"><ExclamationTriangleIcon aria-hidden="true" />
@@ -343,7 +388,9 @@ export function MobileSources(props: MobileSourcesProps) {
                         if (kind === "wallet") props.onQuickLookWallet?.(row as WalletRow);
                         if (kind === "broker") props.onQuickLookBroker?.(row as StockBrokerRow);
                       }}><FidelityIcon name="search" />{t("mobile.sources.quickLook")}</button>
-                    <button type="button" aria-label={`${t("goals.edit")} ${name}`} onClick={() => start(kind, row)}><FidelityIcon name="edit" /></button>
+                    <AliasRename alias={row.alias} name={name} fallback={fallback} names={renameNames}
+                      index={renameIndex}
+                      onRename={(alias) => rename(kind, row, alias)} />
                     <button type="button" className="is-danger" aria-label={`${t("common.delete")} ${name}`}
                       onClick={() => setRemoval({ kind, value: row })}><FidelityIcon name="trash" /></button>
                   </div>
@@ -361,6 +408,9 @@ export function MobileSources(props: MobileSourcesProps) {
                   if (kind === "wallet") props.onToggleWallet(row as WalletRow);
                   if (kind === "broker") props.onToggleBroker(row as StockBrokerRow);
                 }} />
+                <AliasRename alias={row.alias} name={name} fallback={fallback} names={renameNames}
+                  index={renameIndex}
+                  onRename={(alias) => rename(kind, row, alias)} />
                 <button type="button" className="ios-d3-source-more" aria-label={t("mobile.sources.moreActions").replace("{source}", name)}
                   onClick={() => { haptic("selection"); setMenu({ kind, value: row, name }); }}><DotsHorizontalIcon aria-hidden="true" /></button>
               </div>;

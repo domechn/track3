@@ -32,6 +32,68 @@ const props = {
 };
 
 describe("mobile data sources", () => {
+  it("renames a saved exchange from its phone row without editing credentials", () => {
+    const rename = vi.fn();
+    render(<MobileSources {...props} onRenameExchange={rename} />);
+    fireEvent.click(screen.getByRole("button", { name: "Rename Binance" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Alias" }), { target: { value: "  Trading  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(rename).toHaveBeenCalledWith(props.exchanges[0], "Trading");
+    expect(props.onSaveExchange).not.toHaveBeenCalled();
+  });
+  it("previews wallet duplicate aliases across phone source sections", () => {
+    render(<MobileSources {...props}
+      exchanges={[{ ...props.exchanges[0], alias: "Main" }]}
+      wallets={[{ type: "btc", address: "bc1q-demo-cold-storage", alias: "Cold", active: true }]}
+      selectedKind="wallet" />);
+    fireEvent.click(screen.getByRole("button", { name: "Rename Cold" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Alias" }), { target: { value: "Main" } });
+    expect(screen.getByRole("dialog")).toHaveTextContent("Shown elsewhere as Main (2)");
+  });
+  it("opens the full source editor from the source name beside Rename on iPhone", async () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="exchange" />);
+    const edit = (await screen.findAllByRole("button", { name: "Edit Binance" }))[0];
+    expect(edit).toContainElement(screen.getByTitle("Binance"));
+    expect(screen.getAllByRole("button", { name: "Edit Binance" })).toHaveLength(1);
+    fireEvent.click(edit);
+    expect(screen.getByRole("dialog", { name: "Edit data source" })).toBeVisible();
+  });
+  it("shows a paused source's stored last-success date when its provider is unique", async () => {
+    localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([{
+      sourceId: "cex:2", label: "Kraken", kind: "exchange", provider: "Kraken",
+      status: "ok", lastSuccessAt: "2026-10-12T18:05:00.000Z",
+    }]));
+    try {
+      render(<MobileSources {...props} fidelityLayout selectedKind="exchange"
+        exchanges={[{ type: "kraken", apiKey: "sample-kraken-key", secret: "", active: false }]}
+        exchangeOptions={[...props.exchangeOptions, { value: "kraken", label: "Kraken" }]} />);
+      expect(await screen.findByText("12 Oct, 18:05")).toBeVisible();
+    } finally {
+      localStorage.removeItem("track3-refresh-source-statuses");
+    }
+  });
+  it("does not assign a numbered broker status to a paused broker", async () => {
+    localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([{
+      sourceId: "stock:0", label: "Old broker", kind: "broker", provider: "Interactive Brokers",
+      hint: "#1", status: "ok", lastSuccessAt: "2026-10-30T09:41:00.000Z",
+    }]));
+    try {
+      render(<MobileSources {...props} fidelityLayout selectedKind="broker"
+        brokers={[{ type: "ibkr", queryId: "query-1234", token: "", active: false }]}
+        brokerOptions={[{ value: "ibkr", label: "Interactive Brokers" }]} />);
+      const row = (await screen.findByRole("button", { name: "Rename Interactive Brokers" }))
+        .closest(".fidelity-source-row");
+      expect(row).not.toHaveTextContent("30 Oct, 09:41");
+    } finally {
+      localStorage.removeItem("track3-refresh-source-statuses");
+    }
+  });
+  it("formats a six-character Flex Query ID without hiding any digit", async () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="broker"
+      brokers={[{ type: "ibkr", queryId: "912406", token: "", active: true }]} />);
+    expect(await screen.findByText("Flex Query · ID 912…406")).toBeVisible();
+    expect(screen.queryByText("Flex Query · ID 912406")).not.toBeInTheDocument();
+  });
   it("looks up the IP only on the exchange credentials step, then copies and refreshes", async () => {
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
@@ -341,7 +403,7 @@ describe("mobile data sources", () => {
       fidelityLayout selectedKind={kind as "exchange" | "wallet" | "broker"}
       wallets={[{ type: "btc", address: "bc1qexample", active: true }]}
       brokers={[{ type: "ibkr", token: "secret", queryId: "12345", active: true }]} />);
-    fireEvent.click(await screen.findByRole("button", { name: new RegExp(`^${name} `) }));
+    fireEvent.click(await screen.findByRole("button", { name: `Edit ${name}` }));
     expect(screen.getByRole("textbox", { name: field })).toHaveAttribute("readonly");
     if (kind === "wallet") {
       expect(screen.getByRole("heading", { name: "Edit wallet" })).toBeVisible();

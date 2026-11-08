@@ -1,4 +1,4 @@
-import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
+import type { CurrentSourceStatus } from "@/middlelayers/source-status-labels";
 
 type Source = { id: string; label: string };
 type Identity = { wallet?: string; type?: string };
@@ -8,13 +8,14 @@ export function matchSourceStatus(
   source: Source,
   identities: Record<string, Identity | undefined>,
   sources: readonly Source[],
-  statuses: readonly PortfolioSourceStatus[],
+  statuses: readonly CurrentSourceStatus[],
 ) {
-  const direct = statuses.find((status) => status.sourceId === source.id || status.label === source.label);
-  if (direct) return direct;
   const provider = providerName(identities[source.id]?.type);
+  const direct = statuses.find((status) => (status.sourceId === source.id || status.walletId === source.id) &&
+    (!provider || providerName(status.provider) === provider));
+  if (direct) return direct;
   if (!provider) return undefined;
-  const candidates = statuses.filter((status) => providerName(status.provider) === provider);
+  const candidates = statuses.filter((status) => !status.walletId && providerName(status.provider) === provider);
   const wallet = identities[source.id]?.wallet;
   const hint = wallet && wallet.length >= 14 ? `${wallet.slice(0, 6)}…${wallet.slice(-4)}` : undefined;
   const hinted = candidates.filter((status) => status.hint === hint);
@@ -23,5 +24,8 @@ export function matchSourceStatus(
     const address = identities[item.id]?.wallet;
     return address && `${address.slice(0, 6)}…${address.slice(-4)}` === hint;
   }).length === 1) return hinted[0];
-  return peers.length === 1 && candidates.length === 1 ? candidates[0] : undefined;
+  const walletStatus = candidates[0]?.kind === "wallet" ||
+    /^(btc|erc20|sol|doge|trc20|ton|sui):/.test(candidates[0]?.sourceId ?? "");
+  return peers.length === 1 && candidates.length === 1 && (!walletStatus || !hint)
+    ? candidates[0] : undefined;
 }

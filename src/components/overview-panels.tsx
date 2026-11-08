@@ -14,6 +14,7 @@ import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store"
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
 import { sourceDisplayNames } from "./source-display-name";
+import { useCurrentSourceStatuses } from "./use-current-source-statuses";
 import { matchSourceStatus } from "./source-status-match";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { buildAssetDetailsPath } from "@/utils/assets";
@@ -41,7 +42,8 @@ export function useOverviewPanelsData(dateRange: TDateRange, allTimeRange: TDate
   const [weekBased, setWeekBased] = useState(false);
   const [coins, setCoins] = useState<CoinRow[]>([]);
   const [sources, setSources] = useState<WalletAssetsPercentageData>([]);
-  const [statuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const [storedStatuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const statuses = useCurrentSourceStatuses(storedStatuses);
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   const allKey = `${allTimeRange.start.getTime()}-${allTimeRange.end.getTime()}`;
 

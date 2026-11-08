@@ -41,11 +41,15 @@ import type { PriceDraft } from "./custom-price-fields";
 import { validateCustomPrice } from "@/middlelayers/custom-price";
 import { BackpackIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
+import { AliasRename } from "./alias-rename";
+import { sourceAliasFallback } from "@/components/source-display-name";
 
 const CONFIG_LIST_PAGE_SIZE = 30;
 
 const OthersSection = memo(function OthersSection({
   others,
+  renameNames,
+  renameOffset = 0,
   baseCurrency,
   othersPage,
   othersPageCount,
@@ -59,6 +63,7 @@ const OthersSection = memo(function OthersSection({
   onCommitOtherAmountInput,
   onOthersPageChange,
   onRemove,
+  onRename,
   onOpenAttachModal,
   getAttachDisplayLabel,
 }: OthersSectionProps) {
@@ -111,7 +116,7 @@ const OthersSection = memo(function OthersSection({
                     <TableHead>{t("config.alias")}</TableHead>
                     <TableHead>{t("config.symbol")}</TableHead>
                     <TableHead>{t("config.amount")}</TableHead>
-                    <TableHead className="w-[84px] text-right">
+                    <TableHead className="w-[140px] text-right">
                       {t("config.actions")}
                     </TableHead>
                   </TableRow>
@@ -132,12 +137,11 @@ const OthersSection = memo(function OthersSection({
                             type="text"
                             maxLength={100}
                             name="alias"
+                            aria-label={t("config.alias")}
                             placeholder={t("config.placeholder.alias")}
                             value={o.alias ?? ""}
                             autoComplete="off"
-                            onChange={(e) =>
-                              onOthersChange(globalIdx, "alias", e.target.value)
-                            }
+                            onChange={(e) => onOthersChange(globalIdx, "alias", e.target.value)}
                           />
                         </TableCell>
                         <TableCell>
@@ -182,6 +186,9 @@ const OthersSection = memo(function OthersSection({
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="inline-flex items-center justify-end gap-1">
+                            <AliasRename alias={o.alias} name={o.alias || o.symbol} fallback={sourceAliasFallback("custom", o.symbol)}
+                              names={renameNames ?? others.map((item) => item.alias || item.symbol)} index={renameOffset + globalIdx}
+                              onRename={(alias) => onRename?.(globalIdx, alias)} />
                             {o.attachTo ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>

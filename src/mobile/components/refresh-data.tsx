@@ -44,6 +44,7 @@ import { publishRefreshProgress, refreshSourceEvent } from "@/mobile/components/
 import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
 import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
 import SourceMark from "@/mobile/components/source-mark";
+import { useCurrentSourceStatuses } from "@/components/use-current-source-statuses";
 
 let lastRetryResult: RefreshAllDataResult | undefined;
 
@@ -66,6 +67,7 @@ const App = ({
   refreshLoadingRef.current = refreshLoading;
   const retrySchedule = useSyncExternalStore(refreshRetryScheduler.subscribe, refreshRetryScheduler.status);
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const displayStatuses = useCurrentSourceStatuses(sourceStatuses);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult | undefined>(() => lastRetryResult);
   const [refreshing, setRefreshing] = useState(false);
   const [pendingSources, setPendingSources] = useState<Array<{ sourceId: string; label: string }>>([]);
@@ -273,20 +275,23 @@ const App = ({
   const hasFailure = sourceStatuses.some((source) => source.status === "failed" || source.status === "stale");
   const hasPartial = sourceStatuses.some((source) => source.status === "partial");
   const sourceLabel = (source: Pick<PortfolioSourceStatus, "sourceId" | "label">) => {
+    const stored = sourceStatuses.find((status) => status.sourceId === source.sourceId);
+    const current = displayStatuses.find((status) => status.sourceId === source.sourceId);
+    const label = stored && current && current.label !== stored.label ? current.label : source.label;
     const wallet = /^(erc20|sol|btc|doge|trc20|ton|sui):(\d+)$/.exec(source.sourceId);
-    if (wallet && source.label.toLowerCase() === `${wallet[1]} wallet ${Number(wallet[2]) + 1}`) {
+    if (wallet && label.toLowerCase() === `${wallet[1]} wallet ${Number(wallet[2]) + 1}`) {
       return t("refresh.walletSource")
         .replace("{chain}", wallet[1].toUpperCase())
         .replace("{number}", String(Number(wallet[2]) + 1));
     }
-    return source.sourceId === "others" ? t("refresh.othersSource") : source.label;
+    return source.sourceId === "others" ? t("refresh.othersSource") : label;
   };
   const displayIdentity = (source: PortfolioSourceStatus) =>
     sourceIdentity({ ...source, label: sourceLabel(source) });
   const displayHint = (source: PortfolioSourceStatus) =>
     source.kind === "exchange" && source.hint && !source.hint.startsWith("#")
       ? `${t("refresh.hint.apikey")} ${source.hint}` : source.hint;
-  const sortedStatuses = sortSourceStatuses(sourceStatuses);
+  const sortedStatuses = sortSourceStatuses(displayStatuses);
   const sourceOrder = new Map(sourceStatuses.map((source, index) => [source.sourceId, index]));
   const progressSources = [...pendingSources, ...liveSources.filter((source) =>
     !pendingSources.some((pending) => pending.sourceId === source.sourceId))]

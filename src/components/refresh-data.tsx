@@ -20,6 +20,7 @@ import {
 import { RefreshButtonLoadingContext } from "./index/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
 import { getConfiguration, updateAllCurrencyRates } from "@/middlelayers/configuration";
+import { useCurrentSourceStatuses } from "./use-current-source-statuses";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -66,6 +67,7 @@ const App = ({
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [showLastKnownOffer, setShowLastKnownOffer] = useState(false);
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const currentSourceStatuses = useCurrentSourceStatuses(sourceStatuses);
   const sourceTriggerRef = useRef<HTMLButtonElement>(null);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult | undefined>(() => lastRetryResult);
   const lastResultRef = useRef(lastResult);
@@ -388,20 +390,23 @@ const App = ({
   const hasFailure = sourceStatuses.some((source) => source.status === "failed" || source.status === "stale");
   const hasPartial = sourceStatuses.some((source) => source.status === "partial");
   const sourceLabel = (source: PortfolioSourceStatus) => {
+    const stored = sourceStatuses.find((status) => status.sourceId === source.sourceId);
+    const current = currentSourceStatuses.find((status) => status.sourceId === source.sourceId);
+    const label = stored && current && current.label !== stored.label ? current.label : source.label;
     const wallet = /^(erc20|sol|btc|doge|trc20|ton|sui):(\d+)$/.exec(source.sourceId);
-    if (wallet && source.label.toLowerCase() === `${wallet[1]} wallet ${Number(wallet[2]) + 1}`) {
+    if (wallet && label.toLowerCase() === `${wallet[1]} wallet ${Number(wallet[2]) + 1}`) {
       return t("refresh.walletSource")
         .replace("{chain}", wallet[1].toUpperCase())
         .replace("{number}", String(Number(wallet[2]) + 1));
     }
-    return source.sourceId === "others" ? t("refresh.othersSource") : source.label;
+    return source.sourceId === "others" ? t("refresh.othersSource") : label;
   };
   const displayIdentity = (source: PortfolioSourceStatus) =>
     sourceIdentity({ ...source, label: sourceLabel(source) });
   const displayHint = (source: PortfolioSourceStatus) =>
     source.kind === "exchange" && source.hint && !source.hint.startsWith("#")
       ? `${t("refresh.hint.apikey")} ${source.hint}` : source.hint;
-  const sortedStatuses = sortSourceStatuses(sourceStatuses);
+  const sortedStatuses = sortSourceStatuses(currentSourceStatuses);
   const failedStatuses = sortedStatuses.filter((source) => source.status === "failed");
   const partialStatuses = sortedStatuses.filter((source) => source.status === "partial");
   const quotaStatuses = sortedStatuses.filter((source) => source.status !== "ok" && source.category === "quota");
@@ -557,7 +562,7 @@ const App = ({
           </AlertDialogHeader>
           {wideStatusFlow ? <div className="t3-refresh-flow-list">
             {refreshing && <p>{t("refresh.design.previousResults")}</p>}
-            {sourceStatuses.map((source) => <div key={source.sourceId} className="t3-refresh-flow-row" role="group" aria-label={displayIdentity(source)}>
+            {currentSourceStatuses.map((source) => <div key={source.sourceId} className="t3-refresh-flow-row" role="group" aria-label={displayIdentity(source)}>
               <i aria-hidden="true">{sourceLabel(source).slice(0, 2)}</i>
               <div><strong>{sourceLabel(source)}</strong><small className={source.category === "quota" ? "quota" : source.status === "ok" ? "" : "failed"}>
                 {source.status === "ok" && source.startedAt && source.finishedAt

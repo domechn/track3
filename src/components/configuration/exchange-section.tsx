@@ -46,11 +46,15 @@ import type { ExchangeSectionProps } from "./types";
 import { PublicIpInfo } from "./public-ip-info";
 import { BackpackIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
+import { AliasRename } from "./alias-rename";
+import { sourceAliasFallback } from "@/components/source-display-name";
 
 const CONFIG_LIST_PAGE_SIZE = 30;
 
 const ExchangeSection = memo(function ExchangeSection({
   exchanges,
+  renameNames,
+  renameOffset = 0,
   visibleExchanges,
   exchangePage,
   exchangePageCount,
@@ -66,6 +70,7 @@ const ExchangeSection = memo(function ExchangeSection({
   onToggleActive,
   onRemove,
   onQuickLook,
+  onRename,
 }: ExchangeSectionProps) {
   const { t } = useTranslation();
 
@@ -289,7 +294,7 @@ const ExchangeSection = memo(function ExchangeSection({
                   <TableHead className="w-[120px]">
                     {t("config.status")}
                   </TableHead>
-                  <TableHead className="w-[84px] text-right">
+                  <TableHead className="w-[140px] text-right">
                     {t("config.actions")}
                   </TableHead>
                 </TableRow>
@@ -314,7 +319,7 @@ const ExchangeSection = memo(function ExchangeSection({
                       </div>
                     </TableCell>
                     <TableCell className="w-[170px] text-sm">
-                      {ex.alias || `${ex.type}-${idx + 1}`}
+                      <span className="block truncate" title={ex.alias || `${ex.type}-${idx + 1}`}>{ex.alias || `${ex.type}-${idx + 1}`}</span>
                     </TableCell>
                     <TableCell className="w-[220px] text-xs text-muted-foreground">
                       <p className="truncate">{maskSensitive(ex.apiKey)}</p>
@@ -334,8 +339,12 @@ const ExchangeSection = memo(function ExchangeSection({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="w-[84px] text-right">
-                      <div className="inline-flex w-[64px] items-center justify-end gap-1">
+                    <TableCell className="w-[140px] text-right">
+                      <div className="inline-flex items-center justify-end gap-1">
+                        <AliasRename alias={ex.alias} name={ex.alias || `${ex.type}-${idx + 1}`}
+                          fallback={sourceAliasFallback("exchange", ex.type)} index={renameOffset + exchanges.indexOf(ex)}
+                          names={renameNames ?? exchanges.map((item) => item.alias || sourceAliasFallback("exchange", item.type, item.apiKey))}
+                          onRename={(alias) => onRename?.(ex.type, ex.apiKey, alias)} />
                         {isPro && (
                           <Button
                             size="icon"

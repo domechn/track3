@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/mobile/i18n";
 import { ConfirmSheet, ModalPage } from "@/mobile/components/mobile/overlays";
 import { ActionSheet } from "@/mobile/components/mobile";
-import { BackpackIcon, Cross2Icon, DotsHorizontalIcon, Link2Icon, LockClosedIcon, Pencil1Icon, TrashIcon } from "@radix-ui/react-icons";
+import { BackpackIcon, Cross2Icon, DotsHorizontalIcon, Link2Icon, LockClosedIcon, TrashIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
 import { getWalletLogo } from "@/lib/utils";
 import UnknownLogo from "@/assets/icons/unknown-logo.svg";
@@ -16,6 +16,8 @@ import { validateCustomPrice } from "@/middlelayers/custom-price";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
 import { encodedAttachTo, parseAttachTo } from "@/utils/attach-to";
 import type { SelectOption } from "@/components/configuration/types";
+import { AliasRename } from "@/components/configuration/alias-rename";
+import { sourceAliasFallback } from "@/components/source-display-name";
 
 function displayPriceAmount(value: string) {
   if (!/^\d+(?:\.\d*)?$/.test(value)) return value;
@@ -25,8 +27,11 @@ function displayPriceAmount(value: string) {
 
 export function MobileOthers(props: {
   others: OtherRow[];
+  renameNames?: string[];
+  renameOffset?: number;
   baseCurrency?: { currency: string; rate: number };
   onSave: (index: number | null, value: OtherRow) => void;
+  onRename?: (index: number, alias: string) => void;
   onRemove: (index: number) => void;
   onAttach: (index: number, fromMenu?: boolean) => void;
   hideEmpty?: boolean;
@@ -109,7 +114,8 @@ export function MobileOthers(props: {
           aria-labelledby={`fidelity-custom-more-${index}`} onClick={() => setMenu(index)}>
           <span className="sr-only" id={`fidelity-custom-more-${index}`}>{t("mobile.sources.moreActions").replace("{source}", other.symbol)}</span>
           {other.symbol === "GOLD" ? "AU" : other.symbol.slice(0, 2).toUpperCase()}</button>
-          <div><strong id={`fidelity-custom-symbol-${index}`}>{other.symbol}</strong><small>{other.alias || other.symbol} · {other.amount.toLocaleString("en-US")}</small></div></div>
+          <div><button type="button" className="fidelity-custom-name" aria-label={`${t("goals.edit")} ${other.symbol}`}
+            aria-describedby={`fidelity-custom-detail-${index}`} onClick={() => open(index)}><strong id={`fidelity-custom-symbol-${index}`}>{other.symbol}</strong></button><small id={`fidelity-custom-detail-${index}`} title={other.alias || other.symbol}>{other.alias || other.symbol} · {other.amount.toLocaleString("en-US")}</small></div></div>
         <div className="fidelity-custom-details">
           <div><span>{other.price?.kind === "manual" ? t("fidelity.settings.custom.manual") : other.price?.kind === "follow"
             ? t("fidelity.settings.custom.follows").replace("{symbol}", other.price.symbol)
@@ -123,7 +129,10 @@ export function MobileOthers(props: {
           <button type="button" aria-labelledby={`fidelity-custom-attach-${index} fidelity-custom-symbol-${index}`}
             onClick={() => props.onAttach(index)}><Link2Icon aria-hidden="true" />
             <span id={`fidelity-custom-attach-${index}`}>{t("fidelity.settings.custom.attach")}</span></button>
-          <button type="button" aria-label={`${t("goals.edit")} ${other.symbol}`} onClick={() => open(index)}><Pencil1Icon aria-hidden="true" /></button>
+          <AliasRename alias={other.alias} name={other.alias || other.symbol} fallback={sourceAliasFallback("custom", other.symbol)}
+            names={props.renameNames ?? props.others.map((item) => item.alias || item.symbol)}
+            index={(props.renameOffset ?? 0) + index}
+            onRename={(alias) => props.onRename?.(index, alias)} />
           <button type="button" className="is-danger" aria-label={`${t("common.delete")} ${other.symbol}`} onClick={() => setRemoval(index)}><TrashIcon aria-hidden="true" /></button>
         </div>
       </div>)}
@@ -133,6 +142,7 @@ export function MobileOthers(props: {
     <div className="fidelity-custom-info"><LockClosedIcon aria-hidden="true" /><div><strong>{t("fidelity.settings.custom.noteTitle")}</strong>
       <span>{t("fidelity.settings.custom.note")}</span></div></div>
     {menu !== null && <ActionSheet open onOpenChange={(open) => { if (!open) setMenu(null); }} title={props.others[menu]?.symbol ?? ""} actions={[
+      { label: t("goals.edit"), onClick: () => open(menu) },
       { label: t("config.others.attachTo"), onClick: () => props.onAttach(menu, true) },
       { label: t("common.delete"), destructive: true, onClick: () => setRemoval(menu) },
     ]} />}
@@ -232,6 +242,10 @@ export function MobileOthers(props: {
               ? `config.customPrice.${other.price.kind}` : "config.customPrice.invalidRule")}` : ""}
           </span>
         </button>
+        <AliasRename alias={other.alias} name={other.alias || other.symbol} fallback={sourceAliasFallback("custom", other.symbol)}
+          names={props.renameNames ?? props.others.map((item) => item.alias || item.symbol)}
+          index={(props.renameOffset ?? 0) + index}
+          onRename={(alias) => props.onRename?.(index, alias)} />
         <button className="ios-d3-source-more" aria-label={t("mobile.sources.moreActions").replace("{source}", other.symbol)} onClick={() => setMenu(index)}><DotsHorizontalIcon aria-hidden="true" /></button>
       </div>)}
     </div>}

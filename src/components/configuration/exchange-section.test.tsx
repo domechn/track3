@@ -77,6 +77,22 @@ describe("ExchangeSection", () => {
     expect(screen.getByText("8.8.8.8")).toHaveClass("select-text");
   });
 
+  it("previews the exchange name when its alias is cleared", () => {
+    render(<ExchangeSection {...baseProps} />);
+    fireEvent.click(screen.getByRole("button", { name: "Rename Main" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Alias" }), { target: { value: "" } });
+    expect(screen.getByRole("dialog")).toHaveTextContent("Shown elsewhere as Binance");
+  });
+
+  it("numbers a rename that duplicates an unaliased exchange's portfolio name", () => {
+    render(<ExchangeSection {...baseProps} exchanges={[
+      mockExchanges[0], { type: "binance", apiKey: "second-key", secret: "", active: true },
+    ]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Rename Main" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Alias" }), { target: { value: "Binance" } });
+    expect(screen.getByRole("dialog")).toHaveTextContent("Shown elsewhere as Binance (1)");
+  });
+
   it("copies the visible IP, refreshes it, and displays a lookup error", async () => {
     const writeText = vi.fn(async () => {});
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
@@ -104,6 +120,15 @@ describe("ExchangeSection", () => {
     expect(screen.getByText("Binance")).toBeInTheDocument();
     expect(screen.getByText("OKX")).toBeInTheDocument();
     expect(screen.getByText("Main")).toBeInTheDocument();
+  });
+
+  it("renames an exchange without changing its identifying fields", () => {
+    const onRename = vi.fn();
+    render(<ExchangeSection {...baseProps} onRename={onRename} />);
+    fireEvent.click(screen.getByRole("button", { name: "Rename Main" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Alias" }), { target: { value: "  Trading  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onRename).toHaveBeenCalledWith("binance", "key123", "Trading");
   });
 
   it("shows active/inactive status", () => {

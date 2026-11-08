@@ -54,6 +54,16 @@ export function previewSourceNames(names: readonly string[]) {
   };
 }
 
+export function sourceAliasFallback(kind: "exchange" | "wallet" | "broker" | "custom", type: string, identifier = ""): string {
+  if (kind === "wallet") return sourceDisplayNames([{ alias: identifier, wallet: identifier }])[0];
+  if (kind === "broker") return type === "ibkr" ? "IBKR" : type;
+  if (kind === "custom") return type;
+  if (type === "okex") return "Okex";
+  if (type === "htx" || type === "mexc") return type.toUpperCase();
+  return ["binance", "bitget", "gate", "kraken", "coinbase", "bybit", "backpack"].includes(type)
+    ? type.charAt(0).toUpperCase() + type.slice(1) : type;
+}
+
 export function transactionSourceName(id: string, source?: DisplaySource) {
   if (!source) return undefined;
   const name = sourceDisplayNames([{ id, ...source }])[0];
