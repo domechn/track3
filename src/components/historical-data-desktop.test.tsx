@@ -104,3 +104,17 @@ it("mutes a zero edit-log delta", async () => {
   const log = await screen.findByRole("region", { name: "Edits" });
   expect(within(log).getByText("$0.00")).toHaveClass("zero");
 });
+
+it("moves selection through the snapshot list with keyboard navigation", async () => {
+  render(<MemoryRouter><HistoricalDataDesktop currency={currency} quoteColor="green-up-red-down" /></MemoryRouter>);
+  const list = await screen.findByRole("region", { name: "Snapshots" });
+  await waitFor(() => expect(within(list).getAllByTestId("history-snapshot-row")[0]).toHaveClass("selected"));
+  const first = within(list).getAllByTestId("history-snapshot-row")[0].querySelector("button")!;
+  first.focus();
+  fireEvent.keyDown(first, { key: "ArrowDown" });
+  expect(within(list).getAllByTestId("history-snapshot-row")[1]).toHaveClass("selected");
+  fireEvent.keyDown(document.activeElement!, { key: "Home" });
+  expect(within(list).getAllByTestId("history-snapshot-row")[0]).toHaveClass("selected");
+  fireEvent.keyDown(document.activeElement!, { key: "End" });
+  expect(within(list).getAllByTestId("history-snapshot-row")[1]).toHaveClass("selected");
+});

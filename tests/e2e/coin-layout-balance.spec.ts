@@ -214,3 +214,24 @@ test("desktop chart follows a much taller expanded source column", async ({ page
   await page.getByRole("button", { name: /44 sources with no balance/ }).click();
   await expect(chart).toHaveCSS("position", "static");
 });
+
+test("desktop chart follows a source column once it would leave a 120px blank slab", async ({ page }) => {
+  await page.setViewportSize({ width: 1184, height: 820 });
+  await installTauriBridge(page, { fidelityDesktop: "full" });
+  await seedCoinLayoutCase(page, "sixteen");
+  await page.evaluate(() => (window as any).__e2eInvoke("plugin:sql|execute", {
+    query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('fidelity-oct-31', '2026-10-31T09:41:00.000Z', 'extra-zero-1', 'crypto', 'BTC', 0, 0, 63842.11),
+      ('fidelity-oct-31', '2026-10-31T09:41:00.000Z', 'extra-zero-2', 'crypto', 'BTC', 0, 0, 63842.11)`,
+    values: [],
+  }));
+  await page.goto("/#/coins/BTC");
+  await page.getByRole("button", { name: /16 sources with no balance/ }).click();
+  const difference = await page.evaluate(() => {
+    const main = document.querySelector(".coin-fidelity-main-column")!.getBoundingClientRect();
+    const side = document.querySelector(".coin-fidelity-side-column")!.getBoundingClientRect();
+    return side.height - main.height;
+  });
+  expect(difference).toBeGreaterThanOrEqual(120);
+  await expect(page.locator(".coin-fidelity-chart")).toHaveCSS("position", "sticky");
+});

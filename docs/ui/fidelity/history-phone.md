@@ -32,9 +32,9 @@ The design invents 1,284 snapshots and source refresh names/counts. The existing
 
 ## Remaining differences
 
-The no-snapshot card now uses the shared centred icon, title, hint, and action. The supplied empty source page shows the earlier dashed treatment; the saved-data and refresh flows are the same.
+The no-snapshot card now uses the source's dashed treatment, title, hint, and action. Its note describes the app's actual fixed page size rather than a setting that does not exist.
 
-The HTML source pages are present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. The table compares fresh Chromium renders in `/tmp/fidelity/source-review/` with app captures in `/tmp/fidelity/history/` at 390 × 844. A pixel differs when its summed absolute RGB difference exceeds 48. The source long page is 3687 px and the app page is 3647 px; their common-height ratio is below, and the full-height ratio is 10.75%. Full-page captures hide the fixed tab bar so it does not cover a row.
+The HTML source pages are present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. On 8 Nov 2026 they were re-rendered in Chromium with scrollbars hidden into `/tmp/ui43-source/`; current app captures are preserved in `/tmp/ui43-captures-phone/`. The source list card begins at (16, 148) with width 358 px and its card background is `rgb(19, 18, 23)` by `getBoundingClientRect()` and `getComputedStyle()`. Both images use a 390 × 844 viewport. A pixel differs when its summed absolute RGB difference exceeds 48. The source long page is 3687 px; the app's fixed shell scrolls inside its main area, so a `fullPage` screenshot captures only the 844 px viewport and cannot serve as a like-for-like long-page comparison. The viewport ratios below are the applicable screen measurements.
 
 | State | Source vs app difference |
 | --- | ---: |
@@ -43,12 +43,12 @@ The HTML source pages are present at `/home/ubuntu/.hermes/projects/track3-desig
 | Swipe | 1.17% |
 | Delete confirmation | 1.52% |
 | Undo | 1.13% |
-| Empty | 1.70% |
-| Loading | 2.66% |
-| Long page, common 390 × 3647 | 9.77% |
+| Empty | 2.36% |
+| Loading | 3.11% |
 
 Remaining visible differences, with product reasons:
 
+- The initial loading frame says “Loading…” in the subtitle; the static source shows its invented count and latest date before loading has finished. The product has not queried those values yet, causing the loading viewport to exceed 3%.
 - Complete rows show “8 assets” without “5 of 5 sources”; the complete snapshot has no stored per-source refresh count. The retry note on 22 Oct is absent for the same reason: retry history is not stored with a complete snapshot. Partial rows use the actual stored source count.
 - The filter shows actual counts from bounded status queries: Issues 1 and Edited 1 for this fixture. The design's Issues 2 includes a retry on a complete snapshot; retry history is not stored, so the product cannot count it. While a new filter range is loading, the last available count remains visible. The count/latest date are unavailable before the initial query completes.
 - Some invented source row change amounts do not equal the difference between adjacent stored totals, beginning on 21 Oct. The app shows the calculated change from actual adjacent snapshots.

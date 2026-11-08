@@ -19,8 +19,8 @@ export function useStickyCoinChart(active = true) {
       const chartBox = chart.getBoundingClientRect();
       const sideColumnBox = sideColumn.getBoundingClientRect();
       const columns = chartBox.width > 0 && sideBox.left > chartBox.right;
-      setSticky(columns && sideBox.height > mainBox.height * 1.5);
-      setStickySide(columns && mainBox.height > sideColumnBox.height * 1.5);
+      setSticky(columns && sideBox.height - mainBox.height >= 120);
+      setStickySide(columns && mainBox.height - sideColumnBox.height >= 120);
     };
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
     observer?.observe(main);

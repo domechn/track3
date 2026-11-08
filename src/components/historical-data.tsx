@@ -45,6 +45,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -596,6 +597,9 @@ const App = ({
         >
           <DialogContent className="t3-history-detail min-w-[80%] touch:min-w-0 touch:w-[calc(100vw-1rem)] touch:max-w-[1200px] touch:max-h-[calc(100dvh-1rem)]">
             <DialogHeader>
+              <DialogClose asChild><button type="button" className="t3-history-detail-back" autoFocus>
+                {t("history.fidelity.backToSnapshots")}
+              </button></DialogClose>
               <DialogTitle>{t("history.detailTitle")}</DialogTitle>
               <DialogDescription className="sr-only">
                 {t("history.detailDescription")}

@@ -48,6 +48,20 @@ Chromium briefly sets a 1 × 1 viewport during some full page screenshots. The d
 
 ## Remaining differences
 
+On 8 Nov 2026 the source HTML was rendered again in Chromium with scrollbars hidden at 1600 × 1024. `getBoundingClientRect()` puts its filter at (84, 88), its list at (84, 164) with width 861.33 px, and its detail at (961.33, 164) with width 610.67 px; `getComputedStyle()` reports 13/18 px body text and `rgb(19, 18, 23)` card backgrounds. The current app captures are preserved in `/tmp/ui43-captures-desktop/` and the source renders and measurements are in `/tmp/ui43-source/`. A pixel differs when the summed absolute RGB difference exceeds 60, with black padding to the larger canvas.
+
+| State at 1600 × 1024 | Current source versus app difference |
+| --- | ---: |
+| Populated | 8.87% |
+| Delete confirmation | 6.19% |
+| Empty | 1.37% |
+| Loading | 1.63% |
+| Undo | 8.10% |
+
+The populated, delete, and undo captures exceed 3% because History now follows the required fixed-height master-detail layout. The reference has a standalone full-width filter and 46 px rows on a 1271.5 px scrolling page. The app pins the filter inside the list, uses 39 px rows, pins the pager and detail header, and scrolls each pane separately. The section chips and expanders are also absent from the reference. The KPI/header block is taller relative to a short fixed pane; at 900 × 560 the detail has about 120 px of scrollable content. Those changes keep both panes aligned and all controls reachable at every tested height. The older ratios below describe the prior page structure and are retained as measurement history.
+
+At 900–1099 px the app keeps Change visible by placing the amount above its percent in the 39 px row and using compact source text. The source table overflows its card at those widths. At 700 px desktop width the existing searchable detail opens as a full-window surface with Back; the source uses a phone-style layout below 760 px, so the two screens have different content density. The 700 px Back button initially shows the dialog's focus ring, a small visible difference kept for keyboard focus feedback. At 820 px the app shows one pane at a time with Back, while the source still shows two narrow columns. The iPad detail has no pointer-open focus outline; a keyboard Enter keeps a visible focus outline.
+
 The 7 Nov 2026 populated History capture is **5.71%** different from the
 saved 1600 × 1272 source render at RGB-sum threshold 60 when the app's
 1600 × 1024 scroll viewport is padded to the source height. The fixed shell
