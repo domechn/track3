@@ -477,7 +477,7 @@ function ReadyChat({
           {t("assistant.chat.deleteFailed")}: {deleteError}
         </p>
       )}
-      {drawer && <button type="button" className="absolute inset-0 z-[4] bg-black/40"
+      {drawer && <button type="button" className="absolute inset-0 z-[4] bg-[var(--overlay-scrim)]"
         data-testid="assistant-pane-scrim" aria-label={t("common.close")}
         onClick={() => setPane(drawer)} />}
       <div className="t3-assistant-pane t3-assistant-chats-pane" id="assistant-chats"

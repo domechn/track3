@@ -2661,6 +2661,7 @@
   "fidelity.refresh.quotaFinishedMeta": "{ok} of {all} refreshed · {failed} needs a plan change",
   "fidelity.refresh.quotaReason": "Pro limit reached: 50 of 50 ERC20 refreshes used, resets 1 Nov",
   "fidelity.startup.syncLocked": "Sync is locked",
+  "sync.fidelity.lockedTitle": "Sync is locked",
   "fidelity.startup.syncDescription": "Enter your sync passphrase to unlock encrypted data in your Cloudflare R2 bucket. Until then, Track3 keeps working on this device only.",
   "fidelity.startup.syncPassphrase": "Sync passphrase",
   "fidelity.startup.syncHint": "The passphrase never leaves your devices. Without it, remote data cannot be read.",

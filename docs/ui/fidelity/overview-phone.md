@@ -31,6 +31,8 @@ The segmented controls, rank sort buttons, and insight dismiss icon have at leas
 
 App: `/tmp/fidelity/overview/overview-phone.png`. Source: `/tmp/fidelity/overview/design-overview.png`. The current 390px dark viewport comparison differs by **6.30%** at the threshold of 20 in any RGB channel; both captures are 844px high. The earlier 2.27% measurement used a prior app capture. The authoritative Chromium HTML render governs both comparisons.
 
+A fresh 8 Nov source-page render at 390 × 844 differs from the same dark app capture by **7.254%** at a 16/255 RGB threshold (**6.969%** at 20/255). The source range remains 306 × 44px with a dark selected fill. The app now inherits that fill in Dark and the `--secondary` fill in Light; the light selected label has about **15.14:1** contrast.
+
 Earlier long capture: `/tmp/fidelity/overview/overview-phone-long.png` vs `/tmp/fidelity/overview/design-overview-long.png`; **7.02%** pixel difference by the same threshold, heights 3299/3299px.
 
 ## Remaining differences

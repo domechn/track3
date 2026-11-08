@@ -162,6 +162,15 @@ describe.each([
     expect(screen.queryByLabelText("Sync passphrase")).not.toBeInTheDocument();
   });
 
+  it("names the passphrase dialog with its locked heading", async () => {
+    publish({ mode: "locked", sync: { phase: "idle" } });
+    render(<Indicator />);
+    const title = "Sync is locked";
+    const dialog = await screen.findByRole("dialog", { name: title });
+    expect(dialog).toHaveTextContent(title);
+    expect(dialog).not.toHaveTextContent("Last sync result");
+  });
+
   it("turns off sync only after confirmation and leaves cancel harmless", async () => {
     publish({ mode: "locked", sync: { phase: "idle" } });
     render(<Indicator />);

@@ -368,7 +368,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
           </button>
         </PopoverTrigger>
         {wide && open && !fidelityReady && <div className="t3-b-sync-scrim" aria-hidden="true" onClick={() => setOpen(false)} />}
-        <PopoverContent ref={popoverRef} align="end" side="bottom" sideOffset={wide && !fidelityReady ? -10 : fidelityReady ? 8 : 0} collisionPadding={16}
+        <PopoverContent ref={popoverRef} aria-labelledby={locked ? "sync-locked-title" : undefined} align="end" side="bottom" sideOffset={wide && !fidelityReady ? -10 : fidelityReady ? 8 : 0} collisionPadding={16}
           // Radix Escape was intermittent with focused content in the widened card; nested confirmations handle their own Escape.
           onKeyDown={(event) => {
             if (event.key === "Escape" && !document.querySelector('[role="alertdialog"]')) setOpen(false);
@@ -482,7 +482,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
           </div>
           </> : <>
           {fidelitySheet && (!locked || compactLocked) ? <div className="fidelity-sync-sheet-head">
-            <h2>{t(locked ? "fidelity.b.sync.sheetLocked" : status.sync.retryStopped ? "fidelity.b.sync.stopped" : phase === "error" || phase === "unreadable"
+            <h2 id={locked ? "sync-locked-title" : undefined}>{t(locked ? "sync.fidelity.lockedTitle" : status.sync.retryStopped ? "fidelity.b.sync.stopped" : phase === "error" || phase === "unreadable"
               ? "fidelity.b.sync.sheetFailed" : phase === "syncing" ? "fidelity.b.sync.syncing"
                 : never ? "settings.tab.sync" : "fidelity.b.sync.sheetUpToDate")}</h2>
             <span className={`fidelity-sync-sheet-pill${locked ? " is-warning" : phase === "error" || phase === "unreadable"
@@ -493,14 +493,14 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
                 : phase === "syncing" ? status.sync.progress?.phase === "pull" ? "fidelity.b.sync.sheetDownloading" : "fidelity.b.sync.sheetUploading"
                   : never ? "fidelity.b.sync.sheetNever" : "fidelity.b.sync.synced")}
             </span>
-          </div> : !(mobile && locked && !compactLocked) && <h2 className="text-base font-semibold">{t("sync.status.details")}</h2>}
+          </div> : !fidelityLocked && !(mobile && locked && !compactLocked) && <h2 id={locked ? "sync-locked-title" : undefined} className="text-base font-semibold">{t(locked ? "sync.fidelity.lockedTitle" : "sync.status.details")}</h2>}
           {status.mode === "unreadable" ? <>
             <p role="alert" className="text-destructive">{t("sync.unreadable")}</p>
             <a href="#/settings/sync" className="text-primary underline">{t("sync.reenter")}</a>
           </> : fidelityLocked ? (
             <div className="t3-sync-fidelity-locked">
               <LockClosedIcon className="t3-sync-fidelity-lock-icon" aria-hidden="true" />
-              <h2>{t("sync.fidelity.lockedTitle")}</h2>
+              <h2 id="sync-locked-title">{t("sync.fidelity.lockedTitle")}</h2>
               <p className="t3-sync-fidelity-intro">{t("sync.fidelity.lockedDescription").replace("{destination}",
                 syncRuntime.getSettings().endpoint.includes("r2.cloudflarestorage.com")
                   ? t("sync.fidelity.cloudflareDestination") : t("sync.fidelity.s3Destination"))}</p>
@@ -527,7 +527,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
           ) : locked && mobile && !compactLocked ? (
             <div className="fd-sync-locked">
               <LockClosedIcon className="fd-sync-lock-icon" aria-hidden="true" />
-              <h2>{t("fidelity.startup.syncLocked")}</h2>
+              <h2 id="sync-locked-title">{t("sync.fidelity.lockedTitle")}</h2>
               <p>{t("fidelity.startup.syncDescription")}</p>
               <Label htmlFor="sync-status-passphrase">{t("fidelity.startup.syncPassphrase")}</Label>
               <div className="fd-sync-passphrase">
@@ -545,7 +545,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
               <button type="button" className="fd-sync-forgot" onClick={() => recoveryRef.current?.scrollIntoView({ block: "start" })}>
                 {t("fidelity.startup.forgotPassphrase")}</button>
               <Button className="fd-sync-unlock" disabled={busy} onClick={() => void unlock()}>{t("fidelity.startup.unlock")}</Button>
-              <Button className="fd-sync-skip" disabled={busy} onClick={() => {
+              <Button variant="ghost" className="fd-sync-skip" disabled={busy} onClick={() => {
                 syncRuntime.skip();
                 setOpen(false);
               }}>{t("fidelity.startup.continueWithoutSync")}</Button>

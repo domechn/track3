@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
-import { expectReadablePublicIpButton } from "./public-ip-contrast";
+import { expectReadablePublicIpButton } from "./public-ip-scenes";
 
 test.use({
   isMobile: true, hasTouch: true, viewport: { width: 390, height: 844 },

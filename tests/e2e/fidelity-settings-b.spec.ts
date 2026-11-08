@@ -238,6 +238,15 @@ for (const state of states) {
       }
       if (state === "sync-pop-locked") {
         await expect(page.getByRole("dialog")).toHaveCSS("height", "227px");
+        const scrim = await page.locator(".fidelity-sync-sheet-backdrop").evaluate((node) => {
+          const probe = document.createElement("span");
+          probe.style.background = "var(--overlay-scrim)";
+          node.append(probe);
+          const token = getComputedStyle(probe).backgroundColor;
+          probe.remove();
+          return { background: getComputedStyle(node).backgroundColor, token };
+        });
+        expect(scrim.background).toBe(scrim.token);
       }
       if (state === "sync-forget") {
         await page.locator(".t3-sync-devices").getByRole("button", { name: /Forget remote/i }).click();
@@ -459,10 +468,10 @@ test("locked sync cards fit on a light phone", async ({ page }) => {
   await page.getByRole("button", { name: "Continue without sync" }).click();
   await expect(page.locator(".fidelity-b-sync .t3-sync-passphrase")).toBeVisible();
   await expectSettingsCardsFitContent(page, ".fidelity-b-sync > [data-ui-card]");
-  await expect(page.locator('label[for="sync-passphrase"]')).toHaveCSS("color", "rgb(255, 255, 255)");
-  await expect(page.locator(".fidelity-b-sync .t3-sync-status")).toHaveCSS("background-color", "rgb(19, 18, 23)");
-  await expect(page.locator(".fidelity-b-sync .t3-sync-status-rows > div").first()).toHaveCSS("border-top-color", "rgb(34, 34, 36)");
-  await expect(page.locator(".fidelity-b-sync .t3-sync-status button")).toHaveCSS("color", "rgb(180, 182, 188)");
+  await expect(page.locator('label[for="sync-passphrase"]')).toHaveCSS("color", "rgb(23, 23, 28)");
+  await expect(page.locator(".fidelity-b-sync .t3-sync-status")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.locator(".fidelity-b-sync .t3-sync-status-rows > div").first()).toHaveCSS("border-top-color", "rgb(212, 212, 216)");
+  await expect(page.locator(".fidelity-b-sync .t3-sync-status button")).toHaveCSS("color", "rgb(83, 83, 90)");
   await page.locator(".fidelity-b-sync .t3-sync-status").screenshot({ path: "/tmp/track3-sync-390-locked-status-light.png" });
   await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
   await page.screenshot({ path: "/tmp/track3-sync-390-locked-light.png", fullPage: true });

@@ -2661,6 +2661,7 @@
   "fidelity.refresh.quotaFinishedMeta": "{ok}/{all} 已刷新 · {failed} 个需要调整套餐",
   "fidelity.refresh.quotaReason": "已达到 Pro 限额：50 次 ERC20 刷新额度已用完，11 月 1 日重置",
   "fidelity.startup.syncLocked": "同步已锁定",
+  "sync.fidelity.lockedTitle": "同步已锁定",
   "fidelity.startup.syncDescription": "输入同步密码，解锁 Cloudflare R2 存储桶中的加密数据。在解锁前，Track3 仍可仅在本机使用。",
   "fidelity.startup.syncPassphrase": "同步密码",
   "fidelity.startup.syncHint": "密码不会离开你的设备。没有密码，远程数据无法读取。",
