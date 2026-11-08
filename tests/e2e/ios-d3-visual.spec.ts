@@ -203,14 +203,14 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await page.locator(".pf-alloc-row").first().scrollIntoViewIfNeeded();
     await capture(page, phone.name, theme, "rebalance-targets");
     await page.locator(".pf-trade").first().scrollIntoViewIfNeeded();
-    const sell = page.locator(".pf-trade").filter({ has: page.locator(".pf-pill", { hasText: "Sell" }) }).first();
-    const buy = page.locator(".pf-trade").filter({ has: page.locator(".pf-pill", { hasText: "Buy" }) }).first();
+    const sell = page.locator(".pf-trade").filter({ has: page.locator(".t3-tag", { hasText: "Sell" }) }).first();
+    const buy = page.locator(".pf-trade").filter({ has: page.locator(".t3-tag", { hasText: "Buy" }) }).first();
     await expect(sell.locator("strong")).toHaveText(/^\$[0-9]/);
     await expect(buy.locator("strong")).toHaveText(/^\$[0-9]/);
     await expect(sell.locator("strong")).toHaveAttribute("aria-label", /^−\$[0-9]/);
     await expect(buy.locator("strong")).toHaveAttribute("aria-label", /^\+\$[0-9]/);
-    expect(await sell.locator(".pf-pill").evaluate((element) => getComputedStyle(element).color))
-      .not.toBe(await buy.locator(".pf-pill").evaluate((element) => getComputedStyle(element).color));
+    expect(await sell.locator(".t3-tag").evaluate((element) => getComputedStyle(element).color))
+      .not.toBe(await buy.locator(".t3-tag").evaluate((element) => getComputedStyle(element).color));
     const tradeSymbol = page.locator(".pf-trade b").first();
     const symbolBounds = await tradeSymbol.boundingBox();
     const tradeBounds = await page.locator(".pf-trade").first().boundingBox();

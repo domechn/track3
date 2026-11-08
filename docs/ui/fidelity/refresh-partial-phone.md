@@ -26,6 +26,13 @@ Long capture: `/tmp/fidelity/flows/refresh-partial-phone-long.png` vs `/tmp/fide
 
 ## Remaining differences
 
+- Fresh 8 Nov source-page and current app captures at 390 × 844 differ
+  by **7.157%** at an RGB-channel threshold of 20. The source illustrates
+  a failed OKX refresh and a `$621,333.50` total. The test fixture's
+  failed source and saved snapshot instead produce `$49,898.45`; the
+  product must display those stored values. The Partial marker beside
+  the total is a shared warning tag and stays visible when the value
+  mode changes.
 - Current 390px viewport pixel diff: **3.87%** (any RGB channel differs by more than 20).
 - Current 390px full-page pixel diff: **6.59%** with the same threshold.
 - The partial total excludes OKX, unknown changes stay dashed, and the foreground card geometry matches. The chart plots persisted complete snapshots, whose stroke differs from the invented reference series. Mobile text/glyph rasterization and the real source-status rows account for the remaining viewport and full-page difference.

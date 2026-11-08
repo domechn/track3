@@ -110,7 +110,7 @@ export default function RebalanceFidelity({
   const tradeRow = (row: typeof sells[number], index: number) =>
     <div className="pf-trade" key={`${row.assetType}:${row.symbol}`}>
       <span className="pf-step">{index}</span>
-      <span className={`pf-pill ${row.tradeValue > 0 ? "pf-info" : ""}`}>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}</span>
+      <span className="t3-tag" data-tone={row.tradeValue > 0 ? "accent" : "neutral"}>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}</span>
       <b>{row.symbol}</b>
       <strong aria-label={`${row.tradeValue > 0 ? "+" : "−"}${money(row.tradeValue, currency.symbol)}`}>
         {money(row.tradeValue, currency.symbol)}</strong>
@@ -196,7 +196,7 @@ export default function RebalanceFidelity({
       <div className={`pf-alloc-total ${!valid && !allUnset ? "pf-bad" : ""}`}>
         <b>{t("fidelity.rebalance.total")}</b><span>{pct(rows.reduce((sum, row) => sum + row.current, 0))}</span>
         <strong className={allUnset ? "pf-zero" : valid ? "pf-positive" : "pf-negative"}>{pct(totalTarget)}</strong>
-        <em className={`pf-pill ${allUnset ? "" : valid ? "pf-positive" : "pf-negative"}`}>
+        <em className="t3-tag" data-tone={allUnset ? "neutral" : valid ? "positive" : "negative"}>
           {allUnset ? t("fidelity.rebalance.needs100") : valid ? t("fidelity.rebalance.sums100")
             : t("fidelity.rebalance.over").replace("{difference}", absPts(totalTarget - 100))}
         </em>

@@ -28,7 +28,7 @@ test("phone list aligns values and uses the source text hierarchy", async ({ pag
   expect(Math.round(positions.total)).toBe(357);
   expect(Math.round(positions.delta)).toBe(357);
   expect(Math.round(positions.time)).toBe(39);
-  await expect(page.locator(".fidelity-history-edited").first()).toHaveCSS("font-weight", "500");
+  await expect(page.locator(".history-mobile-snapshot .t3-tag[data-tone='accent']").first()).toHaveCSS("font-weight", "500");
   await expect(page.locator(".mobile-tab-badge")).toHaveCSS("font-size", "10px");
   await expect(page.locator(".mobile-tab-badge")).toHaveCSS("font-weight", "700");
   await expect(page.locator(".mobile-tab-badge")).toHaveCSS("line-height", "18px");
@@ -152,6 +152,7 @@ test("history change has separate aligned amount and percent with the source gap
   await page.goto("/#/history");
   const change = page.locator(".history-mobile-snapshot-delta").first();
   await expect(change).toBeVisible({ timeout: 20_000 });
+  await expect(change).toHaveCSS("border-top-width", "0px");
   const spans = change.locator("span");
   await expect(spans).toHaveCount(2);
   const left = await spans.first().boundingBox();

@@ -240,7 +240,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
                 <div className="fd-wallet-retry"><button type="button" onClick={() => source.status && requestRefreshSource(source.status.sourceId)}><ReloadIcon aria-hidden="true" />{t("refresh.retryButton")}</button>
                   {next && <span>{t("fidelity.wallets.nextRetry").replace("{time}", time(new Date(next).toISOString()))}</span>}</div></> :
                 <small>{source.status?.detail || (source.kind === "exchange" ? t("fidelity.wallets.exchange") : source.kind === "broker" ? t("fidelity.wallets.broker") : t("fidelity.wallets.publicAddress"))}</small>}</div>
-              <span>{sourceFailed ? t("fidelity.wallets.failed") : time(source.status?.lastSuccessAt)}</span></div>; })}
+              <span className={sourceFailed ? "t3-tag" : undefined} data-tone={sourceFailed ? "negative" : undefined}>{sourceFailed ? t("fidelity.wallets.failed") : time(source.status?.lastSuccessAt)}</span></div>; })}
         </section>}
         {chosen ? <section className="fd-card fd-wallet-changes"><div className="fd-card-heading"><h3>{t("fidelity.wallets.assetChanges")}</h3><span>{range}, {currency.currency}</span></div>
           <MoverList items={movers} currency={currency} />

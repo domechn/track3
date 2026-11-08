@@ -244,7 +244,7 @@ test("expanded overview and asset charts expose text summaries", async ({ page }
     if (route.startsWith("/coins/")) {
       const chart = page.locator(".coin-fidelity-plot > svg");
       await expect(chart).toBeVisible();
-      await expect(chart).toHaveAttribute("role", "img");
+      await expect(chart).toHaveAttribute("role", "group");
       await expect(chart).toHaveAttribute("aria-label", /\S/);
       continue;
     }

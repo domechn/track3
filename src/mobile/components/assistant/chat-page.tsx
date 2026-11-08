@@ -772,7 +772,7 @@ function NotConfiguredCard() {
       <div className="fidelity-no-key-page-head">
         <h1>{t("nav.assistant")}</h1>
         <p>{t("fidelity.assistant.noKeyDescription")}</p>
-        <span>{t("fidelity.assistant.noKeyBadge")}</span>
+        <span className="t3-tag mt-2.5" data-tone="warning">{t("fidelity.assistant.noKeyBadge")}</span>
       </div>
       <section className="fidelity-no-key-chat">
         <header className="fidelity-chat-header">
@@ -832,7 +832,7 @@ function NotConfiguredCard() {
             >
               <RocketIcon className="h-4 w-4" />
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            <span className="t3-tag" data-tone="positive">
               {t("assistant.phase6.syncBadge")}
             </span>
           </div>
@@ -940,7 +940,7 @@ function UpgradeCard() {
             >
               <RocketIcon className="h-4 w-4" />
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+            <span className="t3-tag" data-tone="accent">
               Pro
             </span>
           </div>

@@ -13,8 +13,7 @@ type AssetLabelProps = {
   badgeClassName?: string;
 };
 
-const defaultBadgeClassName =
-  "shrink-0 rounded-sm border border-border px-1.5 py-0.5 text-[10px] uppercase leading-none text-muted-foreground";
+const defaultBadgeClassName = "t3-tag";
 
 export default function AssetLabel({
   asset,
@@ -35,7 +34,7 @@ export default function AssetLabel({
         {formatAssetLabel(asset)}
       </span>
       {assetType !== "crypto" ? (
-        <span className={cn(defaultBadgeClassName, badgeClassName)}>
+        <span className={cn(defaultBadgeClassName, badgeClassName)} data-tone="neutral">
           {assetType}
         </span>
       ) : null}

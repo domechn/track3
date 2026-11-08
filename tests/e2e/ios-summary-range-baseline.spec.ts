@@ -24,7 +24,7 @@ test("phone Summary compares each range with its preceding snapshot", async ({ p
     for (const metric of await card.locator(".fd-kpis strong").all()) {
       await expect(metric).not.toHaveText(/^(–|n\/a)$/);
     }
-    await expect(card.locator(".fd-kpis > div").nth(2)).toContainText(
+    await expect(card.locator(".fd-primary-stat small")).toContainText(
       preset === "All" ? "1038 snapshots" : `${count} in range`);
     if (preset === "1D") {
       await expect(card.locator(".fd-summary-chart text").last()).toHaveText("−$190");

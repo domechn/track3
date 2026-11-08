@@ -83,6 +83,20 @@ describe("Profit loading", () => {
     /></I18nProvider></MemoryRouter>);
     await waitFor(() => expect(container.querySelector(".mobile-movers-total")).toHaveTextContent(count));
     expect(container.querySelector(".mobile-movers-total")).toHaveTextContent(baseline);
+    expect(container.querySelector(".mobile-movers-total .t3-tag")).toHaveAttribute("data-tone", "positive");
+  });
+
+  it("uses a neutral tag for unavailable Summary profit", async () => {
+    const { container } = render(<MemoryRouter><Profit
+      currency={usdCurrency}
+      dateRange={{ start: new Date("2024-01-02T12:00:00Z"), end: new Date("2024-01-02T12:00:00Z") }}
+      quoteColor="green-up-red-down"
+      rangeValue="1D"
+      summaryRange={{ snapshots: [new Date("2024-01-02T12:00:00Z")], databaseCount: 1 }}
+    /></MemoryRouter>);
+    await waitFor(() => expect(container.querySelector(".mobile-movers-total .t3-tag")).toHaveTextContent("–"));
+    expect(container.querySelector(".mobile-movers-total .t3-tag")).toHaveAttribute("data-tone", "neutral");
+    expect(container.querySelector(".mobile-movers-total .t3-tag")).toHaveAttribute("title", "Needs a second snapshot");
   });
 
   it("reports loaded after profit data arrives even if logo lookup is still pending", async () => {
