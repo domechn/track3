@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { memo, useEffect, useMemo, useState } from "react";
 import {
   Dialog,
@@ -8,7 +9,6 @@ import {
 } from "@/mobile/components/ui/dialog";
 import { ReloadIcon, StarIcon } from "@radix-ui/react-icons";
 import { useTranslation } from "@/mobile/i18n";
-import { resolveAssetLogoSrc } from "@/utils/assets";
 import { prettyPriceNumberToLocaleString } from "@/utils/currency";
 import type { QuickLookDialogProps } from "@/components/configuration/types";
 import { isIOS } from "@/utils/platform";
@@ -135,14 +135,7 @@ const QuickLookDialog = memo(function QuickLookDialog({
                   key={item.symbol + idx}
                   className="grid grid-cols-2 text-sm px-2 py-1.5 rounded hover:bg-muted items-center"
                 >
-                  <div className="flex items-center">
-                    <img
-                      className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
-                      src={resolveAssetLogoSrc(item, logoMap[item.symbol])}
-                      alt={item.symbol}
-                    />
-                    <span className="font-medium">{item.symbol}</span>
-                  </div>
+                  <AssetLabel asset={item} src={logoMap[item.symbol]} size={20} />
                   <span className="text-right">
                     {prettyPriceNumberToLocaleString(item.amount)}
                   </span>

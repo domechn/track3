@@ -21,6 +21,8 @@ import { CoinSourceSummary } from "@/components/coin-source-summary";
 import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import { Pager, usePager } from "@/components/ui/pager";
 import { groupCoinSources } from "@/components/coin-detail-sections";
+import AssetLabel from "@/components/common/asset-label";
+import { sourceIconKind } from "@/components/source-allocation-list";
 import "@/mobile/components/mobile/fidelity.css";
 
 type Source = { name: string; amount: number; value: number; wallet: string };
@@ -331,10 +333,13 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
     </section>
   </div>;
   return <div className="fd-page fd-coin d2-coin" data-state={loading?"loading":"ready"} data-asset-type={assetType} data-manual={Boolean(data?.manual)}>
-    <header className="fd-page-head fd-coin-head"><nav aria-label={label("breadcrumbs")}><button type="button" onClick={goBack}>{label("overview")}</button><ChevronRightIcon aria-hidden="true" /><button type="button" aria-expanded={coinSelectOpen} onClick={() => setCoinSelectOpen(true)}>{label("coins")}</button><ChevronRightIcon aria-hidden="true" /><span>{symbol}</span></nav><h1>{name} {name !== symbol && <span>{symbol}</span>} <em>{kind}</em></h1>{descriptionNames.length ? <CoinSourceSummary names={descriptionNames} template={sourceTemplate} locale={locale} moreLabel={t("coin.sourcesMore")} allLabel={t("coin.sourcesAll")} lastPrefix={lastSourcePrefix} /> : <p /> }<button type="button" className="fd-cost-link" onClick={()=>navigate("/cost-basis")}><svg viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 2.5v13M12 5.5c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 2.2 3 1 3 2.3-1.3 2-3 2-3-.8-3-2" /></svg>{label("openCostBasis")}</button></header>
+    <header className="fd-page-head fd-coin-head"><nav aria-label={label("breadcrumbs")}><button type="button" onClick={goBack}>{label("overview")}</button><ChevronRightIcon aria-hidden="true" /><button type="button" aria-expanded={coinSelectOpen} onClick={() => setCoinSelectOpen(true)}>{label("coins")}</button><ChevronRightIcon aria-hidden="true" /><span>{symbol}</span></nav>
+      <h1><AssetLabel kind={data?.manual ? "custom" : assetType === "stock" ? "stock" : "coin"} symbol={symbol}
+        name={name === symbol ? name : `${name} ${symbol}`} size={32} tag={kind} /></h1>
+      {descriptionNames.length ? <CoinSourceSummary names={descriptionNames} template={sourceTemplate} locale={locale} moreLabel={t("coin.sourcesMore")} allLabel={t("coin.sourcesAll")} lastPrefix={lastSourcePrefix} /> : <p /> }<button type="button" className="fd-cost-link" onClick={()=>navigate("/cost-basis")}><svg viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 2.5v13M12 5.5c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 2.2 3 1 3 2.3-1.3 2-3 2-3-.8-3-2" /></svg>{label("openCostBasis")}</button></header>
     <BottomSheet open={coinSelectOpen} onOpenChange={setCoinSelectOpen} title={t("coin.symbol")}>
       <input className="fd-coin-search" value={coinKeyword} onChange={(event) => setCoinKeyword(event.target.value)} placeholder={t("coin.searchPlaceholder")} aria-label={t("coin.searchPlaceholder")} />
-      <div className="mobile-coin-options">{filteredSymbols.slice(0, 200).map((item) => <button type="button" key={getAssetLogoKey(item)} className="mobile-coin-option" onClick={() => { setCoinSelectOpen(false); navigate(buildAssetDetailsPath(item)); }}>{formatAssetLabel(item)}</button>)}</div>
+      <div className="mobile-coin-options">{filteredSymbols.slice(0, 200).map((item) => <button type="button" key={getAssetLogoKey(item)} className="mobile-coin-option" onClick={() => { setCoinSelectOpen(false); navigate(buildAssetDetailsPath(item)); }}><AssetLabel asset={item} size={20} /></button>)}</div>
     </BottomSheet>
     {card(<><div className="fd-coin-primary"><span className="fd-label">{data?.manual?label("manualPrice"):label("assetPrice").replace("{name}",name)}</span><strong>{point?moneyInCurrency(price,false,currentPriceDigits):dash}</strong><small>{data?.manual?label("setByYouOn").replace("{date}",date(data.manualSetAt??point?.date??new Date())):data?.followSymbol?t("coin.customPrice.follow").replace("{symbol}",data.followSymbol):assetType==="stock"?label("stockFeed.generic"):label("perAsset").replace("{symbol}",symbol)}</small></div>
       <div className={`fd-coin-changes ${data?.manual?"manual":""}`}>{data?.manual?<Metric label={label("priceFeed")} value={label("none")} detail={label("changesUnavailable")} />:<>{[[assetType==="stock"?label("oneDay"):"24h",ch1],["7D",ch7],["30D",ch30]].map(([name,result])=>{const v=result as ReturnType<typeof change>;return <Metric key={name as string} label={name as string} value={v?pct(v.pct):dash} valueTone={tone(v?.pct)} detail={v?moneyInCurrency(v.dollars,true):dash} />})}</>}
@@ -353,16 +358,18 @@ export default function CoinFidelity({ symbol, assetType, currency, dateRange, o
         {cardHeading(label("holdingsSource"), sourceCount(data?.sources.length ?? 0))}
         {data?.sources.length ? <div className="fd-source-list">
           {sourceGroups.visible.map((source) => <div className="fd-source-row" key={source.id}>
-            <b>{source.label}</b><strong>{moneyInCurrency(source.value)}</strong>
-            <small>{quantity(source.amount, assetType, Boolean(data?.manual))} {symbol} · {source.share.toFixed(1)}% · {source.kind}</small>
+            <AssetLabel kind={sourceIconKind(data?.aliases[source.id]?.type)} type={data?.aliases[source.id]?.type}
+              name={source.label} size={20} secondary={`${quantity(source.amount, assetType, Boolean(data?.manual))} ${symbol} · ${source.share.toFixed(1)}% · ${source.kind}`} />
+            <strong>{moneyInCurrency(source.value)}</strong>
           </div>)}
           {sourceGroups.empty.length > 0 && <>
             <button className="fd-source-empty-toggle" type="button" aria-expanded={emptySourcesExpanded} onClick={() => setEmptySourcesExpanded(!emptySourcesExpanded)}>
               {label("emptySources").replace("{count}", String(sourceGroups.empty.length))} <span aria-hidden="true">{emptySourcesExpanded ? "⌃" : "⌄"}</span>
             </button>
             {emptySourcesExpanded && sourceGroups.empty.map((source) => <div className="fd-source-row fd-source-zero" key={source.id}>
-              <b>{source.label}</b><strong>{moneyInCurrency(source.value)}</strong>
-              <small>{quantity(source.amount, assetType, Boolean(data?.manual))} {symbol} · 0.0% · {source.kind}</small>
+              <AssetLabel kind={sourceIconKind(data?.aliases[source.id]?.type)} type={data?.aliases[source.id]?.type}
+                name={source.label} size={20} secondary={`${quantity(source.amount, assetType, Boolean(data?.manual))} ${symbol} · 0.0% · ${source.kind}`} />
+              <strong>{moneyInCurrency(source.value)}</strong>
             </div>)}
           </>}
           <div className="fd-source-row total"><b>{label("total")}</b><strong>{moneyInCurrency(value)}</strong><small>{quantity(held,assetType,Boolean(data?.manual))} {symbol}</small></div>

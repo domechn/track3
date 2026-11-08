@@ -12,10 +12,11 @@ import { bindRefreshRetry, refreshRetryScheduler } from "@/middlelayers/refresh-
 import { useToast } from "@/components/ui/use-toast";
 import { overviewRefreshActivityEvent, overviewRefreshRequestedEvent, overviewUseLastKnownEvent, publishSourceStatuses } from "./source-status-event";
 import { Button } from "./ui/button";
+import AssetLabel from "@/components/common/asset-label";
 import { ToastAction } from "./ui/toast";
 import {
-  ArchiveIcon, BackpackIcon, CheckIcon, CrossCircledIcon, CubeIcon,
-  ExclamationTriangleIcon, GlobeIcon, InfoCircledIcon, ReloadIcon, UpdateIcon,
+  CheckIcon, CrossCircledIcon,
+  ExclamationTriangleIcon, InfoCircledIcon, ReloadIcon, UpdateIcon,
 } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "./index/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
@@ -419,7 +420,6 @@ const App = ({
     ? t("refresh.autoRetry.next").replace("{time}", new Date(nextRetryAt).toLocaleTimeString(
       locale === "zh" ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false }))
     : retrySchedule.stopped ? t("refresh.autoRetry.stopped") : "";
-  const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
   const statusStyle = {
     ok: "t3-pill t3-refresh-status-pill",
     stale: "t3-pill t3-refresh-status-pill",
@@ -558,9 +558,8 @@ const App = ({
           {wideStatusFlow ? <div className="t3-refresh-flow-list">
             {refreshing && <p>{t("refresh.design.previousResults")}</p>}
             {sourceStatuses.map((source) => <div key={source.sourceId} className="t3-refresh-flow-row" role="group" aria-label={displayIdentity(source)}>
-              <i aria-hidden="true">{sourceLabel(source).slice(0, 2)}</i>
-              <div><strong>{sourceLabel(source)}</strong><small className={source.category === "quota" ? "quota" : source.status === "ok" ? "" : "failed"}>
-                {source.status === "ok" && source.startedAt && source.finishedAt
+              <AssetLabel kind={source.kind === "exchange" ? "exchange" : source.kind === "wallet" ? "wallet" : source.kind === "broker" ? "broker" : "custom"}
+                type={source.provider} name={sourceLabel(source)} size={20} secondary={source.status === "ok" && source.startedAt && source.finishedAt
                   ? t("refresh.fidelity.doneIn").replace("{seconds}", Math.max(0,
                     (Date.parse(source.finishedAt) - Date.parse(source.startedAt)) / 1000).toFixed(1))
                   : source.category === "quota" ? quota && source.sourceId === quota.sourceId
@@ -568,8 +567,7 @@ const App = ({
                       .replace("{limit}", String(quota.limit)).replace("{resource}", quota.resource)
                       .replace("{date}", quota.date)
                     : t("refresh.fidelity.quotaReached")
-                  : source.detail ? t(detailKey[source.detail]) : t(`refresh.reason.${source.category ?? "other"}`)}
-              </small></div>
+                  : source.detail ? t(detailKey[source.detail]) : t(`refresh.reason.${source.category ?? "other"}`)} />
               {source.category === "quota" && !refreshing && <button type="button" onClick={() => {
                 window.location.hash = "#/settings/systemInfo";
               }}>{t("refresh.fidelity.managePlan")}</button>}
@@ -581,17 +579,15 @@ const App = ({
           </div> : <div className="t3-refresh-status-list my-2 max-h-80 overflow-y-auto">
             {refreshLoading && sourceStatuses.length > 0 && <p className="t3-refresh-previous">{t("refresh.design.previousResults")}</p>}
             {sortedStatuses.map((source) => {
-              const Icon = kindIcon[source.kind ?? "others"];
               const StatusIcon = statusIcon[source.status];
               return (
               <div key={source.sourceId} role="group" aria-label={displayIdentity(source)}
                 data-source-status-row className="t3-refresh-source-row flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold break-all">{sourceLabel(source)}</div>
-                  {source.provider && <div className="text-xs text-muted-foreground">
-                    <Icon aria-hidden="true" className="mr-1 inline-block h-3.5 w-3.5" />
-                    {source.provider}{source.hint && ` · ${displayHint(source)}`}
-                  </div>}
+                  <AssetLabel kind={source.kind === "exchange" ? "exchange" : source.kind === "broker" ? "broker" :
+                    source.kind === "wallet" ? "wallet" : "custom"}
+                    type={source.provider ?? source.sourceId.split(":")[0]} name={sourceLabel(source)} size={20}
+                    secondary={source.provider ? `${source.provider}${source.hint ? ` · ${displayHint(source)}` : ""}` : undefined} />
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
                     <span data-tone={source.status === "ok" ? "ok" : source.status === "failed" ? "err" : "warn"} className={`inline-flex items-center gap-1 font-medium ${statusStyle[source.status]}`}>
                       <StatusIcon aria-hidden="true" className="h-3.5 w-3.5" />

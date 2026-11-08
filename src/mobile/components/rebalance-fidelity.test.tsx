@@ -48,8 +48,9 @@ it("does not label a stock with a crypto asset's display name when tickers colli
     { symbol: "BTC", assetType: "stock", amount: 1, value: 40, price: 40 },
   ]} />);
   const rows = document.querySelectorAll(".pf-alloc-row .pf-asset");
-  expect(rows[0]).toHaveTextContent("BTCBitcoin");
-  expect(rows[1]).toHaveTextContent("BTCBTC");
+  expect(rows[0].querySelector(".t3-asset-label-secondary")).toHaveTextContent("Bitcoin");
+  expect(rows[1].querySelector(".t3-asset-label-secondary")).toHaveTextContent("BTC");
+  expect(rows[1]).not.toHaveTextContent("Bitcoin");
 });
 
 it("preserves each typed digit and decimal point in a focused target", async () => {

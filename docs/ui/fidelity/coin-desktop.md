@@ -60,6 +60,7 @@ On 6 Nov, the design HTML was rendered again at 1600 × 1000 into `/tmp/wui18-so
 
 ## Remaining differences
 
+- UI42 uses the approved website-style neutral tile for coin and source marks. The older Coin detail page design renders those marks differently.
 - The product's live total, DatePicker, refresh and sync controls use a solid 49 px toolbar above the coin scroll area. Keeping that bar in normal flow prevents its controls from covering the hero when a user scrolls. The static design has no equivalent bar, so all seven current desktop captures shift downward and exceed 3%; the scroll container also reserves 15 px for its scrollbar. Matching the source y positions with an absolute toolbar caused the reviewed overlap.
 - When a real coin has no sources, open lots, or transactions, its section shows the shared centred empty state. The supplied BTC, NVDA, and NOVA source pages contain data, so there is no matching source screen for those zero-data sections.
 - The source's sample NOVA has a display name and is omitted from its portfolio total. A saved NOVA may only have its ticker, and its actual $5,052 holding contributes 0.7% to the portfolio.

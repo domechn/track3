@@ -46,8 +46,8 @@ test("Wallets all sources uses the approved section order and stored source tota
         })), null, 2));
     expect((await page.locator(".fd-wallet-balances").boundingBox())?.y).toBe(729);
     expect((await page.locator(".fd-wallet-status").boundingBox())?.y).toBe(1123);
-    expect((await page.locator(".fd-wallet-matrix").boundingBox())?.y).toBe(1548);
-    expect((await page.locator(".fd-wallet-moved").boundingBox())?.y).toBe(2132);
+    expect((await page.locator(".fd-wallet-matrix").boundingBox())?.y).toBe(1550);
+    expect((await page.locator(".fd-wallet-moved").boundingBox())?.y).toBe(2134);
     await expect(page.locator(".fd-wallet-main-stat > strong")).toHaveCSS("font-size", "32px");
     expect((await page.locator(".fd-wallet-main-stat > strong").boundingBox())?.height).toBe(38);
     expect((await page.locator(".fd-wallet-main-stat > strong").boundingBox())?.y).toBe(391);

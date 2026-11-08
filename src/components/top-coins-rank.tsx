@@ -15,7 +15,6 @@ import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
-  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
@@ -180,31 +179,9 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                     #{row.rank}
                   </TableCell>
                   <TableCell className="py-1.5">
-                    <div className="flex items-center gap-2">
-                      <img
-                        className="w-[18px] h-[18px] rounded-full"
-                        src={resolveAssetLogoSrc(
-                          { symbol: row.coin, assetType: row.assetType },
-                          logoMap[
-                            getAssetLogoKey({
-                              symbol: row.coin,
-                              assetType: row.assetType,
-                            })
-                          ],
-                        )}
-                        alt={formatAssetLabel({
-                          symbol: row.coin,
-                          assetType: row.assetType,
-                        })}
-                      />
-                      <AssetLabel
-                        asset={{
-                          symbol: row.coin,
-                          assetType: row.assetType,
-                        }}
-                        labelClassName="font-medium text-sm"
-                      />
-                    </div>
+                    <AssetLabel asset={{ symbol: row.coin, assetType: row.assetType }}
+                      src={logoMap[getAssetLogoKey({ symbol: row.coin, assetType: row.assetType })]}
+                      size={20} quiet />
                   </TableCell>
                   <TableCell className="text-right py-1.5">
                     {renderChangeBadge(row.change)}

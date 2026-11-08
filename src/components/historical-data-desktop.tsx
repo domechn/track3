@@ -21,6 +21,7 @@ import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { addToBlacklist } from "@/middlelayers/configuration";
 import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
 import { useOptimisticDelete } from "./common/use-optimistic-delete";
+import AssetLabel from "./common/asset-label";
 import { HistoryPartialDetails } from "./history-partial";
 import SyncStatusIndicator from "./sync-status-indicator";
 import { FidelityDateInput } from "./fidelity-date-input";
@@ -437,7 +438,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "price");
               const restoredAsset = (edits ?? []).find((edit) => edit.symbol === asset.symbol &&
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "restore");
-              return <tr key={`${asset.assetType}:${asset.symbol}`}><td>{asset.symbol}
+              return <tr key={`${asset.assetType}:${asset.symbol}`}><td><AssetLabel asset={asset} size={20} quiet tag="" />
                 <button type="button" className="t3-icon-button" aria-label={t("history.fidelity.deleteAsset").replace("{asset}", asset.symbol)}
                   disabled={isDeletingAsset} onClick={() => setDeleteAssetId(asset.id)}><TrashIcon aria-hidden="true" /></button></td>
               <td>{restoredAsset ? <><span className="fidelity-edited-value">{quantity(asset.assetType === "crypto" &&

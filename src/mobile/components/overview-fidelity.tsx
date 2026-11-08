@@ -12,7 +12,7 @@ import { buildAssetDetailsPath } from "@/utils/assets";
 import { currencyWrapper } from "@/utils/currency";
 import { useTranslation } from "@/mobile/i18n";
 import { rangeLabel } from "@/mobile/components/fidelity-range";
-import SourceMark from "@/mobile/components/source-mark";
+import AssetLabel from "@/components/common/asset-label";
 import { loadAIConfig } from "@/middlelayers/configuration";
 import { getConfiguration } from "@/middlelayers/configuration";
 import { isProVersion } from "@/middlelayers/license";
@@ -37,7 +37,7 @@ import { directionColorVar, directionTone } from "@/utils/color";
 type Snapshot = Awaited<ReturnType<typeof queryHistoricalData>>[number];
 type Asset = Awaited<ReturnType<typeof queryLatestAssetsPercentage>>[number];
 type Point = Awaited<ReturnType<typeof queryTotalValues>>[number];
-export type View = { points: Point[]; snapshots: Snapshot[]; latest: Snapshot | null; prior: Snapshot | null; week: Snapshot | null; holdings: Asset[]; partial: boolean; currentTotal: number; excluded: Awaited<ReturnType<typeof queryTotalValue>>["excludedSources"]; sources: ReturnType<typeof listPortfolioSources>; sourceLabels: Record<string, string> };
+export type View = { points: Point[]; snapshots: Snapshot[]; latest: Snapshot | null; prior: Snapshot | null; week: Snapshot | null; holdings: Asset[]; partial: boolean; currentTotal: number; excluded: Awaited<ReturnType<typeof queryTotalValue>>["excludedSources"]; sources: Array<ReturnType<typeof listPortfolioSources>[number] & { provider?: string }>; sourceLabels: Record<string, string>; sourceTypes?: Record<string, string | undefined> };
 
 const names: Record<string, string> = {
   BTC: "Bitcoin", ETH: "Ethereum", SOL: "Solana", USDT: "Tether", USDC: "USD Coin",
@@ -238,7 +238,17 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
       queryHistoricalData(50, false, { includeTransactions: false }),
       queryLatestAssetsPercentage(allTimeRange),
       Promise.resolve().then(() => queryTotalValue(allTimeRange)).catch(() => null),
-      Promise.all([getConfiguration(), isProVersion()]).then(([config, license]) => config ? listPortfolioSources(config, license) : []),
+      Promise.all([getConfiguration(), isProVersion()]).then(([config, license]) => {
+        if (!config) return [];
+        const exchanges = (config.exchanges ?? []).filter((exchange) => exchange.active !== false);
+        const brokers = (config.stockConfig?.brokers ?? []).filter((broker) => broker.active !== false);
+        return listPortfolioSources(config, license).map((source) => {
+          const [type, ordinal] = source.sourceId.split(":");
+          const provider = type === "cex" ? exchanges[Number(ordinal)]?.name
+            : type === "stock" ? brokers[Number(ordinal)]?.name : type;
+          return { ...source, provider };
+        });
+      }),
     ]).then(async ([points, snapshots, holdings, detail, sources]) => {
       if (!active) return;
       setWithLastKnown(false);
@@ -262,7 +272,8 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
       if (!active) return;
       const labels = sourceDisplayNames(wallets.map((id) => ({ id, ...aliases[id] })), walletName, walletOrdinals);
       const sourceLabels = Object.fromEntries(wallets.map((wallet, index) => [wallet, labels[index]]));
-      setView((current) => current ? { ...current, sourceLabels } : current);
+      const sourceTypes = Object.fromEntries(wallets.map((wallet) => [wallet, aliases[wallet]?.type]));
+      setView((current) => current ? { ...current, sourceLabels, sourceTypes } : current);
     }).catch(() => { if (active) setStatus("error"); });
     return () => { active = false; };
   }, [allTimeRange.start.getTime(), allTimeRange.end.getTime(), version, t, walletOrdinals]);
@@ -467,7 +478,8 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
           const price = asset.value / asset.amount;
           const change = oldPrice ? ratio(price - oldPrice, oldPrice) : null;
           return <Link className="fd-overview-row" key={key} to={buildAssetDetailsPath({ symbol: asset.coin, assetType: asset.assetType })}>
-            <span><b>{asset.coin}</b> <em>{names[asset.coin] ?? ""}</em></span><strong>{amt(asset.value, currency)}</strong>
+            <AssetLabel asset={{ symbol: asset.coin, assetType: asset.assetType }} size={20} quiet
+              secondary={names[asset.coin] ?? ""} /><strong>{amt(asset.value, currency)}</strong>
             <small>{asset.amount.toLocaleString("en-US", { maximumFractionDigits: 4 })} <span>{amt(price, currency)}</span> <span>{asset.percentage.toFixed(1)}%</span></small>
             <small data-tone={change === null ? "neutral" : tone(change)}>{change === null ? dash : pct(change, 1)} <i>7D</i></small>
           </Link>;
@@ -487,13 +499,14 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
       </section>
       <section className="fd-card fd-overview-moved"><div className="fd-card-heading"><h3>{t("overview.design.whatMoved")}</h3><span>{t("fidelity.overview.movedSubtitle").replace("{amount}", amt(weekChange, currency, 0, true))}</span></div>
         {movers.map((item) => <Link key={item.key} className="fd-overview-mover" to={buildAssetDetailsPath({ symbol: item.symbol, assetType: item.key.startsWith("stock:") ? "stock" : "crypto" })}>
-          <b>{item.symbol}</b><span style={{ "--fd-zero": `${moverZero}%` } as CSSProperties}>{item.value !== 0 && <i data-tone={tone(item.value)} style={item.value > 0
+          <b><AssetLabel asset={{ symbol: item.symbol, assetType: item.key.startsWith("stock:") ? "stock" : "crypto" }} size={20} quiet /></b><span style={{ "--fd-zero": `${moverZero}%` } as CSSProperties}>{item.value !== 0 && <i data-tone={tone(item.value)} style={item.value > 0
             ? { left: `${moverZero}%`, width: `${item.value * moverUnit}%` }
             : { right: `${100 - moverZero}%`, width: `${-item.value * moverUnit}%` }} />}</span><strong data-tone={tone(item.value)}>{amt(item.value, currency, 0, true)}</strong></Link>)}
       </section>
       <section className="fd-card fd-overview-rank" data-expanded={rankExpanded}><div className="fd-card-heading"><h3>{t("overview.design.topCoins")}</h3><div className="fd-overview-mini"><button aria-pressed={sort === "value"} onClick={() => setSort("value")}>{t("overview.design.byValue")}</button><button aria-pressed={sort === "change"} onClick={() => setSort("change")}>{t("overview.design.byPriceChange")}</button></div></div>
         {coins.slice(0, rankExpanded ? undefined : 3).map((coin) => <Link key={coin.coin} className="fd-overview-row" to={buildAssetDetailsPath({ symbol: coin.coin, assetType: coin.assetType })}>
-          <span><b>{coin.name}</b> <em>{coin.coin}</em></span><strong>{amt(coin.value, currency)}</strong>
+          <AssetLabel asset={{ symbol: coin.coin, assetType: coin.assetType }} name={coin.name} size={20} quiet
+            secondary={coin.coin} /><strong>{amt(coin.value, currency)}</strong>
           <small><span>{t("overview.design.portfolioRank")} #{coin.rank}</span> <span>{amt(coin.price, currency)}</span></small>
           <small><span data-tone={coin.day === null || Math.abs(coin.day) < .0005 ? "neutral" : tone(coin.day)}>{coin.day === null ? dash : pct(coin.day, 1)}</span> 24h · <span data-tone={coin.week === null || Math.abs(coin.week) < .0005 ? "neutral" : tone(coin.week)}>{coin.week === null ? dash : pct(coin.week, 1)}</span> 7D</small></Link>)}
         {coins.length > 3 && <button type="button" className="fd-overview-more" onClick={() => setRankExpanded(!rankExpanded)}>{rankExpanded ? t("overview.design.showFewer") : t("overview.design.showMore").replace("{count}", String(coins.length - 3))} <span style={rankExpanded ? { transform: "rotate(180deg)" } : undefined}><Icon name="chevron" size={14} /></span></button>}
@@ -503,10 +516,15 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
         {staleSource && <div className="fd-overview-stale-banner"><ExclamationTriangleIcon className="fd-overview-stale-icon" aria-hidden="true" /><div><b>{t("fidelity.overview.staleTitle").replace("{source}", staleSource.label)}</b><span>{t("fidelity.overview.staleDescription").replace("{reason}", staleReason.endsWith(".") ? staleReason : `${staleReason}.`).replace("{value}", amt(staleValue, currency)).replace("{time}", staleTime)}</span></div></div>}
         {orderedSources.map(([name, value]) => {
           const source = statuses.find((status) => status.label === name);
+          const configuredSource = view?.sources.find((item) => item.label === name);
+          const sourceType = configuredSource?.sourceId.split(":")[0];
+          const sourceKind = source?.kind ?? (sourceType === "cex" ? "exchange" : sourceType === "stock" ? "broker" : sourceType === "others" ? "others" : "wallet");
           const sourceTone = source?.status === "ok" ? "gain" : source?.status ? "loss" : "neutral";
           const isStale = source?.status === "failed" || source?.status === "stale";
-          return <div className="fd-overview-source" key={name}><SourceMark className="fd-overview-logo" initialsOnly source={{ ...(view?.sources.find((item) => item.label === name) ?? { sourceId: "", label: name }), kind: source?.kind, provider: source?.provider }} />
-            <span><b>{name}</b><small>{source?.kind ? t(`fidelity.overview.kind.${source.kind}`) : t("overview.design.sources")} · {pct(ratio(value, current), 1, false)}</small></span>
+          return <div className="fd-overview-source" key={name}>
+            <AssetLabel kind={sourceKind === "others" ? "custom" : sourceKind === "exchange" || sourceKind === "broker" ? sourceKind : "wallet"}
+              type={source?.provider ?? configuredSource?.provider ?? (sourceType === "cex" ? name : sourceType === "stock" ? "ibkr" : sourceType)}
+              name={name} size={20} secondary={`${t(`fidelity.overview.kind.${sourceKind}`)} · ${pct(ratio(value, current), 1, false)}`} />
             <strong>{amt(value, currency)}</strong><small data-tone={sourceTone}>{isStale ? t("fidelity.overview.staleStatus").replace("{time}", source.lastSuccessAt ? timeLabel(new Date(source.lastSuccessAt)) : dash) : source?.lastSuccessAt ? t("fidelity.overview.updated").replace("{time}", timeLabel(new Date(source.lastSuccessAt))) : dash}</small>
             {isStale && <button type="button" className="fd-overview-retry" onClick={() => requestRefreshSource(source.sourceId)}><Icon name="refresh" size={13} />{t("fidelity.overview.retry")}</button>}</div>;
         })}

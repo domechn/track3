@@ -10,6 +10,7 @@ import type { ExchangeDraft, OtherRow, StockBrokerDraft, WalletDraft } from "./t
 import { PublicIpInfo } from "./public-ip-info";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useTranslation } from "@/i18n";
+import AssetLabel from "@/components/common/asset-label";
 
 type Tab = "exchanges" | "wallets" | "brokers" | "custom";
 type Props = {
@@ -27,10 +28,6 @@ type Props = {
 
 const exchanges = ["binance", "okex", "bitget", "kraken", "gate", "coinbase", "bybit", "htx", "mexc", "backpack"];
 const exchangeName = (key: string) => CEX_OPTIONS.find((option) => option.value === key)?.label ?? key;
-const exchangeMark: Record<string, string> = {
-  binance: "BN", okex: "OK", bitget: "BG", kraken: "KR", gate: "GT",
-  coinbase: "CB", bybit: "BY", htx: "HT", mexc: "MX", backpack: "BP",
-};
 const shield = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
 </svg>;
@@ -136,15 +133,20 @@ export function SourceEditorDesign({ tab, onClose, onSaveExchange, onSaveWallet,
       <div className="t3-fidelity-editor-head">
         {tab === "exchanges" && step === "form" && <button type="button" className="t3-fidelity-editor-back" onClick={() => setStep("pick")}><ChevronLeftIcon />{t("fidelity.editor.chooseExchange")}</button>}
         <div className="t3-fidelity-editor-heading">
-          {tab === "exchanges" && step === "form" && <span className="t3-fidelity-source-logo">{exchangeMark[exchange.type]}</span>}
-          <div><DialogTitle>{title}</DialogTitle><DialogDescription>{subtitle}</DialogDescription></div>
+          {tab === "exchanges" && step === "form" ? <>
+            <div className="t3-fidelity-editor-exchange-heading">
+              <DialogTitle><AssetLabel kind="exchange" type={exchange.type} name={title} size={24} /></DialogTitle>
+              <DialogDescription>{subtitle}</DialogDescription>
+            </div></> :
+            <div><DialogTitle>{title}</DialogTitle><DialogDescription>{subtitle}</DialogDescription></div>}
         </div>
       </div>
       <div className="t3-fidelity-editor-body">
         {tab === "exchanges" && step === "pick" && <>
           <div className="t3-fidelity-editor-picks">
             {exchanges.map((key) => <button key={key} type="button" aria-label={exchangeName(key)} className={selectedExchange === key ? "selected" : ""}
-              onClick={() => setSelectedExchange(key)}><span className="t3-fidelity-source-logo">{exchangeMark[key]}</span><span><b>{exchangeName(key)}</b><small>{key === "bitget" || key === "okex" ? t("fidelity.editor.keySecretPassphrase") : t("fidelity.editor.keySecret")}</small></span></button>)}
+              onClick={() => setSelectedExchange(key)}><AssetLabel kind="exchange" type={key} name={exchangeName(key)} size={24}
+                secondary={key === "bitget" || key === "okex" ? t("fidelity.editor.keySecretPassphrase") : t("fidelity.editor.keySecret")} /></button>)}
           </div>
           {info}
           <p>{t("fidelity.editor.notListed")}<br /><a href="https://track3.dev/docs/" target="_blank" rel="noreferrer">{t("fidelity.editor.apiHelp")} <OpenInNewWindowIcon aria-hidden="true" /></a></p>
@@ -167,7 +169,9 @@ export function SourceEditorDesign({ tab, onClose, onSaveExchange, onSaveWallet,
         </>}
         {tab === "wallets" && <>
           <EditorField label={t("fidelity.editor.walletType")}><div className="t3-fidelity-editor-picks c3">
-            {walletTypes.map((option) => <button key={option.key} type="button" className={wallet.type === option.key ? "selected" : ""} onClick={() => setWallet({ ...wallet, type: option.key, address: "" })}><b>{option.code}{option.pro && <span className="t3-fidelity-source-pro">Pro</span>}</b><small>{option.name}</small></button>)}
+            {walletTypes.map((option) => <button key={option.key} type="button" className={wallet.type === option.key ? "selected" : ""} onClick={() => setWallet({ ...wallet, type: option.key, address: "" })}>
+              <AssetLabel kind="wallet" type={option.key} name={option.code} tag={option.pro ? "Pro" : undefined}
+                secondary={option.name} size={24} /></button>)}
           </div></EditorField>
           <EditorField label={t("fidelity.editor.address")} hint={!wallet.address ? t("fidelity.editor.addressHint") : undefined}
             error={wallet.address && !addressValid ? wallet.type === "erc20" ? t("fidelity.editor.ethereumInvalid") : t("fidelity.editor.addressInvalid").replace("{chain}", wallet.type.toUpperCase()) : undefined}
@@ -186,7 +190,8 @@ export function SourceEditorDesign({ tab, onClose, onSaveExchange, onSaveWallet,
           {info}
         </>}
         {tab === "brokers" && <>
-          <div className="t3-fidelity-editor-banner neutral"><span className="t3-fidelity-source-logo">IB</span><div><b>Interactive Brokers</b><span>{t("fidelity.source.brokerNote")}</span></div></div>
+          <div className="t3-fidelity-editor-banner neutral"><AssetLabel kind="broker" type="ibkr" name="Interactive Brokers"
+            size={24} secondary={t("fidelity.source.brokerNote")} /></div>
           <EditorField label={t("fidelity.editor.flexId")} error={broker.queryId && !brokerIdValid ? t("fidelity.editor.flexIdInvalid") : undefined}><input aria-label={t("fidelity.editor.flexId")} className={broker.queryId && !brokerIdValid ? "error" : ""} value={broker.queryId} onChange={(event) => setBroker({ ...broker, queryId: event.target.value })} /></EditorField>
           <EditorField label={t("fidelity.editor.flexToken")} error={saveError}><div className={`t3-fidelity-editor-secret ${saveError ? "error" : ""}`}><input aria-label={t("fidelity.editor.flexToken")} type={showToken ? "text" : "password"} value={broker.token} onChange={(event) => setBroker({ ...broker, token: event.target.value })} autoComplete="off" /><button type="button" aria-label={t(showToken ? "fidelity.editor.hide" : "fidelity.editor.show")} onClick={() => setShowToken(!showToken)}>{showToken ? <EyeNoneIcon /> : <EyeOpenIcon />}</button></div></EditorField>
           <EditorField label={t("fidelity.editor.label")} optional><input aria-label={t("fidelity.editor.label")} placeholder="Interactive Brokers" value={broker.alias ?? ""} onChange={(event) => setBroker({ ...broker, alias: event.target.value })} /></EditorField>

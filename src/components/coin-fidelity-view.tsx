@@ -25,6 +25,7 @@ import { Pager, usePager } from "./ui/pager";
 import { CoinLotsTable, CoinSourcesTable, useStickyCoinChart, type CoinLotRow } from "./coin-detail-sections";
 import { ArchiveIcon, BackpackIcon, ClockIcon } from "@radix-ui/react-icons";
 import EmptyState from "./empty-state";
+import AssetLabel from "./common/asset-label";
 
 type Props = {
   symbol: string;
@@ -247,7 +248,10 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const sheetGain = sheetDisposals.reduce((total, disposal) => total + disposal.gainLoss, 0);
   return <div className={`analyze-coin coin-fidelity${assetType === "stock" ? " coin-fidelity-stock" : ""}${custom ? " coin-fidelity-custom" : ""}${quoteColor === "red-up-green-down" ? " fidelity-reverse" : ""}`}>
     <div className="coin-fidelity-heading">
-      <div><div className="coin-fidelity-crumb"><span>{t("coin.fidelity.overview")}</span><CoinChevron /><span>{t("coin.fidelity.coins")}</span><CoinChevron /><span>{symbol}</span></div><h1>{coinName} <b>{custom ? t("coin.fidelity.customAsset") : assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")}</b></h1>{sourceNames.length > 0 && <CoinSourceSummary names={sourceNames} template={sourceTemplate} locale={locale} moreLabel={t("coin.sourcesMore")} allLabel={t("coin.sourcesAll")} lastPrefix={lastSourcePrefix} />}</div>
+      <div><div className="coin-fidelity-crumb"><span>{t("coin.fidelity.overview")}</span><CoinChevron /><span>{t("coin.fidelity.coins")}</span><CoinChevron /><span>{symbol}</span></div>
+        <h1 className="coin-fidelity-title"><AssetLabel kind={custom ? "custom" : assetType === "stock" ? "stock" : "coin"}
+          symbol={symbol} name={coinName} size={32} tag={custom ? t("coin.fidelity.customAsset") : assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")} /></h1>
+        {sourceNames.length > 0 && <CoinSourceSummary names={sourceNames} template={sourceTemplate} locale={locale} moreLabel={t("coin.sourcesMore")} allLabel={t("coin.sourcesAll")} lastPrefix={lastSourcePrefix} />}</div>
       <Button variant="outline" onClick={() => navigate("/cost-basis")}><svg aria-hidden="true" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2.5v13M12 5.5c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 2.2 3 1 3 2.3-1.3 2-3 2-3-.8-3-2" /></svg> {t("coin.openCostBasis")}</Button>
     </div>
     {loadError && <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => setRetry((value) => value + 1)}>{t("summary.fidelity.retry")}</button></div>}
@@ -300,7 +304,7 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
         emptyState={<EmptyState icon={ArchiveIcon} title={t("coin.lots.empty.title")} hint={t("coin.lots.empty.hint")} />} />
       </div>
       <div ref={sideColumnRef} className="coin-fidelity-side-column">
-      <CoinSourcesTable sources={sources.map((row) => ({ id: row.wallet, label: sourceName(row.wallet),
+      <CoinSourcesTable sources={sources.map((row) => ({ id: row.wallet, label: sourceName(row.wallet), logoType: row.walletType,
         kind: assetType === "stock" ? t("coin.fidelity.broker") : isExchangeSource(row.walletType) ? t("coin.fidelity.exchange") : t("coin.fidelity.wallet"),
         amount: row.amount, value: row.value }))} labels={tableLabels} money={(value) => money(value)}
         quantity={(value) => num(value, custom ? 2 : assetType === "stock" ? 0 : 4)} sectionRef={sideRef}

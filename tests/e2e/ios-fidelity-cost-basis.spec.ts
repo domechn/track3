@@ -371,7 +371,7 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
     return right.left - left.right;
   });
   expect(emptyValueGap).toBeGreaterThanOrEqual(8);
-  expect(await page.locator(".fidelity-cost-prices .fidelity-price-row strong").allTextContents())
+  expect(await page.locator(".fidelity-cost-prices .fidelity-price-row .t3-asset-label-name").allTextContents())
     .toEqual(["BTC", "ETH", "SOL", "BNB", "AAPL", "NVDA"]);
   await page.screenshot({ path: `${dir}/cost-basis-empty-phone.png` });
   await page.screenshot({ path: `${dir}/cost-basis-empty-phone-long.png`, fullPage: true,

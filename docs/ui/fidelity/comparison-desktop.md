@@ -23,6 +23,7 @@ With fewer than two stored snapshots, the page shows an empty explanation and no
 
 ## Remaining differences
 
+- UI42's approved neutral logo tiles replace the bare marks in the older design page. On the iPad mover rows, the STOCK tag sits below its ticker so the ticker, movement bar and signed value remain visible within the available columns.
 Fresh renders of the source HTML and app with the source's eight assets both measure 1600 × 1452 px. The default state differs at **5.27%** of pixels with any RGB channel above 20, or **4.21%** above 60. With picker A open the ratios are **5.36%** and **4.23%**, respectively. The captures and `getBoundingClientRect`/`getComputedStyle` measurements are in `/tmp/ui14-current/`. The required mover layout accounts for the largest region of changed pixels. The source cannot display the required 11-asset state, so these ratios measure the same eight-asset data on both sides.
 
 - The source ranks mover rows by signed change, uses 42 px rows and fixed 459 px cards, and puts its zero axis and value columns at different positions. The product ranks by absolute size, uses 36 px rows, one diverging scale and shared columns per card, and grows the cards for up to ten rows plus expansion. Matching the source here would restore the overflow or break the required behavior.

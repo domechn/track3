@@ -196,7 +196,7 @@ it("uses an asset type label for holdings outside the fixture set", () => {
     holdings: [{ assetType: "crypto", symbol: "XRP", amount: 1, value: 6000, price: 6000 }],
     targets: [{ kind: "asset", assetType: "crypto", symbol: "XRP", percent: 100 }],
   })} />);
-  expect(screen.getByText("XRP").nextElementSibling).toHaveTextContent("Crypto");
+  expect(screen.getByText("XRP").closest(".t3-asset-label")?.querySelector(".t3-asset-label-secondary")).toHaveTextContent("Crypto");
 });
 
 it("does not instruct a buy-only plan to sell first", () => {

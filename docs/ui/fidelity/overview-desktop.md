@@ -37,6 +37,8 @@ The type face is Public Sans with tabular numbers. Tokens: `--ground #0d0d0e`, `
 
 ## Remaining differences
 
+UI42 uses the approved website-style neutral tile for asset and source marks. The older Overview page design renders those marks differently.
+
 The 7 Nov 2026 UI27 captures compare the saved source page renders
 `/tmp/fidelity-desktop/design/overview-{base,sync}-1440.png` with
 `/tmp/fidelity-desktop/overview/overview{-sync}-desktop.png`. At the RGB-sum

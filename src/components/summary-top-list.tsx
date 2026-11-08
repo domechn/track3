@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { barGeometry, divergingScale } from "./comparison-fidelity-movers";
 import { formatListProfitPercent } from "./profit-percentage";
+import AssetLabel from "./common/asset-label";
 
 type Row = { assetType: string; symbol: string; value: number | null; percentage: number | null | undefined; stable: boolean };
 
@@ -20,7 +21,7 @@ export function SummaryTopList({ heading, rows, scaleValues, amount, tone }: {
       const bar = value === null ? null : barGeometry(value, scale);
       const percentage = formatListProfitPercent(row.percentage);
       return <div className="summary-top-row" key={`${row.assetType}:${row.symbol}`} role="row" style={{ gridRow: index + 2 }}>
-        <b role="rowheader">{row.symbol}</b>
+        <b role="rowheader"><AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /></b>
         <span className="summary-top-track" aria-hidden="true"><span>{bar && <i className={tone(value)} data-tone={tone(value)}
           style={{ left: bar.left === undefined ? undefined : `${bar.left}%`, right: bar.right === undefined ? undefined : `${bar.right}%`,
             width: `min(${bar.side}%, max(${bar.minimumPixels}px, ${bar.width}%))` }} />}</span></span>

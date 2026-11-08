@@ -15,6 +15,9 @@ import { FittingAttributionAmount } from "./fitting-attribution-amount";
 import { useFittingAttributionTicks } from "./use-fitting-attribution-ticks";
 import { SummaryTopList } from "./summary-top-list";
 import { marketProfitPercentage } from "./profit-percentage";
+import { classifyWalletType } from "@/utils/wallet-treemap";
+import AssetLabel from "./common/asset-label";
+import type { AssetIconKind } from "./ui/asset-icon";
 
 type Result = Awaited<ReturnType<typeof queryAttribution>>;
 
@@ -114,8 +117,15 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
         <div className="fidelity-attribution-row head" role="row"><span role="columnheader">{t("summary.fidelity.asset")}</span><span role="columnheader"><span className="sr-only">{t("profit.attribution.chart")}</span></span><span role="columnheader">{t("summary.fidelity.market")}</span><span role="columnheader">{t("summary.fidelity.quantity")}</span>{hasResidual && <span role="columnheader">{t("profit.attribution.residual")}</span>}<span role="columnheader">{t("summary.fidelity.total")}</span></div>
         {paging.rows.map((group) => {
           const quantityStart = group.priceEffect * group.flowEffect < 0 ? 0 : group.priceEffect;
+          const name = group.label.split(" · ")[0];
+          const provider = dimension === "wallet" ? result.aliases[group.key]?.type : group.key;
+          const category = classifyWalletType(provider);
+          const kind: AssetIconKind = dimension === "coin" ? group.key.startsWith("stock:") ? "stock" : "coin"
+            : dimension === "assetType" ? "custom"
+              : category === "cex" ? "exchange" : category === "broker" ? "broker" : "wallet";
           return <div className="fidelity-attribution-row" role="row" key={group.key}>
-          <b role="rowheader">{group.label.split(" · ")[0]}</b>
+          <b role="rowheader"><AssetLabel kind={kind} symbol={name} type={provider} name={name} size={20} quiet
+            tag={kind === "stock" ? "stock" : undefined} /></b>
           <span className="fidelity-attribution-track" role="cell" aria-label={t("profit.attribution.chart")}><b style={{ left: `${zero}%` }} /><i className="market" style={{ left: `${axisPosition(Math.min(0, group.priceEffect))}%`, width: `${Math.abs(axisPosition(group.priceEffect) - zero)}%` }} /><i className="quantity" style={{ left: `${axisPosition(Math.min(quantityStart, quantityStart + group.flowEffect))}%`, width: `${Math.abs(axisPosition(group.flowEffect) - axisPosition(0))}%` }} /></span>
           <span role="cell" className={tone(group.priceEffect)} title={exactMoney(group.priceEffect)}>{money(group.priceEffect)}</span>
           <span role="cell" title={exactMoney(group.flowEffect)}>{money(group.flowEffect)}</span>

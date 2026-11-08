@@ -12,7 +12,7 @@ const backupDirectory = "/tmp/fidelity-wdb-locked/history";
 function reflowedDetailHeader(sourceX: number, sourceFirstWidth: number) {
   const left = 973.58;
   const right = 1536;
-  const firstWidth = 72;
+  const firstWidth = 124;
   return left + firstWidth + (sourceX - left - sourceFirstWidth)
     * (right - left - firstWidth) / (right - left - sourceFirstWidth);
 }

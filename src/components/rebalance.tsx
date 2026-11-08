@@ -33,6 +33,8 @@ import { FinanceChartSkeleton, RebalanceCharts } from "./finance-charts";
 import { rebalanceVisuals } from "./finance-visuals";
 import { RebalanceSummary } from "./rebalance-summary";
 import RebalanceDesktop from "./rebalance-desktop";
+import AssetLabel from "./common/asset-label";
+import AssetIcon from "./ui/asset-icon";
 import FidelityRail from "./fidelity-rail";
 import type { QuoteColor } from "@/middlelayers/types";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -446,11 +448,14 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down", 
                 <CardContent className="space-y-2 px-4 pb-4">
                   {visual?.trades.length ? visual.trades.map((row) => (
                     <div key={`${row.assetType}:${row.symbol}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
-                      <p className="font-medium">
-                        {t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}{" "}
-                        {row.tradeQuantity === null ? "" : `${Number(Math.abs(row.tradeQuantity).toFixed(8)).toLocaleString(undefined, { maximumFractionDigits: 8 })} `}
-                        {row.symbol}
-                      </p>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <AssetIcon kind={row.assetType === "stock" ? "stock" : "coin"} symbol={row.symbol} size={20} quiet decorative />
+                        <span className="font-medium">
+                          {t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}
+                          {row.tradeQuantity === null ? "" : ` ${Number(Math.abs(row.tradeQuantity).toFixed(8)).toLocaleString(undefined, { maximumFractionDigits: 8 })}`}
+                          {` ${row.symbol}`}
+                        </span>
+                      </div>
                       <span className="tabular-nums text-muted-foreground">~{Math.abs(row.tradeValue).toLocaleString(undefined, { maximumFractionDigits: 2 })} {currency.currency}</span>
                     </div>
                   )) : <p className="text-sm text-muted-foreground">{t("rebalance.noTrade")}</p>}

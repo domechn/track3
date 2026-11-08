@@ -1,3 +1,4 @@
+import AssetLabel from "./common/asset-label";
 import {
   queryLatestAssets,
   queryRealTimeAssetsValue,
@@ -149,14 +150,7 @@ const App = ({
                 className="pt-1 md:basis-1/2"
               >
                 <div className="px-1 py-0.5 text-sm flex justify-between items-center gap-3">
-                  <div className="flex items-center min-w-0">
-                    <img
-                      className="inline-block w-[18px] h-[18px] rounded-full mr-1.5"
-                      src={logoMap[asset.symbol]}
-                      alt={asset.symbol}
-                    />
-                    <div className="truncate">{asset.symbol}</div>
-                  </div>
+                  <AssetLabel asset={asset} src={logoMap[asset.symbol]} size={20} quiet />
                   <div className="tabular-nums">
                     {currency.symbol +
                       prettyPriceNumberToLocaleString(

@@ -35,6 +35,7 @@ Earlier long capture: `/tmp/fidelity/overview/overview-phone-long.png` vs `/tmp/
 
 ## Remaining differences
 
+- UI42 uses the approved website-style neutral tile for asset and source marks. The older phone Overview page design renders those marks differently.
 - The refreshed 7 Nov 2026 390px viewport capture differs by **6.30%** from the saved
   source-page render (any RGB channel differs by more than 20). The source
   assumes configured sync; the base app fixture has never configured sync, so

@@ -14,8 +14,8 @@ import { useToast } from "@/mobile/components/ui/use-toast";
 import { ToastAction } from "@/mobile/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import {
-  ArchiveIcon, BackpackIcon, CheckIcon, CrossCircledIcon, CubeIcon,
-  ExclamationTriangleIcon, GlobeIcon, InfoCircledIcon, UpdateIcon,
+  CheckIcon, CrossCircledIcon,
+  ExclamationTriangleIcon, InfoCircledIcon, UpdateIcon,
 } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "@/mobile/components/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
@@ -43,7 +43,8 @@ import { listPortfolioSources } from "@/middlelayers/data";
 import { publishRefreshProgress, refreshSourceEvent } from "@/mobile/components/refresh-progress-event";
 import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
 import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
-import SourceMark from "@/mobile/components/source-mark";
+import AssetLabel from "@/components/common/asset-label";
+import { sourceIconKind } from "@/components/source-allocation-list";
 
 let lastRetryResult: RefreshAllDataResult | undefined;
 
@@ -68,7 +69,7 @@ const App = ({
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult | undefined>(() => lastRetryResult);
   const [refreshing, setRefreshing] = useState(false);
-  const [pendingSources, setPendingSources] = useState<Array<{ sourceId: string; label: string }>>([]);
+  const [pendingSources, setPendingSources] = useState<Array<{ sourceId: string; label: string; provider?: string }>>([]);
   const [liveSources, setLiveSources] = useState<PortfolioSourceResult[]>([]);
 
   const {
@@ -100,7 +101,16 @@ const App = ({
     setRefreshLoading(true);
     try {
       const [config, userInfo] = await Promise.all([getConfiguration(), isProVersion()]);
-      setPendingSources(config ? listPortfolioSources(config, userInfo).filter((source) => !sourceId || source.sourceId === sourceId) : []);
+      const exchanges = config?.exchanges?.filter((exchange) => exchange.active !== false) ?? [];
+      const brokers = config?.stockConfig?.brokers?.filter((broker) => broker.active !== false) ?? [];
+      setPendingSources(config ? listPortfolioSources(config, userInfo)
+        .filter((source) => !sourceId || source.sourceId === sourceId)
+        .map((source) => {
+          const [kind, ordinal] = source.sourceId.split(":");
+          const provider = kind === "cex" ? exchanges[Number(ordinal)]?.name
+            : kind === "stock" ? brokers[Number(ordinal)]?.name : kind;
+          return { ...source, provider };
+        }) : []);
     } catch {
       setPendingSources([]);
     }
@@ -306,7 +316,6 @@ const App = ({
     ? t("refresh.autoRetry.next").replace("{time}", new Date(nextRetryAt).toLocaleTimeString(
       locale === "zh" ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false }))
     : retrySchedule.stopped ? t("refresh.autoRetry.stopped") : "";
-  const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
   const statusStyle = {
     ok: "t3-pill t3-refresh-status-pill",
     stale: "t3-pill t3-refresh-status-pill",
@@ -430,13 +439,16 @@ const App = ({
               const StatusIcon = completed?.status === "stale" || completed?.status === "partial"
                 ? ExclamationTriangleIcon : completed ? CheckIcon : UpdateIcon;
               return <div key={pending.sourceId} data-source-status-row role="group" aria-label={sourceLabel(pending)} className="fd-refresh-progress-row">
-                <SourceMark initialsOnly source={{ ...pending, kind: completed?.kind ?? previous?.kind, provider: completed?.provider ?? previous?.provider }} />
-                <div><b>{sourceLabel(pending)}</b><small data-tone={completed?.status === "stale" ? "loss" : completed ? "gain" : "neutral"}>
+                <AssetLabel kind={completed?.kind === "exchange" || completed?.kind === "broker" ? completed.kind :
+                  previous?.kind === "exchange" || previous?.kind === "broker" ? previous.kind :
+                    sourceIconKind(pending.provider ?? pending.sourceId.split(":")[0])}
+                  type={completed?.provider ?? previous?.provider ?? pending.provider ?? pending.sourceId.split(":")[0]}
+                  name={sourceLabel(pending)} size={20} secondary={<>
                   <StatusIcon aria-hidden="true" className={completed ? undefined : "animate-spin motion-reduce:animate-none"} />
                   {completed?.status === "ok" ? t("fidelity.refresh.doneIn").replace("{duration}", duration)
                     : completed?.status === "stale" ? <>{t("refresh.status.stale")} · {t(`refresh.reason.${completed.category ?? "other"}`)}</>
                     : completed?.status === "partial" ? t("refresh.status.partial")
-                    : <>{t("fidelity.refresh.readingBalances")}<span className="sr-only">{t("refresh.inProgress")}</span></>}</small></div>
+                    : <>{t("fidelity.refresh.readingBalances")}<span className="sr-only">{t("refresh.inProgress")}</span></>}</>} />
                 {(previous?.status === "failed" || completed?.status === "stale") && completed?.category !== "quota" && previous?.category !== "quota" &&
                   <Button size="sm" variant="secondary" disabled
                     aria-label={t("refresh.retrySource").replace("{source}", sourceLabel(pending))}>{t("refresh.retryButton")}</Button>}
@@ -451,10 +463,9 @@ const App = ({
               return <div key={pending.sourceId} data-source-status-row role="group" aria-label={label} className="ios-d3-refresh-row t3-refresh-source-row flex items-center justify-between gap-3 px-4 py-3">
                 <div className="ios-d3-refresh-row-main">
                   <StatusIcon aria-hidden="true" className={`h-5 w-5 shrink-0 ${completed ? completed.status === "stale" || completed.status === "partial" ? "text-amber-600" : "text-green-600 dark:text-green-400" : "animate-spin text-primary motion-reduce:animate-none"}`} />
-                  <div className="ios-d3-refresh-row-content">
-                    <div className="ios-d3-refresh-row-title">{label}</div>
-                    <div className="text-xs text-muted-foreground">{completed ? t(`refresh.status.${completed.status}`) : t("refresh.inProgress")}</div>
-                  </div>
+                  <AssetLabel kind={completed?.kind === "exchange" || completed?.kind === "broker" ? completed.kind :
+                    sourceIconKind(pending.provider ?? pending.sourceId.split(":")[0])} type={completed?.provider ?? pending.provider ?? pending.sourceId.split(":")[0]}
+                    name={label} size={20} secondary={completed ? t(`refresh.status.${completed.status}`) : t("refresh.inProgress")} />
                 </div>
                 <span className="ios-d3-refresh-row-duration text-muted-foreground">{completed?.startedAt && completed.finishedAt
                   ? `${((Date.parse(completed.finishedAt) - Date.parse(completed.startedAt)) / 1000).toFixed(1)}s`
@@ -464,20 +475,16 @@ const App = ({
               </div>;
             })}
             {!refreshing && sortedStatuses.map((source) => {
-              const Icon = kindIcon[source.kind ?? "others"];
               const StatusIcon = statusIcon[source.status];
               return (
               <div key={source.sourceId} role="group" aria-label={displayIdentity(source)}
                 data-source-status-row className="ios-d3-refresh-row t3-refresh-source-row flex items-center justify-between gap-3 px-4 py-3">
                 <div className="ios-d3-refresh-row-main">
                   {isIOS() && <StatusIcon aria-hidden="true" className={`mt-1 h-5 w-5 shrink-0 ${source.status === "ok" ? "text-green-600 dark:text-green-400" : source.status === "failed" ? "text-destructive" : "text-amber-600"}`} />}
-                  <div className="ios-d3-refresh-row-content">
-                  <div className="ios-d3-refresh-row-title" title={sourceLabel(source)}>{sourceLabel(source)}</div>
-                  {source.provider && <div className="ios-d3-refresh-identity text-xs text-muted-foreground">
-                    <Icon aria-hidden="true" className="mr-1 inline-block h-3.5 w-3.5" />
-                    {source.provider}{source.hint && ` · ${displayHint(source)}`}
-                  </div>}
-                  </div>
+                  <AssetLabel kind={source.kind === "exchange" ? "exchange" : source.kind === "broker" ? "broker" :
+                    source.kind === "wallet" ? "wallet" : "custom"}
+                    type={source.provider ?? source.sourceId.split(":")[0]} name={sourceLabel(source)} size={20}
+                    secondary={source.provider ? `${source.provider}${source.hint ? ` · ${displayHint(source)}` : ""}` : undefined} />
                 </div>
                 {source.startedAt && source.finishedAt && <span className="ios-d3-refresh-row-duration text-muted-foreground">
                   {((Date.parse(source.finishedAt) - Date.parse(source.startedAt)) / 1000).toFixed(1)}s

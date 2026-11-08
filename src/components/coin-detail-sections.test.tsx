@@ -18,6 +18,14 @@ const money = (value: number) => `$${value.toFixed(2)}`;
 const quantity = (value: number) => value.toFixed(4);
 
 describe("CoinSourcesTable", () => {
+  it("shows the same tile beside each source label", () => {
+    const { container } = render(<CoinSourcesTable sources={[
+      { id: "binance", label: "Binance", logoType: "binance", kind: "Exchange", amount: 1, value: 100 },
+      { id: "btc", label: "Ledger", logoType: "btc", kind: "Wallet", amount: 1, value: 50 },
+    ]} labels={labels} money={money} quantity={quantity} />);
+    expect([...container.querySelectorAll(".coin-fidelity-sources tbody .t3-asset-icon")]
+      .map((tile) => tile.getAttribute("data-size"))).toEqual(["20", "20"]);
+  });
   for (const [count, positive] of [[0, 0], [1, 1], [3, 2], [16, 2]] as const) {
     it(`collapses zero balances among ${count} sources and keeps displayed shares totaling 100%`, async () => {
       const sources = Array.from({ length: count }, (_, index) => source(index + 1, index < positive ? index + 1 : 0));

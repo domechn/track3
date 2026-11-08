@@ -1,3 +1,4 @@
+import AssetLabel from "./common/asset-label";
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -189,7 +190,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
           .replace("{currency}", "USD").replace("{range}", year || t("cost.fidelity.selectedRange"))}</span></div>
         {byAsset.some((row) => row.gainLoss !== null) ? <ol>{byAsset.map((row) => <li key={`${row.assetType}:${row.symbol}`}
           className={row.gainLoss === null ? "unknown" : undefined}>
-          <strong>{row.symbol}</strong><span className="fidelity-cost-chart-track"
+          <strong><AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /></strong><span className="fidelity-cost-chart-track"
             style={{ "--zero-at": `${zeroAt}%` } as CSSProperties}><i className={tone(row.gainLoss, quoteColor)}
               style={{ left: row.gainLoss === null ? 0 : row.gainLoss >= 0 ? `${zeroAt}%`
                 : `${zeroAt - Math.abs(row.gainLoss) / chartSpan * 92}%`,
@@ -209,7 +210,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
             const boughtQty = price?.bought ?? 0;
             const assetType = key.slice(0, key.indexOf(":"));
             const symbol = key.slice(key.indexOf(":") + 1);
-            return <tr key={key}><td>{symbol}</td><td>{boughtQty ? assetQuantity(assetType, boughtQty) : <span className="zero">–</span>}</td>
+            return <tr key={key}><td><AssetLabel asset={{ symbol, assetType: assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /></td><td>{boughtQty ? assetQuantity(assetType, boughtQty) : <span className="zero">–</span>}</td>
               <td>{boughtQty ? money(price!.averageBuy) : <span className="zero">–</span>}</td>
               <td>{soldQty ? assetQuantity(assetType, soldQty) : <span className="zero">–</span>}</td>
               <td>{soldQty ? money(price!.averageSell) : <span className="zero">–</span>}</td></tr>;
@@ -231,12 +232,12 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
             tab === "open" ? "unrealized" : "gain", "term"].map((key) => <th key={key}>{t(`cost.fidelity.${key}`)}</th>)}
         </tr></thead><tbody>{pagedRows.map(({ row, index, groupLength }, i) => <Fragment key={`${"id" in row ? row.id : row.eventId}:${i}`}>
           {isWarning(row) ? <tr className="fidelity-warnrow">
-            <td>{index === 0 ? row.symbol : ""}</td><td>{isAverage ? t("cost.fidelity.pooled") :
+            <td>{index === 0 ? <AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /> : ""}</td><td>{isAverage ? t("cost.fidelity.pooled") :
               withdrawn.get(row.eventId)?.acquiredAt ? date(withdrawn.get(row.eventId)!.acquiredAt!, locale) : "–"}</td>
             <td><ExclamationTriangleIcon className="fidelity-inline-warning" aria-hidden="true" /> {t("cost.fidelity.withdrawn")} {date(row.date, locale)}</td>
             <td>{assetQuantity(row.assetType, row.amount)}</td><td>{withdrawn.has(row.eventId) ? money(withdrawn.get(row.eventId)!.costBasis) : "–"}</td><td>–</td><td>–</td><td>–</td>
           </tr> : <tr>
-            <td>{index === 0 ? row.symbol : ""}</td><td>{isAverage ? t("cost.fidelity.pooled") : date(row.acquiredAt, locale)}</td>
+            <td>{index === 0 ? <AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /> : ""}</td><td>{isAverage ? t("cost.fidelity.pooled") : date(row.acquiredAt, locale)}</td>
             <td>{tab === "open" ? held(row.acquiredAt) : date("disposedAt" in row ? row.disposedAt : "", locale)}</td>
             <td>{assetQuantity(row.assetType, row.amount)}</td><td>{money(row.costBasis)}</td>
             <td>{money("marketValue" in row ? row.marketValue : row.proceeds)}</td>

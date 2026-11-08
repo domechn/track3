@@ -22,6 +22,8 @@ import {
 import type { AssetType } from "@/middlelayers/datafetch/types";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { Button } from "@/components/ui/button";
+import AssetLabel from "@/components/common/asset-label";
+import AssetIcon from "@/components/ui/asset-icon";
 import AISetupCard from "@/mobile/components/common/ai-setup-card";
 import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions/page-settings";
 import { readRebalanceOptions, setRebalanceOptions } from "@/middlelayers/ui-state/page-prefs";
@@ -470,10 +472,11 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
                   {visual?.trades.length ? visual.trades.map((row) => (
                     <div key={`${row.assetType}:${row.symbol}`} className={`ios-d3-trade flex flex-nowrap items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${row.tradeValue > 0 ? "ios-d3-buy" : "ios-d3-sell"}`}>
                       <p className="ios-d3-trade-description min-w-0 font-medium">
-                        {mobile && <strong className="ios-d3-trade-symbol block">{row.symbol}</strong>}
-                        <span>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}{" "}
-                        {row.tradeQuantity === null ? "" : `${Number(Math.abs(row.tradeQuantity).toFixed(8)).toLocaleString(undefined, { maximumFractionDigits: mobile ? 4 : 8 })} `}
-                        {!mobile && row.symbol}</span>
+                        <AssetIcon kind={row.assetType === "stock" ? "stock" : "coin"} symbol={row.symbol} size={20} quiet decorative />
+                        <span>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}
+                        {row.tradeQuantity === null ? "" : ` ${Number(Math.abs(row.tradeQuantity).toFixed(8)).toLocaleString(undefined, { maximumFractionDigits: mobile ? 4 : 8 })}`}
+                        {` ${row.symbol}`}
+                        </span>
                       </p>
                       <span className="ios-d3-trade-value tabular-nums text-muted-foreground">{mobile
                         ? formatPhoneMoney(row.tradeValue, currency.symbol, true)
@@ -503,7 +506,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
                     {result.rows.map((row) => (
                       <li key={`${row.assetType ?? "cash"}:${row.symbol}`} aria-label={row.symbol} className="min-w-0 space-y-3 rounded-2xl border bg-card p-4 text-sm tabular-nums">
                         <div className="flex min-w-0 items-center justify-between gap-2">
-                          <strong className="min-w-0 truncate">{row.symbol}</strong>
+                          <strong className="min-w-0 truncate"><AssetLabel kind={row.kind === "cash" ? "custom" : row.assetType === "stock" ? "stock" : "coin"} symbol={row.symbol} size={20} quiet /></strong>
                           <span className="text-muted-foreground">{row.kind === "cash"
                             ? t("rebalance.cashReserveAmount").replace("{amount}", row.tradeValue.toFixed(2)).replace("{currency}", currency.currency)
                             : row.tradeValue > 0 ? t("rebalance.buy") : row.tradeValue < 0 ? t("rebalance.sell") : t("rebalance.noTrade")}</span>
@@ -529,7 +532,7 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down" }
                       <tbody>
                         {result.rows.map((row) => (
                           <tr key={`${row.assetType ?? "cash"}:${row.symbol}`} className="border-b last:border-0">
-                            <th scope="row" className="px-2 py-2 text-left font-medium">{row.symbol}</th>
+                            <th scope="row" className="px-2 py-2 text-left font-medium"><AssetLabel kind={row.kind === "cash" ? "custom" : row.assetType === "stock" ? "stock" : "coin"} symbol={row.symbol} size={20} quiet /></th>
                             <td className="px-2 py-2">{row.currentPercent.toFixed(2)}%</td>
                             <td className="px-2 py-2">{row.targetPercent.toFixed(2)}%</td>
                             <td className="px-2 py-2">{row.deviationPercent >= 0 ? "+" : ""}{row.deviationPercent.toFixed(2)} {t("rebalance.percentagePoints")}</td>

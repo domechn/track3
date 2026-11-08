@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -428,7 +429,8 @@ export default function GoalsFidelity({
                 .replace("{value}", rule.kind === "period_pnl" ? signedUsd(measured.value) : usd(measured.value))
                 .replace("{remaining}", usd(Math.abs(rule.threshold - measured.value)));
           return <div className={`pf-goal-row ${rule.enabled ? "" : "pf-off"}`} key={rule.id}>
-            <div className="pf-goal-name"><b>{titleFor(rule)}</b><small>{descriptionFor(rule)}</small></div>
+            <div className="pf-goal-name"><AssetLabel kind={rule.symbol ? rule.assetType === "stock" ? "stock" : "coin" : "custom"}
+              symbol={rule.symbol ?? ""} name={titleFor(rule)} size={20} secondary={descriptionFor(rule)} /></div>
             <label className="pf-goal-switch"><span className="sr-only">{t("goals.enableRule").replace("{kind}", t(`goals.kind.${rule.kind}`))}</span>
               <input type="checkbox" role="switch" aria-label={t("goals.enableRule").replace("{kind}", t(`goals.kind.${rule.kind}`))}
                 checked={rule.enabled} onChange={(event) => onToggle(rule, event.currentTarget.checked)} /></label>

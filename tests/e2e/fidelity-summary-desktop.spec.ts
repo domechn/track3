@@ -39,7 +39,7 @@ for (const state of ["full", "empty", "loading"] as const) {
     if (state === "full") {
       await expect(page.locator(".t3-fidelity-topbar .t3-date-trigger")).toHaveAttribute("aria-description", /Jul 1.*Oct 31, 2026/);
       expect((await page.locator(".fidelity-summary-pnl").boundingBox())!.y).toBe(137);
-      const sol = page.locator(".fidelity-attribution-row").filter({ has: page.locator("b:text-is('SOL')") }).first();
+      const sol = page.locator(".fidelity-attribution-row").filter({ has: page.locator(".t3-asset-label-name:text-is('SOL')") }).first();
       const solBars = sol.locator(".fidelity-attribution-track i");
       const zero = await sol.locator(".fidelity-attribution-track b").evaluate((node) => parseFloat((node as HTMLElement).style.left));
       const quantityLeft = await solBars.nth(1).evaluate((node) => parseFloat((node as HTMLElement).style.left));

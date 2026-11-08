@@ -64,6 +64,8 @@ it("shows a whole-unit Summary range with its exact title and aligned amounts", 
     quoteColor="green-up-red-down"
   />);
   const table = await screen.findByRole("table", { name: "Profit attribution" });
+  const assetRow = within(table).getByRole("row", { name: /BTC/ });
+  expect(assetRow.querySelector('.t3-asset-icon[data-kind="coin"][data-size="20"]')).toBeInTheDocument();
   const total = within(table).getByRole("row", { name: /^Total/ });
   const [range, market, quantity, unexplained, totalChange] = within(total).getAllByRole("cell");
   expect(range).toHaveTextContent("$6,003,301 → $22,503,903");

@@ -49,7 +49,7 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
       await expect(page.locator(".mobile-tab-badge")).toHaveText("2");
       const heroHeight = (await page.locator(".fd-coin-hero").boundingBox())!.height;
       expect(await page.locator(".fd-cost-link").evaluate((node) =>
-        node.getBoundingClientRect().y + parseFloat(getComputedStyle(node, "::before").top))).toBe(94);
+        node.getBoundingClientRect().y + parseFloat(getComputedStyle(node, "::before").top))).toBe(94.3125);
       expect(heroHeight).toBe(symbol === "NOVA" ? 600 : 586);
       if (symbol === "NOVA") {
         expect(Math.round((await page.locator(".fd-position-grid").boundingBox())!.y)).toBe(449);
@@ -62,7 +62,7 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         await expect(page.locator(".fd-coin-trend > .fd-outline-pill")).toHaveCSS("font-weight", "500");
       }
       if (symbol !== "NOVA") {
-        expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(symbol === "BTC" ? 2506 : 1964);
+        expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(symbol === "BTC" ? 2509 : 1965);
       }
       mkdirSync(`/tmp/fidelity/coin-${symbol.toLowerCase()}`, { recursive: true });
       writeFileSync(`/tmp/fidelity/coin-${symbol.toLowerCase()}/geometry.json`, JSON.stringify(await page.evaluate(() => ({

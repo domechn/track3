@@ -36,7 +36,7 @@ import AssetLabel from "./common/asset-label";
 import { useWindowSize } from "@/utils/hook";
 import { WALLET_DETAIL_URLS } from "@/middlelayers/constants";
 import { useTranslation } from "@/i18n";
-import { SourceAllocationList } from "./source-allocation-list";
+import { SourceAllocationList, sourceIconKind } from "./source-allocation-list";
 import {
   classifyWalletType,
   pickTileTextColor,
@@ -540,7 +540,8 @@ const App = ({
       {!symbol && onSelectSource && <nav className="analyze-source-picker" aria-label={t("wallets.h1")}>
         <button type="button" aria-pressed={selectedSource === null} onClick={() => onSelectSource(null)}>{t("wallets.allSources")}</button>
         {sortedWallets.map((wallet) => <button type="button" key={wallet.wallet} aria-pressed={selectedSource === wallet.wallet}
-          onClick={() => onSelectSource(wallet.wallet)} title={wallet.wallet}>{displayName(wallet)}</button>)}
+          onClick={() => onSelectSource(wallet.wallet)} title={wallet.wallet}><AssetLabel kind={sourceIconKind(wallet.walletType)}
+            type={wallet.walletType} name={displayName(wallet)} size={16} /></button>)}
       </nav>}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-3">
         <CardTitle className="flex flex-wrap items-center gap-1 text-sm font-medium text-muted-foreground">

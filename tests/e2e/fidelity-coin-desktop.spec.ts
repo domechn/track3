@@ -58,7 +58,7 @@ for (const state of ["btc", "btc-edit", "btc-price", "btc-sheet", "nvda", "nova"
       .toHaveCount(symbol === "BTC" ? 3 : 2, { timeout: 40_000 });
     if (state.startsWith("nova")) await expect(page.locator(".coin-fidelity-custom")).toBeVisible();
     if (state === "nova") {
-      expect((await page.locator(".coin-fidelity-crumb").boundingBox())!.y).toBe(69);
+      expect((await page.locator(".coin-fidelity-crumb").boundingBox())!.y).toBe(67.859375);
       expect((await page.locator(".coin-fidelity-hero").boundingBox())!.y).toBe(159);
       expect((await page.locator(".coin-fidelity-hero").boundingBox())!.width).toBe(1473);
     }
@@ -81,14 +81,14 @@ for (const state of ["btc", "btc-edit", "btc-price", "btc-sheet", "nvda", "nova"
       const transactionCard = await page.locator(".coin-fidelity-transactions").boundingBox();
       expect(sourceHeader?.x).toBeCloseTo(973.58, 0);
       expect(await page.locator(".coin-fidelity-sources table").first().evaluate((node) => getComputedStyle(node).tableLayout)).toBe("auto");
-      expect(sourceHeader?.width).toBeGreaterThan(223);
-      expect(sourceHeader?.width).toBeLessThan(224);
+      expect(sourceHeader?.width).toBeGreaterThan(208);
+      expect(sourceHeader?.width).toBeLessThan(209);
       expect(sourceRow?.y).toBeCloseTo(517.5, 0);
       expect(lotsHeading?.y).toBeCloseTo((lotsCard?.y ?? 0) + 21, 0);
       expect(lotsCard?.x).toBeCloseTo(chartCard?.x ?? 0, 0);
       expect(lotsCard?.y).toBeCloseTo((chartCard?.y ?? 0) + (chartCard?.height ?? 0) + 16, 0);
       expect(chartHeading?.y).toBeCloseTo(466, 0);
-      expect(coinHeading?.y).toBeCloseTo(91, 0);
+      expect(coinHeading?.y).toBeCloseTo(90, 0);
       expect(secondLabel?.x).toBeCloseTo(362.5, 0);
       expect(secondValue?.y).toBeCloseTo(200, 0);
       expect(secondNote?.y).toBeCloseTo(228, 0);
@@ -680,7 +680,7 @@ test("Coin subtitle and cost basis action follow the source heading grid", async
   await installTauriBridge(page, { fidelityDesktop: "full" });
   await page.goto("/#/coins/BTC");
   await expect(page.locator(".coin-fidelity-heading")).toBeVisible({ timeout: 40_000 });
-  expect((await page.locator(".coin-fidelity-heading p").boundingBox())!.y).toBeCloseTo(125, 0);
+  expect((await page.locator(".coin-fidelity-heading p").boundingBox())!.y).toBeCloseTo(126, 0);
   const action = (await page.locator(".coin-fidelity-heading > button").boundingBox())!;
   expect(action.y).toBeCloseTo(109, 0);
   expect(action.x).toBeCloseTo(1408, 0);
@@ -771,7 +771,9 @@ test("Coin chart controls and source tags match source positioning", async ({ pa
     return { background: css.backgroundColor, border: css.borderColor, radius: css.borderRadius, padding: css.padding };
   })).toEqual({ background: "rgb(10, 10, 11)", border: "rgb(58, 58, 62)", radius: "6px", padding: "0px 28px 0px 12px" });
   await expect(page.locator(".coin-fidelity-sources tbody tr").first()).toContainText("Ledger cold wallet");
-  await expect(page.locator(".coin-fidelity-sources td small").first()).toHaveCSS("margin-left", "5px");
+  const name = await page.locator(".coin-fidelity-sources .t3-asset-label-name").first().boundingBox();
+  const secondary = await page.locator(".coin-fidelity-sources .t3-asset-label-secondary").first().boundingBox();
+  expect(Math.abs((name?.x ?? 0) - (secondary?.x ?? 0))).toBeLessThanOrEqual(1);
 });
 
 test("NVDA chart reserves the smaller axis and end-label widths", async ({ page }) => {
@@ -806,7 +808,7 @@ test("NVDA gridlines land on the source pixel rows", async ({ page }) => {
   expect(rows).toEqual([524, 565, 607, 648, 690]);
 });
 
-for (const [symbol, sourceQuantityX] of [["BTC", 1197.1], ["NVDA", 1206.6], ["NOVA", 1156.9]] as const) {
+for (const [symbol, sourceQuantityX] of [["BTC", 1182], ["NVDA", 1190], ["NOVA", 1138]] as const) {
   test(`${symbol} source columns size themselves to their content`, async ({ page }) => {
     await installTauriBridge(page, { fidelityDesktop: symbol === "NOVA" ? "nova" : "full" });
     await page.goto(`/#/coins/${symbol}${symbol === "NVDA" ? "?assetType=stock" : ""}`);

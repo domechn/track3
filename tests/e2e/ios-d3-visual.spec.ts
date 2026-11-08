@@ -296,14 +296,15 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await expect(page.locator(".ios-d3-toast-viewport")).toBeHidden();
     const sourceLayout = await page.locator(".ios-d3-refresh-sheet [data-source-status-row]").evaluateAll((rows) =>
       rows.map((row) => {
-        const identity = row.querySelector(".ios-d3-refresh-row-title");
+        const identity = row.querySelector(".t3-asset-label-name");
         const date = [...row.querySelectorAll("div")].find((node) => node.textContent?.startsWith("Last data "));
         return {
           rowWidth: row.getBoundingClientRect().width,
           columns: getComputedStyle(row).gridTemplateColumns,
           mainWidth: row.querySelector(".ios-d3-refresh-row-main")?.getBoundingClientRect().width ?? 0,
-          contentWidth: row.querySelector(".ios-d3-refresh-row-content")?.getBoundingClientRect().width ?? 0,
+          contentWidth: row.querySelector(".t3-asset-label-text")?.getBoundingClientRect().width ?? 0,
           identityWidth: identity?.getBoundingClientRect().width ?? 0,
+          identityClipped: identity ? identity.scrollWidth > identity.clientWidth + 1 : true,
           identityText: identity?.textContent ?? "",
           dateRight: date?.getBoundingClientRect().right ?? 0,
           rowRight: row.getBoundingClientRect().right,
@@ -312,7 +313,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
           date: date?.textContent ?? "",
         };
       }));
-    expect(sourceLayout.every((row) => row.identityWidth >= 70 &&
+    expect(sourceLayout.every((row) => row.identityWidth >= 70 && !row.identityClipped &&
       row.identityHeight <= row.identityLine + 1 &&
       row.dateRight <= row.rowRight + 1), JSON.stringify(sourceLayout)).toBe(true);
     expect(sourceLayout.map((row) => row.date).join(" ")).not.toContain("2026-");

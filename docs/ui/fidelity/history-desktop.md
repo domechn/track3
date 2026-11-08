@@ -48,6 +48,8 @@ Chromium briefly sets a 1 × 1 viewport during some full page screenshots. The d
 
 ## Remaining differences
 
+UI42 uses the approved website-style neutral tile for saved asset and source marks. The older History page design renders those marks differently.
+
 The 7 Nov 2026 populated History capture is **5.71%** different from the
 saved 1600 × 1272 source render at RGB-sum threshold 60 when the app's
 1600 × 1024 scroll viewport is padded to the source height. The fixed shell

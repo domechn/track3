@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import bluebird from "bluebird";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
@@ -14,7 +15,6 @@ import { getImageApiPath } from "@/utils/app";
 import {
   formatAssetLabel,
   getAssetLogoKey,
-  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { directionClass, directionColorVar } from "@/utils/color";
@@ -292,32 +292,20 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                   key={logoKey}
                   data-testid="tcpc-row"
                   className={[
-                    "grid grid-cols-[20px_minmax(0,1fr)_64px_64px] sm:grid-cols-[20px_minmax(0,1fr)_72px_64px_80px_96px] min-h-11 items-center gap-1.5 sm:gap-2 rounded-md px-1.5 sm:px-2 py-1.5",
+                    "grid grid-cols-[minmax(0,1fr)_64px_64px] sm:grid-cols-[minmax(0,1fr)_72px_64px_80px_96px] min-h-11 items-center gap-1.5 sm:gap-2 rounded-md px-1.5 sm:px-2 py-1.5",
                     isTop && showBadges ? "bg-muted/40" : "",
                     isBot && showBadges ? "bg-muted/40" : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
                 >
-                  <img
-                    data-testid="tcpc-logo"
-                    className="h-5 w-5 shrink-0 rounded-full bg-muted"
-                    src={resolveAssetLogoSrc(
-                      { symbol: row.coin, assetType: row.assetType },
-                      logoMap[logoKey],
-                    )}
-                    alt={formatAssetLabel({
-                      symbol: row.coin,
-                      assetType: row.assetType,
-                    })}
-                  />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span
                         data-testid="tcpc-symbol"
-                        className="w-full sm:w-auto truncate text-sm font-semibold"
+                        className="w-full sm:w-auto min-w-0"
                       >
-                        {row.coin}
+                        <AssetLabel asset={{ symbol: row.coin, assetType: row.assetType }} src={logoMap[logoKey]} size={20} quiet />
                       </span>
                       {isTop && showBadges ? (
                         <span

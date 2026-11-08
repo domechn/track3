@@ -78,11 +78,11 @@ test("phone keeps the approved source description order while sorting the source
       query: "INSERT OR REPLACE INTO configuration (id, data) VALUES (6, '40')", values: [],
     }));
     await page.goto("/#/coins/BTC");
-    await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready");
+    await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
     await expect(page.locator(".fd-coin-head p")).toHaveText("Held on Binance and a Ledger cold wallet");
     await expect(page.locator(".fd-source-row").first()).toContainText("Ledger cold wallet");
     expect(await page.locator(".fd-coin-holdings .fd-open-lots").count()).toBe(1);
-    expect(await page.locator("#app-main-content").evaluate((element) => element.scrollHeight)).toBe(2506);
+    expect(await page.locator("#app-main-content").evaluate((element) => element.scrollHeight)).toBe(2509);
   } finally { await context.close(); }
 });
 

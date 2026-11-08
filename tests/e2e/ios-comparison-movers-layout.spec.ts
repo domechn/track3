@@ -10,7 +10,7 @@ test("minimum gain bars show two colored pixels on iPhone and iPad", async ({ br
     await page.reload();
     await page.getByRole("button", { name: "30 days" }).click();
     await expect(page.locator(".fd-comparison-mover")).toHaveCount(20, { timeout: 120_000 });
-    await expectMinimumGainPixels(page, ".fd-comparison-movers .fd-comparison-mover", "span");
+    await expectMinimumGainPixels(page, ".fd-comparison-movers .fd-comparison-mover", ":scope > span");
     await page.setViewportSize({ width: 820, height: 1000 });
     await page.reload();
     await page.getByRole("radio", { name: "1M", exact: true }).click();
@@ -34,7 +34,7 @@ for (const theme of ["dark", "light"] as const) {
       await expect(page.locator(".fd-comparison-mover")).toHaveCount(20, { timeout: 60_000 });
       await expect(page.locator(".fd-comparison-movers").first()).toContainText("BTC and BNB made 99%");
       await expect(page.locator(".fd-comparison-movers").last()).toContainText("USDT moved −2.23%");
-      await expectMoverGeometry(page, ".fd-comparison-movers", ".fd-comparison-mover", "span", 44);
+      await expectMoverGeometry(page, ".fd-comparison-movers", ".fd-comparison-mover", ":scope > span", 44);
       await page.locator(".fd-comparison-movers").first().scrollIntoViewIfNeeded();
       await page.screenshot({ path: `/tmp/comparison-movers-phone-${theme}.png` });
       for (const button of await page.locator(".fd-comparison-more").all()) await button.click();
@@ -60,7 +60,7 @@ for (const width of [390, 507, 600, 683]) {
       await expect(page.locator(".fd-comparison-mover")).toHaveCount(20, { timeout: 60_000 });
       await expect(page.locator(".fd-comparison-movers").first().locator(".fd-comparison-mover").first())
         .toContainText("+$7,433,476");
-      await expectMoverGeometry(page, ".fd-comparison-movers", ".fd-comparison-mover", "span", 44);
+      await expectMoverGeometry(page, ".fd-comparison-movers", ".fd-comparison-mover", ":scope > span", 44);
     } finally {
       await context.close();
     }
@@ -119,7 +119,7 @@ test("iOS 15 fallback keeps phone mover plots aligned without subgrid", async ({
     for (const card of await page.locator(".fd-comparison-movers").all()) {
       const plots = await card.locator(".fd-comparison-mover").evaluateAll((rows) => rows.map((row) => {
         const label = row.firstElementChild!.getBoundingClientRect();
-        const plot = row.querySelector("span")!.getBoundingClientRect();
+        const plot = row.querySelector(":scope > span")!.getBoundingClientRect();
         return { y: label.y, x: plot.x, width: plot.width };
       }));
       for (const [index, plot] of plots.entries()) {

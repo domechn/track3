@@ -5,6 +5,7 @@ import { directionBackgroundClass, directionClass } from "@/utils/color";
 import { comparisonMovers } from "./comparison-movers";
 import { barGeometry, divergingScale } from "./comparison-fidelity-movers";
 import { boundedPercentText } from "./profit-percentage";
+import AssetLabel from "./common/asset-label";
 
 type Row = {
   symbol: string;
@@ -35,7 +36,7 @@ export default function ComparisonMoversPanel({ rows, currency, quoteColor, t, s
         `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
       const shown = kind === "percent" && !shouldMaskValue ? boundedPercentText(value, label) : { text: label, exact: label };
       return <li key={`${row.assetType}:${row.symbol}`}>
-        <strong>{row.symbol}</strong>
+        <strong><AssetLabel asset={row} size={20} quiet /></strong>
         <span className="comparison-mover-track" aria-hidden="true" style={{ "--zero": `${scale.zero}%` } as CSSProperties}>
           {bar && <span className={directionBackgroundClass(value, quoteColor)}
             style={{

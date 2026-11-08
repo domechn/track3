@@ -25,7 +25,6 @@ import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
-  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useDataChangedVersion } from "@/contexts/data-changed";
@@ -223,13 +222,11 @@ const App = ({
               "{asset}",
               formatAssetLabel(d),
             )}</span>
-            <img
-              className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-              src={resolveAssetLogoSrc(d, logoMap[getAssetLogoKey(d)])}
-              alt=""
-            />
             <AssetLabel
               asset={d}
+              src={logoMap[getAssetLogoKey(d)]}
+              size={20}
+              quiet
               className="min-w-0"
               labelClassName="font-medium text-sm"
             />

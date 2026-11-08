@@ -762,7 +762,8 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(dialog).toHaveTextContent("不支持的交易所");
     expect(dialog).toHaveTextContent("数据源持仓无效");
     expect(dialog).not.toHaveTextContent("API key");
-    expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(6);
+    expect(dialog.querySelectorAll("[data-source-status-row] .t3-asset-icon")).toHaveLength(3);
+    expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(3);
   });
 
   it("carries the last successful time into a full refresh that fails without saved holdings", async () => {
