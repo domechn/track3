@@ -76,7 +76,7 @@ for (const theme of ["dark", "light"]) {
       await page.getByTestId("history-mobile-row").first().click();
       const detail = page.getByRole("dialog", { name: "Snapshot details" });
       await expect(detail).toBeVisible();
-      await expect(detail.locator(".history-detail-assets p.text-xl")).toHaveText("11");
+      await expect(detail.locator(".fidelity-history-detail-subkpis > div:last-child strong")).toHaveText("11");
       await page.evaluate(() => document.fonts.ready);
       const failures = await detail.evaluate((root) => [...root.querySelectorAll("p, strong")].flatMap((node) => {
         const box = node.getBoundingClientRect();

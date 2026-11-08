@@ -183,9 +183,16 @@ test("history page size follows a compact to wide to compact resize", async ({ p
   await page.goto("/#/history");
   await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50, { timeout: 20_000 });
   await page.setViewportSize({ width: 800, height: 844 });
+  await expect(page.locator(".fidelity-history-chips")).toBeVisible();
+  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50, { timeout: 20_000 });
+  await expect(page.getByRole("combobox", { name: /Rows \d+/ })).toHaveCount(0);
+  await page.setViewportSize({ width: 1194, height: 834 });
   await expect(page.getByRole("combobox", { name: "Rows 20" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".fidelity-history-chips")).toHaveCount(0);
+  await expect(page.locator(".history-mobile-snapshot")).toHaveCount(20, { timeout: 20_000 });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50, { timeout: 20_000 });
+  await expect(page.getByRole("combobox", { name: /Rows \d+/ })).toHaveCount(0);
 });
 
 test("snapshot replacement edit values carry their currency unit", async ({ page }) => {

@@ -2424,12 +2424,12 @@ body:has(.fidelity-history, .fidelity-history-detail) {
 .d2-history .fidelity-history-card.history-records-card > .fidelity-history-skeleton-pager { padding: 12px 16px; }
 .fidelity-history-skeleton-pager i { display: block; width: 90px; height: 14px; border-radius: 4px; background: #24242a; }
 .fidelity-history-card.t3-history-records.history-records-card:has(.fidelity-history-empty) { padding-bottom: 16px; }
-.fidelity-history-empty { height: 360px; min-height: 0; display: grid; place-items: center; margin: 4px 16px 0;
+.fidelity-history-empty.t3-empty-state { height: 360px; min-height: 0; display: flex; gap: 6px; margin: 4px 16px 0;
   border: 1px dashed var(--h-control); border-radius: 6px; text-align: center; }
-.fidelity-history-empty > div { max-width: 280px; }
 .fidelity-history-empty .t3-empty-state-icon { display: none; }
+.fidelity-history-empty > div { max-width: 280px; }
 .fidelity-history-empty strong { font-size: 15px; font-weight: 500; }
-.fidelity-history-empty p { color: var(--h-muted); margin: 0 0 1px; }
+.fidelity-history-empty p { color: var(--h-muted); margin: 0 0 5px; }
 .fidelity-history-empty button { display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 40px; border-radius: 999px; background: var(--h-text);
   color: var(--h-ground); padding: 0 14px; font-weight: 500; }
@@ -2510,6 +2510,16 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   font-size: 12px; line-height: 16px; font-weight: 500; }
 .fidelity-history-detail-actions button.danger { flex-basis: 100%; margin-top: 6px; border-color: var(--h-danger-border); color: var(--h-danger); }
 .fidelity-history-detail-actions svg { width: 14px; height: 14px; }
+.fidelity-history-detail-sections {
+  position: sticky; top: 0; z-index: 2; display: flex; gap: 8px;
+  padding: 8px 0; background: var(--h-ground);
+}
+.fidelity-history-detail-sections button, .fidelity-history-detail-expand {
+  min-height: 36px; padding: 0 12px; border: 1px solid var(--h-control);
+  border-radius: 999px; color: var(--h-muted); font-size: 12px;
+}
+.fidelity-history-detail-section[id] { scroll-margin-top: 54px; }
+.fidelity-history-detail-expand { margin-top: 10px; }
 .fidelity-history-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .fidelity-history-section-head h3 { margin: 0; font-size: 15px; line-height: 20px; font-weight: 600; }
 .fidelity-history-section-head span { color: var(--h-faint); font-size: 12px; text-align: right; }

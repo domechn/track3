@@ -59,6 +59,9 @@ for (const width of [1440, 1100]) for (const sources of [3, 8, 16, 30]) {
         const contentBox = (await content.boundingBox())!;
         expect(contentBox.y + contentBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
       }
+      const matrix = (await page.locator(".t3-wallet-matrix").boundingBox())!;
+      const moved = (await page.locator(".t3-wallet-moved").boundingBox())!;
+      expect(Math.abs(matrix.y + matrix.height - moved.y - moved.height)).toBeLessThanOrEqual(1);
     }
     if (sources === 3 || sources === 16) await scroll.screenshot({ path: `/tmp/wallet-matrix-${width}-${sources}.png` });
   });
@@ -82,6 +85,8 @@ test("History detail names sources without hash fragments", async ({ page }) => 
   await installManySourceFixture(page, 16);
   await page.goto("/#/history");
   const sources = page.locator(".fidelity-history-source-row");
+  await expect(sources).toHaveCount(12, { timeout: 30_000 });
+  await page.getByRole("button", { name: "Show all (16)" }).click();
   await expect(sources).toHaveCount(16);
   expect(await sources.allTextContents()).not.toContainEqual(expect.stringMatching(/[0-9a-f]{12,}/i));
   await expect(sources.first()).toContainText("Wallet 1");

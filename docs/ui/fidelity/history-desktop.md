@@ -48,11 +48,25 @@ Chromium briefly sets a 1 × 1 viewport during some full page screenshots. The d
 
 ## Remaining differences
 
-The merged 8 Nov 1600 × 1024 viewport captures in `/tmp/fidelity-desktop/history/` differ from the source renders in `/tmp/rv1103b/design/` by 6.26% populated, 4.54% delete, 1.45% empty, 0.66% loading, and 5.67% undo at RGB-sum threshold 60. Populated, delete, and undo compare the shared first 1024 px because the source document extends below the app's fixed viewport. The selected-row, stored-edit, scroll-gutter, sync, and shared-icon differences below explain the remaining visible gaps. Empty and loading fall below the owner's 3% threshold.
+On 8 Nov 2026 the source HTML was rendered again in Chromium with scrollbars hidden at 1600 × 1024. `getBoundingClientRect()` puts its filter at (84, 88), its list at (84, 164) with width 861.33 px, and its detail at (961.33, 164) with width 610.67 px; `getComputedStyle()` reports 13/18 px body text and `rgb(19, 18, 23)` card backgrounds. The branch captures before this merge are preserved in `/tmp/ui43-captures-desktop/` and the source renders and measurements are in `/tmp/ui43-source/`. A pixel differs when the summed absolute RGB difference exceeds 60, with black padding to the larger canvas.
+
+| State at 1600 × 1024 | Current source versus app difference |
+| --- | ---: |
+| Populated | 8.87% |
+| Delete confirmation | 6.19% |
+| Empty | 1.37% |
+| Loading | 1.63% |
+| Undo | 8.10% |
+
+The populated, delete, and undo captures exceed 3% because History now follows the required fixed-height master-detail layout. The reference has a standalone full-width filter and 46 px rows on a 1271.5 px scrolling page. The app pins the filter inside the list, uses 39 px rows, pins the pager and detail header, and scrolls each pane separately. The section chips and expanders are also absent from the reference. The KPI/header block is taller relative to a short fixed pane; at 900 × 560 the detail has about 120 px of scrollable content. Those changes keep both panes aligned and all controls reachable at every tested height. The earlier ratios below use different fixtures or page structures and are retained as measurement history.
+
+At 900–1099 px the app keeps Change visible by placing the amount above its percent in the 39 px row and using compact source text. The source table overflows its card at those widths. At 700 px desktop width the existing searchable detail opens as a full-window surface with Back; the source uses a phone-style layout below 760 px, so the two screens have different content density. The 700 px Back button initially shows the dialog's focus ring, a small visible difference kept for keyboard focus feedback. At 820 px the app shows one pane at a time with Back, while the source still shows two narrow columns. The iPad detail has no pointer-open focus outline; a keyboard Enter keeps a visible focus outline.
+
+Before the fixed-height pane update, the 8 Nov 1600 × 1024 captures in `/tmp/fidelity-desktop/history/` differed from `/tmp/rv1103b/design/` by 6.26% populated, 4.54% delete, 1.45% empty, 0.66% loading, and 5.67% undo at the same RGB-sum threshold 60. Populated, delete, and undo compare the shared first 1024 px because the source document extends below the app's fixed viewport. The selected-row, stored-edit, scroll-gutter, sync, and shared-icon differences below explain those visible gaps.
 
 UI42 uses the approved website-style neutral tile for saved asset and source marks. The older History page design renders those marks differently.
 
-The 8 Nov 2026 current 1600 × 1024 app viewport differs by **6.076%**
+An earlier 8 Nov 2026 1600 × 1024 app viewport differs by **6.076%**
 from the same area of the rendered `records-history.html` source at RGB-sum
 threshold 60. Captures are `.local/tag-theme/desktop-history-edited-app.png`
 and `/tmp/ui21-source-fresh/history.png`. This isolated fixture shows the
@@ -64,9 +78,9 @@ source's recorded 209.61 px at 1600 px, leaving room for date, time and
 the Edited tag. The fixed-height shell and stored edit differences below
 also remain visible.
 
-The overflow fixture in `fix_ui37.md` describes 40/32/28 px amounts, while a fresh Chromium render of the authoritative History HTML measures 22/28 px amounts and 20 px column padding at 1600 px (`/tmp/history-kpi-overflow/design-history-bounds.json`). The app follows the rendered amount size. It uses 24 px padding when the three values fit, then 16 px, then 12 px, and finally stacks the rows to keep values unwrapped with at least 16 px between them. Wide cards distribute the three columns evenly. At the 1272 px design capture height the list and detail bottoms align; at a 1024 px viewport the list caps its height to keep the pager on screen.
+The overflow fixture in `fix_ui37.md` describes 40/32/28 px amounts, while a fresh Chromium render of the authoritative History HTML measures 22/28 px amounts and 20 px column padding at 1600 px (`/tmp/history-kpi-overflow/design-history-bounds.json`). The app follows the rendered amount size. It uses 24 px padding when the three values fit, then 16 px, then 12 px, and finally stacks the rows to keep values unwrapped with at least 16 px between them. Wide cards distribute the three columns evenly. The fixed-height layout aligns the list and detail bottoms at both 1272 and 1024 px; the pager stays pinned within the list card.
 
-At 761–1279 px the snapshot list sits above the detail card, unlike the source's side-by-side cards. The current narrow-window layout keeps the shared asset icons and delete controls readable. The detail card is wide enough to retain the 13 px table text, aligned Asset header and symbol cells, and a 124 px Asset column with the delete target inside it. The three 22 px summary amounts remain on one row at 1100 px. At 1280 px the cards sit side by side and the summary stacks when its values cannot fit. At 1280–1599 px the table retains 13 px text and sizes its numeric columns from their content, so large currency values stay clear of the Share column. The static source keeps fixed column fractions in that range.
+At 761–899 px the app shows one pane at a time; at 900 px and above the cards sit side by side. The narrow two-pane layout uses 7/5 grid columns through 1099 px, 5/6 at 1100–1179 px, then 6/6 through 1279 px so shared asset icons, delete controls, KPI amounts, and numeric values fit. The Asset column is 72 px at 900–1099 px, 104 px at 1100–1279 px, and 124 px at larger widths. At 1280–1599 px the table sizes its numeric columns from their content, so large currency values stay clear of the Share column. The static source keeps fixed column fractions in that range.
 
 The 7 Nov 2026 populated History capture is **5.71%** different from the
 saved 1600 × 1272 source render at RGB-sum threshold 60 when the app's

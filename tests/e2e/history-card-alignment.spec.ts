@@ -25,7 +25,7 @@ test("History cards align at design height and the pager stays in the shorter vi
   await page.screenshot({ path: "/tmp/history-kpi-overflow/history-aligned-1600.png",
     fullPage: true, animations: "disabled" });
   await page.setViewportSize({ width: 1600, height: 1024 });
-  const pager = await page.locator(".fidelity-history-list > .fidelity-history-pager").boundingBox();
+  const pager = await page.locator(".fidelity-history-footer .fidelity-history-pager").boundingBox();
   expect(pager!.y + pager!.height).toBeLessThanOrEqual(1024);
   await page.getByRole("button", { name: "Next", exact: true }).first().click();
   await expect(page.locator(".fidelity-history-pager")).toContainText("Page 2 of 26");

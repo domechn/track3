@@ -125,7 +125,9 @@ test("mouse history delete dialog fits inside the viewport", async ({ page }) =>
   await installTauriBridge(page);
   await page.goto("/#/history");
   const detail = page.getByTestId("history-desktop-detail");
+  await page.getByTestId("history-snapshot-row").first().click();
   await expect(detail).toBeVisible();
+  await expect(page.locator(".fidelity-history-list")).toBeHidden();
   await detail.getByRole("button", { name: "Delete", exact: true }).click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toBeVisible();

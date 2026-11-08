@@ -72,7 +72,7 @@ test("phone and iPad keep the Overview inset and approved card borders", async (
     await page.goto("/#/history");
     const records = page.locator(".history-records-card");
     await expect(records).toBeVisible();
-    await expect(records).toHaveCSS("border-left-width", width === 390 ? "1px" : "0px");
+    await expect(records).toHaveCSS("border-left-width", "1px");
 
     await page.goto("/#/summary");
     const metrics = page.locator(".fd-summary > .fd-card, .profit-metrics-card").first();

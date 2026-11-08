@@ -138,3 +138,23 @@ test("expanding a long zero-source list keeps the two card edges aligned", async
   expect(Math.abs(((await chart.boundingBox())!.y + (await chart.boundingBox())!.height) - ((await side.boundingBox())!.y + (await side.boundingBox())!.height))).toBeLessThanOrEqual(1);
   await assertNoBlankSlabs(page);
 });
+
+test("desktop chart fills the row when expanded sources would leave a 120px blank slab", async ({ page }) => {
+  await page.setViewportSize({ width: 1184, height: 820 });
+  await installTauriBridge(page, { fidelityDesktop: "full" });
+  await seedCoinLayoutCase(page, "sixteen");
+  await page.evaluate(() => (window as any).__e2eInvoke("plugin:sql|execute", {
+    query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('fidelity-oct-31', '2026-10-31T09:41:00.000Z', 'extra-zero-1', 'crypto', 'BTC', 0, 0, 63842.11),
+      ('fidelity-oct-31', '2026-10-31T09:41:00.000Z', 'extra-zero-2', 'crypto', 'BTC', 0, 0, 63842.11)`,
+    values: [],
+  }));
+  await page.goto("/#/coins/BTC");
+  await page.getByRole("button", { name: /16 sources with no balance/ }).click();
+  const chart = (await page.locator(".coin-fidelity-chart").boundingBox())!;
+  const side = (await page.locator(".coin-fidelity-side-column").boundingBox())!;
+  expect(Math.abs(chart.y - side.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(chart.y + chart.height - side.y - side.height)).toBeLessThanOrEqual(1);
+  expect(Math.max(...await coinCardContentGaps(page))).toBeLessThan(24);
+  await expect(page.locator(".coin-fidelity-chart")).toHaveCSS("position", "static");
+});
