@@ -76,7 +76,7 @@ describe("Comparison page", () => {
       render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
       await waitFor(() => expect(document.querySelector(".fd-comparison-movers.percent p"))
         .toHaveTextContent("XUSD moved"));
-      fireEvent.pointerEnter(document.querySelector(".fd-comparison-movers:not(.percent) .fd-comparison-mover span")!);
+      fireEvent.pointerEnter(document.querySelector(".fd-comparison-movers:not(.percent) .fd-comparison-mover [data-chart-mark]")!);
       expect(screen.getByRole("tooltip")).toHaveTextContent("+$20.00");
     } finally {
       stableQuery.mockRestore();

@@ -32,23 +32,26 @@ The design invents 1,284 snapshots and source refresh names/counts. The existing
 
 ## Remaining differences
 
-The no-snapshot card now uses the shared centred icon, title, hint, and action. The supplied empty source page shows the earlier dashed treatment; the saved-data and refresh flows are the same.
+The 8 Nov 390 × 844 viewport captures in `/tmp/fidelity/history/` versus the saved source render in `/tmp/fidelity/source-review/` measure 3.37% populated, 1.72% delete, 4.92% empty, 5.15% loading, 1.50% filter, and 2.79% undo at RGB-sum threshold 48. The shared active tab now has the product's selected tint and indicator, which the static source lacks; this is the main increase from the previous captures. During the first loading pass the app cannot show the source's invented `1,284 snapshots` count before SQLite returns it; it says `Loading...` instead. The guarded source test measured the loading list at x17, y193, 356 × 520 px. Its fresh render has different text rasterization from the saved design render and differs from the app by 5.44%.
 
-The HTML source pages are present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. The table compares fresh Chromium renders in `/tmp/fidelity/source-review/` with app captures in `/tmp/fidelity/history/` at 390 × 844. A pixel differs when its summed absolute RGB difference exceeds 48. The source long page is 3687 px and the app page is 3647 px; their common-height ratio is below, and the full-height ratio is 10.75%. Full-page captures hide the fixed tab bar so it does not cover a row.
+The no-snapshot card uses the shared title, hint, and action inside the source's dashed panel. Its decorative, screen-reader-hidden icon is hidden only on phone History because the design has no icon; other empty states keep it. The saved-data and refresh flows are unchanged.
+
+The HTML source pages are present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. The table compares Chromium renders in `/tmp/fidelity/source-review/` with the latest app captures in `/tmp/fidelity/history/` at 390 × 844. A pixel differs when its summed absolute RGB difference exceeds 48. The source scrolls the document; the app scrolls inside its fixed shell, so the current browser `fullPage` capture stays 844 px high and cannot show all rows in a single image.
 
 | State | Source vs app difference |
 | --- | ---: |
-| First screen | 1.20% |
-| Filter | 1.51% |
-| Swipe | 1.17% |
-| Delete confirmation | 1.52% |
-| Undo | 1.13% |
-| Empty | 1.70% |
-| Loading | 2.66% |
-| Long page, common 390 × 3647 | 9.77% |
+| First screen | 3.37% |
+| Filter | 1.50% |
+| Swipe | 3.33% |
+| Delete confirmation | 1.72% |
+| Undo | 2.79% |
+| Empty | 4.92% |
+| Loading | 5.15% |
 
 Remaining visible differences, with product reasons:
 
+- The shared selected tab uses the app-wide tinted background and indicator. The static source uses an untinted active icon. Keeping the same tab treatment across routes preserves the current navigation system; it contributes to the populated, swipe, empty, and loading ratios.
+- Detail asset rows use the current shared AssetIcon marks instead of the older source artwork; ticker and type still come from the stored snapshot.
 - Complete rows show “8 assets” without “5 of 5 sources”; the complete snapshot has no stored per-source refresh count. The retry note on 22 Oct is absent for the same reason: retry history is not stored with a complete snapshot. Partial rows use the actual stored source count.
 - The filter shows actual counts from bounded status queries: Issues 1 and Edited 1 for this fixture. The design's Issues 2 includes a retry on a complete snapshot; retry history is not stored, so the product cannot count it. While a new filter range is loading, the last available count remains visible. The count/latest date are unavailable before the initial query completes.
 - Some invented source row change amounts do not equal the difference between adjacent stored totals, beginning on 21 Oct. The app shows the calculated change from actual adjacent snapshots.

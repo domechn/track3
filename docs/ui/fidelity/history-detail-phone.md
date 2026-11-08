@@ -21,10 +21,12 @@ Stored assets supply symbol, quantity, price and value. A local `price` edit cha
 
 ## Remaining differences
 
-The HTML source page is present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. A fresh app capture in `/tmp/fidelity/history-detail/` differs from the Chromium source render in `/tmp/fidelity/source-review/` by **1.33%** at 390 × 844, **3.22%** over the common 390 × 1251 pixels of the long pages, and **18.52%** over their full 1486 px source height. The missing source rows below the app's 1251 px height are the unsupported named Sources section described below. A pixel differs when its summed absolute RGB difference exceeds 48. Full-page captures hide the fixed tab bar so it does not cover AAPL.
+The HTML source page is present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. The 8 Nov app viewport capture in `/tmp/fidelity/history-detail/history-detail-phone.png` differs from the Chromium source render in `/tmp/fidelity/source-review/records-history-detail.png` by **4.22%** at 390 × 844. A pixel differs when its summed absolute RGB difference exceeds 48. The new shared selected tab treatment, absent from the static source, raises the previous 1.85% ratio. The app scrolls inside its fixed shell, so its `fullPage` browser capture remains 844 px high; the source's document capture is 1486 px high. The source's unsupported named Sources section is described below.
 
 Remaining visible differences, with product reasons:
 
+- The active History tab keeps the app-wide tinted background and indicator; the source has only an active icon.
+- Asset rows use the current shared AssetIcon marks, which differ from the older source art while preserving the stored ticker and type.
 - “5 of 5 sources” beneath Assets and the entire named Sources section are absent. Complete snapshots do not store per-source names, values, or refresh outcomes, so current configuration cannot reconstruct those historical facts.
 - “View assets” and its down chevron replace the source's “Edit” button and pencil. They accurately describe the available shortcut because the product has no snapshot editor. Existing per-asset actions remain available.
 - The source's blue asset values with “was …” and the “changes the total by …” summary require per-field asset edits that the product does not store. The app shows a transaction price edit and a symbol-free imported replacement in the general log, with “2 edits” in the heading and no invented total delta.
