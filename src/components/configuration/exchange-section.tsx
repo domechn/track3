@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { memo } from "react";
 import {
   Table,
@@ -40,7 +41,6 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
-import { getWalletLogo } from "@/lib/utils";
 import { maskSensitive } from "@/utils/attach-to";
 import type { ExchangeSectionProps } from "./types";
 import { PublicIpInfo } from "./public-ip-info";
@@ -140,11 +140,7 @@ const ExchangeSection = memo(function ExchangeSection({
                         <SelectLabel>{t("config.cex")}</SelectLabel>
                         {cexOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            <img
-                              className="h-4 w-4 text-muted-foreground inline-block mr-2"
-                              src={getWalletLogo(o.value)}
-                            />
-                            {o.label}
+                            <AssetLabel kind="exchange" type={o.value} name={o.label} size={20} />
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -306,17 +302,7 @@ const ExchangeSection = memo(function ExchangeSection({
                     className="h-[42px] group align-middle"
                   >
                     <TableCell className="w-[170px]">
-                      <div className="flex items-center gap-2 text-sm">
-                        <img
-                          className="w-[18px] h-[18px] rounded-full"
-                          src={getWalletLogo(ex.type)}
-                          alt={ex.type}
-                        />
-                        <span className="truncate">
-                          {cexOptions.find((c) => c.value === ex.type)?.label ??
-                            ex.type}
-                        </span>
-                      </div>
+                      <AssetLabel kind="exchange" type={ex.type} name={cexOptions.find((c) => c.value === ex.type)?.label ?? ex.type} size={24} />
                     </TableCell>
                     <TableCell className="w-[170px] text-sm">
                       <span className="block truncate" title={ex.alias || `${ex.type}-${idx + 1}`}>{ex.alias || `${ex.type}-${idx + 1}`}</span>

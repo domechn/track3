@@ -24,19 +24,19 @@ test("Comparison renders the October sample pair and ordered asset sections", as
     await expect(page.locator(".fd-comparison-kpis strong").first()).toHaveCSS("line-height", "22px");
     expect((await page.locator(".fd-comparison-snapshots").boundingBox())?.height).toBe(531);
     expect((await page.locator(".fd-comparison-assets").boundingBox())?.y).toBe(667);
-    expect((await page.locator(".fd-comparison-assets").boundingBox())?.height).toBe(920);
+    expect((await page.locator(".fd-comparison-assets").boundingBox())?.height).toBe(936);
     expect((await page.locator(".fd-comparison-asset").first().boundingBox())?.y).toBe(748);
-    expect((await page.locator(".fd-comparison-asset").first().boundingBox())?.height).toBe(82);
+    expect((await page.locator(".fd-comparison-asset").first().boundingBox())?.height).toBe(84);
     expect((await page.locator(".fd-comparison-asset").first().boundingBox())?.x).toBe(33);
-    expect((await page.locator(".fd-comparison-asset").nth(1).boundingBox())?.height).toBe(83);
+    expect((await page.locator(".fd-comparison-asset").nth(1).boundingBox())?.height).toBe(85);
     expect((await page.locator(".fd-comparison-info").boundingBox())?.height).toBe(80);
     expect((await page.locator(".fd-comparison-info > div").boundingBox())?.height).toBe(54);
     await expect(page.locator(".fd-comparison-info")).toHaveCSS("border-color", "rgb(31, 58, 92)");
     expect((await page.locator(".fd-comparison-mover.percent").first().boundingBox())?.height).toBe(44);
     const columns = await page.locator(".fd-comparison-movers.percent .fd-comparison-mover-list").first().evaluate((list) => getComputedStyle(list).gridTemplateColumns);
-    expect(columns).toBe("64px 184px 64px");
+    expect(columns).toBe("88px 160px 64px");
     await expect(page.locator(".fd-comparison-mover.percent").first()).toHaveCSS("grid-template-columns", /^subgrid/);
-    const zero = Number((await page.locator(".fd-comparison-mover.percent").first().locator("span").first().getAttribute("style"))?.match(/--fd-zero: ([\d.]+)%/)?.[1]);
+    const zero = Number((await page.locator(".fd-comparison-mover.percent").first().locator(":scope > span").first().getAttribute("style"))?.match(/--fd-zero: ([\d.]+)%/)?.[1]);
     expect(zero).toBe(15);
     await page.screenshot({ path: "/tmp/fidelity/comparison/comparison-phone.png" });
     writeFileSync("/tmp/fidelity/comparison/info-styles.json", JSON.stringify(await page.locator(".fd-comparison-info").evaluate((element) =>
@@ -72,7 +72,7 @@ test("Comparison value-mask icon has a phone-size touch target", async ({ browse
   try {
     const box = await page.getByRole("button", { name: "Hide values" }).boundingBox();
     expect(box && box.width >= 44 && box.height >= 44).toBe(true);
-    const price = page.locator(".fd-comparison-asset").first().locator("span").first();
+    const price = page.locator(".fd-comparison-asset").first().locator(":scope > span").first();
     const visiblePrice = await price.textContent();
     expect(visiblePrice).toContain("$");
     await page.getByRole("button", { name: "Hide values" }).click();

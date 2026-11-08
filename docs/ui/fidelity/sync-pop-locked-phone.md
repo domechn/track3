@@ -135,13 +135,15 @@ State: **pop-locked**. Button actions, input validity, status, overlays, and toa
 
 Capture: `/tmp/fidelity/settings-b/sync-pop-locked.png` (full page: `sync-pop-locked-long.png`). Design and app were compared side by side at 390 × 844 CSS px. Remaining differences are listed below.
 
+- The app places Passphrase before Connection so the blocked unlock action is encountered first; the source places Connection first. The source says Connected, while the locked runtime can only confirm that the bucket is Configured.
 - The source shows a partly visible access-key ID and an eye control for the secret. The app masks both stored credential fields and has no secret reveal control.
 - The fake S3 fixture now contains a remote device manifest. Unlocked captures show the remote iPhone and this device. Remote item and size totals are not exposed by the runtime, and locked/setup captures cannot list remote devices before unlock.
 - The source Passphrase and What to sync sections show metadata and descriptions that the current runtime does not expose. The app retains the real unlock, category switches and recovery-file flow, leaving different card heights.
 - The fixture now creates three real configuration conflicts and the unlocked page renders resolution controls. The runtime does not expose the source mockup’s per-setting device names or change times; locked/setup captures cannot show resolvable conflicts before unlock.
 - The page title, 16px sans-serif connection inputs, input surfaces, status pill and sync sheets now follow the source geometry. The reference reveals portions of credentials and includes item-size totals or per-setting metadata that the runtime does not expose.
 - The locked sheet now uses the source’s visible height with its additional skip, recovery-file and turn-off controls reachable by scrolling. The app cannot prefill a passphrase for a capture.
+- The shared locked heading and action read “Sync is locked” and “Unlock sync”; the mockup shortens both to “Sync locked” and “Unlock”. The shared wording stays consistent across the startup and settings entry points.
 
 ## Pixel difference
 
-Viewport: **10.061%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).
+Viewport: **12.733%** of pixels differ by more than 16/255 in any RGB channel (fresh source-page Chromium render versus the 8 Nov app Chromium capture). The saved earlier source render gives **11.402%** against the same app capture. The two source renders themselves differ by **3.875%** in the available browser environments. The locked page order and data limitations above account for the difference beyond the visual acceptance threshold.

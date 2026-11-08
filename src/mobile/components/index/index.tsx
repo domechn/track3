@@ -238,9 +238,9 @@ function TopBar({
           </TooltipProvider>
         </div>
       </div>
-      {refreshProgress > 0 && refreshButtonLoading && (
+      {refreshButtonLoading && (
         <div className="absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none">
-          <Progress value={refreshProgress} className="w-[80%]" />
+          <Progress value={refreshProgress} aria-label={t("refresh.fidelity.progressAria")} className="h-[3px] w-[80%]" />
         </div>
       )}
     </div>
@@ -724,6 +724,7 @@ function AppRoutes({
                   currency={currentCurrency}
                   dateRange={maxDateRange}
                   quoteColor={quoteColor}
+                  availableDates={availableDates}
                 />
                 <AnalyticsHub currency={currentCurrency} dateRange={maxDateRange} quoteColor={quoteColor} />
               </PageWrapper>

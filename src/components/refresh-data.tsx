@@ -1,10 +1,10 @@
-import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type MouseEvent } from "react";
 import {
   refreshAllData,
   type RefreshAllDataResult,
 } from "../middlelayers/charts";
 import type { RefreshOperation } from "../middlelayers/charts-refresh";
-import type { PortfolioSourceStatus } from "../middlelayers/portfolio-baseline";
+import type { PortfolioSourceResult, PortfolioSourceStatus } from "../middlelayers/portfolio-baseline";
 import { v4 as uuidv4 } from "uuid";
 import { trackRefreshEvent } from "@/middlelayers/ui-state/telemetry";
 import { retries, retryInterval, readStoredStatuses, writeStoredStatuses, retryRefresh, desktopRefreshOptions } from "@/middlelayers/ui-state/source-status-store";
@@ -12,10 +12,11 @@ import { bindRefreshRetry, refreshRetryScheduler } from "@/middlelayers/refresh-
 import { useToast } from "@/components/ui/use-toast";
 import { overviewRefreshActivityEvent, overviewRefreshRequestedEvent, overviewUseLastKnownEvent, publishSourceStatuses } from "./source-status-event";
 import { Button } from "./ui/button";
+import AssetLabel from "@/components/common/asset-label";
 import { ToastAction } from "./ui/toast";
 import {
-  ArchiveIcon, BackpackIcon, CheckIcon, CrossCircledIcon, CubeIcon,
-  ExclamationTriangleIcon, GlobeIcon, InfoCircledIcon, ReloadIcon, UpdateIcon,
+  CheckIcon, CrossCircledIcon,
+  ExclamationTriangleIcon, InfoCircledIcon, ReloadIcon, UpdateIcon,
 } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "./index/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
@@ -37,13 +38,16 @@ import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
-import { normalizeSourceStatuses, sourceIdentity, sortSourceStatuses } from "@/middlelayers/source-status";
+import { normalizeSourceStatuses, sortSourceStatuses } from "@/middlelayers/source-status";
 import { partialEndpointKeys } from "@/middlelayers/datafetch/utils/source-failure";
 import { listPortfolioSources } from "@/middlelayers/data";
 import { invalidateUsageCache, isProVersion, LicenseCenter } from "@/middlelayers/license";
 import { getUsageWarnings, type UsageWarning } from "@/middlelayers/usage-preflight";
 import { useRefreshQuota } from "./refresh-quota";
 import { FULL_REFRESH_REQUEST_EVENT } from "./refresh-request";
+import { sourceDisplayNames } from "./source-display-name";
+import { runningSourceStarts } from "./source-run-progress";
+import { refreshSourceName } from "./refresh-source-name";
 
 let lastRetryResult: RefreshAllDataResult | undefined;
 type NearQuota = { resource: "ERC20" | "TRON"; used: number; limit: number; periodEnd: string };
@@ -65,19 +69,38 @@ const App = ({
   const { t, locale } = useTranslation();
   const desktopFlow = (useWindowSize().width ?? window.innerWidth) >= 761;
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [statusPosition, setStatusPosition] = useState<{ top: number; right: number }>();
   const [showLastKnownOffer, setShowLastKnownOffer] = useState(false);
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const currentSourceStatuses = useCurrentSourceStatuses(sourceStatuses);
+  const [pendingSources, setPendingSources] = useState<Array<{ sourceId: string; label: string }>>([]);
+  const [liveSources, setLiveSources] = useState<PortfolioSourceResult[]>([]);
+  const refreshStartedAt = useRef(new Date().toISOString());
+  const [now, setNow] = useState(Date.now);
   const sourceTriggerRef = useRef<HTMLButtonElement>(null);
   const [lastResult, setLastResult] = useState<RefreshAllDataResult | undefined>(() => lastRetryResult);
   const lastResultRef = useRef(lastResult);
   const [preflight, setPreflight] = useState<{ sourceId?: string; warnings: UsageWarning[] } | null>(null);
   const [preflightPending, setPreflightPending] = useState(false);
   const [running, setRunning] = useState(false);
+  useEffect(() => {
+    if (!running) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [running]);
   const preflightPendingRef = useRef(false);
   const refreshInProgress = useRef(false);
   const pendingRetryRef = useRef<{ sourceId?: string } | null>(null);
   const refreshLoadingRef = useRef(refreshLoading);
+  const openStatus = (event: MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setStatusPosition({
+      top: Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - Math.min(window.innerHeight * 0.6, 420) - 8)),
+      right: Math.max(8, Math.min(window.innerWidth - Math.min(390, window.innerWidth - 32) - 8,
+        window.innerWidth - rect.right)),
+    });
+    setStatusDialogOpen(true);
+  };
   refreshLoadingRef.current = refreshLoading;
   useEffect(() => {
     const closeOnNavigation = () => {
@@ -104,7 +127,6 @@ const App = ({
   const {
     setButtonLoading: setRefreshLoading,
     setProgress: setRefreshProgress,
-    progress,
   } = useContext(RefreshButtonLoadingContext);
 
   const retry = <T,>(fn: () => Promise<T>, times: number, interval: number): Promise<T> =>
@@ -123,9 +145,20 @@ const App = ({
     if (!automatic) refreshRetryScheduler.manualStart();
     refreshInProgress.current = true;
     setRunning(true);
+    if (!automatic) setShowLastKnownOffer(false);
+    setNow(Date.now());
+    refreshStartedAt.current = new Date().toISOString();
+    setLiveSources([]);
+    setPendingSources([]);
     cancelInsightRefresh();
     setRefreshLoading(true);
-    if (!automatic && desktopFlow && overviewFlow) setStatusDialogOpen(true);
+    try {
+      const [config, userInfo] = await Promise.all([getConfiguration(), isProVersion()]);
+      setPendingSources(config ? listPortfolioSources(config, userInfo)
+        .filter((source) => !sourceId || source.sourceId === sourceId) : []);
+    } catch {
+      setPendingSources([]);
+    }
     const operation: RefreshOperation = { operationUuid: uuidv4() };
     let succeeded = false;
     let retryStatuses: PortfolioSourceStatus[] | undefined;
@@ -138,7 +171,9 @@ const App = ({
       setProgress(0);
       const result = await refreshAllData(
         setProgress,
-        desktopRefreshOptions(sourceId, lastResultRef.current, sourceStatuses),
+        { ...desktopRefreshOptions(sourceId, lastResultRef.current, sourceStatuses),
+          onSourceResult: (source) => setLiveSources((current) =>
+            [...current.filter((item) => item.sourceId !== source.sourceId), source]) },
         operation,
         (attempt) => automatic ? attempt() : retry(attempt, retries, retryInterval),
       );
@@ -157,9 +192,6 @@ const App = ({
         if (!automatic) refreshRetryScheduler.complete(statuses);
         setSourceStatuses(statuses);
         insightStatuses = statuses;
-        setStatusDialogOpen((open) => automatic ? open && !statuses.every((source) => source.status === "ok")
-          : overviewFlow ? open
-            : statuses.some((source) => source.status === "failed" || source.status === "stale"));
         try {
           writeStoredStatuses(statuses);
         } catch {
@@ -185,20 +217,17 @@ const App = ({
           }}>
             {t("refresh.retryButton")}
           </ToastAction>}
-        <ToastAction altText={t("refresh.details")} onClick={() => setStatusDialogOpen(true)}>
-          {t("refresh.details")}
-        </ToastAction>
       </>;
       if (succeeded && !automatic) {
         const unavailable = insightStatuses.filter((source) => source.status === "stale" || source.status === "failed").map((source) =>
-          sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ");
+          refreshSourceName({ ...source, label: sourceLabel(source) })).join(", ");
         const incomplete = insightStatuses.some((source) => source.status === "failed");
         const partialSources = insightStatuses.filter((source) => source.status === "partial");
         const usualWarning = partialSources.some((source) => source.partial?.lowerThanPrevious);
         const partialWarning = partialSources.length
           ? t(usualWarning ? "refresh.partialToastLower" : "refresh.partialToast")
             .replace("{sources}", partialSources.map((source) =>
-              sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ")) : "";
+              refreshSourceName({ ...source, label: sourceLabel(source) })).join(", ")) : "";
         const statusWarning = incomplete
           ? t("refresh.incomplete").replace("{sources}", unavailable)
           : result.usedLastKnownData
@@ -232,15 +261,12 @@ const App = ({
           tone: singleFailed ? "error" : hasWarning || nearQuotaNotice ? "warning" : "success",
           action: nearQuotaNotice ? <ToastAction altText={t("refresh.seeUsage")} onClick={() => { window.location.hash = "#/settings/systemInfo"; }}>
             {t("refresh.seeUsage")}
-          </ToastAction> : hasWarning ? quotaFailure || retryable.length ? noticeActions()
-            : <ToastAction altText={t("refresh.details")} onClick={() => setStatusDialogOpen(true)}>
-              {t("refresh.details")}
-            </ToastAction> : undefined,
+          </ToastAction> : hasWarning && (quotaFailure || retryable.length) ? noticeActions() : undefined,
         });
       } else if (!succeeded && !automatic) {
         const unavailable = insightStatuses.filter((source) => source.status !== "ok" &&
           (!sourceId || source.sourceId === sourceId)).map((source) =>
-          sourceIdentity({ ...source, label: sourceLabel(source) })).join(", ");
+          refreshSourceName({ ...source, label: sourceLabel(source) })).join(", ");
         const key = sourceId ? "refresh.sourceRetryFailed" : "refresh.allSourcesFailed";
         toast({ title: t("refresh.fidelity.failed"),
           description: unavailable ? t(key).replace("{sources}", unavailable) : t(`${key}Generic`),
@@ -272,7 +298,8 @@ const App = ({
       setProgress(0);
       const pendingRetry = pendingRetryRef.current;
       pendingRetryRef.current = null;
-      if (pendingRetry) queueMicrotask(() => void runRefreshRef.current(pendingRetry.sourceId));
+      if (pendingRetry) queueMicrotask(() => void runRefreshRef.current(
+        lastResultRef.current?.sourceResults ? pendingRetry.sourceId : undefined));
       afterRefresh?.(succeeded);
       if (succeeded) {
         if (alertResult) {
@@ -389,7 +416,7 @@ const App = ({
 
   const hasFailure = sourceStatuses.some((source) => source.status === "failed" || source.status === "stale");
   const hasPartial = sourceStatuses.some((source) => source.status === "partial");
-  const sourceLabel = (source: PortfolioSourceStatus) => {
+  const sourceLabel = (source: Pick<PortfolioSourceStatus, "sourceId" | "label">) => {
     const stored = sourceStatuses.find((status) => status.sourceId === source.sourceId);
     const current = currentSourceStatuses.find((status) => status.sourceId === source.sourceId);
     const label = stored && current && current.label !== stored.label ? current.label : source.label;
@@ -402,7 +429,7 @@ const App = ({
     return source.sourceId === "others" ? t("refresh.othersSource") : label;
   };
   const displayIdentity = (source: PortfolioSourceStatus) =>
-    sourceIdentity({ ...source, label: sourceLabel(source) });
+    refreshSourceName({ ...source, label: sourceLabel(source) });
   const displayHint = (source: PortfolioSourceStatus) =>
     source.kind === "exchange" && source.hint && !source.hint.startsWith("#")
       ? `${t("refresh.hint.apikey")} ${source.hint}` : source.hint;
@@ -415,21 +442,40 @@ const App = ({
   const incompleteCount = nonQuotaIncompleteCount + quotaStatuses.length;
   const failedNames = failedStatuses.map(displayIdentity).join(", ");
   const refreshing = refreshLoading || running;
-  const finishedCount = refreshing
-    ? progress > 0 ? Math.min(sourceStatuses.length, Math.max(1, Math.round(progress / 100 * sourceStatuses.length))) : 0
-    : sourceStatuses.filter((source) => source.status === "ok").length;
+  const currentSources = [...pendingSources, ...liveSources.filter((source) =>
+    !pendingSources.some((pending) => pending.sourceId === source.sourceId))];
+  const currentNames = sourceDisplayNames(currentSources.map((source) => ({
+    id: source.sourceId,
+    alias: displayIdentity(sourceStatuses.find((status) => status.sourceId === source.sourceId)
+      ?? liveSources.find((result) => result.sourceId === source.sourceId)
+      ?? { ...source, status: "ok" }),
+  })));
+  const startedSources = runningSourceStarts(currentSources, liveSources, refreshStartedAt.current);
+  const storedNames = sourceDisplayNames(sourceStatuses.map((source) => ({ id: source.sourceId, alias: displayIdentity(source) })));
+  const storedNameById = new Map(sourceStatuses.map((source, index) => [source.sourceId, storedNames[index]]));
+  const currentRows = currentSources.map((source, index) => ({
+    source, name: currentNames[index], result: liveSources.find((item) => item.sourceId === source.sourceId),
+    startedAt: startedSources[source.sourceId],
+    previous: sourceStatuses.find((item) => item.sourceId === source.sourceId),
+  })).sort((a, b) => {
+    const rank = (row: typeof a) => row.result ? row.result.status === "ok" ? 3 : 0 : row.startedAt ? 1 : 2;
+    return rank(a) - rank(b);
+  });
+  const finishedCount = refreshing ? liveSources.length : sourceStatuses.filter((source) => source.status === "ok").length;
+  const failedCount = refreshing ? liveSources.filter((source) => source.status === "stale").length
+    : sourceStatuses.filter((source) => source.status === "failed" || source.status === "stale").length;
+  const currentTotal = refreshing ? currentRows.length : sourceStatuses.length;
   const wideStatusFlow = desktopFlow && overviewFlow && (refreshing || hasFailure || !!lastResult);
   const nextRetryAt = Math.min(...Object.values(retrySchedule.nextBySource));
   const retryStatus = Number.isFinite(nextRetryAt)
     ? t("refresh.autoRetry.next").replace("{time}", new Date(nextRetryAt).toLocaleTimeString(
       locale === "zh" ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false }))
     : retrySchedule.stopped ? t("refresh.autoRetry.stopped") : "";
-  const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
   const statusStyle = {
-    ok: "t3-pill t3-refresh-status-pill",
-    stale: "t3-pill t3-refresh-status-pill",
-    partial: "t3-pill t3-refresh-status-pill",
-    failed: "t3-pill t3-refresh-status-pill",
+    ok: "t3-tag t3-refresh-status-pill",
+    stale: "t3-tag t3-refresh-status-pill",
+    partial: "t3-tag t3-refresh-status-pill",
+    failed: "t3-tag t3-refresh-status-pill",
   };
   const statusIcon = { ok: CheckIcon, stale: ExclamationTriangleIcon,
     partial: ExclamationTriangleIcon, failed: CrossCircledIcon };
@@ -453,12 +499,12 @@ const App = ({
   return (
     <div className="t3-refresh-controls flex items-center gap-2">
       <span role="status" className="sr-only">{refreshLoading || preflightPending ? t("refresh.inProgress") : ""}</span>
-      {refreshing && sourceStatuses.length > 0 && wideStatusFlow
-        ? <Button variant="outline" className="t3-refresh-progress-pill" onClick={() => setStatusDialogOpen(true)}
-          aria-label={progress > 0 ? t("refresh.fidelity.refreshingCount").replace("{count}", String(finishedCount)).replace("{total}", String(sourceStatuses.length))
+      {refreshing && currentTotal > 0 && wideStatusFlow
+        ? <Button variant="outline" className="t3-refresh-progress-pill" onClick={openStatus}
+          aria-label={currentTotal > 0 ? t("refresh.fidelity.refreshingCount").replace("{count}", String(finishedCount)).replace("{total}", String(currentTotal))
             : t("refresh.fidelity.refreshingSources")}>
           <ReloadIcon aria-hidden="true" className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />
-          {progress > 0 ? t("refresh.fidelity.refreshingCount").replace("{count}", String(finishedCount)).replace("{total}", String(sourceStatuses.length))
+          {currentTotal > 0 ? t("refresh.fidelity.refreshingCount").replace("{count}", String(finishedCount)).replace("{total}", String(currentTotal))
             : t("refresh.fidelity.refreshingSources")}
         </Button>
         : <Button variant="outline" className="t3-refresh-button" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
@@ -467,7 +513,7 @@ const App = ({
               : <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />}
           <p className="hidden sm:inline-block">{t("common.refresh")}</p>
         </Button>}
-      {(sourceStatuses.length > 0 || refreshLoading) && (
+      {(sourceStatuses.length > 0 || refreshing) && (
         <Button
           ref={sourceTriggerRef}
           variant="outline"
@@ -475,16 +521,17 @@ const App = ({
           className="t3-refresh-source-trigger"
           data-refreshed={lastResult ? "" : undefined}
           aria-label={t("refresh.sourceStatus")}
-          title={t("refresh.sourceStatus")}
-          data-tone={hasFailure ? "err" : hasPartial ? "warn" : "ok"}
-          onClick={() => setStatusDialogOpen(true)}
+          title={failedCount ? t("refresh.fidelity.failedCount").replace("{count}", String(failedCount)) : t("refresh.sourceStatus")}
+          data-tone={refreshing ? failedCount ? "err" : "ok" : hasFailure ? "err" : hasPartial ? "warn" : "ok"}
+          onClick={openStatus}
           disabled={preflightPending}
         >
           {(hasFailure || !hasPartial) && <InfoCircledIcon aria-hidden="true" data-icon="source-info" className="t3-refresh-source-icon mr-1.5 h-3.5 w-3.5" />}
           {!hasFailure && hasPartial && <ExclamationTriangleIcon aria-hidden="true" className="mr-1.5 h-3.5 w-3.5" />}
           <span className="t3-refresh-source-default">{t("refresh.sourceStatus")}</span>
+          {failedCount > 0 && <span className="t3-refresh-failed-count">{failedCount}</span>}
           <span className="t3-refresh-source-summary">{t("refresh.fidelity.sourceCountAt")
-            .replace("{count}", String(finishedCount)).replace("{total}", String(sourceStatuses.length))
+            .replace("{count}", String(finishedCount)).replace("{total}", String(currentTotal))
             .replace("{time}", new Date(sourceStatuses.map((source) => source.finishedAt).filter(Boolean).sort().at(-1) ?? Date.now())
               .toLocaleTimeString(locale === "zh" ? "zh-CN" : "en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }))}</span>
         </Button>
@@ -513,22 +560,23 @@ const App = ({
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog open={statusDialogOpen} onOpenChange={(open) => {
-        setStatusDialogOpen(open);
-        if (!open) setShowLastKnownOffer(false);
+        if (!open) {
+          setStatusDialogOpen(false);
+          setShowLastKnownOffer(false);
+        }
       }}>
         <AlertDialogContent overlayProps={{ className: "t3-refresh-overlay", onPointerDown: () => setStatusDialogOpen(false) }}
-          className="t3-refresh-popover sm:max-w-md">
+          className="t3-refresh-popover t3-refresh-status-popover sm:max-w-md" style={statusPosition}>
           <AlertDialogHeader>
             <AlertDialogTitle>{t(wideStatusFlow
               ? refreshing ? "refresh.fidelity.refreshingSources" : "refresh.fidelity.finished"
               : "refresh.sourceStatus")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {wideStatusFlow && refreshing && progress === 0 ? t("refresh.fidelity.parallel")
-                : wideStatusFlow ? t(refreshing ? "refresh.fidelity.progressSummary"
+              {wideStatusFlow ? t(refreshing ? "refresh.fidelity.progressSummary"
                   : quotaStatuses.length ? nonQuotaIncompleteCount ? "refresh.fidelity.finishedMixedSummary"
                     : "refresh.fidelity.finishedQuotaSummary" : "refresh.fidelity.finishedSummary")
-                .replace("{count}", String(finishedCount)).replace("{total}", String(sourceStatuses.length))
-                .replace("{failed}", String(refreshing ? failedStatuses.length : incompleteCount))
+                .replace("{count}", String(finishedCount)).replace("{total}", String(currentTotal))
+                .replace("{failed}", String(refreshing ? failedCount : incompleteCount))
                 .replace("{quota}", String(quotaStatuses.length))
                 : refreshing ? t("refresh.inProgress") : partialStatuses.length
                 ? t("refresh.partialSummary")
@@ -547,58 +595,59 @@ const App = ({
                   : t("refresh.allCurrent")}
             </AlertDialogDescription>
             {retryStatus && <p className="text-xs text-muted-foreground">{retryStatus}</p>}
-            {refreshing && <div role="progressbar" aria-label={t("refresh.inProgress")}
-              aria-valuenow={progress > 0 ? progress : undefined}
-              aria-valuetext={progress === 0 ? t("refresh.fidelity.parallel") : undefined}
-              aria-valuemin={0} aria-valuemax={100} data-indeterminate={progress === 0 ? "" : undefined}
-              className="t3-refresh-progress">
-              <span style={{ width: `${progress}%` }} />
-            </div>}
-            {wideStatusFlow && !refreshing && <div role="progressbar" aria-label={t("refresh.fidelity.finished")}
-              aria-valuenow={100} aria-valuemin={0} aria-valuemax={100}
-              data-tone={hasFailure || hasPartial ? "warning" : "success"} className="t3-refresh-progress t3-refresh-finished-progress">
-              <span style={{ width: "100%" }} />
-            </div>}
           </AlertDialogHeader>
-          {wideStatusFlow ? <div className="t3-refresh-flow-list">
-            {refreshing && <p>{t("refresh.design.previousResults")}</p>}
-            {currentSourceStatuses.map((source) => <div key={source.sourceId} className="t3-refresh-flow-row" role="group" aria-label={displayIdentity(source)}>
-              <i aria-hidden="true">{sourceLabel(source).slice(0, 2)}</i>
-              <div><strong>{sourceLabel(source)}</strong><small className={source.category === "quota" ? "quota" : source.status === "ok" ? "" : "failed"}>
-                {source.status === "ok" && source.startedAt && source.finishedAt
-                  ? t("refresh.fidelity.doneIn").replace("{seconds}", Math.max(0,
-                    (Date.parse(source.finishedAt) - Date.parse(source.startedAt)) / 1000).toFixed(1))
-                  : source.category === "quota" ? quota && source.sourceId === quota.sourceId
+          {wideStatusFlow || refreshing ? <div className="t3-refresh-flow-list" role="status" aria-live="polite" aria-busy={refreshing}>
+            {(refreshing ? currentRows : sortedStatuses.map((source) => ({
+              source, name: storedNameById.get(source.sourceId) ?? sourceLabel(source),
+              result: source, previous: undefined, startedAt: undefined,
+            }))).map(({ source, name, result, previous, startedAt }) => <div key={source.sourceId} data-source-status-row className="t3-refresh-flow-row" role="group" aria-label={name}>
+              <AssetLabel kind={result?.kind === "exchange" ? "exchange" : result?.kind === "wallet" ? "wallet" : result?.kind === "broker" ? "broker" : "custom"} type={result?.provider ?? source.sourceId.split(":")[0]} name={name} size={20} />
+              <div><small className={`tabular-nums ${result?.category === "quota" ? "quota" : result && result.status !== "ok" ? "failed" : ""}`}>
+                {!result ? <><ReloadIcon aria-hidden="true" className="inline-block h-3 w-3 animate-spin motion-reduce:animate-none" />{" "}
+                  {startedAt ? t("refresh.fidelity.refreshingElapsed").replace("{seconds}",
+                    Math.max(0, (now - Date.parse(startedAt)) / 1000).toFixed(0)) : t("refresh.fidelity.waiting")}
+                  {previous?.startedAt && previous.finishedAt && <> · {t("refresh.fidelity.lastDuration").replace("{seconds}",
+                    ((Date.parse(previous.finishedAt) - Date.parse(previous.startedAt)) / 1000).toFixed(1))}</>}</>
+                  : result.status === "ok"
+                  ? <><CheckIcon aria-hidden="true" className="inline-block h-3 w-3" />{" "}
+                    {result.startedAt && result.finishedAt
+                      ? t("refresh.fidelity.doneIn").replace("{seconds}", Math.max(0,
+                        (Date.parse(result.finishedAt) - Date.parse(result.startedAt)) / 1000).toFixed(1))
+                      : t("refresh.fidelity.done")}</>
+                  : result.category === "quota" ? quota && source.sourceId === quota.sourceId
                     ? t("refresh.fidelity.quotaPanelDetail").replace("{used}", String(quota.used))
                       .replace("{limit}", String(quota.limit)).replace("{resource}", quota.resource)
                       .replace("{date}", quota.date)
                     : t("refresh.fidelity.quotaReached")
-                  : source.detail ? t(detailKey[source.detail]) : t(`refresh.reason.${source.category ?? "other"}`)}
+                  : <><ExclamationTriangleIcon aria-hidden="true" className="inline-block h-3 w-3" />{" "}
+                    {result.detail && detailKey[result.detail] ? t(detailKey[result.detail])
+                      : t(`refresh.reason.${result.category ?? "other"}`)}</>}
               </small></div>
-              {source.category === "quota" && !refreshing && <button type="button" onClick={() => {
+              {result?.category === "quota" && !refreshing && <button type="button" onClick={() => {
                 window.location.hash = "#/settings/systemInfo";
               }}>{t("refresh.fidelity.managePlan")}</button>}
-              {source.status !== "ok" && source.category !== "quota" && !refreshing &&
-                <button type="button" onClick={() => { setStatusDialogOpen(false); void requestRefresh(lastResult?.sourceResults ? source.sourceId : undefined); }}>
+              {result && result.status !== "ok" && result.category !== "quota" &&
+                <button type="button" onClick={() => {
+                  setStatusDialogOpen(false);
+                  if (refreshInProgress.current) pendingRetryRef.current = { sourceId: source.sourceId };
+                  else void requestRefresh(lastResult?.sourceResults ? source.sourceId : undefined);
+                }}>
                   {t("refresh.retryButton")}
                 </button>}
             </div>)}
-          </div> : <div className="t3-refresh-status-list my-2 max-h-80 overflow-y-auto">
-            {refreshLoading && sourceStatuses.length > 0 && <p className="t3-refresh-previous">{t("refresh.design.previousResults")}</p>}
+          </div> : <div className="t3-refresh-status-list my-2 max-h-80 overflow-y-auto" role="status" aria-live="polite" aria-busy={false}>
             {sortedStatuses.map((source) => {
-              const Icon = kindIcon[source.kind ?? "others"];
               const StatusIcon = statusIcon[source.status];
               return (
-              <div key={source.sourceId} role="group" aria-label={displayIdentity(source)}
+              <div key={source.sourceId} role="group" aria-label={storedNameById.get(source.sourceId) ?? displayIdentity(source)}
                 data-source-status-row className="t3-refresh-source-row flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold break-all">{sourceLabel(source)}</div>
-                  {source.provider && <div className="text-xs text-muted-foreground">
-                    <Icon aria-hidden="true" className="mr-1 inline-block h-3.5 w-3.5" />
-                    {source.provider}{source.hint && ` · ${displayHint(source)}`}
-                  </div>}
+                  <AssetLabel kind={source.kind === "exchange" ? "exchange" : source.kind === "broker" ? "broker" :
+                    source.kind === "wallet" ? "wallet" : "custom"}
+                    type={source.provider ?? source.sourceId.split(":")[0]} name={sourceLabel(source)} size={20}
+                    secondary={source.provider ? `${source.provider}${source.hint ? ` · ${displayHint(source)}` : ""}` : undefined} />
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                    <span data-tone={source.status === "ok" ? "ok" : source.status === "failed" ? "err" : "warn"} className={`inline-flex items-center gap-1 font-medium ${statusStyle[source.status]}`}>
+                    <span data-tone={source.status === "ok" ? "positive" : source.status === "failed" ? "negative" : "warning"} className={`inline-flex items-center gap-1 font-medium ${statusStyle[source.status]}`}>
                       <StatusIcon aria-hidden="true" className="h-3.5 w-3.5" />
                       {t(`refresh.status.${source.status}`)}
                     </span>
@@ -624,7 +673,7 @@ const App = ({
                     size="sm"
                     variant="outline"
                     disabled={refreshLoading || preflightPending}
-                    aria-label={t("refresh.retrySource").replace("{source}", displayIdentity(source))}
+                    aria-label={t("refresh.retrySource").replace("{source}", storedNameById.get(source.sourceId) ?? displayIdentity(source))}
                     onClick={() => requestRefresh(source.sourceId)}
                   >
                     {t("refresh.retryButton")}
@@ -633,9 +682,9 @@ const App = ({
               </div>
             ); })}
           </div>}
-          {showLastKnownOffer && <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+          {showLastKnownOffer && !refreshing && <div className="t3-refresh-last-known-offer rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
             <p>{t("refresh.lastKnownSaved")}</p>
-            <Button className="mt-2" variant="outline" size="sm" onClick={() => {
+            <Button variant="outline" size="sm" onClick={() => {
               window.dispatchEvent(new Event(overviewUseLastKnownEvent));
               setShowLastKnownOffer(false);
               setStatusDialogOpen(false);

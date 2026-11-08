@@ -101,8 +101,8 @@ vi.mock("@/mobile/components/wallet-assets-percentage", () => ({
   default: () => <div data-testid="wallet-assets-percentage-stub" />,
 }));
 vi.mock("@/components/common/asset-label", () => ({
-  default: ({ asset }: { asset: { symbol: string } }) => (
-    <span>{asset.symbol}</span>
+  default: ({ asset, symbol, name }: { asset?: { symbol: string }; symbol?: string; name?: string }) => (
+    <span>{name ?? asset?.symbol ?? symbol}</span>
   ),
 }));
 

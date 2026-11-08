@@ -36,6 +36,8 @@ Source chips filter the page; Refresh and Retry call the existing source refresh
 
 ## Remaining differences
 
+UI42 uses the approved website-style neutral tile for asset and source marks. The older Wallets page design renders those marks differently.
+
 With no wallets or exchanges, the page uses the shared 200px empty state and an add-source route. The supplied Wallets source pages show populated source filters, so there is no matching zero-source screenshot.
 
 On 5 Nov 2026, the source HTML was rendered again in Chromium and compared with current 1600 px app captures. With an RGB-difference sum greater than 60, the visible viewport differs by **3.32%** for All sources, **2.47%** for Binance, and **2.78%** for OKX. The fixed app shell scrolls its content, so its All sources screenshot is 900 px tall while the source full page is 1322 px. Expanding only the capture scroll host gives a 1326 px app image and **3.53%** full-content difference. The stored-status limitation in the Source status card `(1087,374)-(1572,783)` accounts for 0.81 percentage points of the viewport and 0.54 of the full content; the differences outside it are **2.51%** and **2.99%**, respectively. Fresh source images and computed bounds are in `/tmp/ui3-remeasure/`.

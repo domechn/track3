@@ -28,7 +28,7 @@ export function SecurityDesign(p: Props) {
     {p.keyRotated && <div className="t3-b-banner positive"><CheckIcon /><div><b>{t("fidelity.settingsB.security.rotated")}</b><span>{t("fidelity.settingsB.security.rotatedDesc")}</span></div></div>}
     <section className="t3-b-card t3-b-security-key">
       <div className="t3-b-card-head"><div><h3>{t("fidelity.settingsB.security.key")}</h3><p>{t("fidelity.settingsB.security.keyDesc")}</p></div>
-        <span className="t3-b-pill connected">{t("fidelity.settingsB.security.inUse")}</span></div>
+        <span className="t3-tag" data-tone="positive">{t("fidelity.settingsB.security.inUse")}</span></div>
       <div className="t3-b-kpis">
         <div><small>{t("fidelity.settingsB.security.keyId")}</small><strong>—</strong></div>
         <div><small>{t("fidelity.settingsB.security.created")}</small><strong>—</strong></div>
@@ -79,7 +79,7 @@ export function SecurityDesign(p: Props) {
     </section>
     <section className="t3-b-card t3-b-security-lock">
       <div className="t3-b-card-head"><div><h3>{t("fidelity.settingsB.security.appLock")}</h3><p>{t("fidelity.settingsB.security.iOSOnly")}</p></div>
-        <span className="t3-b-pill testing">iOS</span></div>
+        <span className="t3-tag" data-tone="accent">iOS</span></div>
       <div className="t3-b-notice"><LockClosedIcon /><b>{t("fidelity.settingsB.security.unavailableDesktop")}</b>
         {t("fidelity.settingsB.security.unavailableDesktopDesc")}</div>
     </section>

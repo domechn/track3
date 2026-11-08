@@ -7,6 +7,61 @@ const usd = { currency: "USD", rate: 1, alias: "US Dollar", symbol: "$" };
 const eur = { currency: "EUR", rate: 2, alias: "Euro", symbol: "€" };
 
 describe("overview panels", () => {
+  it("reveals exact daily change, percent, and ending value across the whole column", () => {
+    render(<DailyChangeCard currency={usd} daily={[
+      { timestamp: Date.parse("2026-11-07T12:00:00Z"), value: 4_000, previousTotal: 1_711_000, total: 1_715_000 },
+      { timestamp: Date.parse("2026-11-08T12:00:00Z"), value: -52_314.07, previousTotal: 1_715_000, total: 1_662_685.93 },
+    ]} desktopFidelity />);
+    const marks = screen.getAllByRole("button", { name: /Nov/ });
+    fireEvent.pointerEnter(marks[1], { pointerType: "mouse" });
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toHaveTextContent("−$52,314.07");
+    expect(tooltip).toHaveTextContent("−3.05%");
+    expect(tooltip).toHaveTextContent("$1,662,685.93");
+    expect(tooltip).toHaveTextContent("8 Nov");
+    expect(screen.getByText("−3.05%")).toHaveClass("text-loss");
+    expect(marks[0]).toHaveStyle({ opacity: "0.55" });
+    expect(marks[1]).toHaveAttribute("aria-label", expect.stringMatching(/8 Nov.*down 52,314.07.*minus 3.05%/));
+  });
+
+  it("moves the daily tooltip with arrow keys and clears it with Escape", () => {
+    render(<DailyChangeCard currency={usd} daily={[
+      { timestamp: Date.parse("2026-11-07T12:00:00Z"), value: 4_000, previousTotal: 1_000_000, total: 1_004_000 },
+      { timestamp: Date.parse("2026-11-08T12:00:00Z"), value: -4_000, previousTotal: 1_004_000, total: 1_000_000 },
+    ]} />);
+    const marks = screen.getAllByRole("button", { name: /Nov/ });
+    fireEvent.focus(marks[0]);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("+$4,000.00");
+    fireEvent.keyDown(marks[0], { key: "ArrowRight" });
+    expect(document.activeElement).toBe(marks[1]);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("−$4,000.00");
+    fireEvent.keyDown(marks[1], { key: "Escape" });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("pins the daily tooltip on touch and dismisses it with an outside tap", () => {
+    render(<><DailyChangeCard currency={usd} daily={[
+      { timestamp: Date.parse("2026-11-08T12:00:00Z"), value: 4_000, previousTotal: 1_000_000, total: 1_004_000 },
+    ]} /><button>Outside</button></>);
+    fireEvent.pointerDown(screen.getByRole("button", { name: /8 Nov/ }), { pointerType: "touch" });
+    expect(screen.getByRole("tooltip")).toHaveTextContent("+$4,000.00");
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Outside" }), { pointerType: "touch" });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+  it("selects a dense daily mark from a touch on the chart surface", () => {
+    render(<DailyChangeCard currency={usd} daily={[
+      { timestamp: Date.parse("2026-11-07T12:00:00Z"), value: 4_000, previousTotal: 1_000_000, total: 1_004_000 },
+      { timestamp: Date.parse("2026-11-08T12:00:00Z"), value: -4_000, previousTotal: 1_004_000, total: 1_000_000 },
+    ]} desktopFidelity />);
+    const chart = screen.getByRole("group", { name: /daily change chart/i });
+    const marks = chart.querySelectorAll<HTMLElement>("[data-chart-mark]");
+    marks.forEach((mark, index) => {
+      mark.getBoundingClientRect = () => ({ left: index * 10, right: index * 10 + 10, top: 0, bottom: 100,
+        width: 10, height: 100, x: index * 10, y: 0, toJSON: () => ({}) });
+    });
+    fireEvent.pointerDown(chart, { pointerType: "touch", clientX: 17 });
+    expect(screen.getByRole("tooltip")).toHaveTextContent("−$4,000.00");
+  });
   it("shows the best day and separates gain from loss in the daily chart", () => {
     render(<DailyChangeCard currency={usd} daily={[
       { timestamp: Date.parse("2026-10-29"), value: 120 },
@@ -14,7 +69,7 @@ describe("overview panels", () => {
     ]} bestDay={{ timestamp: Date.parse("2026-10-29"), value: 120 }} />);
     expect(screen.getByText("Daily change")).toBeInTheDocument();
     expect(screen.getByText(/best day/)).toHaveTextContent("+$120");
-    expect(screen.getByLabelText(/daily change chart/i)).toHaveTextContent("−$30");
+    expect(screen.getByRole("group", { name: /daily change chart/i })).toHaveTextContent("−$30");
   });
 
   it("labels the daily chart's vertical direction outside its date axis", () => {
@@ -51,6 +106,34 @@ describe("overview panels", () => {
     expect(screen.getByText("Last 3 snapshots")).toBeInTheDocument();
     expect(screen.getByText("+$40.00")).toBeInTheDocument();
     expect(screen.getByText("−$25.00")).toBeInTheDocument();
+    expect(document.querySelectorAll(".t3-moved-list .t3-asset-icon[data-size='20']")).toHaveLength(2);
+  });
+  it("pages through desktop movers without stretching the chart row", () => {
+    const rows = Array.from({ length: 11 }, (_, index) => ({
+      symbol: `ASSET${index}`, assetType: "crypto" as const, value: 100 - index,
+    }));
+    render(<MemoryRouter><WhatMovedCard currency={usd} count={2} rows={rows} desktopFidelity /></MemoryRouter>);
+    expect(document.querySelectorAll(".t3-moved-list li")).toHaveLength(8);
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    expect(document.querySelectorAll(".t3-moved-list li")).toHaveLength(3);
+    expect(screen.getByText("9–11 of 11")).toBeInTheDocument();
+    expect(screen.queryByText("ASSET7")).not.toBeInTheDocument();
+    expect(screen.getByText("ASSET10")).toBeInTheDocument();
+    fireEvent.pointerEnter(screen.getByRole("button", { name: "ASSET10: +$90.00" }), { pointerType: "mouse" });
+    expect(screen.getByRole("tooltip")).toHaveTextContent("ASSET10: +$90.00");
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(screen.queryByText("ASSET10")).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".t3-moved-list li")).toHaveLength(8);
+  });
+  it("shows the exact value when a What moved row is hovered", () => {
+    render(<MemoryRouter><WhatMovedCard currency={usd} count={2} weekBased rows={[
+      { symbol: "ETH", assetType: "crypto", value: -25.37 },
+    ]} /></MemoryRouter>);
+    const row = screen.getByText("ETH").closest("li")!;
+    expect(row.tagName).toBe("LI");
+    expect(row.querySelector("[data-chart-mark]")).toHaveAttribute("role", "button");
+    fireEvent.pointerEnter(row.querySelector("[data-chart-mark]")!, { pointerType: "mouse" });
+    expect(screen.getByRole("tooltip")).toHaveTextContent("−$25.37");
   });
   it("uses shared direction tokens for What moved bars and coin changes", () => {
     render(<MemoryRouter>
@@ -129,7 +212,7 @@ describe("overview panels", () => {
       <WhatMovedCard currency={eur} count={2} rows={[{ symbol: "BTC", assetType: "crypto", value: 20 }]} />
       <TopCoinsCard currency={eur} rows={[{ symbol: "ETH", assetType: "crypto", value: 50, amount: 2 }]} />
     </MemoryRouter>);
-    expect(screen.getByLabelText(/daily change chart/i)).toHaveTextContent("+€20.00");
+    expect(screen.getByRole("group", { name: /daily change chart/i })).toHaveTextContent("+€20.00");
     expect(screen.getByText("+€40.00")).toBeInTheDocument();
     expect(screen.getByTestId("overview-coin-row")).toHaveTextContent("€50.00");
     expect(screen.getByTestId("overview-coin-row")).toHaveTextContent("€100.00");
@@ -153,6 +236,15 @@ describe("overview panels", () => {
     expect(screen.getByText("Binance")).toBeInTheDocument();
     expect(screen.getByText("OKX")).toBeInTheDocument();
     expect(screen.getByText("Failed")).toBeInTheDocument();
+  });
+
+  it("keeps a source action at the bottom when few sources fill the desktop card", () => {
+    render(<SourceStatusCard variant="card" desktopFidelity sources={[{
+      wallet: "Ledger", walletAlias: "Ledger", value: 100, percentage: 100, amount: 1, chartColor: "#000",
+    }]} statuses={[
+      { sourceId: "wallet:1", label: "Ledger", status: "ok" },
+    ]} />);
+    expect(screen.getByRole("link", { name: "Manage sources" })).toHaveAttribute("href", "#/settings/configuration");
   });
 
   it("shows three rankings first on phone and expands them without changing sorting", () => {

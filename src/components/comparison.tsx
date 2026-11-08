@@ -24,9 +24,9 @@ import PageLoadingOverlay from "./page-loading-overlay";
 import {
   formatAssetLabel,
   getAssetLogoKey,
-  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
+import AssetLabel from "./common/asset-label";
 import {
   CalendarIcon,
   ChevronDownIcon,
@@ -99,8 +99,8 @@ const App = ({
         const raw = readAssistantComparisonDates();
         if (raw === undefined) return;
         const dates = validateActionArgs("set_comparison_dates", raw);
-        const base = dateOptions.find((option) => option.label === dates.base);
-        const head = dateOptions.find((option) => option.label === dates.head);
+        const base = dateOptions.find((option) => parseDateToTS(option.label) === parseDateToTS(String(dates.base)));
+        const head = dateOptions.find((option) => parseDateToTS(option.label) === parseDateToTS(String(dates.head)));
         if (base && head) {
           clearAssistantComparisonDates();
           setCurrentQuickCompare(null);
@@ -759,7 +759,7 @@ const App = ({
                     <tbody>{[...coinComparisons].sort((a, b) =>
                       Math.abs(b.value.head - b.value.base) - Math.abs(a.value.head - a.value.base),
                     ).map((coin) => <tr key={getAssetLogoKey(coin)} className="border-b last:border-b-0">
-                      <td className="py-3 font-semibold">{formatAssetLabel(coin)}</td>
+                      <td className="py-3 font-semibold"><AssetLabel asset={coin} src={logoMap[getAssetLogoKey(coin)]} size={20} quiet /></td>
                       <td className="py-3 text-right">{formatVal(coin.amount.base, "amount")}</td>
                       <td className="py-3 text-right">{formatVal(coin.amount.head, "amount")}</td>
                       <td className="py-3 text-right">{formatVal(coin.price.base, "price")}</td>

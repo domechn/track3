@@ -33,6 +33,8 @@ The visible source name opens the existing configuration editor. The iPhone avat
 
 The new alias screenshots use actual source data, so their text and values differ from the fixed design fixture. The capture table below is the earlier matched-fixture baseline.
 
+UI42 uses the approved website-style neutral tile for exchange, wallet, broker and custom marks. The older Sources page design renders those marks differently.
+
 The wide empty Sources card keeps the design's 188px outer height; its dashed inner state has a 146px minimum. This is shorter than the shared component's 200px default because the approved source page uses the compact card.
 
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.

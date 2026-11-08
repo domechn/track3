@@ -260,9 +260,9 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 ## Captured comparison
 
-- App capture: `/tmp/fidelity/coin-btc/coin-btc-edit-phone.png`.
-- Reference render: `/tmp/rev-fa3/design/records-coin-btc-edit.png`.
-- Fresh 390 × 844 first-screen pixel difference: **4.68%** (RGB difference >20/255 in any channel).
+- App capture: `/tmp/ui39-app-final/coin-btc-edit-phone.png`.
+- Reference render: `/tmp/ui39-source-final/btc-edit-phone.png`.
+- 8 Nov 390 × 844 first-screen pixel difference at DPR 2: **8.529%** (any RGB channel differs by more than 20).
 
 ## Real-data limits
 
@@ -270,4 +270,7 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
+- The 8.529% viewport difference includes the live, editable controls and saved page backdrop; the source freezes its form and background.
 - The reference uses static text in its price control. The app keeps an editable input for typing and saving, which rasterizes some text edges differently.
+- The selected transaction type uses the owner's shared active tint; the older source uses a solid grey selected fill.
+- The underlying Overview tab uses the owner's shared active tile; the older Coin source highlights only its text.

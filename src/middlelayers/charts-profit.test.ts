@@ -117,17 +117,22 @@ beforeEach(() => {
   vi.mocked(invoke).mockResolvedValue(undefined);
 });
 
-it("finds the opening baseline, skipping a prior snapshot when one exists at month start", async () => {
+it("finds the snapshot strictly before a selected start", async () => {
   vi.mocked(selectFromDatabaseWithSql).mockResolvedValueOnce([
     { createdAt: "2026-04-04T12:00:00.000Z" },
   ]);
   const start = new Date(2026, 9, 1);
   expect(await queryPreviousProfitSnapshotDate(start)).toEqual(new Date("2026-04-04T12:00:00.000Z"));
   expect(selectFromDatabaseWithSql).toHaveBeenCalledWith(
-    `SELECT CASE WHEN EXISTS (SELECT 1 FROM assets_v2 WHERE createdAt = ?)
-      THEN NULL ELSE MAX(createdAt) END AS createdAt
-      FROM assets_v2 WHERE createdAt < ?`,
-    [start.toISOString(), start.toISOString()],
+    `SELECT MAX(createdAt) AS createdAt FROM assets_v2 WHERE createdAt < ?`,
+    [start.toISOString()],
+  );
+});
+
+it("uses a snapshot strictly before the selected start as its cost baseline", async () => {
+  await calculateTotalProfit(dateRange, "BTC", "crypto");
+  expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledWith(
+    undefined, new Date(dateRange.start.getTime() - 1), "BTC",
   );
 });
 

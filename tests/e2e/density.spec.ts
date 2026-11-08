@@ -14,7 +14,7 @@ test("mouse layout stays compact at narrow and wide desktop widths", async ({ pa
     expect((await track.boundingBox())!.height).toBeCloseTo(20, 2);
     expect((await page.getByRole("button", { name: "Enable sync" }).boundingBox())!.height).toBeCloseTo(34, 2);
     const sidebar = page.locator("aside").getByRole("link", { name: "Overview" });
-    expect((await sidebar.boundingBox())!.height).toBeLessThanOrEqual(38.01);
+    expect((await sidebar.boundingBox())!.height).toBe(40);
     expect((await page.locator("aside").boundingBox())!.width).toBe(56);
     await page.goto("/#/settings/configuration");
     const labels = page.locator('label[for="groupUSD"], label[for="hideInactive"]');
@@ -139,7 +139,7 @@ test("collapsed mouse sidebar keeps its rail padding", async ({ page }) => {
   await installTauriBridge(page);
   await page.goto("/#/overview");
   await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
-  expect(await page.locator("aside nav").evaluate((node) => getComputedStyle(node).paddingLeft)).toBe("10px");
+  expect(await page.locator("aside nav").evaluate((node) => getComputedStyle(node).paddingLeft)).toBe("8px");
 });
 
 test("mouse settings labels keep their original native layout", async ({ page }) => {

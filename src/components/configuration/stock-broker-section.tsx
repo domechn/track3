@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { memo } from "react";
 import {
   Table,
@@ -40,7 +41,6 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
-import { getWalletLogo } from "@/lib/utils";
 import { maskSensitive } from "@/utils/attach-to";
 import type { StockBrokerSectionProps } from "./types";
 import { BackpackIcon } from "@radix-ui/react-icons";
@@ -137,11 +137,7 @@ const StockBrokerSection = memo(function StockBrokerSection({
                         <SelectLabel>{t("config.broker")}</SelectLabel>
                         {stockBrokerOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            <img
-                              className="h-4 w-4 text-muted-foreground inline-block mr-2"
-                              src={getWalletLogo(o.value)}
-                            />
-                            {o.label}
+                            <AssetLabel kind="broker" type={o.value} name={o.label} size={20} />
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -267,18 +263,9 @@ const StockBrokerSection = memo(function StockBrokerSection({
                     className="h-[42px] group align-middle"
                   >
                     <TableCell className="w-[170px]">
-                      <div className="flex items-center gap-2 text-sm">
-                        <img
-                          className="w-[18px] h-[18px] rounded-full"
-                          src={getWalletLogo(broker.type)}
-                          alt={broker.type}
-                        />
-                        <span className="truncate">
-                          {stockBrokerOptions.find(
-                            (c) => c.value === broker.type,
-                          )?.label ?? broker.type}
-                        </span>
-                      </div>
+                      <AssetLabel kind="broker" type={broker.type} name={stockBrokerOptions.find(
+                        (c) => c.value === broker.type,
+                      )?.label ?? broker.type} size={24} />
                     </TableCell>
                     <TableCell className="w-[170px] text-sm">
                       <span className="block truncate" title={broker.alias || `${broker.type}-${idx + 1}`}>{broker.alias || `${broker.type}-${idx + 1}`}</span>

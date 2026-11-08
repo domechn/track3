@@ -43,7 +43,7 @@ export async function expectSummaryTopGeometry(page: Page, rowHeight: number) {
   await expect(groups).toHaveCount(3);
   for (const [symbol, percentage] of [
     ["1211.HK", "−94.5%"], ["IOTA", "−66.7%"], ["EUL", "−80.0%"], ["BNB", "−20.0%"],
-  ]) await expect(page.locator(".summary-top-row").filter({ has: page.locator(`b:text-is("${symbol}")`) }).locator("small"))
+  ]) await expect(page.locator(".summary-top-row").filter({ has: page.locator(`.t3-asset-label-name:text-is("${symbol}")`) }).locator("small"))
     .toHaveText(percentage);
   const geometry = await groups.evaluateAll((elements) => elements.map((group) => {
     const rows = [...group.querySelectorAll(".summary-top-row")];
@@ -63,7 +63,10 @@ export async function expectSummaryTopGeometry(page: Page, rowHeight: number) {
           const box = range.getBoundingClientRect();
           return { x: box.x, right: box.right, y: box.y, bottom: box.bottom };
         });
-        return { height: rowBox.height, right: rowBox.right, track: { x: trackBox.x, right: trackBox.right, width: trackBox.width },
+        const tickerName = ticker.querySelector(".t3-asset-label-name");
+        return { symbol: tickerName?.textContent, height: rowBox.height, right: rowBox.right,
+          tickerClipped: tickerName ? tickerName.scrollWidth > tickerName.clientWidth + 1 : true,
+          track: { x: trackBox.x, right: trackBox.right, width: trackBox.width },
           bar: barBox && { x: barBox.x, right: barBox.right, y: barBox.y, bottom: barBox.bottom, width: barBox.width }, text };
       }),
     };
@@ -77,7 +80,8 @@ export async function expectSummaryTopGeometry(page: Page, rowHeight: number) {
   for (const row of rows) {
     expect(row.height).toBeCloseTo(rowHeight, 0);
     expect(row.track.width).toBeGreaterThanOrEqual(80);
-    expect(row.text[0].right).toBeLessThanOrEqual(row.track.x - 6);
+    expect(row.tickerClipped, row.symbol ?? "").toBe(false);
+    expect(row.text[0].right, JSON.stringify(row)).toBeLessThanOrEqual(row.track.x - 6);
     expect(row.text[1].x).toBeGreaterThanOrEqual(row.track.right + 6);
     expect(row.text[2].x).toBeGreaterThanOrEqual(row.text[1].right + 6);
     expect(row.text[2].right).toBeLessThanOrEqual(row.right + 1);

@@ -170,7 +170,24 @@ export async function queryLastRefreshAt(): Promise<string | undefined> {
   return lc ? timeToDateStr(new Date(lc).getTime(), true) : undefined;
 }
 
-export async function queryLatestAssets(): Promise<Asset[]> {
+export async function queryLatestAssets(dateRange?: TDateRange): Promise<Asset[]> {
+  if (dateRange) {
+    const rows = await selectFromDatabaseWithSql<{
+      symbol: string; assetType: AssetType; amount: number; value: number;
+    }>(
+      `SELECT symbol, asset_type AS assetType, SUM(amount) AS amount, SUM(value) AS value
+       FROM assets_v2 WHERE uuid = (
+         SELECT uuid FROM assets_v2 WHERE createdAt >= ? AND createdAt <= ?
+         ORDER BY createdAt DESC, uuid DESC LIMIT 1
+       )
+       GROUP BY asset_type, symbol HAVING SUM(amount) != 0`,
+      [dateRange.start.toISOString(), dateRange.end.toISOString()],
+    );
+    const blacklist = new Set((await getBlacklistCoins()).map((symbol) => symbol.toUpperCase()));
+    return rows.filter((row) => !blacklist.has(row.symbol.toUpperCase())).map((row) => ({
+      ...row, price: row.value / row.amount,
+    }));
+  }
   const size = 1;
 
   const assets = await ASSET_HANDLER.listSymbolGroupedAssets(size);

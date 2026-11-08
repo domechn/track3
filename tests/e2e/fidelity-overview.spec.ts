@@ -46,7 +46,8 @@ async function samplePage(browser: Browser, s3?: FakeS3) {
 test("Overview matches the approved phone card order and sample values", async ({ browser }) => {
   const { context, page } = await samplePage(browser);
   try {
-    await expect(page.locator(".fd-overview-source [aria-label='Ledger cold wallet wallet']")).toHaveText("Lg");
+    await expect(page.locator(".fd-overview-source").filter({ hasText: "Ledger cold wallet" })
+      .locator(".t3-asset-icon[data-kind='wallet'] img")).toHaveCount(1);
     await page.screenshot({ path: `${dir}/overview-phone.png` });
     writeFileSync(`${dir}/geometry.json`, JSON.stringify(await page.evaluate(() => ({
       height: document.getElementById("app-main-content")!.scrollHeight,
@@ -205,9 +206,9 @@ test("Overview expanded rankings capture six coins and show fewer", async ({ bro
     await page.locator(".fd-overview-rank").evaluate((element) =>
       document.getElementById("app-main-content")!.scrollTo(0, document.getElementById("app-main-content")!.scrollTop + element.getBoundingClientRect().top - 16));
     await expect(page.locator("#app-top-bar")).toBeHidden();
-    expect((await page.locator(".fd-overview-rank").boundingBox())?.height).toBe(520);
-    expect((await page.locator(".fd-overview-more").boundingBox())?.y).toBe(429);
-    expect((await page.locator(".fd-overview-sources").boundingBox())?.y).toBe(548);
+    expect((await page.locator(".fd-overview-rank").boundingBox())?.height).toBe(609);
+    expect((await page.locator(".fd-overview-more").boundingBox())?.y).toBe(518);
+    expect((await page.locator(".fd-overview-sources").boundingBox())?.y).toBe(637);
     await page.screenshot({ path: `${dir}/overview-more-phone.png` });
   } finally { await context.close(); }
 });
@@ -298,6 +299,15 @@ test("Overview opens with the saved shared date range", async ({ browser }) => {
 test("Overview pull refresh shows the source progress strip", async ({ browser }) => {
   const { context, page } = await samplePage(browser);
   try {
+    await page.evaluate(() => {
+      const target = document.querySelector('[data-testid="pull-to-refresh"]');
+      if (!target) throw new Error("pull target missing");
+      const start = new Touch({ identifier: 1, target, clientX: 185, clientY: 80 });
+      const moved = new Touch({ identifier: 1, target, clientX: 185, clientY: 160 });
+      target.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [start], targetTouches: [start], changedTouches: [start] }));
+      target.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [moved], targetTouches: [moved], changedTouches: [moved] }));
+    });
+    await expect(page.locator(".mobile-pull-indicator")).toBeVisible();
     await page.evaluate(() => window.dispatchEvent(new CustomEvent("fidelity:mobile-refresh-progress", {
       detail: { active: true, total: 5, completed: ["Binance", "OKX", "Ledger"] },
     })));
@@ -311,13 +321,17 @@ test("Overview chart reveals the stored value on pointer hover", async ({ browse
   const { context, page } = await samplePage(browser);
   try {
     const chart = page.locator(".fd-overview-chart");
-    await expect(chart.locator("rect")).toHaveCount(0);
+    await expect(chart.locator("rect:not([data-chart-mark])")).toHaveCount(0);
     await chart.hover({ position: { x: 145, y: 90 } });
-    await expect(chart.locator("rect")).toHaveCount(1);
-    const tooltip = chart.locator("g:has(> rect[rx='6'])");
-    await expect(tooltip.locator("text")).toHaveCount(2);
-    await expect(tooltip.locator("text").first()).toContainText(/Oct/);
-    await expect(tooltip.locator("text").last()).toContainText(/\$[\d,]+/);
+    await expect(chart.locator("rect:not([data-chart-mark])")).toHaveCount(0);
+    const tooltip = page.locator("[data-chart-tooltip]");
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(/Oct/);
+    await expect(tooltip).toContainText(/Value: \$[\d,]+\.\d\d/);
+    await expect(tooltip).toContainText(/Change:/);
+    const crosshair = Number(await chart.locator("[data-chart-crosshair]").getAttribute("x1"));
+    const point = Number(await chart.locator("[data-chart-active-point]").getAttribute("cx"));
+    expect(Math.abs(crosshair - point)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: `${dir}/overview-hover-phone.png` });
   } finally { await context.close(); }
 });

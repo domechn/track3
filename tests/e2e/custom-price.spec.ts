@@ -51,6 +51,8 @@ test("custom price screens work in both shells, themes, and languages", async ({
     await page.getByRole("button", { name: locale === "en" ? (mobile ? "Add symbol" : "Add Symbol") : "新增币种" }).click();
     await expect(page.getByRole("radio", { name: locale === "en" ? "Market" : "市场价格" })).toBeVisible();
     await capture(page, `${prefix}-add.png`);
+    if (mobile) await page.getByRole("button", { name: locale === "en" ? "Cancel" : "取消" }).click();
+    else await page.keyboard.press("Escape");
     await page.goto("/#/coins/NOVA");
     if (mobile) {
       await expect(page.getByText(width < 700

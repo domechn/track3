@@ -19,6 +19,8 @@ import { sourceAliasFallback } from "@/components/source-display-name";
 import { matchSourceStatus } from "@/components/source-status-match";
 import { currentSourceStatusLabels, sourceStatusMatches } from "@/middlelayers/source-status-labels";
 import { configurationFromForm } from "@/middlelayers/ui-state/config-form";
+import AssetLabel from "@/components/common/asset-label";
+import { Tag } from "@/components/ui/tag";
 
 type Tab = "exchanges" | "wallets" | "brokers" | "custom";
 type Holding = { wallet: string; symbol: string; amount: number; value: number; price: number };
@@ -243,8 +245,8 @@ export function SourceDesign({
           const toggle = () => kind === "exchange" ? onExchangeToggle(row.type, row.apiKey)
             : kind === "wallet" ? onWalletToggle(row.type, row.address) : onBrokerToggle(row.type, row.queryId);
           return <div className={`t3-fidelity-source-row ${stale ? "error" : ""}`} key={`${kind}:${identity}`}>
-            <div className="t3-fidelity-source-id"><span className="t3-fidelity-source-logo">{kind === "wallet" ? row.type === "erc20" ? "ETH" : row.type.slice(0, 3).toUpperCase() : kind === "broker" ? "IB" : ({ binance: "BN", okex: "OK", kraken: "KR" } as Record<string, string>)[row.type] ?? row.type.slice(0, 2).toUpperCase()}</span><div><button type="button" className="t3-fidelity-source-name" aria-label={`${t("fidelity.source.edit")} ${name}`} onClick={() => setEditor(tab)}><b title={name}>{name}</b></button><small>{metadata}{kind === "wallet" && row.type === "erc20" && <span className="t3-fidelity-source-pro">Pro</span>}</small></div></div>
-            <div><span className={`t3-fidelity-source-pill ${stale ? "error" : active ? "on" : ""}`}><i />{stale ? t("fidelity.source.error") : active ? t("fidelity.source.active") : t("fidelity.source.paused")}</span></div>
+            <div className="t3-fidelity-source-id"><button type="button" className="t3-fidelity-source-name" aria-label={`${t("fidelity.source.edit")} ${name}`} onClick={() => setEditor(tab)}><AssetLabel kind={kind} type={row.type} name={name} size={24} secondary={<>{metadata}{kind === "wallet" && row.type === "erc20" && <Tag tone="accent">Pro</Tag>}</>} /></button></div>
+            <div><span className="t3-tag" data-tone={stale ? "negative" : active ? "positive" : "neutral"}><i />{stale ? t("fidelity.source.error") : active ? t("fidelity.source.active") : t("fidelity.source.paused")}</span></div>
             <div className={stale ? "t3-fidelity-source-warning" : active ? "" : "t3-fidelity-source-faint"}>{stale && latestGood ? `${t("fidelity.source.lastGood")} ${latestGood}` : active && latestGood ? `${t("fidelity.source.today")} ${latestGood}` : !active && sourceStatus?.lastSuccessAt
               ? new Date(sourceStatus.lastSuccessAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).replace(" at ", ", ")
               : active && value > 0 ? dateText : "—"}</div>
@@ -270,7 +272,8 @@ export function SourceDesign({
       </> : emptySource : !others.length ? emptySource : <>
         <div className="t3-fidelity-source-head custom"><span>{t("fidelity.source.asset")}</span><span>{t("fidelity.source.price")}</span><span>{t("fidelity.source.attachedTo")}</span><span>{t("fidelity.source.value")}</span><span>{t("fidelity.source.active")}</span><span /></div>
         {others.map((row, index) => <div className="t3-fidelity-source-row custom" key={`${row.symbol}:${index}`}>
-          <div className="t3-fidelity-source-id"><span className="t3-fidelity-source-logo">{row.symbol === "GOLD" ? "AU" : row.symbol.slice(0, 2)}</span><div><button type="button" className="t3-fidelity-source-name" aria-label={`${t("fidelity.source.edit")} ${row.symbol}`} onClick={() => setEditor(tab)}><b>{row.symbol}</b></button><small title={row.alias || row.symbol}>{row.alias || row.symbol} · {amount(row.amount)}</small></div></div>
+          <div className="t3-fidelity-source-id"><button type="button" className="t3-fidelity-source-name" aria-label={`${t("fidelity.source.edit")} ${row.symbol}`} onClick={() => setEditor(tab)}><AssetLabel kind="custom" symbol={row.symbol} size={24}
+            secondary={`${row.alias || row.symbol} · ${amount(row.amount)}`} /></button></div>
           <div className="t3-fidelity-source-custom-price">{row.price?.kind === "manual" ? `${t("fidelity.source.manual")} · ${usd(row.price.usd)}` : row.price?.kind === "follow" ? `${t("fidelity.source.follows")} ${row.price.symbol} · ${Number.isFinite(otherPrice(row)) ? usd(otherPrice(row)) : "—"}` : "—"}<small>{t("fidelity.source.attachedTo")} {row.attachTo ? row.attachTo.identity : t("fidelity.source.standalone")}</small></div>
           <div className="t3-fidelity-source-value">{Number.isFinite(otherPrice(row)) ? usd(otherPrice(row) * row.amount) : "—"}</div>
           <div className="t3-fidelity-source-switch"><span className="t3-fidelity-source-switch-static"><i /></span></div>
@@ -293,9 +296,12 @@ export function SourceDesign({
           <p>{t(overlay.sourceKind === "exchange" ? "fidelity.source.removeExactBody" : "fidelity.source.removeBody").replace("{name}", overlay.name)}</p>
           <footer><button onClick={close}>{t("common.cancel")}</button><button className="danger" onClick={() => { overlay.apply(); close(); }}><TrashIcon />{t("fidelity.source.remove")} {overlay.name}</button></footer>
         </> : overlay.kind === "quicklook" ? <>
-          <div className="t3-fidelity-source-dialog-heading"><span className="t3-fidelity-source-logo">{overlay.name.slice(0, 2).toUpperCase()}</span><div><h3>{overlay.name}</h3><small>{t("fidelity.source.quickSubtitle").replace("{time}", dateText.toLowerCase())}</small></div><button aria-label={t("common.close")} onClick={close}><Cross2Icon /></button></div>
+          <div className="t3-fidelity-source-dialog-heading"><AssetLabel kind={tab === "exchanges" ? "exchange" : tab === "wallets" ? "wallet" : tab === "brokers" ? "broker" : "custom"}
+            type={rows.find((item) => item.name === overlay.name)?.row.type} name={overlay.name} size={24}
+            secondary={t("fidelity.source.quickSubtitle").replace("{time}", dateText.toLowerCase())} />
+            <button aria-label={t("common.close")} onClick={close}><Cross2Icon /></button></div>
           <table><thead><tr><th>{t("fidelity.source.asset")}</th><th>{t("fidelity.source.amount")}</th><th>{t("fidelity.source.price")}</th><th>{t("fidelity.source.value")}</th></tr></thead><tbody>
-            {currentHoldings.map((item) => <tr key={item.symbol}><td>{item.symbol}</td><td>{amount(item.amount)}</td><td>{usd(item.price)}</td><td>{usd(item.value)}</td></tr>)}
+            {currentHoldings.map((item) => <tr key={item.symbol}><td><AssetLabel kind="coin" symbol={item.symbol} size={20} quiet /></td><td>{amount(item.amount)}</td><td>{usd(item.price)}</td><td>{usd(item.value)}</td></tr>)}
             <tr><td colSpan={3}>{t("fidelity.source.total")}</td><td>{usd(currentHoldings.reduce((sum, item) => sum + item.value, 0))}</td></tr>
           </tbody></table>
           <div className="t3-fidelity-source-quota"><span>✧</span><div><b>{t("fidelity.source.quota")}</b><small>{usage

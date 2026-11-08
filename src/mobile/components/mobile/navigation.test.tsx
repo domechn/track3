@@ -48,6 +48,16 @@ describe("mobile navigation", () => {
     expect(overview).toHaveAttribute("aria-current", "page");
     expect(overview.querySelectorAll("svg rect")).toHaveLength(4);
   });
+  it("highlights Overview for a coin detail on the iPad rail", () => {
+    render(<MemoryRouter initialEntries={["/coins/BTC"]}><MobileSidebar /></MemoryRouter>);
+    expect(document.querySelector('.mobile-sidebar .mobile-rail-item[href="/overview"]')).toHaveAttribute("aria-current", "page");
+    expect(document.querySelectorAll(".mobile-sidebar a[aria-current='page']")).toHaveLength(1);
+  });
+  it("separates Settings from the iPad route groups", () => {
+    render(<MemoryRouter initialEntries={["/settings"]}><MobileSidebar /></MemoryRouter>);
+    const settings = document.querySelector('.mobile-sidebar a[href="/settings"]')!;
+    expect(settings.parentElement).toHaveClass("t3-nav-divider");
+  });
   it("shows four tabs and opens each tab at its root", () => {
     render(<MemoryRouter initialEntries={["/cost-basis"]}>
       <MobileNavigation unread={2} />

@@ -46,24 +46,31 @@ The approved images do not define loading/error/toast or sync-popover pixels for
 
 ## Pixel comparison
 
-On 6 Nov, the design HTML was rendered again at 1600 × 1000 into `/tmp/wui18-source-fresh/`; the BTC source render is pixel-identical to `/tmp/wui18-source/`. The app captures are in `/tmp/wui18-current-coin/`. A pixel differs when any RGB channel differs by more than 20. The design's `getBoundingClientRect()` places its heading at y=42 and hero at y=110 with width 1488; the app's tested bounds are y=91 and y=159, with a 1473 px hero. The app reserves a solid 49 px toolbar above the scroll container and a 15 px scrollbar gutter. At 1440 × 1000, a scrolled BTC capture in `/tmp/wui18-evidence/coin-1440-scrolled.png` confirms the toolbar stays opaque and the hero scrolls beneath its own row.
+On 8 Nov, the design HTML was remeasured in Chromium at 1600 × 1000: its heading is y=42 and its cards start at y=110 and y=391; the middle cards are 554 px tall. The current product captures are in `/tmp/wui39-owner-desktop-captures-final/`, compared with the source renders in `/tmp/wui18-source-fresh/`. A pixel differs when any RGB channel differs by more than 20 in the common 1600 × 1000 viewport. The app's tested heading and hero are y=91 and y=159, with a 1473 px hero. The app reserves a solid 49 px toolbar above the scroll container and a 15 px scrollbar gutter. At 1440 × 1000, a scrolled BTC capture in `/tmp/wui18-evidence/coin-1440-scrolled.png` confirms the toolbar stays opaque and the hero scrolls beneath its own row. Source `.seg` track and selected fills are `rgb(26,26,30)` and `rgb(42,42,48)`; the app's selected controls use the owner's shared active tint.
 
-| State | Current viewport pixel difference |
+| State | Viewport pixel difference | Capture |
 | --- | ---: | --- |
-| BTC | 7.546% |
-| BTC edit | 5.497% |
-| BTC price | 7.136% |
-| BTC sheet | 4.215% |
-| NVDA | 7.250% |
-| NOVA | 6.712% |
-| NOVA edit | 5.100% |
+| BTC | 8.183% | 8 Nov, merged master |
+| BTC edit | 6.182% | 8 Nov, merged master |
+| BTC price | 7.764% | 8 Nov, merged master |
+| BTC sheet | 4.481% | 8 Nov, merged master |
+| NVDA | 7.726% | 8 Nov, merged master |
+| NOVA | 7.064% | 8 Nov, merged master |
+| NOVA edit | 5.359% | 8 Nov, merged master |
 
 ## Remaining differences
 
+- UI42 uses the approved website-style neutral tile for coin and source marks. The older Coin detail page design renders those marks differently.
+- In dark mode, the heading's Crypto/Stock/Custom pill uses the shared `--raised` and muted text tokens, and the lighter symbol in `h1 em` uses `--muted-foreground`. The chart grid and small rules use `--border` and `--rule`. These shift a few pixels from the source's fixed greys. The selected chart and transaction segments use the shared navigation tint described in [navigation.md](navigation.md), which differs from the source's solid selected fill. The compact NVDA plot has a 139 px axis instead of the source's 169 px axis, so its grid rows are about 524/559/593/628/663 rather than 524/565/607/648/690; a transparent chart mark can antialias one gridline pixel.
+- The earlier 1280 × 720 theme check has an **11.562%** dark pixel difference at the 16-channel threshold against a fresh design render. Its live fixture has no transaction cost basis or sale history, so those hero values differ from the mockup. The required live toolbar and differently ordered real source rows also occupy visible pixels. The light-theme capture now has readable foreground text, white cards, subdued labels, and visible controls.
 - The product's live total, DatePicker, refresh and sync controls use a solid 49 px toolbar above the coin scroll area. Keeping that bar in normal flow prevents its controls from covering the hero when a user scrolls. The static design has no equivalent bar, so all seven current desktop captures shift downward and exceed 3%; the scroll container also reserves 15 px for its scrollbar. Matching the source y positions with an absolute toolbar caused the reviewed overlap.
+- Selected chart and transaction segments use the shared blue active tint required by the later navigation state change. The earlier Coin source uses a solid dark grey selected fill.
 - When a real coin has no sources, open lots, or transactions, its section shows the shared centred empty state. The supplied BTC, NVDA, and NOVA source pages contain data, so there is no matching source screen for those zero-data sections.
 - The source's sample NOVA has a display name and is omitted from its portfolio total. A saved NOVA may only have its ticker, and its actual $5,052 holding contributes 0.7% to the portfolio.
-- Content-sized wide layouts keep Holdings by source in the right column and Open lots below the chart on the left. If either column is over 1.5 times taller, the shorter column follows scrolling within the grid. Transactions begin after the taller column, so their vertical position differs from the static reference. Sources with no balance occupy one expandable row; more than ten non-zero sources remain nine rows plus Others. Lots initially show eight rows, with an expandable scroll area for the full list. Short chart histories show an inline hint instead of an empty plot. At 1100–1300px, hero values scale down and notes wrap to keep all text visible.
+- Wide layouts place the chart at left and combine Holdings by source and Open lots in one right card, as in the reference. Both cards share their top and bottom edges; the plot grows when the source or lot tables need more height. Transactions span the width below. Sources with no balance occupy one expandable row; more than ten non-zero sources remain nine rows plus Others. Lots initially show eight rows, with an expandable scroll area for the full list. Short chart histories show an inline hint instead of an empty plot. At 1100–1300px, hero values scale down and notes wrap to keep all text visible.
+- The 1600 px BTC middle row is about 27 px shorter than the 554 px source row. The source leaves that space below its last lot, while the product keeps the last visible row close to the card's content bottom under the no-empty-slab rule. Its chart plot and axis therefore end about 27 px higher.
+- The dense fixture has 16 funded sources and 40 lots. Its chart plot becomes about 600 px tall at 1280 px because the adjacent source and lot tables determine the shared row height. Collapsing more funded rows would hide real holdings, and a shorter chart card would break the aligned-edge layout rule; the source provides no dense fixture to match.
+- Stock charts use a shorter plot where the compact source and lot tables determine the row height; on HKD phone screens, long chart values wrap to a second stat row with aligned labels and clipped leading dividers. These data-dependent states have no matching source page.
 - The header keeps the live total, DatePicker, Refresh, and sync-status popover because they are existing portfolio controls absent from the static design. `Updated 09:41` describes a local refresh; the source's `Synced 09:41` would incorrectly imply S3 synchronization.
 - Stored assets have a ticker and type but no reliable full name or company name. The headings therefore use BTC, NVDA, and NOVA; the NVDA subtitle says it is held at its broker without claiming `NVIDIA Corporation`. The stock price feed also lacks NASDAQ and delay metadata, so its price note says `Per NVDA, all sources`.
 - Stored transactions have no original imported type, edited flag, linked transfer endpoints, or order reference. The `Edited` pills, BTC `from`/`to` transfer labels, and sell-sheet order number in the source cannot be recovered. The BTC edit dialog shows the effective type and Reset clears pending edits.

@@ -273,6 +273,7 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     try {
       const view = renderApp();
       expect(await view.findByRole("button", { name: "Live total" })).toBeInTheDocument();
+      expect(view.container.querySelector(".t3-plan-rail-tools")).toBeInTheDocument();
     } finally {
       vi.unstubAllGlobals();
     }

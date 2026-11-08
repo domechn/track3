@@ -5,6 +5,9 @@ import { directionBackgroundClass, directionClass } from "@/utils/color";
 import { comparisonMovers } from "./comparison-movers";
 import { barGeometry, divergingScale } from "./comparison-fidelity-movers";
 import { boundedPercentText } from "./profit-percentage";
+import AssetLabel from "./common/asset-label";
+
+import { useChartHitArea } from "./chart-tooltip";
 
 type Row = {
   symbol: string;
@@ -20,23 +23,29 @@ export default function ComparisonMoversPanel({ rows, currency, quoteColor, t, s
   shouldMaskValue: boolean;
 }) {
   const [expanded, setExpanded] = useState({ value: false, percent: false });
+  const valueChart = useChartHitArea();
+  const percentChart = useChartHitArea();
   const { byValue, byPercent } = comparisonMovers(rows);
   if (!byValue.some((row) => row.value.head !== row.value.base || row.value.changePercent !== 0)) return null;
   const money = (value: number) =>
     `${value < 0 ? "−" : value > 0 ? "+" : ""}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(value)))}`;
   const render = (items: Row[], kind: "value" | "percent") => {
+    const chart = kind === "value" ? valueChart : percentChart;
     const scale = divergingScale(items.map((row) => kind === "value"
       ? row.value.head - row.value.base : row.value.changePercent));
-    return <ol className={kind === "percent" ? "comparison-movers-percent" : undefined}>{items.slice(0, expanded[kind] ? undefined : 10).map((row) => {
+    return <ol data-chart-group="" className={kind === "percent" ? "comparison-movers-percent" : undefined}>{items.slice(0, expanded[kind] ? undefined : 10).map((row, index) => {
       const difference = row.value.head - row.value.base;
       const value = kind === "value" ? difference : row.value.changePercent;
       const bar = barGeometry(value, scale);
       const label = shouldMaskValue ? "***" : kind === "value" ? money(difference) :
         `${value > 0 ? "+" : ""}${value.toFixed(2)}%`;
       const shown = kind === "percent" && !shouldMaskValue ? boundedPercentText(value, label) : { text: label, exact: label };
+      const exact = shouldMaskValue ? `${row.symbol}: ***`
+        : `${row.symbol}: ${money(difference)} · ${row.value.changePercent > 0 ? "+" : ""}${row.value.changePercent.toFixed(2)}%`;
       return <li key={`${row.assetType}:${row.symbol}`}>
-        <strong>{row.symbol}</strong>
-        <span className="comparison-mover-track" aria-hidden="true" style={{ "--zero": `${scale.zero}%` } as CSSProperties}>
+        <strong><AssetLabel asset={row} size={20} quiet /></strong>
+        <span className="comparison-mover-track" role="button" {...chart.markProps(index, exact, exact)}
+          style={{ "--zero": `${scale.zero}%` } as CSSProperties}>
           {bar && <span className={directionBackgroundClass(value, quoteColor)}
             style={{
               width: `min(${bar.side}%, max(${bar.minimumPixels}px, ${bar.width}%))`,
@@ -58,7 +67,7 @@ export default function ComparisonMoversPanel({ rows, currency, quoteColor, t, s
         ? t("common.showMore") : t("comparison.fidelity.andMore").replace("{count}", String(count - 10))}
     </button>;
   return <div className="comparison-movers">
-    <section><h2>{t("comparison.moversByValue")}</h2>{render(byValue, "value")}{more("value", byValue.length)}</section>
-    <section><h2>{t("comparison.moversByPercent")}</h2>{render(byPercent, "percent")}{more("percent", byPercent.length)}</section>
+    <section><h2>{t("comparison.moversByValue")}</h2>{render(byValue, "value")}{valueChart.tooltip}{more("value", byValue.length)}</section>
+    <section><h2>{t("comparison.moversByPercent")}</h2>{render(byPercent, "percent")}{percentChart.tooltip}{more("percent", byPercent.length)}</section>
   </div>;
 }

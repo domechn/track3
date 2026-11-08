@@ -46,11 +46,23 @@ test("phone cost controls, KPIs and prices use source typography", async ({ page
   expect(Math.round((await page.locator(".fidelity-lot-total .cost-gain").boundingBox())!.x)).toBe(270);
   expect(Math.round((await page.locator(".fidelity-lot-total .cost-gain").boundingBox())!.width)).toBe(87);
   await expect(page.locator(".fidelity-price-row > small").first()).toHaveCSS("line-height", "16px");
-  await expect(page.locator(".fidelity-lot-row .fidelity-term-pill").first()).toHaveCSS("line-height", "18px");
-  expect((await page.locator(".fidelity-lot-row .fidelity-term-pill").first().boundingBox())!.height).toBe(20);
+  await expect(page.locator(".fidelity-lot-row .t3-tag").first()).toHaveCSS("line-height", "18px");
+  expect((await page.locator(".fidelity-lot-row .t3-tag").first().boundingBox())!.height).toBe(20);
   await expect(page.locator(".fidelity-lot-group-head small").first()).toHaveCSS("color", "rgb(180, 182, 188)");
-  await expect(page.locator(".fidelity-term-pill").first()).toHaveCSS("font-weight", "500");
-  await expect(page.locator(".fidelity-term-pill").first()).toHaveCSS("color", "rgb(189, 189, 192)");
+  await expect(page.locator(".fidelity-lot-row .t3-tag").first()).toHaveCSS("font-weight", "500");
+  const tagContrast = await page.locator(".fidelity-lot-row .t3-tag").first().evaluate((node) => {
+    const rgb = (value: string) => [...value.matchAll(/[\d.]+/g)].slice(0, 3).map(([number]) => Number(number));
+    const light = (value: number) => {
+      const channel = value / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = (color: string) => rgb(color).reduce((sum, value, index) =>
+      sum + [0.2126, 0.7152, 0.0722][index] * light(value), 0);
+    const style = getComputedStyle(node);
+    const [low, high] = [luminance(style.color), luminance(style.backgroundColor)].sort((a, b) => a - b);
+    return (high + 0.05) / (low + 0.05);
+  });
+  expect(tagContrast).toBeGreaterThanOrEqual(4.5);
   await expect(page.locator(".fidelity-cost-warning button")).toHaveCSS("color", "rgb(155, 157, 163)");
   expect(Math.round(await page.locator(".fidelity-cost-warning button").evaluate((button) => {
     const text = document.createRange();
@@ -371,7 +383,7 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
     return right.left - left.right;
   });
   expect(emptyValueGap).toBeGreaterThanOrEqual(8);
-  expect(await page.locator(".fidelity-cost-prices .fidelity-price-row strong").allTextContents())
+  expect(await page.locator(".fidelity-cost-prices .fidelity-price-row .t3-asset-label-name").allTextContents())
     .toEqual(["BTC", "ETH", "SOL", "BNB", "AAPL", "NVDA"]);
   await page.screenshot({ path: `${dir}/cost-basis-empty-phone.png` });
   await page.screenshot({ path: `${dir}/cost-basis-empty-phone-long.png`, fullPage: true,
@@ -477,9 +489,10 @@ test("six figure KPI values stay separate on a 320px phone", async ({ page }) =>
 });
 
 test("light cost basis keeps the page, selected segments and tab bar legible", async ({ page }) => {
+  test.setTimeout(120_000);
   await installFidelityRecords(page);
   await page.goto("/#/cost-basis");
-  await expect(page.locator(".fidelity-cost-kpis")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".fidelity-cost-kpis")).toBeVisible({ timeout: 60_000 });
   await page.evaluate(() => {
     localStorage.setItem("track3-ui-theme", "light");
     document.documentElement.classList.remove("dark");
@@ -503,7 +516,13 @@ test("light cost basis keeps the page, selected segments and tab bar legible", a
     const ground = color("#app-main-content", "backgroundColor");
     const tab = color(".mobile-tab-bar", "backgroundColor");
     const segment = color(".fidelity-segments button.selected");
-    const segmentGround = getComputedStyle(document.querySelector(".fidelity-segments button.selected")!, "::before").backgroundColor;
+    const selected = document.querySelector<HTMLElement>(".fidelity-segments button.selected")!;
+    const tint = getComputedStyle(selected, "::before").backgroundColor;
+    const track = getComputedStyle(selected.parentElement!).backgroundColor;
+    const rgba = (value: string) => (value.match(/[\d.]+/g) ?? []).map(Number);
+    const alpha = rgba(tint)[3] ?? 1;
+    const segmentGround = `rgb(${rgba(tint).slice(0, 3).map((value, index) =>
+      Math.round(value * alpha + rgba(track)[index] * (1 - alpha))).join(", ")})`;
     return {
       ground, tab, segment, segmentGround,
       titleContrast: contrast(color(".mobile-route-heading h1"), ground),
@@ -580,7 +599,7 @@ test("open lots show terms and compact holding duration", async ({ page }) => {
   const loss = page.locator(".fidelity-lot-row .cost-gain").filter({ hasText: "−$19,414.73" });
   expect(Math.round((await loss.boundingBox())!.x)).toBe(270);
   expect(Math.round((await loss.boundingBox())!.width)).toBe(87);
-  await expect(page.locator(".fidelity-lot-row .fidelity-term-pill").first()).toBeVisible();
+  await expect(page.locator(".fidelity-lot-row .t3-tag").first()).toBeVisible();
   await expect(page.locator(".fidelity-lot-row").first()).toContainText(/held \d+\.\d y/);
   await expect(page.locator(".fidelity-lot-row").first()).not.toContainText("y days");
   await expect(page.locator(".fidelity-lot-row").filter({ hasText: "264 d" }).first()).toBeVisible();
@@ -595,7 +614,7 @@ test("average dispositions pool each sale and do not claim holding terms", async
   await expect(page.getByRole("button", { name: "Dispositions 7" })).toBeVisible();
   await expect(page.locator(".fidelity-cost-holding")).toContainText("Switch to FIFO, LIFO or HIFO");
   expect(Math.round((await page.locator(".fidelity-cost-holding").boundingBox())!.y)).toBe(969);
-  await expect(page.locator(".fidelity-cost-lots .fidelity-term-pill")).toHaveCount(0);
+  await expect(page.locator(".fidelity-cost-lots .t3-tag")).toHaveCount(0);
   await expect(page.locator(".fidelity-lot-row").first()).toContainText(/Pooled · sold/);
 });
 

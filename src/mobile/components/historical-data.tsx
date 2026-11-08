@@ -62,7 +62,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { resolveAssetLogoSrc } from "@/utils/assets";
 import { positiveNegativeColor } from "@/utils/color";
 import { directionPhysicalTone } from "@/utils/color";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
@@ -745,7 +744,7 @@ const App = ({
         <button ref={phoneBackRef} type="button" className="fidelity-history-back" aria-label={t("common.back")}
           onClick={() => closeDetail(false)}><ChevronLeftIcon aria-hidden="true" /></button>
         <h2>{selectedData ? `${phoneDate(selectedData.createdAt, true)}, ${phoneTime(selectedData.createdAt)}` : t("history.snapshotDetails")}</h2>
-        {phoneSelectedRow?.edited && <span className="fidelity-history-edited">{t("history.editLog.edited")}</span>}
+        {phoneSelectedRow?.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}
       </div>
       {detailLoading && <p role="status">{t("common.loading")}</p>}
       {detailError && <p role="alert">{t("history.detailLoadFailed")}</p>}
@@ -943,8 +942,7 @@ const App = ({
                 <div className="flex min-w-0 items-center justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-2 font-medium">
                     <span className="history-mobile-rank">{item.rank}</span>
-                    <img className="h-7 w-7 shrink-0 rounded-full" src={resolveAssetLogoSrc(item, logoMap[item.symbol])} alt="" />
-                    <span className="min-w-0 break-words">{item.symbol}</span>
+                    <AssetLabel asset={item} src={logoMap[item.symbol]} size={20} quiet />
                   </span>
                   <span className="history-asset-value font-mono text-sm">{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(item.value))}</span>
                 </div>
@@ -1020,10 +1018,6 @@ const App = ({
                     <TableRow aria-hidden="true"><TableCell colSpan={6} style={{ height: detailOffsets[detailStart], padding: 0 }} /></TableRow>
                   ) : null}
                   {virtualRankData.map((item, virtualIndex) => {
-                    const apiPath = resolveAssetLogoSrc(
-                      item,
-                      logoMap[item.symbol],
-                    );
                     return (
                       <TableRow
                         key={"historical-data-detail-row-" + item.assetId}
@@ -1036,14 +1030,7 @@ const App = ({
                           # {item.rank}
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <div className="flex items-center gap-1 text-sm">
-                            <img
-                              className="inline-block w-[18px] h-[18px] rounded-full"
-                              src={apiPath}
-                              alt={item.symbol}
-                            />
-                            <AssetLabel asset={item} />
-                          </div>
+                          <AssetLabel asset={item} src={logoMap[item.symbol]} size={20} quiet />
                         </TableCell>
                         <TableCell className="py-1.5 text-right text-sm">
                           {currency.symbol}
@@ -1175,7 +1162,7 @@ const App = ({
               <span className="sr-only">{t("history.viewSnapshot").replace("{date}", phoneDate(row.createdAt, true))}</span>
               <span className="history-mobile-snapshot-date"><strong>{phoneDate(row.createdAt)}</strong>
                 <span>{phoneTime(row.createdAt)}</span>
-                {row.edited && <span className="fidelity-history-edited">{t("history.editLog.edited")}</span>}
+                {row.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}
               </span>
               <span className="history-mobile-snapshot-total ios-money">{phoneMoney(row.total)}</span>
               <span className="fidelity-history-sources">
@@ -1183,8 +1170,8 @@ const App = ({
                 {row.sourcesTotal !== undefined && <> · <span className="fidelity-history-source-count">{t("fidelity.history.sources")
                   .replace("{ready}", String(row.sourcesTotal - (row.missingCount ?? 0)))
                   .replace("{total}", String(row.sourcesTotal))}</span></>}
-                <span className="fidelity-history-hidden-logos"><ImageStack imageSrcs={row.topAssets.slice(0, 3).map((asset) =>
-                  resolveAssetLogoSrc(asset, logoMap[asset.symbol]))} imageWidth={18} imageHeight={18} /></span>
+                <span className="fidelity-history-hidden-logos"><ImageStack symbols={row.topAssets.slice(0, 3).map((asset) => asset.symbol)}
+                  imageSrcs={row.topAssets.slice(0, 3).map((asset) => logoMap[asset.symbol] ?? "")} imageWidth={18} imageHeight={18} /></span>
               </span>
               <span className="history-mobile-snapshot-delta ios-money" data-tone={directionPhysicalTone(row.change, quoteColor)}>
                 {phoneChange(row.change, row.total)}
@@ -1355,7 +1342,7 @@ const App = ({
                             locale === "zh" ? "zh-CN" : "en-US",
                             { month: "short", day: "numeric" },
                           ).format(new Date(row.createdAt))}</span>
-                          {row.edited ? <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                          {row.edited ? <span className="t3-tag" data-tone="accent">
                             {t("history.editLog.edited")}
                           </span> : null}
                           <HistoryPartialPill row={row} t={t} />
@@ -1363,8 +1350,8 @@ const App = ({
                         </span>
                         <span className="history-mobile-snapshot-secondary">
                           <span className="flex items-center gap-2">
-                            <ImageStack imageSrcs={row.topAssets.slice(0, 3).map((asset) =>
-                              resolveAssetLogoSrc(asset, logoMap[asset.symbol]))}
+                            <ImageStack symbols={row.topAssets.slice(0, 3).map((asset) => asset.symbol)}
+                              imageSrcs={row.topAssets.slice(0, 3).map((asset) => logoMap[asset.symbol] ?? "")}
                               imageWidth={18} imageHeight={18} />
                             {t("history.assetCount").replace("{n}", String(row.assetCount))}
                           </span>
@@ -1411,7 +1398,7 @@ const App = ({
                                 aria-label={t("history.viewSnapshot").replace("{date}", `${timeToDateStr(new Date(row.createdAt).getTime(), true)} · ${displayDate}`)}
                                 className="flex touch:min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <span>{displayDate}</span>
-                                {row.edited ? <span className="mt-1 w-fit rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                {row.edited ? <span className="t3-tag mt-1 w-fit" data-tone="accent">
                                   {t("history.editLog.edited")}
                                 </span> : null}
                                 <HistoryPartialPill row={row} t={t} />
@@ -1444,11 +1431,9 @@ const App = ({
                             <TableCell className="py-1.5">
                               <div className="flex items-center justify-between gap-2">
                                 <ImageStack
+                                  symbols={topAssets.map((asset) => asset.symbol)}
                                   imageSrcs={topAssets.map((asset) =>
-                                    resolveAssetLogoSrc(
-                                      asset,
-                                      logoMap[asset.symbol],
-                                    ),
+                                    logoMap[asset.symbol] ?? "",
                                   )}
                                   imageWidth={18}
                                   imageHeight={18}

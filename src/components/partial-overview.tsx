@@ -11,6 +11,7 @@ import { redactSecrets } from "@/middlelayers/security/redact";
 import { overviewRefreshRequestedEvent } from "./source-status-event";
 import { chartBounds } from "./overview-chart-scale";
 import { useRefreshQuota } from "./refresh-quota";
+import AssetLabel from "@/components/common/asset-label";
 export { chartBounds } from "./overview-chart-scale";
 
 type Point = { timestamp: number; totalValue: number };
@@ -165,7 +166,7 @@ export default function PartialOverview({ view, statuses, currency, bannerOnly =
           <div><span>{t(includeLastKnown ? "refresh.fidelity.withLastKnown" : "refresh.fidelity.totalExcluding")
             .replace("{source}", sourceLabel)}</span>
             <strong className="t3-hero-value">{money(includeLastKnown ? includedTotal + lastGoodTotal : includedTotal)}</strong>
-            <small className="t3-flow-partial-pill">{t("history.partial.label")}</small>
+            <small className="t3-tag t3-flow-partial-pill" data-tone="warning">{t("history.partial.label")}</small>
             <small>{t("refresh.fidelity.sourceLastKnown").replace("{source}", sourceLabel)
               .replace("{value}", lastGoodValue)}</small></div>
           {["today", "sevenDaysLong", "thirtyDays"].map((key) => <div key={key}>
@@ -192,10 +193,10 @@ export default function PartialOverview({ view, statuses, currency, bannerOnly =
           const assets = status.label === sourceLabel ? view.lastGood : view.included.filter((asset) => asset.wallet === status.label);
           const value = assets.length ? assets.reduce((sum, asset) => sum + asset.value, 0) : undefined;
           return <div className="t3-flow-source-row" key={status.sourceId}>
-            <i aria-hidden="true">{status.label.slice(0, 2)}</i>
-            <div><strong>{status.label}</strong><small className={status.status === "ok" ? "" : "failed"}>{status.status === "ok"
+            <AssetLabel kind={status.kind === "exchange" ? "exchange" : status.kind === "wallet" ? "wallet" : status.kind === "broker" ? "broker" : "custom"}
+              type={status.provider} name={status.label} size={20} secondary={status.status === "ok"
               ? t("refresh.fidelity.refreshedAt").replace("{time}", time(status.finishedAt))
-              : t("overview.fidelity.failedLastGood").replace("{time}", at(status.lastSuccessAt))}</small></div>
+              : t("overview.fidelity.failedLastGood").replace("{time}", at(status.lastSuccessAt))} />
             <div><strong>{value === undefined ? "—" : money(value)}</strong><small>{status.status === "ok"
               ? value === undefined ? "—" : `${includedTotal ? (value / includedTotal * 100).toFixed(1) : "0.0"}%`
               : t("refresh.fidelity.lastKnownLabel")}</small></div>

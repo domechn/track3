@@ -21,6 +21,7 @@ import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { addToBlacklist } from "@/middlelayers/configuration";
 import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
 import { useOptimisticDelete } from "./common/use-optimistic-delete";
+import AssetLabel from "./common/asset-label";
 import { HistoryPartialDetails } from "./history-partial";
 import SyncStatusIndicator from "./sync-status-indicator";
 import { FidelityDateInput } from "./fidelity-date-input";
@@ -370,7 +371,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
             <td><button type="button" onClick={() => setSelectedId(row.id)}
               aria-label={`${dateShort(row.createdAt)} · ${t("history.viewSnapshot").replace("{date}", dateLong(row.createdAt))}`}>
               {dateDay(row.createdAt)} <span className="fidelity-history-row-time">{dateTime(row.createdAt)}</span>
-              {row.edited && <span className="fidelity-edit-pill">{t("history.editLog.edited")}</span>}
+              {row.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}
             </button></td>
             <td>{money(row.total)}</td>
             <td style={{ color: row.change === null ? undefined : color(row.change) }}>
@@ -407,7 +408,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
         </div>)}
       </section> : <section className="fidelity-card fidelity-history-detail" data-testid="history-desktop-detail">
         {selected && detail && <>
-          <h2>{dateLong(selected.createdAt)} {selected.edited && <span className="fidelity-edit-pill">{t("history.editLog.edited")}</span>}</h2>
+          <h2>{dateLong(selected.createdAt)} {selected.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}</h2>
           <div className="fidelity-history-detail-kpis">
             <div><span>{t("history.fidelity.totalValue")}</span><strong>{money(valueTotal)}</strong>
               <small>{edits?.length ? t("history.fidelity.includesEdits").replace("{count}", String(edits.length)) : t("history.fidelity.asOfRefresh")}</small></div>
@@ -437,7 +438,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "price");
               const restoredAsset = (edits ?? []).find((edit) => edit.symbol === asset.symbol &&
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "restore");
-              return <tr key={`${asset.assetType}:${asset.symbol}`}><td>{asset.symbol}
+              return <tr key={`${asset.assetType}:${asset.symbol}`}><td><AssetLabel asset={asset} size={20} quiet tag="" />
                 <button type="button" className="t3-icon-button" aria-label={t("history.fidelity.deleteAsset").replace("{asset}", asset.symbol)}
                   disabled={isDeletingAsset} onClick={() => setDeleteAssetId(asset.id)}><TrashIcon aria-hidden="true" /></button></td>
               <td>{restoredAsset ? <><span className="fidelity-edited-value">{quantity(asset.assetType === "crypto" &&

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import RebalanceFidelity from "@/mobile/components/rebalance-fidelity";
@@ -42,14 +42,26 @@ function Harness({ initial = [{ id: 0, kind: "asset" as const, assetType: "crypt
   />;
 }
 
+it("shows exact current, target, and drift on a phone rebalance bar", () => {
+  const { container } = render(<Harness initial={[{ id: 0, kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 }]}
+    positions={[{ symbol: "BTC", assetType: "crypto", amount: 1, value: 60.37, price: 60.37 },
+      { symbol: "ETH", assetType: "crypto", amount: 1, value: 39.63, price: 39.63 }]} />);
+  fireEvent.pointerEnter(container.querySelector(".pf-alloc-bar")!, { pointerType: "mouse" });
+  expect(container.querySelector(".pf-alloc-bar")).toHaveAttribute("role", "button");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("60.37%");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("50.00%");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("+10.37");
+});
+
 it("does not label a stock with a crypto asset's display name when tickers collide", () => {
   render(<Harness positions={[
     { symbol: "BTC", assetType: "crypto", amount: 1, value: 60, price: 60 },
     { symbol: "BTC", assetType: "stock", amount: 1, value: 40, price: 40 },
   ]} />);
   const rows = document.querySelectorAll(".pf-alloc-row .pf-asset");
-  expect(rows[0]).toHaveTextContent("BTCBitcoin");
-  expect(rows[1]).toHaveTextContent("BTCBTC");
+  expect(rows[0].querySelector(".t3-asset-label-secondary")).toHaveTextContent("Bitcoin");
+  expect(rows[1].querySelector(".t3-asset-label-secondary")).toHaveTextContent("BTC");
+  expect(rows[1]).not.toHaveTextContent("Bitcoin");
 });
 
 it("preserves each typed digit and decimal point in a focused target", async () => {

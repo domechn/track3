@@ -23,7 +23,8 @@ it("shows stored source balances and shares without adding fields to status reco
   expect(card).toHaveTextContent("Exchange");
   expect(card).toHaveTextContent("09:41");
   expect(card).toHaveTextContent("1 of 1 up to date");
-  expect(card.querySelector(".t3-source-logo")).toHaveTextContent("BN");
+  expect(card.querySelector(".t3-source-row .t3-asset-icon")).toHaveAttribute("data-kind", "exchange");
+  expect(card.querySelector(".t3-source-row .t3-asset-icon img")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Refresh all" }));
   expect(requested).toBe(1);
 });
@@ -56,7 +57,7 @@ it("shows the stored last good value and offers retry for a failed source", () =
   const failedRow = card.querySelector(".t3-source-row") as HTMLElement;
   expect(failedRow.querySelectorAll(".t3-source-name small")).toHaveLength(2);
   expect(failedRow.querySelector(".t3-source-name small:first-of-type")).toHaveTextContent("Broker");
-  expect(failedRow.querySelector(".t3-source-name small:last-of-type")).toHaveTextContent("Failed · last good 08:12");
+  expect(failedRow.querySelector(".t3-source-last-good")).toHaveTextContent("Failed · last good 08:12");
   expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
 });
 

@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -17,6 +18,7 @@ import PlanIcon from "@/mobile/components/plan-icon";
 import { planAssetName } from "@/mobile/components/plan-asset-name";
 import { alertSentence } from "@/components/finance-visuals";
 import "./plan-fidelity.css";
+import { useChartHitArea } from "@/components/chart-tooltip";
 
 type Props = {
   rules: AlertRule[];
@@ -69,6 +71,7 @@ export default function GoalsFidelity({
   editorOpen, onDraft, onOpenEditor, onCloseEditor, onSave, onToggle, onDelete, onAck, onAckAll, onClear, onAdvanced,
 }: Props) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const windowName = (window: AlertWindow | null) => t(window === "7d" ? "fidelity.goals.sevenDays" :
     window === "30d" ? "fidelity.goals.thirtyDays" : "fidelity.goals.day");
   const cooldownName = (minutes: number) => {
@@ -385,7 +388,7 @@ export default function GoalsFidelity({
         {kpi(t("fidelity.goals.lastCheck"), lastTime, t("fidelity.goals.todayRefresh"),
           lastAt && rules.length ? "" : "pf-zero")}
       </section>
-      <section className={`pf-card pf-rules-list${rules.length > 7 ? " pf-scroll-list" : ""}`}><div className="pf-card-head"><h2 aria-label={t("fidelity.goals.rules")}><button className="pf-heading-action"
+      <section data-chart-group="" className={`pf-card pf-rules-list${rules.length > 7 ? " pf-scroll-list" : ""}`}><div className="pf-card-head"><h2 aria-label={t("fidelity.goals.rules")}><button className="pf-heading-action"
         aria-label={t("fidelity.goals.options")} aria-expanded={setupOpen}
         aria-controls="pf-rules-links" onClick={() => setSetupOpen(!setupOpen)}>
         {t("fidelity.goals.rules")}</button></h2>
@@ -397,7 +400,7 @@ export default function GoalsFidelity({
           <button onClick={() => { setSetupOpen(false); navigate("/goals?view=kinds"); }}>{t("fidelity.goals.ruleKinds")}</button>
           {onAdvanced && <button onClick={() => { setSetupOpen(false); onAdvanced(); }}>{t("fidelity.goals.advanced")}</button>}
         </div>}
-        {loading ? <div role="status">{t("goals.loading")}</div> : rules.length ? rulePaging.rows.map((rule) => {
+        {loading ? <div role="status">{t("goals.loading")}</div> : rules.length ? rulePaging.rows.map((rule, index) => {
           const measured = measureRule(rule, snapshots, prices, targets);
           const progress = progressFor(rule, measured.value);
           const cooldownMinutes = Number(alertDraftFromRule(rule).cooldownMinutes);
@@ -428,11 +431,15 @@ export default function GoalsFidelity({
                 .replace("{value}", rule.kind === "period_pnl" ? signedUsd(measured.value) : usd(measured.value))
                 .replace("{remaining}", usd(Math.abs(rule.threshold - measured.value)));
           return <div className={`pf-goal-row ${rule.enabled ? "" : "pf-off"}`} key={rule.id}>
-            <div className="pf-goal-name"><b>{titleFor(rule)}</b><small>{descriptionFor(rule)}</small></div>
+            <div className="pf-goal-name"><AssetLabel kind={rule.symbol ? rule.assetType === "stock" ? "stock" : "coin" : "custom"}
+              symbol={rule.symbol ?? ""} name={titleFor(rule)} size={20} secondary={descriptionFor(rule)} /></div>
             <label className="pf-goal-switch"><span className="sr-only">{t("goals.enableRule").replace("{kind}", t(`goals.kind.${rule.kind}`))}</span>
               <input type="checkbox" role="switch" aria-label={t("goals.enableRule").replace("{kind}", t(`goals.kind.${rule.kind}`))}
                 checked={rule.enabled} onChange={(event) => onToggle(rule, event.currentTarget.checked)} /></label>
-            <div className="pf-goal-progress"><div className="pf-progress-line"><span role="progressbar"
+            <div className="pf-goal-progress"><div className="pf-progress-line" role="button"
+              {...chart.markProps(index, `${titleFor(rule)}: ${pct(progress)}, ${measured.value === undefined ? t("goals.unavailable") : digits(2).format(measured.value)}`,
+                <><div>{titleFor(rule)}</div><div>{pct(progress)}</div><div>{currentText}</div></>)}>
+              <span role="progressbar"
               aria-label={t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`))}
               aria-valuemin={0} aria-valuemax={100} aria-valuenow={Number(Math.min(100, progress).toFixed(1))}>
               <i className={triggered ? "pf-amber" : ""}
@@ -440,7 +447,7 @@ export default function GoalsFidelity({
               <small>{currentText}</small></div>
             <div className="pf-goal-kind">{kindFor(rule.kind)}<small>{t("fidelity.goals.cooldownShort")
               .replace("{duration}", cooldownShort(cooldownMinutes))}</small></div>
-            <span className={`pf-pill pf-goal-status ${!rule.enabled ? "" : triggered ? "pf-warn" : "pf-info"}`}>
+            <span className="t3-tag pf-goal-status" data-tone={!rule.enabled ? "neutral" : triggered ? "warning" : "accent"}>
               {t(!rule.enabled ? "fidelity.goals.off" : triggered ? "fidelity.goals.triggered" : "fidelity.goals.watching")}</span>
             <div className="pf-goal-actions"><button aria-label={t("fidelity.goals.editNamed").replace("{rule}", titleFor(rule))} onClick={() => openEdit(rule)}><PlanIcon name="edit" /></button>
               <button aria-label={t("fidelity.goals.deleteNamed").replace("{rule}", titleFor(rule))} onClick={() => setDeleteRule(rule)}><PlanIcon name="trash" /></button></div>
@@ -471,7 +478,7 @@ export default function GoalsFidelity({
         </> : <EmptyState icon={BellIcon} title={t("goals.noHistory")} hint={t("goals.history.empty.hint")} className="pf-empty" />}
       </section>
     </>}
-    {edit}{deleteOverlay}{clearOverlay}
+    {edit}{deleteOverlay}{clearOverlay}{chart.tooltip}
   </div>;
 }
 

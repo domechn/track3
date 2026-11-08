@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { memo } from "react";
 import {
   Table,
@@ -40,7 +41,6 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
-import { getWalletLogo } from "@/lib/utils";
 import type { WalletSectionProps } from "./types";
 import { BackpackIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
@@ -135,11 +135,7 @@ const WalletSection = memo(function WalletSection({
                         <SelectLabel>{t("config.walletType")}</SelectLabel>
                         {walletOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            <img
-                              className="h-4 w-4 text-muted-foreground inline-block mr-2"
-                              src={getWalletLogo(o.value)}
-                            />
-                            {o.label}
+                            <AssetLabel kind="wallet" type={o.value} name={o.label} size={20} />
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -238,14 +234,7 @@ const WalletSection = memo(function WalletSection({
                     className="h-[42px] group align-middle"
                   >
                     <TableCell className="w-[140px]">
-                      <div className="flex items-center gap-2 text-sm">
-                        <img
-                          src={getWalletLogo(w.type)}
-                          className="w-[18px] h-[18px] rounded-full"
-                          alt={w.type}
-                        />
-                        <span>{w.type.toUpperCase()}</span>
-                      </div>
+                      <AssetLabel kind="wallet" type={w.type} name={w.type.toUpperCase()} size={24} />
                     </TableCell>
                     <TableCell className="w-[170px] text-sm">
                       <span className="block truncate" title={w.alias || `${w.type}-${idx + 1}`}>{w.alias || `${w.type}-${idx + 1}`}</span>

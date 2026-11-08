@@ -202,9 +202,9 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 ## Captured comparison
 
-- App capture: `/tmp/wui18-final-screens/coin-nvda-phone.png`.
-- Reference render: `/tmp/wui18-source/coin-nvda-phone-viewport.png`.
-- 6 Nov 390 × 844 first-screen pixel difference at DPR 2: **3.564%** (any RGB channel differs by more than 20); **2.258%** at a 40-channel threshold.
+- App capture: `/tmp/ui39-app-final/coin-nvda-phone.png`; value card: `/tmp/ui39-app-final/coin-nvda-value-card.png`.
+- Reference render: `/tmp/ui39-source-final/nvda-phone.png`; value card: `/tmp/ui39-source-final/nvda-card.png`.
+- 8 Nov 390 × 844 first-screen pixel difference at DPR 2: **5.438%** (any RGB channel differs by more than 20); the value card differs by **6.876%**.
 - A full-page PNG comparison is not equivalent because the app scrolls inside its main landmark and the source scrolls the document.
 
 ## Real-data limits
@@ -213,6 +213,10 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
+- The 5.438% first-screen difference includes the owner's shared active Overview tile; the value-card comparison has different chart line and grid positions from dated stored snapshots.
 - The saved alias is “NVIDIA”; no separate “NVIDIA Corporation” name is stored for the subtitle.
 - The saved stock record has no exchange or quote-delay fields, so it cannot substantiate the source’s “NASDAQ · delayed 15 min” price caption. The chart uses dated stored snapshots.
+- With HKD conversion, long chart statistics can wrap to a second aligned row; the USD NVDA source page has shorter values and no wrapped variant.
 - The product's scroll container preserves route scroll position; Chromium antialiases small text in that layer differently from the standalone source page.
+- Selected chart and transaction filters use the owner's shared active tint; the older source uses a solid grey selected fill.
+- The owner's shared active navigation style paints an Overview tab tile and edge; the older Coin source highlights only the tab text.

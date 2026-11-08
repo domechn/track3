@@ -256,9 +256,9 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 ## Captured comparison
 
-- App capture: `/tmp/fidelity/coin-btc/coin-btc-sheet-phone.png`.
-- Reference render: `/tmp/rev-fa3/design/records-coin-btc-sheet.png`.
-- Fresh 390 × 844 first-screen pixel difference: **2.77%** (RGB difference >20/255 in any channel).
+- App capture: `/tmp/ui39-app-final/coin-btc-sheet-phone.png`.
+- Reference render: `/tmp/ui39-source-final/btc-sheet-phone.png`.
+- 8 Nov 390 × 844 first-screen pixel difference at DPR 2: **5.291%** (any RGB channel differs by more than 20).
 
 ## Real-data limits
 
@@ -266,5 +266,7 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
+- The 5.291% viewport difference includes text rasterization in the product's scroll container and its shared bottom navigation treatment.
 - The source shows an import reference ID, which the stored transaction does not expose on this page. The app shows an en dash for the unavailable field.
 - The shared accessible BottomSheet visibly focuses its Close control; the static source has no keyboard focus state.
+- The underlying Overview tab uses the owner's shared active tile; the older Coin source highlights only its text.

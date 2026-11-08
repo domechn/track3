@@ -6,6 +6,7 @@ const fallbacks: Record<string, [string, string]> = {
   negative: ["349 70% 40%", "349 81% 67%"],
   warning: ["37 79% 32%", "39 66% 55%"],
   "muted-foreground": ["240 4% 34%", "225 5% 72%"],
+  foreground: ["240 9% 10%", "0 0% 100%"],
   faint: ["240 4% 38%", "225 4% 62%"],
   border: ["240 5% 84%", "240 3% 14%"],
   control: ["240 5% 64%", "240 3% 24%"],
@@ -59,6 +60,9 @@ export function createGradientFill(
 export const glassTooltip = {
   get backgroundColor() { return chartThemeColor("card"); },
   get borderColor() { return chartThemeColor("control"); },
+  get titleColor() { return chartThemeColor("muted-foreground"); },
+  get bodyColor() { return chartThemeColor("foreground"); },
+  get footerColor() { return chartThemeColor("muted-foreground"); },
   borderWidth: 1,
   cornerRadius: 6,
   padding: 10,

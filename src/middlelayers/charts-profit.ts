@@ -77,10 +77,8 @@ export async function queryTransactionsBySymbolAndDateRange(
 
 export async function queryPreviousProfitSnapshotDate(start: Date): Promise<Date | undefined> {
   const rows = await selectFromDatabaseWithSql<{ createdAt: string | null }>(
-    `SELECT CASE WHEN EXISTS (SELECT 1 FROM assets_v2 WHERE createdAt = ?)
-      THEN NULL ELSE MAX(createdAt) END AS createdAt
-      FROM assets_v2 WHERE createdAt < ?`,
-    [start.toISOString(), start.toISOString()],
+    `SELECT MAX(createdAt) AS createdAt FROM assets_v2 WHERE createdAt < ?`,
+    [start.toISOString()],
   );
   return rows[0]?.createdAt ? new Date(rows[0].createdAt) : undefined;
 }
@@ -144,7 +142,7 @@ export async function calculateTotalProfit(
   const priorAssets = filterByAssetType(
     await ASSET_HANDLER.listAssetsMaxCreatedAt(
       undefined,
-      dateRange.start,
+      new Date(dateRange.start.getTime() - 1),
       symbol,
     ),
     assetType,
