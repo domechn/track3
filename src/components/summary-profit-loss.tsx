@@ -13,6 +13,7 @@ import { requestFullRefresh } from "./refresh-request";
 import { directionColorVar } from "@/utils/color";
 import { splitDirectionLine } from "@/components/direction-line";
 import { summaryProfitPercentage } from "@/middlelayers/summary-breakdown";
+import { useChartHitArea } from "./chart-tooltip";
 
 type Point = { timestamp: number; value: number | null };
 type SummaryData = {
@@ -37,6 +38,7 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
   baseline?: Date; rangeLabel?: string; snapshotCount?: number;
 }) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const date = (value: Date) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(value);
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const dataVersion = useDataChangedVersion();
@@ -136,7 +138,7 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
       <div><span>{rangeLabel === "All" ? t("summary.fidelity.netPnlAll") : t("summary.fidelity.netPnlRange").replace("{range}", rangeLabel)}</span><strong className={cn("big", tone, netPnlLong && "fidelity-long-money")} title={unavailable ? missingReason : netPnlFull ?? undefined}>{netPnlLong && !unavailable ? <span className="whitespace-nowrap">{netPnlText}</span> : netPnlText}</strong><small>{unavailable ? missingReason : t("summary.fidelity.since").replace("{date}", date(baseline ?? dateRange.start))}</small></div>
       <div><span>{t("summary.fidelity.pnlPercent")}</span><strong className={tone} title={unavailable || percentMissing ? percentMissingReason : undefined}>{percentageText}</strong><small>{unavailable || percentMissing ? percentMissingReason : t("summary.fidelity.onInvested").replace("{amount}", money(data.currentValue - data.total!, currency, 0).replace(/^[+−]/, ""))}</small></div>
       <div><span>{t("summary.fidelity.breakeven")}</span><strong className={unavailable ? "fidelity-faint" : undefined} title={unavailable ? missingReason : undefined}>{unavailable ? missing : money(data.currentValue - data.total!, currency, 0).replace(/^[+−]/, "")}</strong><small>{unavailable ? missingReason : t("summary.fidelity.breakevenNote").replace("{symbol}", currency.symbol)}</small></div>
-      <div><span>{t("summary.fidelity.positions")}</span><strong>{data?.positions ?? missing}</strong><small>{data && !oneSnapshot && <><span className={data.up === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"}>{data.up} {t("summary.fidelity.up")}</span> · <span className={data.down === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive"}>{data.down} {t("summary.fidelity.down")}</span> · {Math.max(0, data.positions - data.up - data.down)} {t("summary.fidelity.flat")}</>}{snapshotCount !== undefined && <>{data && !oneSnapshot && " · "}<span>{oneSnapshot && snapshotCount === 1 ? t("summary.fidelity.oneSnapshot") : baseline && snapshotCount > 0 && baseline < dateRange.start
+      <div><span>{t("summary.fidelity.positions")}</span><strong>{data?.positions ?? missing}</strong><small className={rangeLabel === "All" ? "whitespace-nowrap" : undefined}>{data && !oneSnapshot && <><span className={data.up === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"}>{data.up} {t("summary.fidelity.up")}</span> · <span className={data.down === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive"}>{data.down} {t("summary.fidelity.down")}</span> · {Math.max(0, data.positions - data.up - data.down)} {t("summary.fidelity.flat")}</>}{snapshotCount !== undefined && <>{data && !oneSnapshot && " · "}<span>{oneSnapshot && snapshotCount === 1 ? t("summary.fidelity.oneSnapshot") : baseline && snapshotCount > 0 && baseline < dateRange.start
         ? t("summary.fidelity.snapshotsSince").replace("{date}", date(baseline)).replace("{count}", String(snapshotCount))
         : snapshotCount === 1 ? t("summary.fidelity.snapshotInRangeOne")
         : t("summary.fidelity.snapshotsInRange").replace("{count}", String(snapshotCount))}</span></>}</small></div>
@@ -145,24 +147,27 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
       !hasLine ? <div className="fidelity-empty fidelity-summary-chart-empty"><div>{missingReason || t("summary.fidelity.lineStarts")}</div><button type="button" onClick={requestFullRefresh}><svg aria-hidden="true" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3h-3" /></svg>{t("summary.fidelity.refreshNow")}</button></div> :
       <>
         <p className="fidelity-caption">{t("summary.fidelity.chartCaption").replace("{date}", date(baseline ?? dateRange.start))}</p>
-        <svg className="fidelity-summary-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={t("summary.fidelity.chartCaption").replace("{date}", date(baseline ?? dateRange.start))}>
+        <svg className="fidelity-summary-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="group"
+          data-chart-group="" aria-label={t("summary.fidelity.chartCaption").replace("{date}", date(baseline ?? dateRange.start))}>
           {ticks.map((tick, index) => <g key={index}><line x1={left} x2={width} y1={y(tick)} y2={y(tick)} stroke="#262629" shapeRendering="crispEdges" /><text x={left - 8} y={y(tick) + 4} textAnchor="end" fill="#9b9da3" fontSize="12">{compactMoney(currencyWrapper(currency)(tick), currency.symbol).replace(currency.symbol, "")}</text></g>)}
           {lineSegments.map(({ start, end, value }, index) => <line key={index} data-direction={value > 0 ? "gain" : value < 0 ? "loss" : "neutral"}
             x1={start.x} y1={start.y} x2={end.x} y2={end.y}
             stroke={directionColorVar(value, quoteColor)} strokeWidth="2" />)}
           {usablePoints.map((point, index) => {
             const label = `${date(new Date(point.timestamp))}: ${money(point.value, currency)}`;
-            return <circle key={point.timestamp} data-point cx={x(index)} cy={y(point.value)} r="6" fill="transparent" role="img" tabIndex={0} aria-label={label}><title>{label}</title></circle>;
+            return <circle key={point.timestamp} data-point cx={x(index)} cy={y(point.value)} r="10"
+              fill="transparent" role="button" {...chart.markProps(index, label, label)} />;
           })}
-          {best && <g><line x1={x(best.index)} x2={x(best.index)} y1="9" y2={height-bottom} stroke="#9b9da3" opacity=".45" strokeWidth="1" shapeRendering="crispEdges" /><text x={x(best.index)+4} y="17" fill="#9b9da3" fontSize="11">{t("summary.fidelity.bestMonth").replace("{month}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(best.point.timestamp)).replace("{amount}", money(best.change, currency, 0))}</text></g>}
+          {best && <g pointerEvents="none"><line x1={x(best.index)} x2={x(best.index)} y1="9" y2={height-bottom} stroke="#9b9da3" opacity=".45" strokeWidth="1" shapeRendering="crispEdges" /><text x={x(best.index)+4} y="17" fill="#9b9da3" fontSize="11">{t("summary.fidelity.bestMonth").replace("{month}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(best.point.timestamp)).replace("{amount}", money(best.change, currency, 0))}</text></g>}
           {usablePoints.filter((_, index) => index === 0 || index === usablePoints.length - 1 || index % Math.max(1, Math.floor(usablePoints.length / 4)) === 0).map((point) => {
             const index = usablePoints.indexOf(point);
-            return <text key={index} x={x(index)} y={height - 8} textAnchor={index === 0 ? "start" : index === usablePoints.length - 1 ? "end" : "middle"} fill="#9b9da3" fontSize="12">{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { ...(index === 0 ? { day: "numeric" as const } : {}), month: "short", year: "2-digit" }).format(point.timestamp)}</text>;
+            return <text key={index} x={x(index)} y={height} textAnchor={index === 0 ? "start" : index === usablePoints.length - 1 ? "end" : "middle"} fill="#9b9da3" fontSize="12">{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { ...(index === 0 ? { day: "numeric" as const } : {}), month: "short", year: "2-digit" }).format(point.timestamp)}</text>;
           })}
           <text data-direction-end="" x={x(usablePoints.length - 1) + 6} y={y(usablePoints.at(-1)!.value) + 4}
             textAnchor="start" fill={directionColorVar(usablePoints.at(-1)!.value, quoteColor)}
             fontSize="12" fontWeight="600">{money(usablePoints.at(-1)!.value, currency, 0)}</text>
         </svg>
+        {chart.tooltip}
       </>}
   </section>;
 }

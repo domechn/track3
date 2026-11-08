@@ -21,8 +21,9 @@ test("detail labels and symbols follow the source hierarchy", async ({ page }) =
   await expect(detail.locator(".fidelity-history-detail-head .fidelity-history-edited")).toHaveCSS("font-weight", "500");
   await expect(detail.locator(".fidelity-history-detail-asset-body strong").first()).toHaveCSS("font-weight", "700");
   await expect(detail.locator(".fidelity-history-edit-row strong").first()).toHaveCSS("font-weight", "400");
-  await expect(detail.locator(".fidelity-history-detail-total small")).toHaveCSS("color", "rgb(180, 182, 188)");
-  await expect(detail.getByRole("link", { name: "Compare" })).toHaveCSS("color", "rgb(155, 157, 163)");
+  // Shared HSL tokens round one channel differently from the old fixed colors.
+  await expect(detail.locator(".fidelity-history-detail-total small")).toHaveCSS("color", "rgb(180, 182, 187)");
+  await expect(detail.getByRole("link", { name: "Compare" })).toHaveCSS("color", "rgb(154, 156, 162)");
 });
 
 test("edited snapshot detail", async ({ page }) => {
@@ -100,8 +101,9 @@ test("detail change percent follows reversed quote colour", async ({ page }) => 
   await page.goto("/#/history");
   await page.locator(".history-mobile-snapshot").filter({ hasText: "752,642.71" }).getByTestId("history-mobile-row").click();
   const detail = page.getByRole("dialog", { name: /snapshot details/i });
-  await expect(detail.locator(".fidelity-history-detail-subkpis small [data-tone]")).toHaveCSS("color", "rgb(95, 195, 156)");
-  await expect(detail.locator(".fidelity-history-detail-subkpis strong[data-tone]")).toHaveCSS("color", "rgb(95, 195, 156)");
+  // --positive rounds to this RGB value on dark surfaces.
+  await expect(detail.locator(".fidelity-history-detail-subkpis small [data-tone]")).toHaveCSS("color", "rgb(95, 196, 155)");
+  await expect(detail.locator(".fidelity-history-detail-subkpis strong[data-tone]")).toHaveCSS("color", "rgb(95, 196, 155)");
 });
 
 test("phone detail focuses Back, closes on Escape, and restores the opening row", async ({ page }) => {

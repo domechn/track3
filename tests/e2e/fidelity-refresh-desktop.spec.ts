@@ -98,8 +98,10 @@ for (const state of states) test(`Refresh desktop captures ${state} with real so
         await expect(page.getByText("Daily change", { exact: true })).toBeVisible();
         await expect(page.getByText("Top coins", { exact: true })).toBeVisible();
         await expect(page.locator(".t3-overview-more")).toBeVisible();
-        await expect(page.getByRole("alertdialog")).toContainText("Done in 3.1 s");
-        await expect(page.locator(".t3-refresh-progress")).toHaveAttribute("data-indeterminate", "");
+        await expect(page.getByRole("alertdialog")).toHaveCount(0);
+        await page.locator(".t3-refresh-progress-pill").click();
+        await expect(page.getByRole("alertdialog")).toContainText("Refreshing");
+        await expect(page.getByRole("alertdialog").getByRole("progressbar")).toHaveCount(0);
       }
       if (state.endsWith("-pop")) {
         await page.getByRole("button", { name: "Source status" }).click();
@@ -111,7 +113,7 @@ for (const state of states) test(`Refresh desktop captures ${state} with real so
             "Pro limit reached: 50 of 50 ERC20 refreshes used, resets 1 Nov");
           await expect(page.getByRole("alertdialog").getByRole("button", { name: "Manage plan" })).toBeVisible();
         }
-        await expect(page.getByRole("alertdialog").getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+        await expect(page.getByRole("alertdialog").getByRole("progressbar")).toHaveCount(0);
       }
       await page.screenshot({ path: `${output}/refresh-${state}-desktop.png`, fullPage: true, animations: "disabled" });
     } finally {

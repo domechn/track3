@@ -15,6 +15,7 @@ import { sourceDisplayNames } from "@/components/source-display-name";
 import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import { attributionAmount, attributionCompactAmount, attributionRoundedValue } from "@/components/attribution-amount";
 import { FittingAttributionAmount } from "@/components/fitting-attribution-amount";
+import { useChartHitArea } from "@/components/chart-tooltip";
 
 type Data = Awaited<ReturnType<typeof queryAttribution>>;
 const dimensions: AttributionDimension[] = ["coin", "source", "wallet", "assetType"];
@@ -30,6 +31,10 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const dataChangedVersion = useDataChangedVersion();
   const walletOrdinals = useLatestWalletOrdinals();
+  const contributorChart = useChartHitArea();
+  const detractorChart = useChartHitArea();
+  const otherChart = useChartHitArea();
+  const detailChart = useChartHitArea();
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   const data = loaded?.rangeKey === rangeKey ? loaded.result : null;
 
@@ -75,10 +80,10 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
   const contributors = groups.filter((group) => group.priceEffect > 0).sort((a, b) => b.priceEffect - a.priceEffect);
   const detractors = groups.filter((group) => group.priceEffect < 0).sort((a, b) => a.priceEffect - b.priceEffect);
   const otherChanges = groups.filter((group) => group.priceEffect === 0);
-  const bars = (items: typeof groups, emptyKey: string, detail = false) => (
+  const bars = (items: typeof groups, emptyKey: string, chart: ReturnType<typeof useChartHitArea>, detail = false) => (
     items.length === 0 ? <p className="text-xs text-muted-foreground">{label(emptyKey)}</p> :
-    <ol className="space-y-2">
-      {(detail || isMobile ? items : items.slice(0, 5)).map((group) => {
+    <ol className="space-y-2" data-chart-group="">
+      {(detail || isMobile ? items : items.slice(0, 5)).map((group, index) => {
         const key = `${detail ? "detail" : "preview"}:${dimension}:${group.key}`;
         const asset = dimension === "coin" ? {
           assetType: group.key.startsWith("stock:") ? "stock" as const : "crypto" as const,
@@ -89,13 +94,18 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
             ? <img className="attribution-rank-logo" src={resolveAssetLogoSrc(asset, logoMap[getAssetLogoKey(asset)])} alt="" />
             : <span className="attribution-rank-logo attribution-rank-mark" aria-hidden="true">{displayGroup(group).slice(0, 1).toUpperCase()}</span>)}
           <span className="truncate font-medium" title={displayGroup(group)}>{displayGroup(group)}</span>
-          <span className="h-4 rounded-full bg-muted" aria-hidden="true"><span className="block h-full rounded-full" style={{ width: `${Math.abs(group.priceEffect) / max * 100}%`, background: barTone(group.priceEffect) }} /></span>
+          <span className="h-4 rounded-full bg-muted" {...(!isMobile ? { role: "button" as const, ...chart.markProps(index, `${displayGroup(group)}: ${exact(group.priceEffect)}`,
+            <><span>{displayGroup(group)}</span><div className={tone(group.priceEffect)}>{exact(group.priceEffect)}</div></>) } : {})}>
+            <span className="block h-full rounded-full" style={{ width: `${Math.abs(group.priceEffect) / max * 100}%`, background: barTone(group.priceEffect) }} />
+          </span>
           <span className={`min-w-0 whitespace-nowrap text-right tabular-nums ${tone(group.priceEffect)}`} title={exact(group.priceEffect)}>{isMobile
             ? <FittingAttributionAmount full={format(group.priceEffect)} compact={attributionCompactAmount(group.priceEffect, currency, locale)} minBarWidth={32} />
             : format(group.priceEffect)}</span>
         </>;
         return <li key={group.key} className={isMobile ? "attribution-rank" : "grid grid-cols-[minmax(5rem,1fr)_minmax(4rem,2fr)_auto] items-center gap-2 text-xs sm:text-sm"}>
           {isMobile ? <button type="button" className="attribution-rank-button" aria-expanded={expandedKey === key}
+            {...chart.markProps(index, `${displayGroup(group)}: ${exact(group.priceEffect)}`,
+              <><span>{displayGroup(group)}</span><div className={tone(group.priceEffect)}>{exact(group.priceEffect)}</div></>)}
             onClick={() => setExpandedKey(expandedKey === key ? null : key)}>{content}</button> : content}
           {isMobile && expandedKey === key && <dl className="attribution-rank-details">
             {(["priceEffect", "flowEffect", "residual", "totalChange"] as const).map((field) =>
@@ -122,16 +132,16 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
       {dimensions.map((value) => <ButtonGroupItem key={value} value={value} className="touch:min-h-11 px-2 text-xs sm:px-3 sm:text-sm">{label(value)}</ButtonGroupItem>)}
     </ButtonGroup>}
     <figure className="grid gap-4 sm:grid-cols-2" aria-label={label("chart")}>
-      <section className="space-y-2"><h3 className="text-xs font-medium text-muted-foreground">{label("contributors")}</h3>{bars(contributors, "noMarketChange")}</section>
-      <section className="space-y-2"><h3 className="text-xs font-medium text-muted-foreground">{label("detractors")}</h3>{bars(detractors, "noDetractors")}</section>
+      <section className="space-y-2"><h3 className="text-xs font-medium text-muted-foreground">{label("contributors")}</h3>{bars(contributors, "noMarketChange", contributorChart)}</section>
+      <section className="space-y-2"><h3 className="text-xs font-medium text-muted-foreground">{label("detractors")}</h3>{bars(detractors, "noDetractors", detractorChart)}</section>
       {isMobile && otherChanges.length > 0 && <section className="space-y-2 sm:col-span-2">
         <h3 className="text-xs font-medium text-muted-foreground">{label("otherChanges")}</h3>
-        {bars(otherChanges, "noMarketChange")}
+        {bars(otherChanges, "noMarketChange", otherChart)}
       </section>}
     </figure>
     {isMobile && <section role="region" aria-label={label("table")} className="space-y-2">
       <h3 className="text-xs font-medium text-muted-foreground">{label("group")}</h3>
-      {bars(paging.rows, "noMarketChange", true)}
+      {bars(paging.rows, "noMarketChange", detailChart, true)}
     </section>}
     {isMobile && <AttributionPager count={groups.length} {...paging} t={t} />}
     {!isMobile && <div className="max-w-full overflow-x-auto rounded-md border border-border/50">
@@ -151,5 +161,6 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
       </Table>
     </div>}
     {!isMobile && <AttributionPager count={groups.length} {...paging} t={t} />}
+    {contributorChart.tooltip}{detractorChart.tooltip}{otherChart.tooltip}{detailChart.tooltip}
   </div>;
 }

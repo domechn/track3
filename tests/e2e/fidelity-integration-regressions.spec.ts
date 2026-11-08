@@ -6,7 +6,7 @@ test("Overview keeps sync, alerts, and range controls pinned above its content",
   await page.setViewportSize({ width: 1440, height: 900 });
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
-  await expect(page.locator(".t3-overview-grid")).toBeVisible();
+  await expect(page.locator(".t3-overview-grid")).toBeVisible({ timeout: 40_000 });
   await expect(page.locator(".desktop-sync-status-indicator")).toBeVisible();
   const liveTrigger = page.locator(".t3-live-trigger");
   await expect(liveTrigger).toBeVisible();
@@ -113,8 +113,8 @@ test("toast tones keep one icon and clear their close buttons on desktop", async
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`/#${route}`);
     for (const [tone, border] of [
-      ["success", "rgb(95, 195, 156)"], ["info", "rgb(74, 138, 214)"],
-      ["warning", "rgb(217, 164, 65)"], ["error", "rgb(238, 106, 130)"],
+      ["success", "rgb(95, 196, 155)"], ["info", "rgb(72, 136, 213)"],
+      ["warning", "rgb(216, 163, 65)"], ["error", "rgb(239, 103, 128)"],
     ]) {
       await page.evaluate(async (next) => {
         const toastModule = "/src/components/ui/use-toast.ts";

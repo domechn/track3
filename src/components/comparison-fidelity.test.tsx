@@ -29,6 +29,16 @@ const moverRows = ([
 });
 
 describe("ComparisonFidelity", () => {
+  it("exposes exact mover values on hover, including values rounded in the chart labels", () => {
+    const { container } = render(<ComparisonFidelity {...props} rows={[{ ...row,
+      value: { base: 100, head: 120.37, changePercent: 20.37 } }]} noTransactions={false} mask={false} />);
+    const mover = container.querySelector(".t3-cmp-movers-card li")!;
+    expect(mover.tagName).toBe("LI");
+    expect(mover.querySelector("[data-chart-mark]")).toHaveAttribute("role", "button");
+    fireEvent.pointerEnter(mover.querySelector("[data-chart-mark]")!, { pointerType: "mouse" });
+    expect(screen.getByRole("tooltip")).toHaveTextContent("+$20.37");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("+20.37%");
+  });
   it("only attributes an unchanged amount to price movement when the saved log has no transactions", () => {
     const { rerender } = render(<ComparisonFidelity {...props} noTransactions={false} mask={false} />);
     expect(screen.queryByText("Amounts are the same on both dates")).not.toBeInTheDocument();

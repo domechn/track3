@@ -18,6 +18,9 @@ test("configured 320px header keeps the live dot inside its reading", async ({ b
     const s3 = new FakeS3();
     const { header } = await createSyncHeader("fixture sync passphrase");
     await writeSyncHeader(s3, header);
+    await page.addInitScript(() => localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([
+      { sourceId: "binance", label: "Binance", kind: "exchange", provider: "Binance", status: "ok" },
+    ])));
     await installTauriBridge(page, { fidelitySample: "full", seedLockedSync: true, s3 });
     await page.goto("/#/overview");
     await page.reload();
@@ -25,6 +28,16 @@ test("configured 320px header keeps the live dot inside its reading", async ({ b
     await page.getByRole("button", { name: "Unlock", exact: true }).click();
     await expect(page.locator(".fd-overview-hero .fd-overview-value")).toHaveText("$763,809.27", { timeout: 30_000 });
     await expect(page.locator("#app-top-bar .t3-topbar-sync-button")).toBeVisible();
+    const headerControls = page.locator("#app-top-bar");
+    const source = headerControls.getByRole("button", { name: "Source status" });
+    const alerts = headerControls.locator(".fd-header-alerts");
+    await expect(source).toBeVisible();
+    await expect(alerts).toBeVisible();
+    const sourceBox = (await source.boundingBox())!;
+    const alertsBox = (await alerts.boundingBox())!;
+    const syncBox = (await headerControls.locator(".t3-topbar-sync-button").boundingBox())!;
+    expect(syncBox.x + syncBox.width).toBeLessThanOrEqual(sourceBox.x);
+    expect(sourceBox.x + sourceBox.width).toBeLessThanOrEqual(alertsBox.x);
     const reading = page.locator("#app-top-bar .mobile-header-total-reading");
     await expect(reading.locator(".mobile-header-total-value")).toHaveText("$763,809.27");
     const dot = reading.locator(".mobile-header-live-dot");
@@ -135,7 +148,7 @@ for (const configured of [false, true]) {
               clip: { x: 0, y: 0, width: 390, height: 80 } });
           }
           await amount.evaluate((node, value) => { node.textContent = value; }, originalAmount);
-          await expect(source).toBeHidden();
+          await expect(source).toBeVisible();
         } else {
           await expect(header.locator(".t3-topbar-sync-button")).toHaveCount(0);
           await expect(source.locator("svg[data-icon='source-info']")).toBeVisible();

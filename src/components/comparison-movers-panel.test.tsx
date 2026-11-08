@@ -9,6 +9,16 @@ const rows = [
 ];
 
 describe("ComparisonMoversPanel", () => {
+  it("reveals exact value and percentage for each mover row", () => {
+    const { container } = render(<ComparisonMoversPanel rows={rows} currency={currency}
+      quoteColor="green-up-red-down" t={(key) => key} shouldMaskValue={false} />);
+    const row = container.querySelector(".comparison-movers section:first-child li")!;
+    expect(row.tagName).toBe("LI");
+    expect(row.querySelector("[data-chart-mark]")).toHaveAttribute("role", "button");
+    fireEvent.pointerEnter(row.querySelector("[data-chart-mark]")!, { pointerType: "mouse" });
+    expect(screen.getByRole("tooltip")).toHaveTextContent("+$50.00");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("+50.00%");
+  });
   it("bounds a large mover percentage and exposes the exact value", () => {
     const { container } = render(<ComparisonMoversPanel rows={[
       { symbol: "BIG", assetType: "crypto", value: { base: 1, head: 37.1122, changePercent: 3611.22 } },

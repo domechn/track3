@@ -6,7 +6,6 @@ import { alertDraftFromRule, alertRuleFromDraft } from "@/middlelayers/ui-state/
 import { I18nProvider, useTranslation } from "@/i18n";
 import GoalsDesktop, { GoalsKinds } from "./goals-desktop";
 
-vi.mock("./fidelity-rail", () => ({ default: () => null }));
 
 const rule: AlertRule = alertRuleFromDraft({
   id: 1, kind: "asset_price_move", assetType: "stock", symbol: "AAPL",
@@ -116,6 +115,15 @@ it("formats stored history values and firing thresholds for each rule kind", () 
   expect(screen.getByText("$2,524.33 on the 27 Oct refresh")).toBeInTheDocument();
   expect(screen.getByText("Portfolio value reached $750,000")).toBeInTheDocument();
   expect(screen.getByText("$752,683.57 on the 27 Oct refresh")).toBeInTheDocument();
+});
+
+it("shows a rule's exact measured value on its progress bar", () => {
+  render(<GoalsDesktop {...props({ rules: [rule] })} />);
+  const mark = document.querySelector(".t3-fidelity-goal-progress [data-chart-mark]");
+  expect(mark).not.toBeNull();
+  fireEvent.pointerEnter(mark!);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("-100.00%");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("-10.00");
 });
 
 it("keeps deleted move and allocation alerts readable when their rule details are gone", () => {

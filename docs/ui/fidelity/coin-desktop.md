@@ -46,20 +46,22 @@ The approved images do not define loading/error/toast or sync-popover pixels for
 
 ## Pixel comparison
 
-On 6 Nov, the design HTML was rendered again at 1600 × 1000 into `/tmp/wui18-source-fresh/`; the BTC source render is pixel-identical to `/tmp/wui18-source/`. The app captures are in `/tmp/wui18-current-coin/`. A pixel differs when any RGB channel differs by more than 20. The design's `getBoundingClientRect()` places its heading at y=42 and hero at y=110 with width 1488; the app's tested bounds are y=91 and y=159, with a 1473 px hero. The app reserves a solid 49 px toolbar above the scroll container and a 15 px scrollbar gutter. At 1440 × 1000, a scrolled BTC capture in `/tmp/wui18-evidence/coin-1440-scrolled.png` confirms the toolbar stays opaque and the hero scrolls beneath its own row.
+On 6 Nov, the design HTML was rendered again at 1600 × 1000 into `/tmp/wui18-source-fresh/`; the BTC source render is pixel-identical to `/tmp/wui18-source/`. The latest available app captures are in `/tmp/wui30-r7-coin/`; the earlier set is in `/tmp/wui18-current-coin/`. A pixel differs when any RGB channel differs by more than 20. The design's `getBoundingClientRect()` places its heading at y=42 and hero at y=110 with width 1488; the app's tested bounds are y=91 and y=159, with a 1473 px hero. The app reserves a solid 49 px toolbar above the scroll container and a 15 px scrollbar gutter. At 1440 × 1000, a scrolled BTC capture in `/tmp/wui18-evidence/coin-1440-scrolled.png` confirms the toolbar stays opaque and the hero scrolls beneath its own row. Source `.seg` track and selected fills are `rgb(26,26,30)` and `rgb(42,42,48)`; the Coin style assertion measures the same computed fills in the app.
 
-| State | Current viewport pixel difference |
+| State | Viewport pixel difference | Capture |
 | --- | ---: | --- |
-| BTC | 7.546% |
-| BTC edit | 5.497% |
-| BTC price | 7.136% |
-| BTC sheet | 4.215% |
-| NVDA | 7.250% |
-| NOVA | 6.712% |
-| NOVA edit | 5.100% |
+| BTC | 7.484% | 8 Nov |
+| BTC edit | 5.614% | 8 Nov |
+| BTC price | 7.136% | Earlier; fixture load timed out on 8 Nov |
+| BTC sheet | 4.215% | Earlier; fixture load timed out on 8 Nov |
+| NVDA | 7.250% | Earlier; fixture load timed out on 8 Nov |
+| NOVA | 6.561% | 8 Nov |
+| NOVA edit | 5.054% | 8 Nov |
 
 ## Remaining differences
 
+- In dark mode, the heading's Crypto/Stock/Custom pill uses the shared `--raised` and muted text tokens, and the lighter symbol in `h1 em` uses `--muted-foreground`. The chart grid and small rules use `--border` and `--rule`. These shift a few pixels from the source's fixed greys. The selected chart and transaction segments use the shared navigation tint described in [navigation.md](navigation.md), which differs from the source's solid selected fill. A transparent chart mark can antialias one pixel of an NVDA gridline; the five grid rows retain their source positions.
+- The earlier 1280 × 720 theme check has an **11.562%** dark pixel difference at the 16-channel threshold against a fresh design render. Its live fixture has no transaction cost basis or sale history, so those hero values differ from the mockup. The required live toolbar and differently ordered real source rows also occupy visible pixels. The light-theme capture now has readable foreground text, white cards, subdued labels, and visible controls.
 - The product's live total, DatePicker, refresh and sync controls use a solid 49 px toolbar above the coin scroll area. Keeping that bar in normal flow prevents its controls from covering the hero when a user scrolls. The static design has no equivalent bar, so all seven current desktop captures shift downward and exceed 3%; the scroll container also reserves 15 px for its scrollbar. Matching the source y positions with an absolute toolbar caused the reviewed overlap.
 - When a real coin has no sources, open lots, or transactions, its section shows the shared centred empty state. The supplied BTC, NVDA, and NOVA source pages contain data, so there is no matching source screen for those zero-data sections.
 - The source's sample NOVA has a display name and is omitted from its portfolio total. A saved NOVA may only have its ticker, and its actual $5,052 holding contributes 0.7% to the portfolio.

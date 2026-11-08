@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { calculateTotalProfit, queryPNLChartValue } from "@/middlelayers/charts";
 import SummaryProfitLoss from "./summary-profit-loss";
@@ -51,7 +51,7 @@ it("colours cumulative P&L above and below zero with gain and loss tokens", asyn
     currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
     quoteColor="green-up-red-down"
   />);
-  const chart = await screen.findByRole("img", { name: /Cumulative net P&L/ });
+  const chart = await screen.findByRole("group", { name: /Cumulative net P&L/ });
   const segments = [...chart.querySelectorAll("[data-direction]")];
   expect(segments.map((segment) => segment.getAttribute("data-direction"))).toEqual(["loss", "loss", "loss", "gain"]);
   expect(segments.slice(0, 3).every((segment) => segment.getAttribute("stroke") === "hsl(var(--loss))")).toBe(true);
@@ -162,4 +162,25 @@ it("keeps the positions movement breakdown beside the snapshot note", async () =
   const positions = (await screen.findByText("Positions")).closest("div")!;
   expect(positions).toHaveTextContent("1 up · 1 down · 0 flat");
   expect(positions).toHaveTextContent("2 in range");
+});
+
+it("reveals exact cumulative P&L at each Summary point on hover", async () => {
+  vi.mocked(queryPNLChartValue).mockResolvedValue([
+    { timestamp: Date.parse("2026-08-15"), totalValue: 100 },
+    { timestamp: Date.parse("2026-09-15"), totalValue: 90 },
+    { timestamp: Date.parse("2026-10-15"), totalValue: 120 },
+  ]);
+  vi.mocked(calculateTotalProfit).mockImplementation(async (range) => ({
+    total: range.end.toISOString().startsWith("2026-10") ? 12_345.67 : 100,
+    percentage: 0, coins: [], knownTotal: 100, unknownCoins: [],
+  } as never));
+  render(<SummaryProfitLoss
+    dateRange={{ start: new Date("2026-08-01T00:00:00Z"), end: new Date("2026-10-31T23:59:59Z") }}
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+    quoteColor="green-up-red-down"
+  />);
+  const mark = (await screen.findByRole("group", { name: /Cumulative net P&L/ })).querySelectorAll("circle")[3];
+  fireEvent.pointerEnter(mark, { pointerType: "mouse" });
+  expect(screen.getByRole("tooltip")).toHaveTextContent("+$12,345.67");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("15 Oct");
 });

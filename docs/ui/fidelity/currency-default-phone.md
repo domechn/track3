@@ -62,9 +62,10 @@ The source depicts the **default** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
-- The page title now matches **Currency & display**. The real stored currency rates determine the preview values and update time; minor refresh icon and text rasterization differences remain.
+- The page title, rate timestamp, stablecoin switch, history page size, and unread badge match. Some descriptions wrap at different words, the preview card begins slightly lower, and the refresh and navigation icon strokes differ. The app's touch scroller does not paint the source browser's visible scrollbar. Locally bundled Public Sans rasterizes differently from the reference browser's web font.
+- The light-theme cards, selects, menu options, and update action now follow the page tokens.
 
 ## Pixel difference
 
-- Difference ratio: **2.215%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel.
-- Design viewport: `/tmp/fidelity/settings-a/design-currency-default.png` (top 780×1688); app viewport: `/tmp/fidelity/settings-a/currency-default.png` (780×1688).
+- Fresh difference ratio: **5.395%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel. The earlier 2.215% used a seeded currency fixture.
+- Fresh design viewport: `/tmp/wui30-design/currency.png` (780×1688); app viewport: `/tmp/fidelity/settings-a/currency-default.png` (780×1688).

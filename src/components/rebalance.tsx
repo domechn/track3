@@ -33,7 +33,6 @@ import { FinanceChartSkeleton, RebalanceCharts } from "./finance-charts";
 import { rebalanceVisuals } from "./finance-visuals";
 import { RebalanceSummary } from "./rebalance-summary";
 import RebalanceDesktop from "./rebalance-desktop";
-import FidelityRail from "./fidelity-rail";
 import type { QuoteColor } from "@/middlelayers/types";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Input } from "./ui/input";
@@ -282,7 +281,6 @@ export default function Rebalance({ currency, quoteColor = "green-up-red-down", 
 
   return (
     <div className={`t3-manage-rebalance mx-auto flex max-w-6xl flex-col gap-4${legacyWide ? " t3-fidelity-page" : ""}`}>
-      {legacyWide && <FidelityRail isProUser={isProUser} />}
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">{t("rebalance.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("rebalance.description")}</p>

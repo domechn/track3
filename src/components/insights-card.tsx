@@ -45,6 +45,7 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState(false);
   const [summaryError, setSummaryError] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [assistantData, setAssistantData] = useState<AssistantInsightData>();
   const [aiConfigured, setAiConfigured] = useState<boolean>();
   const reload = useCallback(async () => {
@@ -227,18 +228,14 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
   }
 
   if (overviewFidelity && currentSummary) {
+    const summaryLines = currentSummary.split("\n").filter(Boolean);
     return <Card className="t3-insights-card t3-insights-summary" role="region" aria-label={t("overview.fidelity.aiInsights")}>
       <header>
         <h2>{t("overview.fidelity.aiInsights")}</h2>
         <span>{t("overview.fidelity.pro")}</span>
-        <Button size="sm" variant="ghost" onClick={() => void regenerate()} disabled={regenerating}
-          aria-label={t("insights.regenerate")} className="ml-auto h-8 gap-1.5 px-2 text-xs">
-          <ReloadIcon aria-hidden="true" className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
-          {t("insights.regenerate")}
-        </Button>
       </header>
       <div className="t3-insights-summary-lines">
-        {currentSummary.split("\n").filter(Boolean).map((line, index) => {
+        {summaryLines.slice(0, showAll ? undefined : 3).map((line, index) => {
           const separator = line.indexOf(" — ");
           return <div key={index}>
             {separator >= 0
@@ -247,11 +244,22 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
           </div>;
         })}
       </div>
+      {summaryLines.length > 3 && <button type="button" className="t3-insights-more"
+        aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
+        {showAll ? t("overview.design.showFewer") : t("insights.showAll").replace("{count}", String(summaryLines.length))}
+      </button>}
+      <footer className="t3-insights-summary-footer">
       <a href="#/assistant" onClick={() => {
         try {
           storePendingAssistantQuestion({ question: t("insights.askQuestion").replace("{insight}", currentSummary) });
         } catch { /* The link still opens the assistant. */ }
       }}>{t("insights.ask")}</a>
+      <Button size="sm" variant="ghost" onClick={() => void regenerate()} disabled={regenerating}
+        aria-label={t("insights.regenerate")} className="h-8 gap-1.5 px-2 text-xs">
+        <ReloadIcon aria-hidden="true" className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
+        {t("insights.regenerate")}
+      </Button>
+      </footer>
     </Card>;
   }
 
@@ -259,13 +267,13 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
     <Card className="t3-insights-card min-h-[104px]" role="region" aria-label={t("insights.title")}>
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-[var(--card-pad)] pb-2 pt-[var(--card-pad)]">
         <CardTitle className="text-base">{t("insights.title")}</CardTitle>
-        <Button size="sm" variant="ghost" onClick={() => void regenerate()} disabled={regenerating}
+        {!overviewFidelity && <Button size="sm" variant="ghost" onClick={() => void regenerate()} disabled={regenerating}
           aria-label={t("insights.regenerate")} className="h-8 gap-1.5 px-2 text-xs">
           <ReloadIcon aria-hidden="true" className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
           {t("insights.regenerate")}
-        </Button>
+        </Button>}
       </CardHeader>
-      <CardContent className="space-y-2 px-[var(--card-pad)] pb-[var(--card-pad)]">
+      <CardContent className={`${overviewFidelity ? "t3-overview-insights-content " : ""}space-y-2 px-[var(--card-pad)] pb-[var(--card-pad)]`}>
         {error && <p role="alert" className="text-sm text-destructive">{t("insights.error")}</p>}
         {summaryError && <p role="alert" className="text-sm text-destructive">{t("insights.summaryError")}</p>}
         {loading && !card && <p aria-live="polite" className="text-sm text-muted-foreground">{t("insights.loading")}</p>}
@@ -276,7 +284,7 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
         )}
         {card && visible.length > 0 && (card.summaryNeedsRefresh || (card.summary && card.summaryLocale !== locale)) &&
           <p className="text-xs text-muted-foreground">{t("insights.summaryNeedsRefresh")}</p>}
-        {visible.map((insight) => {
+        {visible.slice(0, overviewFidelity && !showAll ? 3 : undefined).map((insight) => {
           const text = formatInsight(insight, t, locale, currency);
           return (
             <div key={insight.id} className="flex min-w-0 flex-wrap items-start gap-2 border-t border-border/50 pt-2 first:border-t-0 first:pt-0">
@@ -306,7 +314,17 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
             </div>
           );
         })}
+        {overviewFidelity && visible.length > 3 && <button type="button" className="t3-insights-more"
+          aria-expanded={showAll} onClick={() => setShowAll((value) => !value)}>
+          {showAll ? t("overview.design.showFewer") : t("insights.showAll").replace("{count}", String(visible.length))}
+        </button>}
       </CardContent>
+      {overviewFidelity && <div className="t3-insights-footer"><Button size="sm" variant="ghost"
+        onClick={() => void regenerate()} disabled={regenerating} aria-label={t("insights.regenerate")}
+        className="h-8 gap-1.5 px-2 text-xs">
+        <ReloadIcon aria-hidden="true" className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
+        {t("insights.regenerate")}
+      </Button></div>}
     </Card>
   );
 }

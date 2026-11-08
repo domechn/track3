@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { installTauriBridge } from "./fidelity-scenes";
 import { createSyncHeader } from "../../src/middlelayers/sync/crypto";
 import { FakeS3, writeSyncHeader } from "../../src/middlelayers/sync/object-store";
+import { contrast } from "./overlay-theme-scenes";
 
 const output = "/tmp/fidelity-desktop/comparison";
 
@@ -41,6 +42,29 @@ async function openComparison(page: Page) {
 }
 
 test.describe("Comparison desktop fidelity", () => {
+  test("light quick range remains readable when selected", async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop");
+    const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+    try {
+      const page = await context.newPage();
+      await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "light"));
+      await installTauriBridge(page, { fidelitySample: "full" });
+      await page.goto("/#/comparison");
+      await page.locator(".t3-cmp-quick button").nth(2).click();
+      const selected = page.locator(".t3-cmp-quick button[aria-pressed='true']");
+      await expect(selected).toBeVisible({ timeout: 40_000 });
+      const colors = await selected.evaluate((node) => {
+        const style = getComputedStyle(node);
+        const tint = style.backgroundColor.match(/[\d.]+/g)!.map(Number);
+        const card = getComputedStyle(node.closest(".t3-cmp-card")!).backgroundColor.match(/[\d.]+/g)!.map(Number);
+        const painted = tint.slice(0, 3).map((channel, index) =>
+          Math.round(channel * tint[3] + card[index] * (1 - tint[3])));
+        return [style.color, `rgb(${painted.join(", ")})`] as const;
+      });
+      expect(contrast(...colors)).toBeGreaterThanOrEqual(4.5);
+    } finally { await context.close(); }
+  });
+
   test("1001px CNY legacy table keeps each amount on one line", async ({ browser }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop");
     const context = await browser.newContext({ viewport: { width: 1001, height: 900 }, timezoneId: "UTC" });

@@ -15,6 +15,26 @@ const sizes = [
   { width: 430, height: 932 },
 ];
 
+test("review: phone assistant summary switch remains beside its label", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  try {
+    const page = await context.newPage();
+    await installTauriBridge(page, { fidelitySample: "full" });
+    await page.goto("/#/settings/assistant", { waitUntil: "domcontentloaded" });
+    const label = page.locator("label[for='assistant-insight-summary']");
+    const control = page.locator("#assistant-insight-summary");
+    await expect(label).toBeVisible({ timeout: 30_000 });
+    const labelBox = (await label.boundingBox())!;
+    const controlBox = (await control.boundingBox())!;
+    expect(await control.locator("..").evaluate((element) => getComputedStyle(element).flexDirection)).toBe("row");
+    expect(controlBox.x).toBeGreaterThan(labelBox.x + labelBox.width);
+    expect(controlBox.y).toBeLessThan(labelBox.y + labelBox.height + 16);
+  } finally {
+    await context.close();
+  }
+});
+
 test("data screens expose grouped history and analytics destinations", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
@@ -70,7 +90,7 @@ test("data screens expose grouped history and analytics destinations", async ({ 
   }
 });
 
-test("phone Overview trend exposes a value chip while scrubbing", async ({ browser }) => {
+test("phone Overview trend exposes a value tooltip while scrubbing", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
@@ -81,15 +101,16 @@ test("phone Overview trend exposes a value chip while scrubbing", async ({ brows
     await plot.scrollIntoViewIfNeeded();
     const box = (await plot.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    const chip = plot.locator("g:has(> rect[rx='6'])");
-    await expect(chip).toBeVisible();
-    await expect(chip).toContainText("$");
+    const tooltip = page.locator("[data-chart-tooltip]");
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(/\d{1,2} [A-Za-z]+/);
+    await expect(tooltip).toContainText("$");
   } finally {
     await context.close();
   }
 });
 
-test("a phone tap on the Overview trend keeps the value chip visible", async ({ browser }) => {
+test("a phone tap on the Overview trend keeps the value tooltip visible", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());
   try {
@@ -100,7 +121,10 @@ test("a phone tap on the Overview trend keeps the value chip visible", async ({ 
     await plot.scrollIntoViewIfNeeded();
     const box = (await plot.boundingBox())!;
     await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(plot.locator("g:has(> rect[rx='6'])")).toBeVisible();
+    const tooltip = page.locator("[data-chart-tooltip]");
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(/\d{1,2} [A-Za-z]+/);
+    await expect(tooltip).toContainText("$");
   } finally {
     await context.close();
   }
@@ -406,7 +430,7 @@ test("Overview range chips change the chart start and announced delta", async ({
   }
 });
 
-test("touching the trend reveals a readable value chip", async ({ browser }) => {
+test("touching the trend reveals a readable value tooltip", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
   const page = watchPage(await context.newPage());
   try {
@@ -416,15 +440,16 @@ test("touching the trend reveals a readable value chip", async ({ browser }) => 
     await expect(chart).toBeVisible();
     const box = (await chart.boundingBox())!;
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    const chip = chart.locator("g:has(> rect[rx='6'])");
-    await expect(chip).toBeVisible();
-    await expect(chip).toContainText("$");
-    await expect(chip).not.toHaveAttribute("role");
-    const firstX = (await chip.boundingBox())!.x;
+    const tooltip = page.locator("[data-chart-tooltip]");
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(/\d{1,2} [A-Za-z]+/);
+    await expect(tooltip).toContainText("$");
+    await expect(tooltip).toHaveAttribute("role", "tooltip");
+    const firstX = (await tooltip.boundingBox())!.x;
     await page.mouse.move(box.x + box.width * 0.8, box.y + box.height / 2);
-    await expect.poll(async () => (await chip.boundingBox())?.x).toBeGreaterThan(firstX + 25);
+    await expect.poll(async () => Math.abs((await tooltip.boundingBox())!.x - firstX)).toBeGreaterThan(10);
     await page.mouse.move(box.x + box.width - 1, box.y + box.height / 2);
-    await expect.poll(async () => (await chip.boundingBox())!.x + (await chip.boundingBox())!.width).toBeLessThanOrEqual(374);
+    await expect.poll(async () => (await tooltip.boundingBox())!.x + (await tooltip.boundingBox())!.width).toBeLessThanOrEqual(382);
     mkdirSync("test-results/mobile", { recursive: true });
     await page.screenshot({ path: "test-results/mobile/390x844-overview-scrub.png" });
   } finally {

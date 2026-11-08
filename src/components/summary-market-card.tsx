@@ -15,6 +15,7 @@ import { FittingAttributionAmount } from "./fitting-attribution-amount";
 import { useFittingAttributionTicks } from "./use-fitting-attribution-ticks";
 import { SummaryTopList } from "./summary-top-list";
 import { marketProfitPercentage } from "./profit-percentage";
+import { useChartHitArea } from "./chart-tooltip";
 
 type Result = Awaited<ReturnType<typeof queryAttribution>>;
 
@@ -28,6 +29,7 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
   oneSnapshot?: boolean;
 }) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const dataVersion = useDataChangedVersion();
   const [result, setResult] = useState<Result>();
@@ -99,9 +101,9 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
         empty ? <div className="fidelity-empty"><span className="fidelity-empty-message">{emptyMessage}</span></div> : <>
           <div role="table" className="summary-top-collection" aria-label={t("summary.fidelity.topCoins")}>
           <div role="row" className="sr-only"><span role="columnheader">{t("summary.fidelity.asset")}</span><span role="columnheader">{t("summary.fidelity.market")}</span><span role="columnheader">%</span></div>
-          <SummaryTopList heading={t("summary.fidelity.topProfit")} rows={rows(positives)} scaleValues={scaleValues} amount={money} tone={tone} />
-          <SummaryTopList heading={t("summary.fidelity.topLoss")} rows={rows(negatives)} scaleValues={scaleValues} amount={money} tone={tone} />
-          <SummaryTopList heading={t("summary.fidelity.noMarket")} rows={rows(flats)} scaleValues={scaleValues} amount={money} tone={tone} />
+          <SummaryTopList heading={t("summary.fidelity.topProfit")} rows={rows(positives)} scaleValues={scaleValues} amount={money} exactAmount={exactMoney} tone={tone} />
+          <SummaryTopList heading={t("summary.fidelity.topLoss")} rows={rows(negatives)} scaleValues={scaleValues} amount={money} exactAmount={exactMoney} tone={tone} />
+          <SummaryTopList heading={t("summary.fidelity.noMarket")} rows={rows(flats)} scaleValues={scaleValues} amount={money} exactAmount={exactMoney} tone={tone} />
           </div>
           <p className="fidelity-caption">{t("summary.fidelity.topNote").replace("{date}", date(baseline ?? dateRange.start))}</p>
         </>}
@@ -116,13 +118,17 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
     {error ? <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => setRetry((n) => n + 1)}>{t("summary.fidelity.retry")}</button></div> :
       empty ? <div className="fidelity-empty"><span className="fidelity-empty-message">{emptyMessage}</span></div> : <>
         <div className="fidelity-attribution-key"><span><i />{t("summary.fidelity.marketMove")}</span><span><i />{t("summary.fidelity.quantityChange")}</span></div>
-        <div role="table" tabIndex={0} aria-label={t("summary.attributionTitle")} className={hasResidual ? "fidelity-attribution-table has-residual" : "fidelity-attribution-table"}>
+        <div role="table" tabIndex={0} data-chart-group="" aria-label={t("summary.attributionTitle")} className={hasResidual ? "fidelity-attribution-table has-residual" : "fidelity-attribution-table"}>
         <div className="fidelity-attribution-row head" role="row"><span role="columnheader">{t("summary.fidelity.asset")}</span><span role="columnheader"><span className="sr-only">{t("profit.attribution.chart")}</span></span><span role="columnheader">{t("summary.fidelity.market")}</span><span role="columnheader">{t("summary.fidelity.quantity")}</span>{hasResidual && <span role="columnheader">{t("profit.attribution.residual")}</span>}<span role="columnheader">{t("summary.fidelity.total")}</span></div>
-        {paging.rows.map((group) => {
+        {paging.rows.map((group, index) => {
           const quantityStart = group.priceEffect * group.flowEffect < 0 ? 0 : group.priceEffect;
           return <div className="fidelity-attribution-row" role="row" key={group.key}>
           <b role="rowheader">{group.label.split(" · ")[0]}</b>
-          <span className="fidelity-attribution-track" role="cell" aria-label={t("profit.attribution.chart")}><b style={{ left: `${zero}%` }} /><i className="market" style={{ left: `${axisPosition(Math.min(0, group.priceEffect))}%`, width: `${Math.abs(axisPosition(group.priceEffect) - zero)}%` }} /><i className="quantity" style={{ left: `${axisPosition(Math.min(quantityStart, quantityStart + group.flowEffect))}%`, width: `${Math.abs(axisPosition(group.flowEffect) - axisPosition(0))}%` }} /></span>
+          <span className="fidelity-attribution-track" role="cell"
+            {...chart.markProps(index, `${group.label}: ${t("summary.fidelity.marketMove")} ${exactMoney(group.priceEffect)}, ${t("summary.fidelity.quantityChange")} ${exactMoney(group.flowEffect)}`,
+              <><div>{group.label}</div><div className={tone(group.priceEffect)}>{t("summary.fidelity.marketMove")} {exactMoney(group.priceEffect)}</div><div>{t("summary.fidelity.quantityChange")} {exactMoney(group.flowEffect)}</div></>)}>
+            <b style={{ left: `${zero}%` }} /><i className="market" style={{ left: `${axisPosition(Math.min(0, group.priceEffect))}%`, width: `${Math.abs(axisPosition(group.priceEffect) - zero)}%` }} /><i className="quantity" style={{ left: `${axisPosition(Math.min(quantityStart, quantityStart + group.flowEffect))}%`, width: `${Math.abs(axisPosition(group.flowEffect) - axisPosition(0))}%` }} />
+          </span>
           <span role="cell" className={tone(group.priceEffect)} title={exactMoney(group.priceEffect)}>{money(group.priceEffect)}</span>
           <span role="cell" title={exactMoney(group.flowEffect)}>{money(group.flowEffect)}</span>
           {hasResidual && <span role="cell" title={exactMoney(group.residual)}>{money(group.residual)}</span>}
@@ -139,5 +145,6 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
         </div>
         <AttributionPager count={groups.length} {...paging} t={t} />
       </>}
+    {chart.tooltip}
   </section>;
 }

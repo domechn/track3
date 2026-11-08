@@ -1,5 +1,7 @@
 # Assistant desktop fidelity
 
+The shared rail geometry and active paint now follow [navigation.md](../navigation.md).
+
 ## Reference and measurements
 
 Viewed all six supplied JPGs in `desktop/plan/`. They are 1440 × 900 except `assistant-thread-desktop.jpg` (1440 × 1500). The task's capture viewport is 1600 × 900; pixel comparisons must render the authoritative HTML at 1600 × 900, then compare same-sized app captures. Source pages: `ds/pages/plan-assistant.html`, `plan-assistant-new.html`, `plan-assistant-long.html`, `plan-assistant-approved.html`, `plan-assistant-error.html`, and `plan-assistant-nokey.html`. `ds.css`, `ds.js`, `plan-assistant.js`, `lib.js`, `ds/BRIEF.md`, and `core-navigation-map.html` determine the structure and values.
