@@ -1,12 +1,11 @@
 import {
-  AssetAction,
   AssetModel,
   TDateRange,
   Transaction,
   TransactionModel,
   TransactionType,
 } from "./types";
-import { getAssetIdentity, getAssetType } from "./datafetch/utils/coins";
+import { getAssetType } from "./datafetch/utils/coins";
 import {
   getCacheGroupEpoch,
   getLocalStorageCacheInstance,
@@ -19,35 +18,36 @@ import { TRANSACTION_HANDLER } from "./entities/transactions";
 import { filterByAssetType } from "./charts-shared";
 import { executeWriteWork, selectFromDatabaseWithSql } from "./database";
 import { invoke } from "@tauri-apps/api/core";
-import { fromStoredTransactions } from "./cost-basis";
+import { calculateSnapshotProfit } from "./charts-interval-profit";
 
 const TOTAL_PROFIT_CACHE_TTL_SECONDS = 15 * 60;
 const TOTAL_PROFIT_CACHE_SESSION_ID =
   globalThis.crypto?.randomUUID?.() ??
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
-type TotalProfit = {
-  // total profit
+export type TotalProfit = {
   total: number | null;
   knownTotal: number | null;
-  unknownCoins: { symbol: string; assetType: AssetType }[];
-  // total profit percentage
-  // if it is undefined, means "∞"
+  unknownCoins: { symbol: string; assetType: AssetType; intervals?: string[]; months?: number }[];
+  unrecordedChange?: number;
+  deposits?: number;
+  trades?: number;
+  transfersIn?: number;
   percentage?: number | null;
   coins: {
     symbol: string;
     assetType: AssetType;
-    // coin profit
     value: number | null;
-    // coin profit percentage
-    // if it is undefined, means "∞"
+    isUnknown?: true;
     percentage?: number | null;
-
     buyAmount: number;
     sellAmount: number;
     costAvgPrice: number;
     sellAvgPrice: number;
+    realSpentValue?: number;
+    unrecordedChange?: number;
   }[];
+  lastRecordDate?: Date | string;
 };
 
 export async function queryTransactionsBySymbolAndDateRange(
@@ -77,259 +77,93 @@ export async function queryTransactionsBySymbolAndDateRange(
 
 export async function queryPreviousProfitSnapshotDate(start: Date): Promise<Date | undefined> {
   const rows = await selectFromDatabaseWithSql<{ createdAt: string | null }>(
-    `SELECT CASE WHEN EXISTS (SELECT 1 FROM assets_v2 WHERE createdAt = ?)
-      THEN NULL ELSE MAX(createdAt) END AS createdAt
-      FROM assets_v2 WHERE createdAt < ?`,
-    [start.toISOString(), start.toISOString()],
+    `SELECT MAX(createdAt) AS createdAt FROM assets_v2 WHERE createdAt < ?`,
+    [start.toISOString()],
   );
   return rows[0]?.createdAt ? new Date(rows[0].createdAt) : undefined;
 }
 
-// calculate total profit from transactions
+type ProfitData = {
+  groups: { createdAt: string; uuid: string; assets: AssetModel[] }[];
+  transactions: TransactionModel[];
+};
+const TRANSFER_WINDOW_MS = 7 * 86_400_000;
+
+async function readProfitData(dateRange: TDateRange, symbol?: string, assetType?: AssetType): Promise<ProfitData> {
+  const [baseline, groups, transactionGroups, snapshotDates] = await Promise.all([
+    ASSET_HANDLER.listLastSnapshotBefore(dateRange.start),
+    symbol
+      ? ASSET_HANDLER.listAssetsBySymbolByDateRange(symbol, dateRange.start, dateRange.end)
+      : ASSET_HANDLER.listAssetsByDateRange(dateRange.start, dateRange.end),
+    TRANSACTION_HANDLER.listTransactionsByDateRange(
+      new Date(dateRange.start.getTime() - TRANSFER_WINDOW_MS),
+      new Date(dateRange.end.getTime() + TRANSFER_WINDOW_MS),
+      symbol,
+    ),
+    symbol ? ASSET_HANDLER.listSnapshotDatesByDateRange(dateRange.start, dateRange.end) : Promise.resolve([]),
+  ]);
+  const useAsset = (asset: { symbol: string; assetType?: AssetType }) =>
+    (!symbol || asset.symbol === symbol) && (!assetType || getAssetType(asset) === assetType);
+  const byUuid = new Map(groups.filter((assets) => assets.length > 0).map((assets) => [assets[0].uuid, assets]));
+  const inRange = symbol
+    ? snapshotDates.map(({ uuid, createdAt }) => ({
+        uuid, createdAt,
+        assets: (byUuid.get(uuid) ?? []).filter(useAsset),
+      }))
+    : groups.map((assets) => ({
+        uuid: assets[0].uuid, createdAt: assets[0].createdAt, assets: assets.filter(useAsset),
+      }));
+  return {
+    groups: [
+      ...(baseline.length ? [{ createdAt: baseline[0].createdAt, uuid: baseline[0].uuid, assets: baseline.filter(useAsset) }] : []),
+      ...inRange,
+    ],
+    transactions: transactionGroups.flat().filter(useAsset),
+  };
+}
+
+function profitFromData(data: ProfitData, dateRange: TDateRange): TotalProfit {
+  const start = dateRange.start.getTime() - TRANSFER_WINDOW_MS;
+  const end = dateRange.end.getTime() + TRANSFER_WINDOW_MS;
+  const transactions = data.transactions.filter((txn) => {
+    const time = new Date(txn.txnCreatedAt).getTime();
+    return time >= start && time <= end;
+  });
+  const byUuid = new Map<string, TransactionModel[]>();
+  for (const txn of transactions) byUuid.set(txn.uuid, [...(byUuid.get(txn.uuid) ?? []), txn]);
+  const snapshots = data.groups.map((group) => ({
+    createdAt: group.createdAt,
+    assets: group.assets,
+    transactions: byUuid.get(group.uuid) ?? [],
+  }));
+  return calculateSnapshotProfit(snapshots, dateRange, transactions);
+}
+
+// Snapshot-end intervals are the unit of P&L, so any partition of a range is additive.
 export async function calculateTotalProfit(
   dateRange: TDateRange,
   symbol?: string,
   assetType?: AssetType,
-): Promise<TotalProfit & { lastRecordDate?: Date | string }> {
-  const cache = getLocalStorageCacheInstance(
-    CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY,
-  );
-  const cacheEpoch = getCacheGroupEpoch(
-    CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY,
-  );
-  const key = `${TOTAL_PROFIT_CACHE_SESSION_ID}-${cacheEpoch}-${dateRange.start.getTime()}-${dateRange.end.getTime()}-${symbol ?? "all"}-${assetType ?? "all"}`;
-  const c = cache.getCache<TotalProfit>(key);
-  if (c) {
-    return c;
-  }
+): Promise<TotalProfit> {
+  const cache = getLocalStorageCacheInstance(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY);
+  const epoch = getCacheGroupEpoch(CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY);
+  const key = `v3-${TOTAL_PROFIT_CACHE_SESSION_ID}-${epoch}-${dateRange.start.getTime()}-${dateRange.end.getTime()}-${symbol ?? "all"}-${assetType ?? "all"}`;
+  const cached = cache.getCache<TotalProfit>(key);
+  if (cached) return cached;
 
-  const latestAssets = filterByAssetType(
-    await ASSET_HANDLER.listAssetsMaxCreatedAt(
-      dateRange.start,
-      dateRange.end,
-      symbol,
-    ),
-    assetType,
-  );
-  // group latestAssets by symbol, can sum amount and value
-  const dateRangeAssets = Array.from(
-    latestAssets.reduce((map, asset) => {
-      const key = getAssetIdentity(asset);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(asset);
-      return map;
-    }, new Map<string, AssetModel[]>())
-  ).map(([_, assets]) => {
-    const first = assets[0];
-    const allAmount = assets.reduce((s, a) => s + a.amount, 0);
-    const allValue = assets.reduce((s, a) => s + a.value, 0);
-    return {
-      symbol: first?.symbol ?? "",
-      assetType: getAssetType(first),
-      price: allAmount === 0 ? 0 : allValue / allAmount,
-      amount: allAmount,
-      value: allValue,
-      // all createdAt are same, so just get the first one
-      createdAt: first?.createdAt,
-    };
-  });
-  const earliestAssets = filterByAssetType(
-    await ASSET_HANDLER.listAssetsMinCreatedAt(
-      dateRange.start,
-      dateRange.end,
-      symbol,
-    ),
-    assetType,
-  );
-  const priorAssets = filterByAssetType(
-    await ASSET_HANDLER.listAssetsMaxCreatedAt(
-      undefined,
-      dateRange.start,
-      symbol,
-    ),
-    assetType,
-  );
+  const result = profitFromData(await readProfitData(dateRange, symbol, assetType), dateRange);
+  cache.setCache<TotalProfit>(key, result, TOTAL_PROFIT_CACHE_TTL_SECONDS);
+  return result;
+}
 
-  const allTransactions = filterByAssetType(
-    (await TRANSACTION_HANDLER.listTransactionsByDateRange(
-      dateRange.start,
-      dateRange.end,
-      symbol,
-    )).flat(),
-    assetType,
-  );
-  const priorIdentities = new Set(priorAssets.map(getAssetIdentity));
-  const baselineAssets = [
-    ...priorAssets,
-    ...earliestAssets.filter((asset) => !priorIdentities.has(getAssetIdentity(asset))),
-  ];
-  const dateRangeEarliestAssets = Array.from(
-    baselineAssets.reduce((map, asset) => {
-      const key = getAssetIdentity(asset);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(asset);
-      return map;
-    }, new Map<string, AssetModel[]>())
-  ).map(([_, assets]) => {
-    const allAmount = assets.reduce((s, a) => s + a.amount, 0);
-    const allValue = assets.reduce((s, a) => s + a.value, 0);
-    const first = assets[0];
-    return {
-      symbol: first?.symbol ?? "",
-      assetType: getAssetType(first),
-      price: allAmount === 0 ? 0 : allValue / allAmount,
-      amount: allAmount,
-      value: allValue,
-      // all createdAt are same, so just get the first one
-      createdAt: first?.createdAt,
-    };
-  });
-
-  const pairedTransfers = new Set(
-    fromStoredTransactions(allTransactions.map((txn) => ({
-      ...txn,
-      assetType: getAssetType(txn),
-    })))
-      .filter((event) => event.type === "transfer-in" || event.type === "transfer-out")
-      .map((event) => Number(event.id)),
-  );
-  const groupedTransactions = Array.from(
-    allTransactions.reduce((map, txn) => {
-      const key = getAssetIdentity(txn);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(txn);
-      return map;
-    }, new Map<string, TransactionModel[]>())
-  ).map(([_, txns]) => {
-    const first = txns[0];
-    const symbolTxns = txns
-      .slice()
-      .sort((a, b) => a.txnCreatedAt.localeCompare(b.txnCreatedAt))
-      .map((txn) => {
-        if ((!isTransactionBuyOrSell(txn) && txn.txnType !== "deposit") || pairedTransfers.has(txn.id)) {
-          return;
-        }
-
-        return transformTransactionModelToAssetAction(txn);
-      })
-      .filter((x): x is NonNullable<typeof x> => !!x);
-    return {
-      symbol: first?.symbol ?? "",
-      assetType: getAssetType(first),
-      unknownDisposal: txns.some((txn) => txn.txnType === "withdraw" && !pairedTransfers.has(txn.id)),
-      actions: symbolTxns,
-    };
-  });
-  const coinIdentities = new Set([
-    ...dateRangeAssets.map(getAssetIdentity),
-    ...earliestAssets.map(getAssetIdentity),
-    ...groupedTransactions.map(getAssetIdentity),
-  ]);
-  const coins = [...coinIdentities]
-    .map((d) => {
-      const latest = dateRangeAssets.find((asset) => getAssetIdentity(asset) === d);
-      if (!latest) {
-        return;
-      }
-      const txns = groupedTransactions.find((group) => getAssetIdentity(group) === d);
-      const baseline = dateRangeEarliestAssets.find((asset) => getAssetIdentity(asset) === d);
-      if (latest.amount === 0 && (baseline?.amount ?? 0) === 0 && !txns?.actions.length) return;
-      const baselineInsideRange = !!baseline && baseline.createdAt >= dateRange.start.toISOString();
-      const firstSnapshotBuys = baselineInsideRange
-        ? (txns?.actions ?? []).filter(
-            (action) => action.changedAt === baseline.createdAt && action.amount > 0,
-          )
-        : [];
-      const firstSnapshotBuyAmount = firstSnapshotBuys.reduce((sum, action) => sum + action.amount, 0);
-      const beforeBuyAmount =
-        (baseline?.amount ?? 0) - firstSnapshotBuyAmount;
-
-      const beforeCost =
-        (baseline?.value ?? 0) - firstSnapshotBuyAmount * (baseline?.price ?? 0);
-      const beforeCreatedAt = baseline?.createdAt;
-      const beforeSellAmount = 0;
-      const beforeSell = 0;
-      // filter out transactions before the first buy
-      const afterActions = (txns?.actions ?? []).filter(
-        (a) => beforeCreatedAt === undefined || a.changedAt > beforeCreatedAt ||
-          (baselineInsideRange && a.changedAt === beforeCreatedAt && a.amount > 0),
-      );
-
-      const buyAmount =
-        afterActions
-          .filter((a) => a.amount > 0)
-          .reduce((s, a) => s + a.amount, 0) + beforeBuyAmount;
-
-      const sellAmount =
-        afterActions
-          .filter((a) => a.amount < 0)
-          .reduce((s, a) => s + (-a.amount), 0) + beforeSellAmount;
-      const cost =
-        afterActions
-          .filter((a) => a.amount > 0)
-          .reduce((s, a) => s + a.amount * a.price, 0) + beforeCost;
-      const sell =
-        afterActions
-          .filter((a) => a.amount < 0)
-          .reduce((s, a) => s + (-a.amount * a.price), 0) + beforeSell;
-      const costAvgPrice = buyAmount === 0 ? 0 : cost / buyAmount;
-      const sellAvgPrice = sellAmount === 0 ? 0 : sell / sellAmount;
-
-      const lastPrice = latest.price;
-
-      const lastAmount = latest.amount;
-
-      const realizedProfit = sellAmount * (sellAvgPrice - costAvgPrice);
-      const unrealizedProfit = lastAmount * (lastPrice - costAvgPrice);
-
-      const percentage =
-        cost === 0
-          ? (realizedProfit + unrealizedProfit === 0 ? 0 : undefined)
-          : ((realizedProfit + unrealizedProfit) / cost) * 100;
-      return {
-        symbol: latest.symbol,
-        assetType: latest.assetType,
-        value: txns?.unknownDisposal ? null : realizedProfit + unrealizedProfit,
-        realSpentValue: cost,
-        buyAmount,
-        sellAmount,
-        costAvgPrice,
-        sellAvgPrice,
-        percentage: txns?.unknownDisposal ? null : percentage,
-      };
-    })
-    .filter((x): x is NonNullable<typeof x> => !!x);
-
-  const total = coins.some((coin) => coin.value === null)
-    ? null
-    : coins.reduce((sum, coin) => sum + (coin.value ?? 0), 0);
-  const knownCoins = coins.filter((coin) => coin.value !== null);
-  const knownTotal = knownCoins.length
-    ? knownCoins.reduce((sum, coin) => sum + coin.value!, 0)
-    : null;
-  const unknownCoins = coins.filter((coin) => coin.value === null)
-    .map(({ symbol, assetType }) => ({ symbol, assetType }));
-  const totalRealSpent = coins.reduce((s, c) => s + c.realSpentValue, 0);
-
-  let lrdAsset: AssetModel | undefined;
-  for (const a of latestAssets) {
-    if (!lrdAsset || new Date(a.createdAt).getTime() > new Date(lrdAsset.createdAt).getTime()) {
-      lrdAsset = a;
-    }
-  }
-  const lrd = lrdAsset?.createdAt;
-
-  const resp = {
-    total,
-    knownTotal,
-    unknownCoins,
-    percentage: total === null ? null
-      : totalRealSpent === 0 ? (total === 0 ? 0 : undefined) : (total / totalRealSpent) * 100,
-    coins,
-    lastRecordDate: lrd ? new Date(lrd) : undefined,
+export async function calculateTotalProfitBatch(ranges: TDateRange[]): Promise<TotalProfit[]> {
+  if (ranges.length === 0) return [];
+  const envelope = {
+    start: new Date(Math.min(...ranges.map((range) => range.start.getTime()))),
+    end: new Date(Math.max(...ranges.map((range) => range.end.getTime()))),
   };
-  cache.setCache<TotalProfit>(key, resp, TOTAL_PROFIT_CACHE_TTL_SECONDS);
-  return resp;
+  const data = await readProfitData(envelope);
+  return ranges.map((range) => profitFromData(data, range));
 }
 
 export function cleanTotalProfitCache() {
@@ -354,25 +188,4 @@ export async function updateTransactionTxnType(
 // return all transactions for exporting data
 export function queryAllTransactions(): Promise<TransactionModel[]> {
   return TRANSACTION_HANDLER.listTransactions();
-}
-
-function transformTransactionModelToAssetAction(
-  txn: TransactionModel,
-): AssetAction {
-  return {
-    assetID: txn.assetID,
-    uuid: txn.uuid,
-    assetType: getAssetType(txn),
-    symbol: txn.symbol,
-    wallet: txn.wallet,
-    amount: ["sell", "withdraw"].includes(txn.txnType)
-      ? -txn.amount
-      : txn.amount,
-    price: txn.price,
-    changedAt: txn.txnCreatedAt,
-  };
-}
-
-function isTransactionBuyOrSell(txn: Transaction) {
-  return txn.txnType === "buy" || txn.txnType === "sell";
 }

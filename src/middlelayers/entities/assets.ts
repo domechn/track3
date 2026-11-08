@@ -72,6 +72,13 @@ class AssetHandler implements AssetHandlerImpl {
     return this.queryAssetsByDateRange(start, end);
   }
 
+  async listSnapshotDatesByDateRange(start: Date, end: Date): Promise<{ uuid: string; createdAt: string }[]> {
+    return selectFromDatabaseWithSql(
+      `SELECT DISTINCT uuid, createdAt FROM ${this.assetTableName} WHERE createdAt >= ? AND createdAt <= ? ORDER BY createdAt DESC`,
+      [start.toISOString(), end.toISOString()],
+    );
+  }
+
   async listAssetsMaxCreatedAt(
     start?: Date,
     end?: Date,
@@ -237,6 +244,14 @@ class AssetHandler implements AssetHandlerImpl {
       uuids,
     );
     return this.normalizeAssetModels(results);
+  }
+
+  async listLastSnapshotBefore(start: Date): Promise<AssetModel[]> {
+    const rows = await selectFromDatabaseWithSql<{ uuid: string }>(
+      `SELECT uuid FROM assets_v2 WHERE createdAt < ? ORDER BY createdAt DESC, uuid DESC LIMIT 1`,
+      [start.toISOString()],
+    );
+    return rows[0] ? this.listAssetsByUUIDs([rows[0].uuid]) : [];
   }
 
   async listAllUUIDs(): Promise<string[]> {

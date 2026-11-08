@@ -131,7 +131,7 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 - App capture: `/tmp/fidelity/summary/summary-loading-phone-long.png`.
 - Reference render: `/tmp/rev-fa3/design/analyze-summary-loading-long.png`.
-- Fresh 390 × 844 first-screen pixel difference: **0.96%** (RGB difference >20/255 in any channel).
+- Earlier 390 × 844 first-screen pixel difference: **0.96%** (RGB difference >20/255 in any channel). The 8 Nov 2026 comparison is under Remaining differences.
 - Full-page overlap pixel difference: **0.31%** (source 2,597px; app 2,597px high).
 
 ## Real-data limits
@@ -140,5 +140,6 @@ The phone reads existing SQLite snapshots, transactions, configuration, and wall
 
 ## Remaining differences
 
+- **8 Nov 2026 current 390 × 844 capture:** loading **2.511%** against `ds/pages/analyze-summary-loading.html` (any RGB channel differs by more than 20). Source: `.local/ui46-final/source-390-analyze-summary-loading.html.png`; app: `/tmp/fidelity/summary/summary-loading-phone.png`; source bounds and computed styles: `/tmp/ui46-source-390-analyze-summary-loading.html.json`; app bounds and computed-style assertions: `ios-fidelity-summary-layout.spec.ts`. Remaining visible differences are readable disabled range labels, the live Refresh loading state, Analytics navigation, and Public Sans rasterization.
 - The source HTML compresses six disabled range labels into an unreadable cluster. The app keeps each label readable within the segmented control for accessibility.
 - The Analytics tab has a small upward chevron to reveal the existing tap-again destinations. The static source has no navigation hint.

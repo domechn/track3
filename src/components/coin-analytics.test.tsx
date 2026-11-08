@@ -303,6 +303,19 @@ it("shows unknown profit after switching from a priced coin to an unmatched with
   expect(profitCard).not.toHaveTextContent("—%");
 });
 
+it("shows known coin profit with a partial badge after an unpaired withdrawal", async () => {
+  mocks.calculateTotalProfit.mockResolvedValue({
+    total: null, knownTotal: 20, percentage: null,
+    unknownCoins: [{ symbol: "BTC", assetType: "crypto", intervals: ["2024-04-15T00:00:00.000Z"], months: 1 }],
+    coins: [],
+  });
+  renderCoinAnalysis();
+  const card = screen.getByText("profit rate:").closest("[data-ui-card]")!;
+  await waitFor(() => expect(card).toHaveTextContent("$20.00"));
+  expect(within(card as HTMLElement).getByRole("button", { name: /Explain partial profit/ })).toHaveTextContent("?");
+  expect(card).toHaveTextContent("—");
+});
+
 function renderCoinAnalysis(
   initialEntries: string[] = ["/coins/BTC"],
   currency: CurrencyRateDetail = usdCurrency,

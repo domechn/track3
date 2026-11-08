@@ -30,6 +30,7 @@ vi.mock("@/middlelayers/entities/assets", () => ({
     listTotalValueRecords: vi.fn(),
     listAssetsByUUIDs: vi.fn(),
     listAssetsBySymbolByDateRange: vi.fn(),
+    listSnapshotDatesByDateRange: vi.fn(),
     listAllSymbols: vi.fn(),
     listAssetsAfterCreatedAt: vi.fn(),
   },
@@ -121,6 +122,10 @@ function configureData(golden: GoldenCase): void {
   vi.mocked(ASSET_HANDLER.listAssetsBySymbolByDateRange).mockImplementation(async (symbol, from, to) =>
     rows.filter((row) => (!from || row.createdAt >= from.toISOString()) && (!to || row.createdAt <= to.toISOString()))
       .map((row) => row.assets.filter((asset) => asset.symbol === symbol)),
+  );
+  vi.mocked(ASSET_HANDLER.listSnapshotDatesByDateRange).mockImplementation(async (from, to) =>
+    rows.filter((row) => row.createdAt >= from.toISOString() && row.createdAt <= to.toISOString())
+      .map(({ uuid, createdAt }) => ({ uuid, createdAt })),
   );
   vi.mocked(ASSET_HANDLER.listAllSymbols).mockResolvedValue(["BTC", "ETH", "USDT", "AAPL", "SOL"]);
   vi.mocked(ASSET_HANDLER.listAssetsAfterCreatedAt).mockResolvedValue(rows.flatMap((row) => row.assets));

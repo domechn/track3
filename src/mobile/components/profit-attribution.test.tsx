@@ -79,7 +79,7 @@ describe("profit attribution", () => {
       fireEvent.click(within(figure).getByRole("button", { name: /BTC/ }));
       const row = within(figure).getByRole("button", { name: /BTC/ }).closest("li")!;
       expect(row.querySelector("img")).toBeInTheDocument();
-      expect(within(row).getByText("Quantity change")).toBeInTheDocument();
+      expect(within(row).getByText("Recorded cash flow")).toBeInTheDocument();
       expect(within(row).getByText("+€200")).toBeInTheDocument();
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     } finally {

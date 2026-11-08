@@ -28,11 +28,11 @@ export function sourceRows<T extends { wallet: string }>(rows: T[], source: stri
   return source === null ? rows : rows.filter((row) => row.wallet === source);
 }
 
-export function profitRanks<T extends { value: number | null }>(rows: readonly T[], limit = 5) {
+export function profitRanks<T extends { value: number | null; isUnknown?: boolean }>(rows: readonly T[], limit = 5) {
   return {
-    gainers: rows.filter((row) => row.value !== null && row.value > 0)
+    gainers: rows.filter((row) => !row.isUnknown && row.value !== null && row.value > 0)
       .sort((a, b) => b.value! - a.value!).slice(0, limit),
-    decliners: rows.filter((row) => row.value !== null && row.value < 0)
+    decliners: rows.filter((row) => !row.isUnknown && row.value !== null && row.value < 0)
       .sort((a, b) => a.value! - b.value!).slice(0, limit),
   };
 }

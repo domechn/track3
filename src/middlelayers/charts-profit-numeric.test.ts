@@ -28,14 +28,14 @@ const year = range("2024-01-01T00:00:00.000Z", "2024-12-31T23:59:59.999Z");
 beforeEach(() => fixture.reset());
 
 describe("numeric profit from refresh snapshots", () => {
-  it("counts a held BTC with no February transaction: 1 × (300 − 200) = 100", async () => {
+  it("includes the first February interval from the last prior snapshot", async () => {
     fixture.load([
       { at: "2024-01-15T00:00:00.000Z", holdings: [holding("w1", 1, 100)] },
       { at: "2024-02-01T00:00:00.000Z", holdings: [holding("w1", 1, 200)] },
       { at: "2024-02-28T00:00:00.000Z", holdings: [holding("w1", 1, 300)] },
     ], generate);
     const result = await calculateTotalProfit(range("2024-02-01T00:00:00.000Z", "2024-02-29T23:59:59.999Z"));
-    expect(result.total).toBe(100);
+    expect(result.total).toBe(200);
     expect(result.coins.map((coin) => coin.symbol)).toEqual(["BTC"]);
   });
 
@@ -202,13 +202,13 @@ describe("numeric profit from refresh snapshots", () => {
     expect((await calculateTotalProfit(range("2024-01-01T00:00:00.000Z", "2024-01-31T23:59:59.999Z"))).total).toBe(100);
   });
 
-  it("uses the midnight snapshot as the opening baseline when refresh is exactly at month start", async () => {
+  it("includes the midnight snapshot interval from the last prior baseline", async () => {
     fixture.load([
       { at: "2024-01-31T12:00:00.000Z", holdings: [holding("w1", 1, 100)] },
       { at: "2024-02-01T00:00:00.000Z", holdings: [holding("w1", 1, 150)] },
       { at: "2024-02-28T12:00:00.000Z", holdings: [holding("w1", 1, 160)] },
     ], generate);
-    expect((await calculateTotalProfit(range("2024-02-01T00:00:00.000Z", "2024-02-29T23:59:59.999Z"))).total).toBe(10);
+    expect((await calculateTotalProfit(range("2024-02-01T00:00:00.000Z", "2024-02-29T23:59:59.999Z"))).total).toBe(60);
   });
 
   it("shows only January, April and October for three snapshots", async () => {
@@ -259,16 +259,16 @@ describe("numeric profit from refresh snapshots", () => {
     expect(feb.lastRecordDate).toBeDefined();
     expect(feb.total).toBeNull();
     expect(feb.knownTotal).toBe(28);
-    expect(feb.unknownCoins).toEqual([{ symbol: "ETH", assetType: "crypto" }]);
+    expect(feb.unknownCoins).toEqual([{ symbol: "ETH", assetType: "crypto", intervals: ["2026-02-10T12:00:00.000Z"], months: 1 }]);
     expect(june.total).toBeNull();
     expect(june.knownTotal).toBe(30);
-    expect(june.unknownCoins).toEqual([{ symbol: "ETH", assetType: "crypto" }]);
+    expect(june.unknownCoins).toEqual([{ symbol: "ETH", assetType: "crypto", intervals: ["2026-06-10T12:00:00.000Z"], months: 1 }]);
     expect(march.total).toBe(31);
     expect(march.knownTotal).toBe(31);
     expect(march.unknownCoins).toEqual([]);
   });
 
-  it("returns no known amount when every coin has an unpaired withdrawal", async () => {
+  it("retains the known interval before an unpaired withdrawal", async () => {
     fixture.load([
       { at: "2026-01-01T12:00:00.000Z", holdings: [holding("w1", 2, 100)] },
       { at: "2026-01-02T12:00:00.000Z", holdings: [holding("w1", 1, 110)] },
@@ -277,8 +277,8 @@ describe("numeric profit from refresh snapshots", () => {
     });
     const result = await calculateTotalProfit(range("2026-01-01T00:00:00.000Z", "2026-01-31T23:59:59.999Z"));
     expect(result.total).toBeNull();
-    expect(result.knownTotal).toBeNull();
-    expect(result.unknownCoins).toEqual([{ symbol: "BTC", assetType: "crypto" }]);
+    expect(result.knownTotal).toBe(0);
+    expect(result.unknownCoins).toEqual([{ symbol: "BTC", assetType: "crypto", intervals: ["2026-01-02T12:00:00.000Z"], months: 1 }]);
   });
 
   it("uses the latest of several snapshots in each month", async () => {
@@ -313,7 +313,7 @@ describe("numeric profit from refresh snapshots", () => {
       expect(jan.lastRecordDate).toEqual(new Date(janLast));
       expect(jan.total).toBe(20);
       expect(feb.lastRecordDate).toEqual(new Date(at(1, 29, 23, 59, 59)));
-      expect(feb.total).toBe(10);
+      expect(feb.total).toBe(40);
     } finally {
       if (previousTZ === undefined) delete process.env.TZ;
       else process.env.TZ = previousTZ;

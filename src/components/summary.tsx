@@ -63,7 +63,7 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
       if (!active) return;
       const totals = data.attribution.totals;
       setSubtitleEmphasis(money(totals.priceEffect));
-      setSubtitle(t("summary.fidelity.fullSubtitle")
+      setSubtitle(t("summary.fidelity.fullSubtitleAdditive")
         .replace("{market}", money(totals.priceEffect))
         .replace("{gain}", money(totals.totalChange).replace(/^\+/, ""))
         .replace("{date}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(dateRange.start))
@@ -102,8 +102,8 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
           <AthValue fidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor} />
           <ProfitSummary fidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
           <ProfitSummary fidelity initialType="year" currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
-          <SummaryMarketCard mode="attribution" currency={currency} dateRange={dateRange} quoteColor={quoteColor} />
-          <SummaryMarketCard mode="leaders" currency={currency} dateRange={dateRange} quoteColor={quoteColor} />
+          <SummaryMarketCard mode="attribution" currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
+          <SummaryMarketCard mode="leaders" currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
         </div>
         {loading && <div className="fidelity-summary-grid" role="status" aria-label={t("summary.fidelity.loadingSubtitle")}>
           <SkeletonCard kind="pnl" title={t("summary.fidelity.profitLoss")} caption={cardCaption} />

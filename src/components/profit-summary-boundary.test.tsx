@@ -7,11 +7,13 @@ import MobileSummary from "@/mobile/components/profit-summary";
 import { calculateTotalProfit } from "@/middlelayers/charts";
 import { queryPreviousProfitSnapshotDate } from "@/middlelayers/charts-profit";
 
+const profitMock = vi.hoisted(() => vi.fn());
 vi.mock("@/middlelayers/charts", () => ({
-  calculateTotalProfit: vi.fn().mockResolvedValue({ total: 0 }),
+  calculateTotalProfit: profitMock,
 }));
 vi.mock("@/middlelayers/charts-profit", () => ({
   queryPreviousProfitSnapshotDate: vi.fn().mockResolvedValue(undefined),
+  calculateTotalProfitBatch: vi.fn((ranges) => Promise.all(ranges.map(profitMock))),
 }));
 vi.mock("@/components/pnl-chart", () => ({ default: () => null }));
 vi.mock("@/mobile/components/pnl-chart", () => ({ default: () => null }));
@@ -22,6 +24,21 @@ beforeEach(() => {
   vi.mocked(queryPreviousProfitSnapshotDate).mockReset().mockResolvedValue(undefined);
 });
 afterEach(() => vi.useRealTimers());
+
+it("clips fidelity year profit to the same selected window as its months", async () => {
+  const start = new Date(2026, 8, 15);
+  const end = new Date(2026, 10, 8, 12);
+  render(<DesktopSummary
+    dateRange={{ start, end }} fidelity initialType="year"
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+    quoteColor="green-up-red-down"
+  />);
+  await waitFor(() => expect(vi.mocked(calculateTotalProfit).mock.calls.some(([range]) =>
+    range.start.getTime() === start.getTime() && range.end.getTime() === end.getTime())).toBe(true));
+  expect(vi.mocked(calculateTotalProfit).mock.calls.some(([range]) =>
+    range.start.getTime() === new Date(2026, 0, 1).getTime()
+    && range.end.getTime() === new Date(2026, 11, 31, 23, 59, 59, 999).getTime())).toBe(false);
+});
 
 it.each([
   ["desktop", DesktopSummary],
@@ -39,7 +56,7 @@ it.each([
       && range.end.getTime() === janEnd,
   )).toBe(true));
   fireEvent.click(screen.getByRole("radio", { name: "Y" }));
-  const yearEnd = new Date(currentYear + 1, 0, 1).getTime() - 1;
+  const yearEnd = _platform === "mobile" ? janEnd : new Date(currentYear + 1, 0, 1).getTime() - 1;
   await waitFor(() => expect(vi.mocked(calculateTotalProfit).mock.calls.some(
     ([range]) => range.start.getTime() === new Date(currentYear, 0, 1).getTime()
       && range.end.getTime() === yearEnd,
@@ -113,7 +130,7 @@ it.each([
 ])("%s marks partial months and years, explains excluded coins, and keeps month detail available", async (_platform, Summary) => {
   vi.mocked(calculateTotalProfit).mockImplementation(async (range) => ({
     total: null,
-    knownTotal: range.start.getMonth() === 1 || range.end.getMonth() === 11 ? 4200 : null,
+    knownTotal: range.start.getMonth() === 1 || range.start.getMonth() !== range.end.getMonth() ? 4200 : null,
     unknownCoins: [{ symbol: "BTC", assetType: "crypto" }, { symbol: "ETH", assetType: "crypto" }],
     coins: [],
     lastRecordDate: new Date(2024, range.start.getMonth(), 15),

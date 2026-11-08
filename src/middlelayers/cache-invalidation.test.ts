@@ -44,8 +44,10 @@ vi.mock("./license", () => ({
 
 vi.mock("./entities/assets", () => ({
   ASSET_HANDLER: {
-    listAssetsMaxCreatedAt: vi.fn(),
-    listAssetsMinCreatedAt: vi.fn(),
+    listAssetsByDateRange: vi.fn(),
+    listAssetsBySymbolByDateRange: vi.fn(),
+    listSnapshotDatesByDateRange: vi.fn(),
+    listLastSnapshotBefore: vi.fn(),
     listSymbolGroupedAssets: vi.fn(),
     listAssets: vi.fn(),
   },
@@ -110,12 +112,12 @@ const transaction: TransactionModel = {
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
-  vi.mocked(ASSET_HANDLER.listAssetsMaxCreatedAt).mockResolvedValue([
-    latestAsset,
+  vi.mocked(ASSET_HANDLER.listAssetsByDateRange).mockResolvedValue([[latestAsset]]);
+  vi.mocked(ASSET_HANDLER.listAssetsBySymbolByDateRange).mockResolvedValue([[latestAsset]]);
+  vi.mocked(ASSET_HANDLER.listSnapshotDatesByDateRange).mockResolvedValue([
+    { uuid: latestAsset.uuid, createdAt: latestAsset.createdAt },
   ]);
-  vi.mocked(ASSET_HANDLER.listAssetsMinCreatedAt).mockResolvedValue([
-    { ...latestAsset, createdAt: "2024-04-01T00:00:00.000Z" },
-  ]);
+  vi.mocked(ASSET_HANDLER.listLastSnapshotBefore).mockResolvedValue([]);
   vi.mocked(
     TRANSACTION_HANDLER.listTransactionsByDateRange,
   ).mockResolvedValue([[transaction]]);
@@ -141,7 +143,7 @@ describe("generic data cache invalidation", () => {
     await queryRealTimeAssetsValue();
     await queryRealTimeAssetsValue();
 
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+    expect(ASSET_HANDLER.listAssetsBySymbolByDateRange).toHaveBeenCalledTimes(1);
     expect(ASSET_HANDLER.listSymbolGroupedAssets).toHaveBeenCalledTimes(1);
 
     const profitEpoch = getCacheGroupEpoch(
@@ -195,7 +197,7 @@ describe("generic data cache invalidation", () => {
       await calculateTotalProfit(dateRange, "BTC", "crypto");
       await queryRealTimeAssetsValue();
 
-      expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
+      expect(ASSET_HANDLER.listAssetsBySymbolByDateRange).toHaveBeenCalledTimes(2);
       expect(ASSET_HANDLER.listSymbolGroupedAssets).toHaveBeenCalledTimes(2);
       expect(consoleWarn).toHaveBeenCalledWith(
         "local storage cache cleanup failed",

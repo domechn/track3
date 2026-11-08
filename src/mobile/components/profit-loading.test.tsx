@@ -115,6 +115,52 @@ describe("Profit loading", () => {
     expect(screen.queryByText("+$0.00")).not.toBeInTheDocument();
   });
 
+  it("keeps a partly known coin in Unknown with an explanation", async () => {
+    calculateTotalProfitMock.mockResolvedValue({
+      total: null, knownTotal: 20, percentage: null,
+      unknownCoins: [{ symbol: "BTC", assetType: "crypto", intervals: ["2024-04-16T00:00:00.000Z"] }],
+      coins: [{ symbol: "BTC", assetType: "crypto", value: 20, isUnknown: true, percentage: null,
+        buyAmount: 1, sellAmount: 0, costAvgPrice: 100, sellAvgPrice: 0 }],
+    });
+    render(<MemoryRouter><Profit
+      currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down"
+    /></MemoryRouter>);
+    expect(await screen.findByText("Unknown")).toBeInTheDocument();
+    expect(screen.getByText("Unknown").parentElement).toHaveTextContent("BTC");
+    expect(screen.getByText("Unknown").parentElement!.querySelector("tr td:last-child .text-sm")).toHaveClass("text-muted-foreground");
+    expect(screen.getAllByRole("button", { name: /Explain partial profit/ }).length).toBeGreaterThan(0);
+  });
+
+  it("marks an unknown phone row without nesting a button in its link", async () => {
+    const oldMatchMedia = window.matchMedia;
+    window.matchMedia = (query: string) => ({
+      matches: query.includes("pointer: coarse"), media: query, onchange: null,
+      addListener: vi.fn(), removeListener: vi.fn(),
+      addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+    });
+    try {
+      calculateTotalProfitMock.mockResolvedValue({
+        total: null, percentage: null,
+        unknownCoins: [{ symbol: "BTC", assetType: "crypto" }],
+        coins: [{ symbol: "BTC", assetType: "crypto", value: 20, isUnknown: true, percentage: null,
+          buyAmount: 1, sellAmount: 0, costAvgPrice: 100, sellAvgPrice: 0 }],
+      });
+      const { container } = render(<MemoryRouter><Profit
+        currency={usdCurrency}
+        dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+        quoteColor="green-up-red-down"
+      /></MemoryRouter>);
+      await screen.findByText("Unknown");
+      expect(container.querySelector(".profit-mobile-list a button")).toBeNull();
+      expect(container.querySelector(".profit-mobile-list .mobile-list-value")).toHaveTextContent("?");
+      expect(container.querySelector(".profit-mobile-list .mobile-list-value .ios-money")).toHaveClass("text-muted-foreground");
+    } finally {
+      window.matchMedia = oldMatchMedia;
+    }
+  });
+
   it("uses navigable grouped rows for profit leaders on a phone", async () => {
     const oldMatchMedia = window.matchMedia;
     window.matchMedia = (query: string) => ({

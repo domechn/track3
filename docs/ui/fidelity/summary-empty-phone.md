@@ -170,7 +170,7 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 - App capture: `/tmp/fidelity/summary/summary-empty-phone-long.png`.
 - Reference render: `/tmp/rev-fa3/design/analyze-summary-empty-long.png`.
-- Fresh 390 × 844 first-screen pixel difference: **2.45%** (RGB difference >20/255 in any channel).
+- Earlier 390 × 844 first-screen pixel difference: **2.45%** (RGB difference >20/255 in any channel). The 8 Nov 2026 comparison is under Remaining differences.
 - Full-page overlap pixel difference: **0.97%** (source 2,237px; app 2,237px high).
 
 ## Real-data limits
@@ -179,6 +179,7 @@ The phone reads existing SQLite snapshots, transactions, configuration, and wall
 
 ## Remaining differences
 
+- **8 Nov 2026 current 390 × 844 capture:** one snapshot **6.240%** against `ds/pages/analyze-summary-empty.html` (any RGB channel differs by more than 20). Source: `.local/ui46-final/source-390-analyze-summary-empty.html.png`; app: `/tmp/fidelity/summary/summary-empty-phone.png`; source bounds and computed styles: `/tmp/ui46-source-390-analyze-summary-empty.html.json`; app bounds and computed-style assertions: `ios-fidelity-summary-layout.spec.ts`. Both first cards are x=16, y=150, 358 × 475. The source packs disabled range labels into an overlapping strip; the app keeps all six labels readable and the Refresh action reachable. The Analytics menu chevron and unread badge belong to the working product navigation. The source and app rasterize the same Public Sans font differently.
 - An empty chart panel now uses the shared centred icon, title, and refresh hint with a 200px minimum. The source predates the shared empty state.
 
 - The source empty state labels attribution with a start date of 1 Jul 2025, although its only snapshot is 31 Oct 2026. The app reports the stored snapshot date.

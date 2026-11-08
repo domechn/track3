@@ -46,17 +46,19 @@ for (const state of ["full", "empty", "loading"] as const) {
       expect(quantityLeft).toBeCloseTo(zero, 5);
       await expect(page.locator(".fidelity-attribution-axis")).not.toContainText("−$50");
       await expect(page.locator(".fidelity-summary-pnl strong.big")).toHaveText("+$188,809.27");
+      await expect(page.locator(".fidelity-summary-pnl-kpis")).toContainText("+32.84%");
+      await expect(page.locator(".fidelity-summary-pnl-kpis")).toContainText("$575,000");
       const pnlHint = page.locator(".fidelity-period-card").first()
         .getByRole("button", { name: "How P&L % is calculated" });
       await pnlHint.click();
       for (const ticker of ["BTC", "ETH", "SOL", "BNB", "NVDA", "AAPL"]) {
         await expect(page.getByRole("tooltip")).toContainText(ticker);
       }
-      await expect(page.getByRole("tooltip")).toContainText("stablecoins are excluded.");
+      await expect(page.getByRole("tooltip")).toContainText("Stablecoins are excluded from coin counts.");
       await pnlHint.click();
       await expect(page.locator(".fidelity-month-card")).toHaveCount(10);
       await expect(page.locator(".fidelity-month-card").nth(1)).toContainText("0 up · 6 down");
-      await expect(page.locator(".fidelity-year-card").nth(1)).toContainText("5 up · 1 down");
+      await expect(page.locator(".fidelity-year-card").nth(1)).toContainText("5 months up · 1 month down");
       await expect(page.locator(".fidelity-summary-chart [data-point]").first()).toHaveAttribute("aria-label", /Jul 2025.*\$0/);
       await expect(page.locator(".t3-fidelity-ranges button").last()).toHaveAttribute("aria-pressed", "true");
     }
@@ -341,7 +343,7 @@ test("two snapshots in one month draw a profit line", async ({ page }) => {
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
   const profitLine = page.locator(".fidelity-summary-chart line[data-direction]");
   expect(await profitLine.count()).toBeGreaterThan(0);
-  await expect(profitLine.first()).toHaveAttribute("stroke", "hsl(var(--muted-foreground))");
+  await expect(profitLine.first()).toHaveAttribute("stroke", "hsl(var(--gain))");
   expect(await profitLine.evaluateAll((lines) => lines.every((line) =>
     Number(line.getAttribute("x2")) > Number(line.getAttribute("x1")) &&
     getComputedStyle(line).stroke !== "none"))).toBe(true);

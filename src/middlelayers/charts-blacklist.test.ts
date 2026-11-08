@@ -38,6 +38,7 @@ vi.mock("./datafetch/coins/others", () => ({
 
 vi.mock("./datafetch/utils/coins", () => ({
   calculateTotalValue: vi.fn(),
+  getAssetIdentity: vi.fn(),
   getAssetType: vi.fn(
     (asset?: { assetType?: "crypto" | "stock" }) =>
       asset?.assetType ?? "crypto",

@@ -12,11 +12,16 @@ import { axisForValues, boundedMonthTimestamps, compactMoney, hasProfitLine } fr
 import { requestFullRefresh } from "./refresh-request";
 import { directionColorVar } from "@/utils/color";
 import { splitDirectionLine } from "@/components/direction-line";
+import { PartialProfitHint, hasVisibleUnrecordedChange } from "./profit-summary-hints";
 
 type Point = { timestamp: number; value: number | null };
 type SummaryData = {
   total: number | null;
+  knownTotal: number | null;
+  unknownCoins: Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"];
+  unrecordedChange: number;
   percentage: number | null | undefined;
+  investedCapital: number;
   positions: number;
   currentValue: number;
   up: number;
@@ -63,21 +68,32 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
         chartTimestamps.unshift(snapshots[0].timestamp);
       }
       const boundedTimestamps = boundedMonthTimestamps(chartTimestamps);
-      const monthly = await bluebird.map(boundedTimestamps, async (timestamp) => {
-        const cumulative = await calculateTotalProfit({ start: dateRange.start, end: new Date(timestamp) });
-        return { timestamp, value: cumulative.total };
-      }, { concurrency: 4 });
-      points.push(...monthly);
+      const intervals = await bluebird.map(boundedTimestamps, (timestamp, index) =>
+        calculateTotalProfit({
+          start: new Date(index === 0 ? dateRange.start.getTime() : boundedTimestamps[index - 1] + 1),
+          end: new Date(timestamp),
+        }), { concurrency: 4 });
+      let runningKnown = 0;
+      const monthly = boundedTimestamps.map((timestamp, index) => {
+        const interval = intervals[index];
+        runningKnown += interval.knownTotal ?? 0;
+        return { timestamp, value: interval.total === null && interval.knownTotal === null ? null : runningKnown };
+      });
+      points.push(...monthly.filter((point) => point.timestamp !== dateRange.start.getTime()));
       const stableCoins = new Set(await new StableCoinsQuery().listAllStableCoins());
       const movers = profit.coins.filter((coin) => !stableCoins.has(coin.symbol));
       if (!active) return;
       setData({
         total: profit.total,
+        knownTotal: profit.knownTotal,
+        unknownCoins: profit.unknownCoins,
+        unrecordedChange: profit.unrecordedChange ?? 0,
         percentage: profit.percentage,
+        investedCapital: profit.coins.reduce((sum, coin) => sum + (coin.realSpentValue ?? 0), 0),
         positions: assets.length,
         currentValue: current.totalValue,
-        up: movers.filter((coin) => coin.value !== null && coin.value > 0.005).length,
-        down: movers.filter((coin) => coin.value !== null && coin.value < -0.005).length,
+        up: movers.filter((coin) => !coin.isUnknown && coin.value !== null && coin.value > 0.005).length,
+        down: movers.filter((coin) => !coin.isUnknown && coin.value !== null && coin.value < -0.005).length,
         points,
         snapshotTimestamps: snapshots.map((point) => point.timestamp),
         sampled: boundedTimestamps.length < chartTimestamps.length,
@@ -91,7 +107,7 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
   }, [rangeKey, dataVersion, retry]);
 
   const usablePoints = useMemo(() => data?.points.filter((point): point is { timestamp: number; value: number } => point.value !== null) ?? [], [data]);
-  const hasLine = hasProfitLine(data?.snapshotTimestamps ?? []) && usablePoints.length > 2;
+  const hasLine = hasProfitLine(data?.snapshotTimestamps ?? []) && usablePoints.length > 1;
   const axis = axisForValues(usablePoints.map((point) => point.value));
   const topValue = axis.upper;
   const span = axis.upper - axis.lower;
@@ -102,21 +118,26 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
   const ticks = axis.ticks;
   const best = data?.sampled ? undefined : usablePoints.slice(1).map((point, index) => ({ point, index: index + 1, change: point.value - usablePoints[index].value }))
     .sort((a, b) => b.change - a.change)[0];
-  const tone = oneSnapshot || data?.total == null ? "fidelity-faint" : data.total >= 0
+  const displayedTotal = data?.total ?? (data?.unknownCoins.length ? data.knownTotal : null);
+  const tone = oneSnapshot || displayedTotal == null ? "fidelity-faint" : displayedTotal >= 0
     ? quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"
     : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive";
   const missing = "–";
-  const netPnlFull = data?.total == null ? null : money(data.total, currency);
+  const netPnlFull = displayedTotal == null ? null : money(displayedTotal, currency);
   const netPnlLong = netPnlFull !== null && netPnlFull.length > 12;
   const netPnlText = oneSnapshot || netPnlFull === null ? missing : netPnlLong
-    ? `${data!.total! > 0 ? "+" : ""}${compactMoney(currencyWrapper(currency)(data!.total!), currency.symbol)}`
+    ? `${displayedTotal! > 0 ? "+" : ""}${compactMoney(currencyWrapper(currency)(displayedTotal!), currency.symbol)}`
     : netPnlFull;
 
   return <section className="fidelity-card fidelity-summary-pnl">
     <div className="fidelity-card-head"><h2>{t("summary.fidelity.profitLoss")}</h2><span>{t("summary.fidelity.netPnlUsd").replace("{currency}", currency.currency)}</span></div>
     <div className="fidelity-kpis fidelity-summary-pnl-kpis">
-      <div><span>{t("summary.fidelity.netPnlAll")}</span><strong className={cn("big", tone, netPnlLong && "fidelity-long-money")} title={oneSnapshot ? undefined : netPnlFull ?? undefined}>{netPnlLong ? <span className="whitespace-nowrap">{netPnlText}</span> : netPnlText}</strong><small>{oneSnapshot || data?.total == null ? t("summary.fidelity.needsSecond") : t("summary.fidelity.since").replace("{date}", date(dateRange.start))}</small></div>
-      <div><span>{t("summary.fidelity.pnlPercent")}</span><strong className={tone}>{oneSnapshot || data?.total == null || data.percentage === null ? missing : data.percentage === undefined ? "∞" : `${data.percentage >= 0 ? "+" : "−"}${number(Math.abs(data.percentage))}%`}</strong><small>{oneSnapshot || data?.total == null ? t("summary.fidelity.investedCapital") : t("summary.fidelity.onInvested").replace("{amount}", money(data.currentValue - data.total, currency, 0).replace(/^[+−]/, ""))}</small></div>
+      <div><span>{t("summary.fidelity.netPnlAll")}</span><strong className={cn("big", tone, netPnlLong && "fidelity-long-money")} title={oneSnapshot ? undefined : netPnlFull ?? undefined}>{netPnlLong ? <span className="whitespace-nowrap">{netPnlText}</span> : netPnlText}</strong><small>{oneSnapshot || displayedTotal == null ? t("summary.fidelity.needsSecond") : t("summary.fidelity.since").replace("{date}", date(dateRange.start))}</small>
+        {data?.unknownCoins.length ? <PartialProfitHint names={data.unknownCoins.map((coin) => coin.symbol)} affected={data.unknownCoins}
+          period={date(dateRange.start)} t={t} /> : null}
+        {!oneSnapshot && data && hasVisibleUnrecordedChange(data.unrecordedChange, currency) && <small className="text-muted-foreground">{t("profitSummary.unrecordedChanges").replace("{amount}", money(data.unrecordedChange, currency))}</small>}
+      </div>
+      <div><span>{t("summary.fidelity.pnlPercent")}</span><strong className={tone}>{oneSnapshot || data?.total == null || data.percentage === null ? missing : data.percentage === undefined ? "∞" : `${data.percentage >= 0 ? "+" : "−"}${number(Math.abs(data.percentage))}%`}</strong><small>{oneSnapshot || data?.total == null ? t("summary.fidelity.investedCapital") : t("summary.fidelity.onInvested").replace("{amount}", money(data.investedCapital, currency, 0).replace(/^[+−]/, ""))}</small></div>
       <div><span>{t("summary.fidelity.breakeven")}</span><strong className={oneSnapshot || data?.total == null ? "fidelity-faint" : undefined}>{oneSnapshot || data?.total == null ? missing : money(data.currentValue - data.total, currency, 0).replace(/^[+−]/, "")}</strong><small>{t("summary.fidelity.breakevenNote").replace("{symbol}", currency.symbol)}</small></div>
       <div><span>{t("summary.fidelity.positions")}</span><strong>{data?.positions ?? missing}</strong><small>{oneSnapshot || data?.total == null ? t("summary.fidelity.oneSnapshot") : <><span className={data.up === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"}>{data.up} {t("summary.fidelity.up")}</span> · <span className={data.down === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive"}>{data.down} {t("summary.fidelity.down")}</span> · {Math.max(0, data.positions - data.up - data.down)} {t("summary.fidelity.flat")}</>}</small></div>
     </div>

@@ -32,6 +32,7 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
 import ProfitAttribution from "@/mobile/components/profit-attribution";
 import { profitRanks } from "@/components/analyze-values";
+import { PartialProfitHint } from "@/components/profit-summary-hints";
 import { DeltaPill, ListRow, SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
 
 function getToneBadgeClass(value: number, quoteColor: QuoteColor) {
@@ -71,8 +72,10 @@ const App = ({
       assetType: "crypto" | "stock";
       percentage?: number | null;
       value: number | null;
+      isUnknown?: true;
     }[]
   >([]);
+  const [unknownCoins, setUnknownCoins] = useState<Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"]>([]);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [view, setView] = useState<"summary" | "attribution">("summary");
   const [profitRange, setProfitRange] = useState<"7D" | "1M" | "1Y" | "ALL">("ALL");
@@ -102,6 +105,7 @@ const App = ({
         setProfit(res.total);
         setProfitPercentage(res.percentage);
         setCoinsProfit(sortedCoins);
+        setUnknownCoins(res.unknownCoins ?? []);
       })
       .finally(() => {
         if (gen === loadGenRef.current) {
@@ -137,7 +141,7 @@ const App = ({
     [coinsProfit],
   );
   const unknownProfitData = useMemo(
-    () => coinsProfit.filter((coin) => coin.value === null),
+    () => coinsProfit.filter((coin) => coin.isUnknown || coin.value === null),
     [coinsProfit],
   );
 
@@ -153,11 +157,11 @@ const App = ({
     ? `${t("common.infinity")}%`
     : `${profitPercentage < 0 ? "" : "+"}${prettyNumberKeepNDigitsAfterDecimalPoint(profitPercentage, 2)}%`;
   const positiveCount = useMemo(
-    () => coinsProfit.filter((coin) => coin.value !== null && coin.value > 0).length,
+    () => coinsProfit.filter((coin) => !coin.isUnknown && coin.value !== null && coin.value > 0).length,
     [coinsProfit],
   );
   const negativeCount = useMemo(
-    () => coinsProfit.filter((coin) => coin.value !== null && coin.value < 0).length,
+    () => coinsProfit.filter((coin) => !coin.isUnknown && coin.value !== null && coin.value < 0).length,
     [coinsProfit],
   );
 
@@ -217,6 +221,7 @@ const App = ({
       assetType: "crypto" | "stock";
       percentage?: number | null;
       value: number | null;
+      isUnknown?: true;
     }[],
     rankStart = 1,
   ) =>
@@ -248,13 +253,15 @@ const App = ({
           </Link>
         </TableCell>
         <TableCell className="text-right py-1.5">
-          <div className={`text-sm ${d.value === null ? "text-muted-foreground" : positiveNegativeTextClass(d.value, quoteColor, 500)}`}>
+          <div className={`text-sm ${d.isUnknown || d.value === null ? "text-muted-foreground" : positiveNegativeTextClass(d.value, quoteColor, 500)}`}>
             {d.value === null ? "—" : (d.value < 0 ? "-" : "+") +
               currency.symbol +
               prettyNumberToLocaleString(
                 currencyWrapper(currency)(Math.abs(d.value)),
               )}
           </div>
+          {d.isUnknown && <PartialProfitHint names={[d.symbol]} affected={unknownCoins.filter((coin) => coin.symbol === d.symbol)}
+            period={d.symbol} t={t} />}
           {showCoinsProfitPercentage && (
             <div className="text-xs text-muted-foreground">
               {d.percentage === null ? "—" : <>
@@ -276,9 +283,10 @@ const App = ({
       const key = getAssetLogoKey(row);
       return <ListRow key={key} href={`#${buildAssetDetailsPath(row)}`}
         value={<span className="text-right">
-          <span className={`block text-sm ios-money ${row.value === null ? "text-muted-foreground" : positiveNegativeTextClass(row.value, quoteColor, 500)}`}>
+          <span className={`block text-sm ios-money ${row.isUnknown || row.value === null ? "text-muted-foreground" : positiveNegativeTextClass(row.value, quoteColor, 500)}`}>
             {row.value === null ? "—" : `${row.value < 0 ? "-" : "+"}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(row.value)))}`}
           </span>
+          {row.isUnknown && <span className="text-muted-foreground" title={t("common.unknown")}>?</span>}
           {showCoinsProfitPercentage && <span className="block text-xs">
             {row.percentage === null ? "—" : row.percentage === undefined ? t("common.infinity")
               : `${row.percentage < 0 ? "" : "+"}${prettyNumberKeepNDigitsAfterDecimalPoint(row.percentage, 2)}%`}
@@ -328,6 +336,8 @@ const App = ({
             </div>
             <div className="text-xs text-muted-foreground">
               {t(showRangeControl ? "profit.netPnlShort" : "profit.netPnl")}
+              {unknownCoins.length > 0 && <PartialProfitHint names={unknownCoins.map((coin) => coin.symbol)}
+                affected={unknownCoins} period={t("profit.netPnl")} t={t} />}
             </div>
           </div>
           <div>

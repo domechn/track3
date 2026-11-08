@@ -53,7 +53,11 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
   const exact = (value: number) => attributionAmount(value, currency, true);
   const tone = (value: number) => directionClass(attributionRoundedValue(value, currency), quoteColor);
   const barTone = (value: number) => directionBackgroundClass(value, quoteColor);
-  const label = (key: string) => t(`profit.attribution.${key}`);
+  const label = (key: string) => t(`profit.attribution.${({
+    priceEffect: "knownPnl",
+    flowEffect: "recordedFlow",
+    method: "methodAdditive",
+  } as Record<string, string>)[key] ?? key}`);
   const displayGroup = (group: { key: string; label: string }) =>
     dimension === "wallet" ? walletLabels[group.key] ?? t("common.unknown")
       : dimension === "source" && group.label === "unknown" ? t("common.unknown") : group.label;

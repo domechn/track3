@@ -6,7 +6,7 @@ import { installTauriBridge as installFidelityBridge } from "./fidelity-scenes";
 const out = ".local/profit-hint-popover";
 const iPhoneUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
-test("phone full year keeps its original amount, deposits, and footer spacing", async ({ browser }) => {
+test("phone full year leaves room for the breakdown control", async ({ browser }) => {
   test.setTimeout(180_000);
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 }, userAgent: iPhoneUserAgent,
@@ -30,7 +30,9 @@ test("phone full year keeps its original amount, deposits, and footer spacing", 
         height: Math.round(box.height),
       };
     });
-    expect(geometry).toEqual({ amount: 42, deposits: 110, footerGap: 22, height: 183 });
+    expect(geometry).toEqual({ amount: 38, deposits: 106, footerGap: 46, height: 200 });
+    expect((await page.locator(".fd-year[data-partial='false']").first()
+      .getByRole("button", { name: "Recorded inflow breakdown" }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   } finally {
     await context.close();
   }
@@ -81,7 +83,7 @@ test("phone Jun, Jul, Aug partial hints stay boxed and inside the screen", async
       }
       await panel.getByRole("button", { name: "How P&L % is calculated" }).tap();
       await expect(page.getByRole("tooltip")).toHaveCount(1);
-      await expect(page.getByRole("tooltip")).toContainText("opening value plus deposits");
+      await expect(page.getByRole("tooltip")).toContainText("opening value plus recorded buys and deposits");
       const years = page.locator(".fd-years");
       const cards = years.locator(".fd-year");
       await expect(cards).toHaveCount(3);

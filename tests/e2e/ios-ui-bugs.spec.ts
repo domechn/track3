@@ -79,6 +79,7 @@ test("phone Summary pages 47 groups while retaining its total", async ({ page })
   await attribution.getByRole("button", { name: "Next" }).click();
   await expect(attribution.getByText("Showing 11-20 of 47")).toBeVisible();
   await expect(attribution.locator(".fd-attr-total")).toContainText("$5,781 → $6,251");
+  await expect(attribution.locator(".fd-attr-total")).toContainText("Known P&L +$470");
 });
 
 test("phone coin detail never uses a source hash as its name", async ({ page }) => {

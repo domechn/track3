@@ -9,8 +9,8 @@ import { selectFromDatabaseWithSql } from "./database";
 import initSqlJs from "sql.js";
 
 const alias = vi.hoisted(() => ({ name: "Main" }));
-vi.mock("./entities/assets", () => ({ ASSET_HANDLER: { listAssetsByUUIDs: vi.fn() } }));
-vi.mock("./entities/transactions", () => ({ TRANSACTION_HANDLER: { listTransactionsByUUIDs: vi.fn() } }));
+vi.mock("./entities/assets", () => ({ ASSET_HANDLER: { listAssetsByUUIDs: vi.fn(), listLastSnapshotBefore: vi.fn() } }));
+vi.mock("./entities/transactions", () => ({ TRANSACTION_HANDLER: { listTransactionsByUUIDs: vi.fn(), listTransactionsByDateRange: vi.fn() } }));
 vi.mock("./database", () => ({ selectFromDatabaseWithSql: vi.fn() }));
 vi.mock("./configuration", () => ({ getBlacklistCoins: vi.fn() }));
 vi.mock("./wallet", () => ({ WalletAnalyzer: class { async listWalletAliases() { return { w: { alias: alias.name, type: "Binance", wallet: "address" } }; } } }));
@@ -22,9 +22,24 @@ const snapshot = (day: number, amount: number, value: number, transactions: unkn
   assets: [{ id: day, uuid: `u${day}`, createdAt: date(day), wallet: "w", symbol: "BTC", assetType: "crypto", amount, value, price: value / amount }],
 });
 
-beforeEach(() => { vi.clearAllMocks(); alias.name = "Main"; vi.mocked(getBlacklistCoins).mockResolvedValue([]); });
+beforeEach(() => {
+  vi.clearAllMocks(); alias.name = "Main"; vi.mocked(getBlacklistCoins).mockResolvedValue([]);
+  vi.mocked(ASSET_HANDLER.listLastSnapshotBefore).mockResolvedValue([]);
+  vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([]);
+});
 
 describe("queryAttribution", () => {
+  it("includes the interval from the last snapshot before the selected year", async () => {
+    const prior = { ...snapshot(1, 1, 80).assets[0], uuid: "prior", createdAt: "2024-03-31T00:00:00.000Z", price: 80 };
+    vi.mocked(ASSET_HANDLER.listLastSnapshotBefore).mockResolvedValue([prior] as never);
+    vi.mocked(selectFromDatabaseWithSql).mockResolvedValue([{ uuid: "u1", createdAt: date(1) }, { uuid: "u2", createdAt: date(2) }] as never);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([...snapshot(1, 1, 100).assets, ...snapshot(2, 1, 120).assets] as never);
+    vi.mocked(TRANSACTION_HANDLER.listTransactionsByUUIDs).mockResolvedValue([]);
+    const result = await queryAttribution({ start: range.start, end: new Date("2024-04-03T23:59:59.000Z") });
+    expect(result.attribution.totals.priceEffect).toBe(40);
+    expect(result.attribution.startValue).toBe(80);
+  });
+
   it("loads unsummarized snapshots with their transactions for the selected range", async () => {
     vi.mocked(selectFromDatabaseWithSql).mockResolvedValue([{ uuid: "u1", createdAt: date(1) }, { uuid: "u2", createdAt: date(2) }] as never);
     vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([...snapshot(2, 2, 240).assets, ...snapshot(1, 1, 100).assets] as never);
@@ -33,6 +48,7 @@ describe("queryAttribution", () => {
     expect(ASSET_HANDLER.listAssetsByUUIDs).toHaveBeenCalledWith(["u1", "u2"]);
     expect(TRANSACTION_HANDLER.listTransactionsByUUIDs).toHaveBeenCalledWith(["u1", "u2"]);
     expect(result.attribution.totals).toEqual({ priceEffect: 20, flowEffect: 120, residual: 0, totalChange: 140 });
+    expect(result.attribution.startValue).toBe(100);
     expect(result.aliases.w).toMatchObject({ alias: "Main", type: "Binance" });
     expect(Object.keys(localStorage).some((key) => key.includes("attribution-v3"))).toBe(false);
   });
