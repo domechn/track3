@@ -10,7 +10,6 @@ import {
   saveTheme,
 } from "@/middlelayers/configuration";
 import { QuoteColor } from "@/middlelayers/types";
-import { reloadApp } from "@/utils/app";
 import { useTheme } from "./common/theme";
 import { type Theme } from "@/middlelayers/ui-state/appearance";
 import {
@@ -67,7 +66,7 @@ const App = ({
     await saveTheme(v);
     setSelectedTheme(v);
     originalThemeRef.current = v;
-    reloadApp();
+    currentTheme.setTheme(v);
   }
 
   async function handleQuoteColorValueChange(val: string) {
@@ -119,9 +118,6 @@ const App = ({
             <div className="text-xl font-semibold capitalize">
               {selectedTheme}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {t("appearance.themeNote")}
-            </p>
           </CardContent>
         </Card>
         <Card>

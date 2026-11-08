@@ -217,7 +217,12 @@
   #app-top-bar button[aria-label="Refresh"]:active { transform: scale(.97); opacity: .7; }
   #app-top-bar .date-picker-mobile button { color: hsl(var(--primary)); }
   #app-top-bar .date-picker-mobile svg { width: 20px; height: 20px; }
-  #app-top-bar .absolute { position: fixed; left: 1rem; right: 1rem; top: calc(var(--mobile-safe-top) + 3.5rem); padding: .5rem; border-radius: .75rem; background: hsl(var(--card)); box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+  #app-top-bar .absolute {
+    position: fixed; left: 1rem; right: 1rem; top: calc(var(--mobile-safe-top) + 3.5rem);
+    padding: .5rem; border-radius: .75rem; background: hsl(var(--card));
+    /* theme-exempt: translucent black shadow is shared by the light and dark surfaces. */
+    box-shadow: 0 4px 16px rgba(0,0,0,.15);
+  }
   #app-main-content { min-width: 0; width: 100%; padding: calc(1rem + var(--mobile-safe-top)) max(1rem, var(--mobile-safe-right)) calc(5rem + var(--mobile-safe-bottom)) max(1rem, var(--mobile-safe-left)); overflow-x: clip; overflow-anchor: none; overscroll-behavior-y: contain; touch-action: pan-y; }
   .mobile-topbar-back + #app-main-content { padding-top: 1rem; }
   #app-main-content > * { min-width: 0; }
@@ -1441,7 +1446,7 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
   height: calc(60px + var(--mobile-safe-bottom));
   padding: 2px var(--mobile-safe-right) var(--mobile-safe-bottom) var(--mobile-safe-left);
   border-top: 1px solid hsl(var(--border));
-  background: hsl(var(--background));
+  background: var(--sidebar-background);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -1456,7 +1461,7 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
   display: grid; min-width: 16px; height: 16px; place-items: center;
   padding: 0 3px; border-radius: var(--radius-pill);
   font-size: 10px; line-height: 18px; font-weight: 700;
-  background: hsl(var(--negative)); color: #1a0509;
+  background: hsl(var(--negative)); color: var(--mobile-tab-badge-foreground);
 }
 body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-tab-badge {
   left: calc(100% - 2px);
@@ -1488,7 +1493,7 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
   .app-layout[data-sidebar-collapsed="true"] { --mobile-sidebar-width: calc(56px + var(--mobile-safe-left)); }
   .mobile-sidebar {
     padding: calc(var(--mobile-safe-top) + 12px) 10px calc(var(--mobile-safe-bottom) + 8px) calc(var(--mobile-safe-left) + 10px);
-    border-right: 1px solid hsl(var(--border)); background: hsl(var(--background));
+    border-right: 1px solid var(--sidebar-border); background: var(--sidebar-background);
     overflow: hidden;
   }
   .mobile-sidebar[data-collapsed="true"] { padding-left: calc(var(--mobile-safe-left) + 5px); padding-right: 5px; }
@@ -1496,20 +1501,20 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
   .mobile-rail-brand svg { width: 28px; height: 28px; flex: none; }
   .mobile-sidebar[data-collapsed="true"] .mobile-rail-brand { justify-content: center; }
   .mobile-sidebar .mobile-rail-brand:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
-  .mobile-rail-group { flex: none; border-top: 1px solid hsl(var(--border)); margin-top: 8px; padding-top: 8px; }
+  .mobile-rail-group { flex: none; border-top: 1px solid var(--sidebar-border); margin-top: 8px; padding-top: 8px; }
   .mobile-rail-group:first-of-type { border: 0; margin-top: 0; padding-top: 0; }
-  .mobile-rail-group-label { padding: 2px 9px 4px; color: hsl(var(--faint)); font-size: 12px; }
-  .mobile-rail-item { display: flex; position: relative; flex: none; align-items: center; min-height: 44px; gap: 12px; width: 100%; padding: 0 9px; border-radius: var(--radius); color: hsl(var(--muted-foreground)); white-space: nowrap; font-size: 13px; font-weight: 500; }
+  .mobile-rail-group-label { padding: 2px 9px 4px; color: var(--sidebar-group-label, var(--sidebar-muted)); font-size: 12px; }
+  .mobile-rail-item { display: flex; position: relative; flex: none; align-items: center; min-height: 44px; gap: 12px; width: 100%; padding: 0 9px; border-radius: var(--radius); color: var(--sidebar-muted); white-space: nowrap; font-size: 13px; font-weight: 500; }
   .mobile-rail-item > svg { flex: none; width: 18px; height: 18px; }
-  .mobile-rail-item[aria-current="page"] { background: hsl(var(--raised)); color: hsl(var(--foreground)); }
+  .mobile-rail-item[aria-current="page"] { background: var(--sidebar-active-bg); color: var(--sidebar-active-fg); }
   .mobile-rail-item[aria-current="page"]::before { content: ""; position: absolute; top: 9px; bottom: 9px; left: -10px; width: 2px; background: hsl(var(--accent-data)); }
   .mobile-rail-badge { display: grid; min-width: 18px; height: 18px; place-items: center; margin-left: auto; padding: 0 5px; border-radius: var(--radius-pill); background: hsl(var(--negative)); color: hsl(var(--background)); font-size: 12px; font-weight: 700; }
   .mobile-rail-spacer { flex: none; min-height: 12px; }
-  .mobile-rail-spacer + .mobile-rail-item { border-top: 1px solid hsl(var(--border)); border-radius: 0; }
-  .mobile-sidebar .mobile-sidebar-collapse { display: flex; min-height: 44px; padding: 0 9px; border-radius: var(--radius); font-size: 13px; }
+  .mobile-rail-spacer + .mobile-rail-item { border-top: 1px solid var(--sidebar-border); border-radius: 0; }
+  .mobile-sidebar .mobile-sidebar-collapse { display: flex; min-height: 44px; padding: 0 9px; border-radius: var(--radius); color: var(--sidebar-muted); font-size: 13px; }
   .mobile-sidebar[data-collapsed="true"] .mobile-rail-item { justify-content: center; padding-inline: 0; }
-  .mobile-sidebar[data-collapsed="true"] .mobile-rail-badge { position: absolute; top: 5px; right: 2px; width: 7px; min-width: 7px; height: 7px; padding: 0; overflow: hidden; font-size: 0; border: 2px solid hsl(var(--background)); }
-  .mobile-sidebar :is(.mobile-rail-item, .mobile-sidebar-collapse):hover:not([aria-current="page"]) { background: hsl(var(--hover)); color: hsl(var(--foreground)); }
+  .mobile-sidebar[data-collapsed="true"] .mobile-rail-badge { position: absolute; top: 5px; right: 2px; width: 7px; min-width: 7px; height: 7px; padding: 0; overflow: hidden; font-size: 0; border: 2px solid var(--sidebar-background); }
+  .mobile-sidebar :is(.mobile-rail-item, .mobile-sidebar-collapse):hover:not([aria-current="page"]) { background: var(--sidebar-hover-bg); color: var(--sidebar-foreground); }
   .mobile-sidebar :is(.mobile-rail-item, .mobile-sidebar-collapse):focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
 }
 
@@ -2234,7 +2239,7 @@ body:has(.fidelity-cost) {
   box-shadow: 0 -20px 50px rgba(0, 0, 0, .5); font-size: 13px; line-height: 18px;
 }
 .fidelity-cost-export .mobile-sheet-handle-area { min-height: 18px; height: 18px; place-items: start center; }
-.fidelity-cost-export .mobile-sheet-handle { height: 4px; border-radius: 2px; background: #44454b; }
+.fidelity-cost-export .mobile-sheet-handle { height: 4px; border-radius: 2px; background: var(--sheet-handle); }
 .fidelity-cost-export .mobile-sheet-heading { position: absolute; width: 1px; height: 1px; min-height: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap; padding: 0; border: 0; }
 .fidelity-cost-export .mobile-sheet-close { display: none; }
@@ -2399,10 +2404,10 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   padding: 14px 16px 0;
 }
 .fidelity-history-filter-sheet.mobile-sheet { height: auto !important; max-height: 90dvh !important; padding-top: 9px;
-  border: 1px solid var(--h-control, #3a3a3e); border-radius: 16px 16px 0 0;
-  background: var(--h-surface, #131217); }
+  border: 1px solid var(--h-control, hsl(var(--border))); border-radius: 16px 16px 0 0;
+  background: var(--h-surface, hsl(var(--card))); }
 .fidelity-history-filter-sheet .mobile-sheet-handle-area { min-height: 14px; height: 14px; place-items: end center; }
-.fidelity-history-filter-sheet .mobile-sheet-handle { height: 4px; border-radius: 2px; background: #44454b; translate: 0 -10px; }
+.fidelity-history-filter-sheet .mobile-sheet-handle { height: 4px; border-radius: 2px; background: var(--sheet-handle); translate: 0 -10px; }
 .fidelity-history-filter-sheet .mobile-sheet-heading { border: 0; justify-content: flex-start; min-height: 34px;
   padding: 0 16px; font-size: 18px; translate: 0 -1px; }
 .fidelity-history-filter-sheet .mobile-sheet-heading h2 { line-height: 24px; }
@@ -2597,21 +2602,21 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .ios-d3-chat [data-testid="chat-card"] { background: #0d0d0e; }
   #app-top-bar .fidelity-chat-header {
     display: flex; flex: none; align-items: center; gap: 4px; width: 100%; height: 56px;
-    border-bottom: 1px solid #222224; background: #0d0d0e; padding: 0 6px 0 84px;
+    border-bottom: 1px solid hsl(var(--border)); background: var(--mobile-topbar-background); padding: 0 6px 0 84px;
   }
   .fidelity-chat-header-primary { display: flex; flex: 1; min-width: 0; align-items: center; gap: 4px; }
   .fidelity-chat-header-button {
     display: grid; flex: none; width: 44px; height: 44px; place-items: center;
-    border: 0; color: #9b9da3; background: transparent;
+    border: 0; color: var(--shell-faint); background: transparent;
   }
   .fidelity-chat-header-button svg { width: 18px; height: 18px; }
   .fidelity-chat-header-title { display: flex; flex: 1; min-width: 0; flex-direction: column; }
   .fidelity-chat-header-title h3 {
-    overflow: hidden; color: white; font-size: 15px; font-weight: 600; line-height: 18px;
+    overflow: hidden; color: hsl(var(--foreground)); font-size: 15px; font-weight: 600; line-height: 18px;
     text-overflow: ellipsis; white-space: nowrap;
   }
-  .fidelity-chat-header-title span { color: #9b9da3; font-size: 12px; line-height: 16px; }
-  .fidelity-chat-header-context { flex: none; color: #9b9da3; font-size: 11px; }
+  .fidelity-chat-header-title span { color: var(--shell-faint); font-size: 12px; line-height: 16px; }
+  .fidelity-chat-header-context { flex: none; color: var(--shell-faint); font-size: 11px; }
   #app-top-bar .fidelity-chat-header-title h3 { top: 8px; transform: translateX(-50%); }
   #app-top-bar .fidelity-chat-header-title span { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); white-space: nowrap; }
   body:has(.ios-d3-chat[data-chat-session="saved"][data-chat-view="thread"]) #app-top-bar .fidelity-chat-header {
@@ -2642,9 +2647,9 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .ios-d3-chat .fidelity-chat-welcome-intro p { margin: 0; color: #b4b6bc; font-size: 13px; line-height: 18px; }
   .fidelity-assistant-insights { width: 100%; border: 1px solid #222224; border-radius: 6px; background: #131217; padding: 16px 20px; text-align: left; }
   .fidelity-assistant-insights > header { display: flex; flex-wrap: wrap; align-items: center; row-gap: 2px; margin-bottom: 12px; }
-  .fidelity-assistant-insights > header h2 { flex-basis: 100%; margin: 0; color: white; font-size: 15px; font-weight: 600; line-height: 20px; }
+  .fidelity-assistant-insights > header h2 { flex-basis: 100%; margin: 0; color: hsl(var(--foreground)); font-size: 15px; font-weight: 600; line-height: 20px; }
   .ios-d3-chat.t3-manage-assistant [data-testid="chat-welcome"] .fidelity-assistant-insights > header h2 { margin: 0; font-size: 15px; line-height: 20px; }
-  .fidelity-assistant-insights > header h3 { flex-basis: 100%; margin: 0; color: white; font-size: 13px; font-weight: 600; line-height: 20px; }
+  .fidelity-assistant-insights > header h3 { flex-basis: 100%; margin: 0; color: hsl(var(--foreground)); font-size: 13px; font-weight: 600; line-height: 20px; }
   .fidelity-assistant-insights-meta { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 36px; gap: 6px; color: #9b9da3; font-size: 12px; line-height: 18px; }
   .fidelity-assistant-insights-meta > span { display: flex; align-items: center; gap: 6px; }
   .fidelity-assistant-insights-meta svg { width: 13px; height: 13px; }
@@ -2832,7 +2837,7 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .fidelity-no-key-page-head p { margin: 2px 0 0; color: #b4b6bc; font-size: 13px; line-height: 18px; }
   .fidelity-no-key-page-head > span { display: inline-block; height: 20px; margin-top: 10px; border-radius: 999px; background: #292316; color: #d9a441; padding: 1px 8px; font-size: 12px; line-height: 18px; }
   .fidelity-no-key-chat { margin-top: 16px; border: 1px solid #222224; border-radius: 6px; background: #131217; overflow: hidden; }
-  .fidelity-no-key-chat .fidelity-chat-header { display: flex; align-items: center; height: 56px; gap: 4px; border-bottom: 1px solid #222224; background: #0d0d0e; padding: 0 6px; }
+  .fidelity-no-key-chat .fidelity-chat-header { display: flex; align-items: center; height: 56px; gap: 4px; border-bottom: 1px solid var(--sidebar-border); background: var(--mobile-topbar-background); padding: 0 6px; }
   .fidelity-no-key-content { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 332px; padding: 28px 16px 16px; text-align: center; }
   .fidelity-no-key-icon { display: grid; width: 52px; height: 52px; margin-bottom: 14px; place-items: center; border-radius: 50%; background: #26262c; color: #b4b6bc; }
   .fidelity-no-key-icon svg { width: 22px; height: 22px; }
@@ -2919,18 +2924,18 @@ body:has(.fidelity-history, .fidelity-history-detail) {
 
 /* Settings A source list follows the 390px approved source geometry. */
 @media (max-width: 699px) {
-  body:has(.fidelity-settings-sources) { background: #0d0d0e; }
+  body:has(.fidelity-settings-sources) { background: hsl(var(--background)); }
   body:has(.fidelity-settings-sources) #app-top-bar.mobile-topbar-back {
-    height: 38px; min-height: 38px; border: 0; background: #0d0d0e; box-shadow: none;
+    height: 38px; min-height: 38px; border: 0; background: var(--mobile-topbar-background); box-shadow: none;
   }
   body:has(.ios-d3-mobile-appearance) #app-top-bar.mobile-topbar-back {
-    height: 38px; min-height: 38px; border: 0; background: #0d0d0e; box-shadow: none;
+    height: 38px; min-height: 38px; border: 0; background: var(--mobile-topbar-background); box-shadow: none;
   }
   body:has(.fidelity-currency) #app-top-bar.mobile-topbar-back {
-    height: 38px; min-height: 38px; border: 0; background: #0d0d0e; box-shadow: none;
+    height: 38px; min-height: 38px; border: 0; background: var(--mobile-topbar-background); box-shadow: none;
   }
   body:has(.fidelity-blacklist) #app-top-bar.mobile-topbar-back {
-    height: 38px; min-height: 38px; border: 0; background: #0d0d0e; box-shadow: none;
+    height: 38px; min-height: 38px; border: 0; background: var(--mobile-topbar-background); box-shadow: none;
   }
   body:has(.fidelity-settings-sources) #app-top-bar > div:first-child {
     height: 38px; min-height: 38px; padding: 0 16px;
@@ -2945,16 +2950,16 @@ body:has(.fidelity-history, .fidelity-history-detail) {
     height: 38px; min-height: 38px; padding: 0 16px;
   }
   body:has(.fidelity-settings-sources) #app-top-bar .mobile-header-back {
-    min-height: 38px; gap: 4px; padding: 0; color: #4a8ad6; font-size: 13px; font-weight: 400;
+    min-height: 38px; gap: 4px; padding: 0; color: hsl(var(--accent-data)); font-size: 13px; font-weight: 400;
   }
   body:has(.ios-d3-mobile-appearance) #app-top-bar .mobile-header-back {
-    min-height: 38px; gap: 4px; padding: 0; color: #4a8ad6; font-size: 13px; font-weight: 400;
+    min-height: 38px; gap: 4px; padding: 0; color: hsl(var(--accent-data)); font-size: 13px; font-weight: 400;
   }
   body:has(.fidelity-currency) #app-top-bar .mobile-header-back {
-    min-height: 38px; gap: 4px; padding: 0; color: #4a8ad6; font-size: 13px; font-weight: 400;
+    min-height: 38px; gap: 4px; padding: 0; color: hsl(var(--accent-data)); font-size: 13px; font-weight: 400;
   }
   body:has(.fidelity-blacklist) #app-top-bar .mobile-header-back {
-    min-height: 38px; gap: 4px; padding: 0; color: #4a8ad6; font-size: 13px; font-weight: 400;
+    min-height: 38px; gap: 4px; padding: 0; color: hsl(var(--accent-data)); font-size: 13px; font-weight: 400;
   }
   body:has(:is(.fidelity-settings-sources, .ios-d3-mobile-appearance, .fidelity-currency, .fidelity-blacklist)) #app-top-bar .mobile-header-back {
     margin-left: -6px; font-size: 15px;
@@ -2977,22 +2982,22 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .ios-d3-settings:has(.fidelity-settings-sources) { max-width: none; padding-bottom: 0; }
   .ios-d3-settings:has(.fidelity-settings-sources) .mobile-split-detail > header { padding-top: 2px; }
   .ios-d3-settings:has(.fidelity-settings-sources) .mobile-split-detail > header h1 {
-    margin: 0; color: white; font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em;
+    margin: 0; color: hsl(var(--foreground)); font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em;
   }
   .ios-d3-settings:has(.ios-d3-mobile-appearance) { max-width: none; padding-bottom: 0; }
   .ios-d3-settings:has(.ios-d3-mobile-appearance) .mobile-split-detail > header { padding-top: 2px; }
   .ios-d3-settings:has(.ios-d3-mobile-appearance) .mobile-split-detail > header h1 {
-    margin: 0; color: white; font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em;
+    margin: 0; color: hsl(var(--foreground)); font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em;
   }
   .ios-d3-settings:has(.fidelity-currency) { max-width: none; padding-bottom: 0; }
   .ios-d3-settings:has(.fidelity-currency) .mobile-split-detail > header { padding-top: 2px; }
   .ios-d3-settings:has(.fidelity-currency) .mobile-split-detail > header h1 {
-    margin: 0; color: white; font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em;
+    margin: 0; color: hsl(var(--foreground)); font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em;
   }
   .ios-d3-settings:has(.fidelity-blacklist) { max-width: none; padding-bottom: 0; }
   .ios-d3-settings:has(.fidelity-blacklist) .mobile-split-detail > header { padding-top: 2px; }
   .ios-d3-settings:has(.fidelity-blacklist) .mobile-split-detail > header h1 {
-    margin: 0; color: white; font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em;
+    margin: 0; color: hsl(var(--foreground)); font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em;
   }
   .ios-d3-settings:has(.fidelity-settings-sources) .ios-d3-settings-page { margin-top: 2px; }
   .fidelity-settings-sources { color: white; font-size: 13px; line-height: 18px; }
@@ -3463,7 +3468,7 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .fidelity-currency-row.is-stack { display: flex; flex-direction: column; align-items: stretch; height: 135px; }
   .fidelity-currency-row.is-stack.is-error { height: 153px; }
   .fidelity-currency-error { color: #e85b77; }
-  .fidelity-currency-card > header span.is-stale { color: #d7a553; }
+  .fidelity-currency-card > header span.is-stale { color: hsl(var(--warning)); }
   .fidelity-currency-row > div:first-child { min-width: 0; flex: 1; }
   .fidelity-currency-row strong { display: block; font-weight: 600; }
   .fidelity-currency-row p { margin: 2px 0 0; color: #b4b6bc; font-size: 12px; line-height: 18px; }
@@ -3494,7 +3499,7 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .fidelity-currency-update:disabled { opacity: .6; }
   .fidelity-currency-update svg { width: 14px; height: 14px; }
   .fidelity-currency-card > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-  .fidelity-currency-card > header span { color: #9b9da3; font-size: 12px; white-space: nowrap; }
+  .fidelity-currency-card > header span { color: var(--shell-faint); font-size: 12px; white-space: nowrap; }
   .fidelity-currency-table { width: 100%; border-collapse: collapse; font-size: 12px; }
   .fidelity-currency-table th { border-bottom: 1px solid #1b1a1f; padding: 0 0 8px; color: #9b9da3; font-weight: 400; text-align: left; }
   .fidelity-currency-table th:not(:first-child), .fidelity-currency-table td:not(:first-child) { text-align: right; }
@@ -3594,19 +3599,19 @@ body:has(.fidelity-history, .fidelity-history-detail) {
 
 /* Settings B phone cards use the approved compact dark geometry. */
 @media (max-width: 699px) {
-  body:has(.fidelity-b) { background: #0d0d0e; font-family: "Public Sans", sans-serif; }
+  body:has(.fidelity-b) { background: hsl(var(--background)); font-family: "Public Sans", sans-serif; }
   body:has(.fidelity-b) #app-top-bar.mobile-topbar-back {
-    height: 38px; min-height: 38px; border: 0; background: #0d0d0e; box-shadow: none;
+    height: 38px; min-height: 38px; border: 0; background: var(--mobile-topbar-background); box-shadow: none;
   }
   body:has(.fidelity-b) #app-top-bar.mobile-topbar-back:has(.mobile-compact-title),
   body:has(.fidelity-b) #app-top-bar.mobile-topbar-back:has(.mobile-compact-title) > div:first-child {
-    height: 56px; min-height: 56px; background: #0d0d0e;
+    height: 56px; min-height: 56px; background: var(--mobile-topbar-background);
   }
   body:has(.fidelity-b) #app-top-bar > div:first-child {
     height: 38px; min-height: 38px; padding: 0 16px;
   }
   body:has(.fidelity-b) #app-top-bar .mobile-header-back {
-    min-height: 38px; gap: 4px; padding: 0; color: #4a8ad6; font-size: 13px; font-weight: 400;
+    min-height: 38px; gap: 4px; padding: 0; color: hsl(var(--accent-data)); font-size: 13px; font-weight: 400;
   }
   body:has(.fidelity-b) #app-main-content {
     padding: var(--mobile-safe-top) max(16px, var(--mobile-safe-right)) 72px max(16px, var(--mobile-safe-left)) !important;
@@ -3616,7 +3621,7 @@ body:has(.fidelity-history, .fidelity-history-detail) {
     padding-top: 2px; margin: 0; display: block;
   }
   .ios-d3-settings:has(.fidelity-b) .mobile-split-detail > header h1 {
-    margin: 0; color: #fff; font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em;
+    margin: 0; color: hsl(var(--foreground)); font-size: 22px; font-weight: 600; line-height: 28px; letter-spacing: -.01em;
     font-family: "Public Sans", sans-serif;
   }
   .ios-d3-settings:has(.fidelity-b) .ios-d3-settings-page { margin: 0; }
