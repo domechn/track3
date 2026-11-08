@@ -23,6 +23,8 @@ import { marketProfitPercentage } from "@/components/profit-percentage";
 import "@/mobile/components/mobile/fidelity.css";
 import { directionColorVar, directionTone } from "@/utils/color";
 import { splitDirectionLine } from "@/components/direction-line";
+import { selectSummaryRange, summaryPresetRange, type SummaryPreset } from "@/middlelayers/summary-range";
+import { roundedSummaryBreakdown, summaryProfitPercentage } from "@/middlelayers/summary-breakdown";
 
 type Profit = Awaited<ReturnType<typeof calculateTotalProfit>>;
 type ChartProfit = Pick<Profit, "total" | "knownTotal" | "unknownCoins">;
@@ -80,7 +82,7 @@ function LineChart({ values, dates, label, symbol, formatMonth, bestMonthText, f
   if (tickMax <= max) tickMax += step;
   const ticks = Array.from({ length: Math.round((tickMax - tickMin) / step) + 1 }, (_, i) => tickMin + i * step);
   const tickLabel = (n: number) => n === 0 ? "0" : `${Math.round(n / 1000)}K`;
-  const endLabel = `${approximate ? "~" : ""}${money(values.at(-1) ?? 0, symbol, 0)}`;
+  const endLabel = `${approximate ? "~" : ""}${money(values.at(-1) ?? 0, symbol, 0, true)}`;
   const padL = 12 + Math.max(...ticks.map(n => tickLabel(n).length * 8));
   const padR = 10 + endLabel.length * 7.5;
   const x = (i: number) => padL + i / Math.max(values.length - 1, 1) * (324 - padL - padR);
@@ -94,8 +96,10 @@ function LineChart({ values, dates, label, symbol, formatMonth, bestMonthText, f
   };
   return <svg className="fd-summary-chart" viewBox="0 0 324 190" role="img" aria-label={label} onPointerMove={scrub} onPointerDown={scrub}>
     {ticks.map(n => <g key={n}><line x1={padL} x2="324" y1={y(n)} y2={y(n)} stroke="var(--fd-border)" /><text x={padL-8} y={y(n)+4} fill="var(--fd-faint)" textAnchor="end" fontSize="12">{tickLabel(n)}</text></g>)}
-    <line x1={x(bestMonth)} x2={x(bestMonth)} y1="9" y2="26" stroke="var(--fd-faint)" strokeWidth="1" opacity=".45" shapeRendering="crispEdges" /><line x1={x(bestMonth)} x2={x(bestMonth)} y1="26" y2="164" stroke="var(--fd-faint)" strokeWidth="1" opacity=".45" shapeRendering="crispEdges" />
-    <text x={x(bestMonth)+4} y="17" fill="var(--fd-muted)" fontSize="11">{bestMonthText}</text>
+    <line x1={x(bestMonth)} x2={x(bestMonth)} y1="26" y2="164" stroke="var(--fd-faint)" strokeWidth="1" opacity=".45" shapeRendering="crispEdges" />
+    <text x="162" y="17" textAnchor="middle" fill="var(--fd-muted)" fontSize="11">{bestMonthText
+      .replace("{month}", `${formatMonth(dates[bestMonth])} ${dates[bestMonth].getFullYear()}`)
+      .replace("{amount}", money(values[bestMonth] - values[bestMonth - 1], symbol, 0, true))}</text>
     {splitDirectionLine(values, x, y).map(({ start, end, value }, index) =>
       <line key={index} data-direction={value > 0 ? "gain" : value < 0 ? "loss" : "neutral"}
         x1={start.x} y1={start.y} x2={end.x} y2={end.y}
@@ -124,10 +128,14 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
   const version = useDataChangedVersion();
   const [display, setDisplay] = useState<Display | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [range, setRange] = useState("All");
+  const [range, setRange] = useState<SummaryPreset>("All");
+  const [rangeRetry, setRangeRetry] = useState(0);
   const [rankOpen, setRankOpen] = useState(false);
   const [focusedMonth, setFocusedMonth] = useState<Date | null>(null);
-  const [selectedStats, setSelectedStats] = useState<{ range: string; total: number | null; percentage: number | null | undefined } | null>(null);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+  const [selectedStats, setSelectedStats] = useState<{ range: string; profit: Profit; attribution: AttributionResult;
+    chart: ChartProfit[]; chartDates: Date[]; months: Month[]; years: Year[];
+    yearMoves: Record<number, { up: number; down: number }> } | null>(null);
   const key = `${dateRange.start.getTime()}-${dateRange.end.getTime()}-${version}`;
   useEffect(() => {
     if (checking) {
@@ -225,33 +233,90 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
   }, [key, checking]);
   const loading = status === "loading";
   const empty = status === "ready" && (display?.values.length ?? 0) <= 1;
+  const selecting = status === "ready" && range !== "All" && selectedStats?.range !== range && rangeError !== range;
   const values = display?.values ?? [];
   const first = values[0], last = values.at(-1);
   const firstDate = first ? new Date(first.timestamp) : dateRange.start;
   const lastDate = last ? new Date(last.timestamp) : dateRange.end;
-  const rangeDays: Record<string, number> = { "1D": 1, "7D": 7, "30D": 30, "90D": 90, "1Y": 365 };
-  const selectedStart = new Date(Math.max(firstDate.getTime(), lastDate.getTime() - (rangeDays[range] ?? 0) * 86_400_000));
+  const selectedStart = summaryPresetRange(values.map((value) => new Date(value.timestamp)), range)?.start ?? firstDate;
+  const selectedRange = selectSummaryRange(values.map((value) => new Date(value.timestamp)), {
+    start: range === "All" ? firstDate : selectedStart, end: lastDate,
+  });
   useEffect(() => {
     if (status !== "ready" || range === "All") return;
     let active = true;
     setSelectedStats(null);
-    calculateTotalProfit({ start: selectedStart, end: lastDate }).then((result) => {
-      if (active) setSelectedStats({ range, total: result.total, percentage: result.percentage });
-    }).catch(() => { if (active) setSelectedStats({ range, total: null, percentage: null }); });
+    setRangeError(null);
+    const selected = { start: selectedStart, end: lastDate };
+    Promise.all([calculateTotalProfit(selected), queryAttribution(selected)]).then(async ([profit, attribution]) => {
+      const monthEnds = new Map<string, Date>();
+      for (const snapshot of selectedRange.snapshots) monthEnds.set(snapshot.toISOString().slice(0, 7), snapshot);
+      const chartDates = [...monthEnds.values()];
+      const periods = await mapAtMostFour(chartDates, async (end) => {
+        const start = new Date(Math.max(selectedStart.getTime(), new Date(end.getFullYear(), end.getMonth(), 1).getTime()));
+        const [cumulative, period] = await Promise.all([
+          calculateTotalProfit({ start: selectedStart, end }),
+          calculateTotalProfit({ start, end }),
+        ]);
+        return { end, start, cumulative, period };
+      });
+      const valueAt = (date: Date) => values.find((value) => value.timestamp === date.getTime())?.totalValue ?? 0;
+      let previousValue = selectedRange.baseline ? valueAt(selectedRange.baseline) : 0;
+      let previousDate = selectedRange.baseline;
+      const months: Month[] = periods.map(({ end, start, period }) => {
+        const endValue = valueAt(end);
+        const changes = period.coins.filter((coin) => !display?.stableSymbols.includes(coin.symbol)).map((coin) => coin.value);
+        const item: Month = {
+          date: end, end: endValue, profit: period.total, knownTotal: period.knownTotal,
+          percentage: period.total !== null && endValue !== period.total
+            ? period.total / (endValue - period.total) * 100 : period.percentage,
+          flow: period.total === null ? 0 : endValue - previousValue - period.total,
+          hasData: Boolean(period.lastRecordDate), unknownCoins: period.unknownCoins,
+          gapDate: previousDate && previousDate < new Date(start.getFullYear(), start.getMonth() - 1, 1) ? previousDate : undefined,
+          up: changes.filter((value) => value !== null && value > .005).length,
+          down: changes.filter((value) => value !== null && value < -.005).length,
+          flat: changes.filter((value) => value !== null && Math.abs(value) <= .005).length,
+        };
+        previousValue = endValue;
+        previousDate = end;
+        return item;
+      });
+      const lastByYear = new Map<number, Date>();
+      for (const month of months) lastByYear.set(month.date.getFullYear(), month.date);
+      const years = await mapAtMostFour([...lastByYear], async ([year, end]) => {
+        const start = new Date(Math.max(selectedStart.getTime(), new Date(year, 0, 1).getTime()));
+        const result = await calculateTotalProfit({ start, end });
+        const inYear = months.filter((month) => month.date.getFullYear() === year);
+        const baseline = selectSummaryRange(values.map((value) => new Date(value.timestamp)), { start, end }).baseline;
+        const flow = result.total === null ? null : valueAt(end) - (baseline ? valueAt(baseline) : 0) - result.total;
+        return { year, profit: result, start: inYear[0].date, end, endingValue: valueAt(end), months: inYear.length, flow };
+      });
+      const yearMoves: Record<number, { up: number; down: number }> = {};
+      for (const year of years) {
+        const changes = year.profit.coins.filter((coin) => !display?.stableSymbols.includes(coin.symbol)).map((coin) => coin.value);
+        yearMoves[year.year] = { up: changes.filter((value) => value !== null && value > .005).length,
+          down: changes.filter((value) => value !== null && value < -.005).length };
+      }
+      if (active) setSelectedStats({ range, profit, attribution: attribution.attribution,
+        chart: periods.map((item) => item.cumulative), chartDates, months, years, yearMoves });
+    }).catch(() => { if (active) { setSelectedStats(null); setRangeError(range); } });
     return () => { active = false; };
-  }, [status, range, selectedStart.getTime(), lastDate.getTime(), version]);
-  const full = display?.attribution;
-  const pnl = display?.profit.total ?? null;
-  const gain = (last?.totalValue ?? 0) - (first?.totalValue ?? 0);
-  const flow = pnl === null ? null : gain - pnl;
-  const shownPnl = range === "All" ? pnl : selectedStats?.range === range ? selectedStats.total : null;
-  const allInvested = pnl === null ? null : (last?.totalValue ?? 0) - pnl;
-  const shownPercentage = range === "All" ? allInvested ? pnl! / allInvested : null
-    : selectedStats?.range === range && selectedStats.percentage != null ? selectedStats.percentage / 100 : null;
-  const shownInvested = range === "All" ? allInvested
-    : shownPnl !== null && shownPercentage ? shownPnl / shownPercentage : null;
-  const selectedMonths = display?.months.filter((m) => m.date.getFullYear() === lastDate.getFullYear()) ?? [];
-  const years = display?.years.slice().reverse() ?? [];
+  }, [status, range, rangeRetry, selectedStart.getTime(), lastDate.getTime(), version, display]);
+  const shownProfit = range === "All" ? display?.profit : selectedStats?.range === range ? selectedStats.profit : undefined;
+  const full = range === "All" ? display?.attribution : selectedStats?.range === range ? selectedStats.attribution : undefined;
+  const shownPnl = shownProfit?.total ?? null;
+  const shownInvested = shownPnl === null ? null : (last?.totalValue ?? 0) - shownPnl;
+  const displayedPercentage = shownInvested === null ? null
+    : summaryProfitPercentage(shownPnl, last?.totalValue ?? 0, shownProfit?.percentage);
+  const shownPercentage = displayedPercentage == null ? displayedPercentage : displayedPercentage / 100;
+  const breakdown = full ? roundedSummaryBreakdown(full.totals, currencyWrapper(currency)(1)) : null;
+  const gain = full?.totals.totalChange ?? 0;
+  const shownChart = range === "All" ? display?.chart : selectedStats?.range === range ? selectedStats.chart : undefined;
+  const shownChartDates = range === "All" ? display?.months.filter((m) => m.hasData).map((m) => m.date)
+    : selectedStats?.range === range ? selectedStats.chartDates : undefined;
+  const selectedMonths = (range === "All" ? display?.months : selectedStats?.range === range ? selectedStats.months : undefined)
+    ?.filter((m) => m.date.getFullYear() === lastDate.getFullYear()) ?? [];
+  const years = (range === "All" ? display?.years : selectedStats?.range === range ? selectedStats.years : undefined)?.slice().reverse() ?? [];
   const yearPaging = usePager(years, key, 3);
   const peak = values.reduce((best, v) => v.totalValue > best.totalValue ? v : best, values[0] ?? { timestamp: 0, totalValue: 0 });
   const peakIndex = values.indexOf(peak);
@@ -268,7 +333,7 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
     return [...map.entries()].sort((a, b) => b[1].total - a[1].total);
   }, [full]);
   const attributionPaging = useAttributionPage(grouped, `${dateRange.start.getTime()}-${dateRange.end.getTime()}:${range}`);
-  const attrRange = attributionRange(first?.totalValue ?? 0, last?.totalValue ?? 0, currency, locale);
+  const attrRange = attributionRange(full?.startValue ?? 0, full?.endValue ?? 0, currency, locale);
   const attrEndpoints = grouped.flatMap(([, row]) => [0, row.market, row.market + row.flow]);
   const attrMin = Math.min(0, ...attrEndpoints);
   const attrMax = Math.max(0, ...attrEndpoints);
@@ -282,14 +347,18 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
   const attrScale = (value: number) => (value - attrStart) / (attrEnd - attrStart) * 100;
   const flowStart = (row: { market: number; flow: number }) => row.market < 0 && row.flow > 0 ? 0 : row.market;
   const monthPercentMax = Math.max(...(display?.months ?? []).map((month) => Math.abs((month.percentage ?? 0) / 100)), 1e-9);
-  const moving = (display?.profit.coins ?? []).filter((coin) => !display?.stableSymbols.includes(coin.symbol));
+  const moving = (shownProfit?.coins ?? []).filter((coin) => !display?.stableSymbols.includes(coin.symbol));
   const positionCounts = { up: moving.filter((coin) => coin.value !== null && coin.value > .005).length,
     down: moving.filter((coin) => coin.value !== null && coin.value < -.005).length,
     flat: Math.max(0, (display?.assets ?? 0) - moving.filter((coin) => coin.value === null || Math.abs(coin.value) > .005).length) };
   const yearsLabel = String(lastDate.getFullYear());
-  const pnlText = pnl === null ? dash : cash(pnl, 0, true);
-  const sub = loading ? t("fidelity.summary.loading") : empty ? t("fidelity.summary.oneSnapshot") :
-    t("fidelity.summary.explainer.dynamic").replace("{pnl}", pnlText).replace("{gain}", cash(gain, 0)).replace("{flow}", flow === null ? dash : cash(flow, 0)).replace("{date}", monthYearLabel(firstDate));
+  const pnlText = breakdown === null ? dash : money(breakdown.market, currency.symbol, 0, true);
+  const sub = loading || selecting ? t("fidelity.summary.loading") : rangeError === range ? t("fidelity.summary.error") : empty ? t("fidelity.summary.oneSnapshot") :
+    t(breakdown?.other ? "fidelity.summary.explainer.other" : "fidelity.summary.explainer.net")
+      .replace("{pnl}", pnlText).replace("{gain}", breakdown === null ? dash : money(breakdown.gain, currency.symbol, 0))
+      .replace("{flow}", breakdown === null ? dash : money(breakdown.added, currency.symbol, 0))
+      .replace("{other}", breakdown === null ? dash : money(breakdown.other, currency.symbol, 0))
+      .replace("{date}", monthYearLabel(selectedRange.baseline ?? firstDate));
   const subParts = sub.split(pnlText);
   const title = (key: string) => t(`fidelity.summary.${key}`);
   const profitText = (value: number | null, known: number | null, coins: Profit["unknownCoins"]) =>
@@ -298,18 +367,28 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
     <PartialProfitHint names={coins.map((coin) => coin.symbol)} period={period} t={t}
       className={`fd-partial-badge${year ? " fd-year-badge" : ""}`} />;
   const emptyCopy = t("fidelity.summary.oneSnapshot.rich").split("**");
+  const unavailableReason = status === "error" || rangeError === range ? title("error") : empty ? title("needsSecond") : !selectedRange.baseline
+    ? title("noBaselineRange").replace("{range}", range)
+    : shownProfit?.total === null ? title("unknownPnlRange").replace("{range}", range)
+    : !shownProfit ? title("loading") : "";
+  const percentUnavailableReason = shownProfit?.percentage === null && shownPnl !== null
+    ? title("unknownPercentRange").replace("{range}", range) : unavailableReason;
+  const missingMetric = empty ? dash : title("notAvailable");
   const card = (children: React.ReactNode, className = "") => <section className={`fd-card ${className}`}>{children}</section>;
   const placeholder = (text: string, height: number) => <div className="fd-empty" style={{ minHeight: height }}>{text}</div>;
-  return <div className="fd-page fd-summary d2-summary" data-state={status} data-empty={empty} data-quote-color={quoteColor} aria-busy={loading}>
+  return <div className="fd-page fd-summary d2-summary" data-state={status} data-empty={empty} data-quote-color={quoteColor} aria-busy={loading || selecting}>
     <header className="fd-page-head"><h1>{t("summary.design.title")}</h1><p>{empty ? <>{emptyCopy[0]}<strong>{emptyCopy[1]}</strong>{emptyCopy[2]}</> : subParts.length === 2 ? <>{subParts[0]}<strong>{pnlText}</strong>{subParts[1]}</> : sub}</p>
-      <div className="fd-actions"><div className="fd-range" role="radiogroup" aria-label={title("range")}>{["1D", "7D", "30D", "90D", "1Y", "All"].map((option) => <button type="button" role="radio" aria-checked={(empty ? "1D" : range) === option} disabled={loading || empty} onClick={() => setRange(option)} key={option}>{option}</button>)}</div>
+      <div className="fd-actions"><div className="fd-range" role="radiogroup" aria-label={title("range")}>{(["1D", "7D", "30D", "90D", "1Y", "All"] as const).map((option) => <button type="button" role="radio" aria-checked={(empty ? "1D" : range) === option} disabled={loading || empty} onClick={() => { if (rangeError === option && range === option) setRangeRetry((n) => n + 1); else setRange(option); }} key={option}>{option}</button>)}</div>
       <button type="button" className={`fd-refresh ${loading ? "fd-refresh-loading" : ""}`} disabled={loading} aria-label={title("refresh")} onClick={() => window.dispatchEvent(new Event(APP_SOFT_REFRESH_EVENT))}><RefreshIcon size={loading ? 14 : 16} />{loading && <span>{title("refresh")}</span>}</button></div></header>
-    {status === "error" && <p role="alert">{title("error")}</p>}
+    {(status === "error" || rangeError === range) && <p role="alert">{title("error")}</p>}
     {card(<><Heading title={title("profitLoss")} />
-      {loading ? <><div className="fd-primary-stat"><Skeleton width="60%" /><Skeleton width="80%" height={24} /><Skeleton width="50%" /></div><div className="fd-kpis fd-three">{[0,1,2].map(i=><div key={i}><Skeleton width="60%" /><Skeleton width="75%" height={24} /><Skeleton width="50%" /></div>)}</div><div className="fd-block" style={{ height: 190 }} /></>
-      : <><div className="fd-primary-stat"><span className="fd-label">{range === "All" ? title("netPnl") : title("netPnl.range").replace("{range}", range)}</span><strong data-tone={empty ? "neutral" : tone(shownPnl)}>{empty || shownPnl === null ? dash : cash(shownPnl, 2, true)}</strong><small>{empty ? title("needsSecond") : t("profitSummary.since").replace("{date}", dateLabel(range === "All" ? firstDate : selectedStart))}</small></div>
-      <div className="fd-kpis fd-three"><div><span className="fd-label">{title("pnlPercent")}</span><strong data-tone={empty ? "neutral" : tone(shownPercentage)}>{empty || shownPercentage === null ? dash : percent(shownPercentage)}</strong><small>{empty ? title("onCapital") : title("onAmount").replace("{amount}", shownInvested === null ? dash : cash(shownInvested, 0))}</small></div><div><span className="fd-label">{title("breakeven")}</span><strong data-tone={empty ? "neutral" : undefined}>{empty || shownInvested === null ? dash : cash(shownInvested, 0)}</strong><small>{title(empty ? "breakevenDetail" : "pnlZero").replace("{zero}", cash(0, 0))}</small></div><div><span className="fd-label">{title("positions")}</span><strong>{display?.assets ?? 0}</strong><small>{empty ? title("inOneSnapshot") : <><span data-tone="gain">{title("upCount").replace("{n}", String(positionCounts.up))}</span> · <span data-tone="loss">{title("downCount").replace("{n}", String(positionCounts.down))}</span><br />{title("flatCount").replace("{n}", String(positionCounts.flat))}</>}</small></div></div>
-      {empty ? <Empty refresh>{title("lineNeedsSecond")}</Empty> : <><p className="fd-chart-caption">{title("cumulative").replace("{date}", dateLabel(firstDate))}</p><LineChart values={[0,...(display?.chart.map((p) => currencyWrapper(currency)(p.total ?? p.knownTotal ?? 0)) ?? [])]} dates={[firstDate,...(display?.months.filter((m) => m.hasData).map((m)=>m.date)??[])]} label={title("cumulative").replace("{date}", dateLabel(firstDate))} symbol={currency.symbol} formatMonth={monthLabel} bestMonthText={title("bestMonth")} focusedMonth={focusedMonth} approximate={display?.chart.some((p) => p.total === null)} /></>}</>}
+      {loading || selecting ? <><div className="fd-primary-stat"><Skeleton width="60%" /><Skeleton width="80%" height={24} /><Skeleton width="50%" /></div><div className="fd-kpis fd-three">{[0,1,2].map(i=><div key={i}><Skeleton width="60%" /><Skeleton width="75%" height={24} /><Skeleton width="50%" /></div>)}</div><div className="fd-block" style={{ height: 190 }} /></>
+      : <><div className="fd-primary-stat"><span className="fd-label">{range === "All" ? title("netPnl") : title("netPnl.range").replace("{range}", range)}</span><strong data-tone={empty ? "neutral" : tone(shownPnl)} title={shownPnl === null ? unavailableReason : undefined}>{empty || shownPnl === null || !selectedRange.baseline ? missingMetric : cash(shownPnl, 2, true)}</strong><small>{empty || shownPnl === null || !selectedRange.baseline ? unavailableReason : t("profitSummary.since").replace("{date}", dateLabel(selectedRange.baseline))}</small></div>
+      <div className="fd-kpis fd-three"><div><span className="fd-label">{title("pnlPercent")}</span><strong data-tone={empty ? "neutral" : tone(shownPercentage)} title={shownPercentage === null ? percentUnavailableReason : undefined}>{empty || shownPnl === null || !selectedRange.baseline ? missingMetric : shownPercentage === undefined ? "∞" : shownPercentage === null ? missingMetric : percent(shownPercentage)}</strong><small>{empty ? title("onCapital") : shownPnl === null || shownPercentage === null ? percentUnavailableReason : title("onAmount").replace("{amount}", cash(shownInvested ?? 0, 0))}</small></div><div><span className="fd-label">{title("breakeven")}</span><strong data-tone={empty ? "neutral" : undefined} title={shownInvested === null ? unavailableReason : undefined}>{empty || shownInvested === null || !selectedRange.baseline ? missingMetric : cash(shownInvested, 0)}</strong><small>{empty ? title("breakevenDetail") : shownInvested === null ? unavailableReason : title("pnlZero").replace("{zero}", cash(0, 0))}</small></div><div><span className="fd-label">{title("positions")}</span><strong>{display?.assets ?? 0}</strong><small>{empty && selectedRange.snapshots.length === 1 ? title("inOneSnapshot") : selectedRange.baseline && selectedRange.baseline < (range === "All" ? firstDate : selectedStart)
+        ? title("snapshotsSince").replace("{date}", dateLabel(selectedRange.baseline)).replace("{count}", String(selectedRange.snapshots.length))
+        : selectedRange.snapshots.length === 1 ? title("snapshotInRangeOne")
+        : title("snapshotsInRange").replace("{count}", String(selectedRange.snapshots.length))}</small></div></div>
+      {empty || !selectedRange.baseline || !shownChart?.length ? <Empty refresh>{unavailableReason || title("lineNeedsSecond")}</Empty> : <><p className="fd-chart-caption">{title("cumulative").replace("{date}", dateLabel(selectedRange.baseline))}</p><LineChart values={[0,...shownChart.map((p) => currencyWrapper(currency)(p.total ?? p.knownTotal ?? 0))]} dates={[selectedRange.baseline,...(shownChartDates ?? [])]} label={title("cumulative").replace("{date}", dateLabel(selectedRange.baseline))} symbol={currency.symbol} formatMonth={monthLabel} bestMonthText={title("bestMonthAmount")} focusedMonth={focusedMonth} approximate={shownChart.some((p) => p.total === null)} /></>}</>}
     </>, "fd-profit-loss")}
     {card(<><Heading title={title("ath")} right={loading ? t("profitSummary.since").replace("{date}", dateLabel(dateRange.start)) : empty ? title("fromOneSnapshot") : t("profitSummary.since").replace("{date}", dateLabel(firstDate))} />
       {loading ? <div className="fd-ath-skeleton"><Skeleton width="40%"/><Skeleton width="70%" height={30}/><Skeleton width="55%"/><Skeleton width="100%" height={6}/>{[0,1,2].map(i=><Skeleton key={i} width="100%" height={14}/>)}</div> : <><div className="fd-label">{empty ? title("highestSoFar") : title("highestRecorded")}</div><div className="fd-big-value">{cash(peak.totalValue)}</div><div className="fd-sub">{empty ? title("onlySnapshotAt").replace("{date}", dateLabel(new Date(peak.timestamp))) : title("athWhen").replace("{date}", dateLabel(new Date(peak.timestamp))).replace("{days}", String(Math.floor((lastDate.getTime()-peak.timestamp)/86_400_000)))}</div><div className="fd-meter" role="progressbar" aria-label={title("ath")} aria-valuenow={peak.totalValue ? (last?.totalValue ?? 0) / peak.totalValue * 100 : 0} aria-valuemin={0} aria-valuemax={100}><span style={{width:`${peak.totalValue ? Math.min(100,(last?.totalValue ?? 0)/peak.totalValue*100):0}%`}} /></div><div className="fd-sub fd-meter-label">{empty ? title("atHigh").replace("{zero}", cash(0, 0)) : <><span>{title("nowOfAth.dynamic").replace("{percent}", peak.totalValue ? ((last?.totalValue ?? 0)/peak.totalValue*100).toFixed(1) : "0")}</span><span>ATH</span></>}</div><div className="fd-facts">{(empty ? [[title("firstSnapshot"), dateTimeLabel(firstDate)], [title("assets"), String(display?.assets ?? 0)], [title("sources"), String(display?.sources ?? 0)], [title("currentValue"), cash(last?.totalValue ?? 0)]] : [[title("distanceAth"), `${cash(distance,2,true)} · ${percent(peak.totalValue ? distance/peak.totalValue : 0)}`], [title("gainNeeded"), peak.totalValue && last?.totalValue ? percent(peak.totalValue/last.totalValue-1) : dash], [title("previousHigh"), previousHigh ? `${cash(previousHigh.totalValue)} · ${dateLabel(new Date(previousHigh.timestamp))}` : dash], [title("lowestSince"), lowestSince ? `${cash(lowestSince.totalValue)} · ${dateLabel(new Date(lowestSince.timestamp))}` : dash], [title("currentValue"), cash(last?.totalValue ?? 0)]]).map(([label,value])=><div key={label}><span>{label}</span><span data-tone={label===title("distanceAth")?tone(distance):undefined}>{value}</span></div>)}</div></>}
@@ -317,7 +396,7 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
     {card(<><Heading title={title("profitSummary")} right={title("monthsOfYear").replace("{year}", yearsLabel)} />
       <div className="fd-profit-hint"><PnlPercentHint names={moving.map((coin) => coin.symbol)} t={t} /></div>
       {loading ? <div className="fd-month-grid">{Array.from({length:6},(_,i)=><div className="fd-block" key={i} style={{height:126}} />)}</div>
-      : empty ? placeholder(title("monthsNeedSecond"),150)
+      : empty ? placeholder(title("monthsNeedSecond"),150) : selecting ? placeholder(title("loading"),150) : rangeError === range ? placeholder(title("error"),150)
       : <><div className="fd-month-grid">{selectedMonths.map((m) => {
         const amount = profitText(m.profit, m.knownTotal, m.unknownCoins);
         const amountValue = m.profit ?? (m.unknownCoins.length ? m.knownTotal : null);
@@ -346,10 +425,10 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
     {card(<><Heading title={title("byYear")} right={title("yearToDate").replace("{year}", yearsLabel)} />
       <div className="fd-profit-hint"><PnlPercentHint names={moving.map((coin) => coin.symbol)} t={t} /></div>
       {loading ? <div className="fd-year-list">{[0,1].map(i=><div className="fd-block" key={i} style={{height:150}} />)}</div>
-      : empty ? placeholder(title("yearsNeedSecond"),150)
+      : empty ? placeholder(title("yearsNeedSecond"),150) : selecting ? placeholder(title("loading"),150) : rangeError === range ? placeholder(title("error"),150)
       : <><div className="fd-year-list">{yearPaging.rows.map((item)=>{
         const { year, profit, flow: deposits } = item;
-        const moves = display?.yearMoves[year];
+        const moves = range === "All" ? display?.yearMoves[year] : selectedStats?.range === range ? selectedStats.yearMoves[year] : undefined;
         const partial = profit.total === null && profit.unknownCoins.length > 0;
         return <div key={year} className={`fd-year ${year===lastDate.getFullYear()?"selected":""}`} data-partial={partial}>
           <span className="fd-month-top"><b>{year}</b><span>{monthLabel(item.start)}–{monthLabel(item.end)}</span></span>
@@ -363,17 +442,17 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
       })}</div>{years.length >= 3 && <div className="fd-year-pager"><Pager count={years.length} {...yearPaging} t={t}
         ariaLabel={title("byYear")} /></div>}</>}
     </>,"fd-years")}
-    {card(<><Heading title={title("attribution")} right={empty?title("attributionDateOnly").replace("{date}",dateLabel(lastDate)).replace("{currency}",currency.currency):title("attributionDateRange").replace("{start}",dateLabel(firstDate)).replace("{end}",dateLabel(lastDate)).replace("{currency}",currency.currency)} />{loading ? <div className="fd-row-skeleton">{Array.from({length:8},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="55%" height={8}/></div>)}</div> : empty ? placeholder(title("attributionNeedsSecond"),260) : <><div className="fd-key"><span><i />{title("marketMove")}</span><span><i />{title("quantityChange")}</span></div>{attributionPaging.rows.map(([symbol,row])=><div className="fd-attr-row" key={symbol}><b>{symbol}</b><span className="fd-attr-track" style={{ "--fd-zero": `${attrScale(0)}%` } as React.CSSProperties}><i className="fd-attr-market" style={{left:`${attrScale(Math.min(0,row.market))}%`,width:`${attrScale(Math.max(0,row.market))-attrScale(Math.min(0,row.market))}%`}} /><i className="fd-attr-flow" style={{left:`${attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`,width:`${attrScale(Math.max(flowStart(row),flowStart(row)+row.flow))-attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`}} /></span><strong data-tone={tone(row.total)} title={attributionAmount(row.total, currency, true)}><FittingAttributionAmount full={attributionAmount(row.total, currency)} compact={attributionCompactAmount(row.total, currency, locale)} /></strong><small className="sr-only"><span>{title("market")} <span data-tone={tone(row.market)}>{cash(row.market,0,true)}</span></span><span>{title("quantity")} {cash(row.flow,0,true)}</span></small></div>)}<div ref={axisRef} className="fd-axis"><span />{attrTicks.map(tick=><span key={tick} data-axis-tick="" data-value={tick} style={{left:`${attrScale(tick)}%`}}>{tick<0?"−":""}{currency.symbol}{new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Math.abs(currencyWrapper(currency)(tick))).replace("K","k")}</span>)}</div><div className="fd-attr-row fd-attr-total"><b>{title("total")}</b><span title={attrRange.full}><FittingAttributionAmount full={attrRange.text} compact={attrRange.compact} /></span><strong title={attributionAmount(gain, currency, true)}><FittingAttributionAmount full={attributionAmount(gain, currency)} compact={attributionCompactAmount(gain, currency, locale)} /></strong><small className="sr-only"><span>{title("market")} {cash(full?.totals.priceEffect??0,0,true)}</span><span>{title("quantity")} {cash((full?.totals.flowEffect??0)+(full?.totals.residual??0),0,true)}</span></small></div><AttributionPager count={grouped.length} {...attributionPaging} t={t} /></>}</>,"fd-attribution")}
-    {card(<><div className="fd-card-heading"><button className="fd-top-dialog-trigger" type="button" disabled={checking} onClick={() => setRankOpen(true)}>{title("topCoins")}</button><span>{title("allTime")}</span></div>{loading ? <div className="fd-row-skeleton">{Array.from({length:6},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="50%" height={8}/></div>)}</div> : empty ? placeholder(title("topNeedsSecond"),260) : <><div role="table" aria-label={title("topCoins")} className="summary-top-collection"><div role="row" className="sr-only"><span role="columnheader">{title("assets")}</span><span role="columnheader">{title("market")}</span><span role="columnheader">%</span></div>{([
+      {card(<><Heading title={title("attribution")} right={empty?title("attributionDateOnly").replace("{date}",dateLabel(lastDate)).replace("{currency}",currency.currency):title("attributionDateRange").replace("{start}",dateLabel(selectedRange.baseline ?? firstDate)).replace("{end}",dateLabel(lastDate)).replace("{currency}",currency.currency)} />{loading ? <div className="fd-row-skeleton">{Array.from({length:8},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="55%" height={8}/></div>)}</div> : empty ? placeholder(title("attributionNeedsSecond"),260) : selecting || rangeError === range ? placeholder(title(selecting ? "loading" : "error"),260) : <><div className="fd-key"><span><i />{title("marketMove")}</span><span><i />{title("quantityChange")}</span></div>{attributionPaging.rows.map(([symbol,row])=><div className="fd-attr-row" key={symbol}><b>{symbol}</b><span className="fd-attr-track" style={{ "--fd-zero": `${attrScale(0)}%` } as React.CSSProperties}><i className="fd-attr-market" style={{left:`${attrScale(Math.min(0,row.market))}%`,width:`${attrScale(Math.max(0,row.market))-attrScale(Math.min(0,row.market))}%`}} /><i className="fd-attr-flow" style={{left:`${attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`,width:`${attrScale(Math.max(flowStart(row),flowStart(row)+row.flow))-attrScale(Math.min(flowStart(row),flowStart(row)+row.flow))}%`}} /></span><strong data-tone={tone(row.total)} title={attributionAmount(row.total, currency, true)}><FittingAttributionAmount full={attributionAmount(row.total, currency)} compact={attributionCompactAmount(row.total, currency, locale)} /></strong><small className="sr-only"><span>{title("market")} <span data-tone={tone(row.market)}>{cash(row.market,0,true)}</span></span><span>{title("quantity")} {cash(row.flow,0,true)}</span></small></div>)}<div ref={axisRef} className="fd-axis"><span />{attrTicks.map(tick=><span key={tick} data-axis-tick="" data-value={tick} style={{left:`${attrScale(tick)}%`}}>{tick<0?"−":""}{currency.symbol}{new Intl.NumberFormat(locale === "zh" ? "zh-CN" : "en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Math.abs(currencyWrapper(currency)(tick))).replace("K","k")}</span>)}</div><div className="fd-attr-row fd-attr-total"><b>{title("total")}</b><span title={attrRange.full}><FittingAttributionAmount full={attrRange.text} compact={attrRange.compact} /></span><strong title={attributionAmount(gain, currency, true)}><FittingAttributionAmount full={attributionAmount(gain, currency)} compact={attributionCompactAmount(gain, currency, locale)} /></strong><small className="sr-only"><span>{title("market")} {cash(full?.totals.priceEffect??0,0,true)}</span><span>{title("quantity")} {cash((full?.totals.flowEffect??0)+(full?.totals.residual??0),0,true)}</span></small></div><AttributionPager count={grouped.length} {...attributionPaging} t={t} /></>}</>,"fd-attribution")}
+      {card(<><div className="fd-card-heading"><button className="fd-top-dialog-trigger" type="button" disabled={checking} onClick={() => setRankOpen(true)}>{title("topCoins")}</button><span>{range === "All" ? title("allTime") : range}</span></div>{loading ? <div className="fd-row-skeleton">{Array.from({length:6},(_,i)=><div key={i}><Skeleton width="36px"/><Skeleton width="50%" height={8}/></div>)}</div> : empty ? placeholder(title("topNeedsSecond"),260) : selecting || rangeError === range ? placeholder(title(selecting ? "loading" : "error"),260) : <><div role="table" aria-label={title("topCoins")} className="summary-top-collection"><div role="row" className="sr-only"><span role="columnheader">{title("assets")}</span><span role="columnheader">{title("market")}</span><span role="columnheader">%</span></div>{([
       [title("topProfit"), moving.filter((coin)=>coin.value !== null && coin.value > 0).sort((a,b)=>(b.value??0)-(a.value??0))],
       [title("topLoss"), moving.filter((coin)=>coin.value !== null && coin.value < 0).sort((a,b)=>(a.value??0)-(b.value??0))],
-      [title("noMarketPnl"), (display?.profit.coins??[]).filter((coin)=>display?.stableSymbols.includes(coin.symbol))
+      [title("noMarketPnl"), (shownProfit?.coins??[]).filter((coin)=>display?.stableSymbols.includes(coin.symbol))
         .sort((a,b)=>(display?.coinValues[`${b.assetType}:${b.symbol}`]??0)-(display?.coinValues[`${a.assetType}:${a.symbol}`]??0))],
     ] as const).map(([heading,items])=><SummaryTopList key={heading} heading={heading}
       rows={items.slice(0, 4).map((coin) => ({ ...coin, stable: display?.stableSymbols.includes(coin.symbol) ?? false,
         percentage: display?.stableSymbols.includes(coin.symbol) ? 0
           : marketProfitPercentage(coin.value, display?.coinValues[`${coin.assetType}:${coin.symbol}`]) }))}
-      scaleValues={moving.map((coin) => coin.value ?? 0)} amount={(value) => cash(value,0,true)} tone={tone} />)}</div><p className="fd-footnote">{title("topNote.market").replace("{date}",dateLabel(firstDate)).replace("{one}",cash(1,0))}</p></>}</>,"fd-top-coins")}
+      scaleValues={moving.map((coin) => coin.value ?? 0)} amount={(value) => cash(value,0,true)} tone={tone} />)}</div><p className="fd-footnote">{title("topNote.market").replace("{date}",dateLabel(selectedRange.baseline ?? firstDate)).replace("{one}",cash(1,0))}</p></>}</>,"fd-top-coins")}
     <BottomSheet open={rankOpen} onOpenChange={setRankOpen} title={t("analytics.rank")} detents={["large"]} initialDetent="large">
       <div className="d2-rank-sheet"><TopCoinsRank dateRange={dateRange} currency={currency} /></div>
     </BottomSheet>

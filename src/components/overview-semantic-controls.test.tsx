@@ -251,6 +251,16 @@ describe("Overview semantic controls", () => {
     expect(screen.getByText(/best day/i)).toHaveTextContent("250");
   });
 
+  it("places a loss sign before the currency in a chart contribution annotation", async () => {
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" metrics={<div>Metrics</div>}
+      bestDay={{ timestamp: Date.parse("2024-04-16"), value: 250 }}
+      bestDayContribution={{ symbol: "ETH", value: -25 }} />);
+    const annotation = await screen.findByText(/best day \(ETH/);
+    expect(annotation).toHaveTextContent("(ETH −$25)");
+  });
+
   it("fits the overview value axis to a small portfolio", async () => {
     renderWithProviders(<TotalValue currency={usdCurrency}
       dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}

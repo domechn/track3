@@ -1,24 +1,31 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import Profit from "@/mobile/components/profit";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { I18nProvider } from "@/mobile/i18n";
 
 const {
   calculateTotalProfitMock,
   getImageApiPathMock,
   appCacheDirMock,
   queryAttributionMock,
+  queryLatestAssetsMock,
+  queryTotalValueMock,
 } = vi.hoisted(() => ({
   calculateTotalProfitMock: vi.fn(),
   getImageApiPathMock: vi.fn(),
   appCacheDirMock: vi.fn(),
   queryAttributionMock: vi.fn(),
+  queryLatestAssetsMock: vi.fn(),
+  queryTotalValueMock: vi.fn(),
 }));
 
 vi.mock("@/middlelayers/charts", () => ({
   calculateTotalProfit: calculateTotalProfitMock,
+  queryLatestAssets: queryLatestAssetsMock,
+  queryTotalValue: queryTotalValueMock,
 }));
 
 vi.mock("@/middlelayers/charts-attribution-data", () => ({
@@ -47,12 +54,35 @@ describe("Profit loading", () => {
       ],
     });
     appCacheDirMock.mockResolvedValue("/tmp/track3-cache");
+    queryLatestAssetsMock.mockResolvedValue([{}]);
+    queryTotalValueMock.mockResolvedValue({ totalValue: 240 });
     queryAttributionMock.mockResolvedValue({ attribution: { entries: [], totals: { priceEffect: 0, flowEffect: 0, residual: 0, totalChange: 0 }, startValue: 0, endValue: 0 }, aliases: {} });
     getImageApiPathMock.mockImplementation(
       () => new Promise<string>(() => {
         // keep pending to assert logos do not block the loading signal
       })
     );
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each([
+    ["en", "since 1 Jan 2024", "1 position ·"],
+    ["zh", "2024年1月1日", "1 个持仓 ·"],
+  ])("shows a localized iPad baseline and one position in %s", async (locale, baseline, count) => {
+    vi.spyOn(navigator, "language", "get").mockReturnValue(locale === "zh" ? "zh-CN" : "en-US");
+    const { container } = render(<MemoryRouter><I18nProvider><Profit
+      currency={usdCurrency}
+      dateRange={{ start: new Date("2024-01-02T12:00:00Z"), end: new Date("2024-01-02T12:00:00Z") }}
+      quoteColor="green-up-red-down"
+      rangeValue="1D"
+      summaryRange={{
+        baseline: new Date("2024-01-01T12:00:00Z"),
+        snapshots: [new Date("2024-01-02T12:00:00Z")],
+        databaseCount: 2,
+      }}
+    /></I18nProvider></MemoryRouter>);
+    await waitFor(() => expect(container.querySelector(".mobile-movers-total")).toHaveTextContent(count));
+    expect(container.querySelector(".mobile-movers-total")).toHaveTextContent(baseline);
   });
 
   it("reports loaded after profit data arrives even if logo lookup is still pending", async () => {

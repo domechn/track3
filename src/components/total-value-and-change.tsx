@@ -611,6 +611,8 @@ const App = ({
       ],
     };
   }, [plottedTimestamps, plottedIndices, lineValues, lineColor, ath, btcAsBase, showPercentageInChart, firstTotalValue, currency, t, assetChangeData.gaps, metrics, dateLocale]);
+  const contributionValue = bestDayContribution
+    ? Math.round(currencyWrapper(currency)(bestDayContribution.value)) : 0;
 
   return (
     <div className={metrics ? "h-full t3-total-overview" : "h-full"}>
@@ -716,12 +718,13 @@ const App = ({
           {metrics}
           <div className="min-h-[120px] flex-1 t3-hero-chart">
             {bestDay && <div className="t3-chart-best-day">{t(bestDayContribution
-              ? "overview.fidelity.bestDayWithAsset" : "overview.design.bestDay")
+              ? "overview.fidelity.bestDayWithSignedAsset" : "overview.design.bestDay")
               .replace("{day}", new Date(bestDay.timestamp).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", day: "numeric" }))
               .replace("{amount}", `${bestDay.value >= 0 ? "+" : "−"}${currency.symbol}${Math.round(currencyWrapper(currency)(Math.abs(bestDay.value))).toLocaleString()}`)
               .replace("{asset}", bestDayContribution?.symbol ?? "")
               .replace("{contribution}", bestDayContribution
-                ? `${currency.symbol}${Math.round(currencyWrapper(currency)(bestDayContribution.value)).toLocaleString()}` : "")}</div>}
+                ? `${contributionValue > 0 ? "+" : contributionValue < 0 ? "−" : ""}${currency.symbol}${Math.abs(contributionValue).toLocaleString()}`
+                : "")}</div>}
             {metrics && !btcAsBase && !showPercentageInChart && chartEnd !== undefined &&
               <span className="t3-chart-end-value">
                 {currency.symbol}{Math.round(chartEnd).toLocaleString()}

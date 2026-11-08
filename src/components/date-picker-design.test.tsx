@@ -34,4 +34,20 @@ describe("Overview date picker", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     expect(onDateChange).toHaveBeenCalledWith(10, { from: dates[5], to: dates[14] });
   });
+
+  it("allows a custom range containing one day with a snapshot", () => {
+    const dates = [1, 5, 9].map((day) => new Date(2026, 0, day, 12));
+    const onDateChange = vi.fn();
+    render(<DatePicker availableDates={dates} value={{ from: dates[0], to: dates[2] }}
+      onDateChange={onDateChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Choose date range" }));
+    fireEvent.click(screen.getByRole("gridcell", { name: "9" }));
+    fireEvent.click(screen.getByRole("gridcell", { name: "9" }));
+    expect(screen.getByRole("button", { name: "Submit" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    expect(onDateChange).toHaveBeenCalledWith(1, {
+      from: new Date(2026, 0, 9, 0),
+      to: new Date(2026, 0, 9, 23, 59, 59, 999),
+    });
+  });
 });

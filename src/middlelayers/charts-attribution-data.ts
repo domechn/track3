@@ -14,7 +14,7 @@ const pageSize = 100;
 export async function queryAttribution(dateRange: TDateRange): Promise<{ attribution: AttributionResult; aliases: Record<string, WalletAlias | undefined> }> {
   const groupKey = CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY;
   const cache = getMemoryCacheInstance(groupKey);
-  const key = `attribution-v3-${getCacheGroupEpoch(groupKey)}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
+  const key = `attribution-v4-${getCacheGroupEpoch(groupKey)}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   let attribution = cache.getCache<AttributionResult>(key);
 
   if (!attribution) {
@@ -24,6 +24,20 @@ export async function queryAttribution(dateRange: TDateRange): Promise<{ attribu
     let startValue = 0;
     let endValue = 0;
     let previous: AttributionSnapshot | undefined;
+    const baselineRows = await selectFromDatabaseWithSql<{ uuid: string; createdAt: string }>(
+      `SELECT uuid, MAX(createdAt) AS createdAt FROM assets_v2
+       WHERE createdAt < ? GROUP BY uuid ORDER BY createdAt DESC, uuid DESC LIMIT 1`,
+      [dateRange.start.toISOString()],
+    );
+    if (baselineRows[0]) {
+      const baselineId = [baselineRows[0].uuid];
+      const [assets, transactions] = await Promise.all([
+        ASSET_HANDLER.listAssetsByUUIDs(baselineId),
+        TRANSACTION_HANDLER.listTransactionsByUUIDs(baselineId),
+      ]);
+      if (assets.length) previous = { createdAt: baselineRows[0].createdAt, assets, transactions };
+    }
+    let firstInterval = true;
     let cursor = { createdAt: dateRange.start.toISOString(), uuid: "" };
     while (true) {
       const rows = await selectFromDatabaseWithSql<{ uuid: string; createdAt: string }>(
@@ -61,7 +75,8 @@ export async function queryAttribution(dateRange: TDateRange): Promise<{ attribu
       }));
       const interval = attributeSnapshots(previous ? [previous, ...snapshots] : snapshots, blacklist);
       if (interval.entries.length > 0) {
-        if (!previous) startValue = interval.startValue;
+        if (firstInterval) startValue = interval.startValue;
+        firstInterval = false;
         endValue = interval.endValue;
         for (const entry of interval.entries) {
           const id = JSON.stringify([entry.assetType, entry.symbol, entry.wallet]);

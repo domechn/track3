@@ -724,6 +724,7 @@ function AppRoutes({
                   currency={currentCurrency}
                   dateRange={maxDateRange}
                   quoteColor={quoteColor}
+                  availableDates={availableDates}
                 />
                 <AnalyticsHub currency={currentCurrency} dateRange={maxDateRange} quoteColor={quoteColor} />
               </PageWrapper>
