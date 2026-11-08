@@ -1578,6 +1578,8 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 }
 @media (max-width: 900px) {
   .t3-manage-goals { grid-template-columns: minmax(0, 1fr); }
+  /* Let empty panels grow; size containment traps History in an inner scroll without focusable controls. */
+  .t3-manage-goals > :is(.t3-goals-rules, .t3-goals-history):has([data-empty-state]) { contain: none; max-height: none; }
   .t3-rebalance-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .t3-rebalance-summary > div:nth-child(4) { border-top: 1px solid hsl(var(--border)); border-left: 0; }
   .t3-rebalance-summary > div:nth-child(5) { grid-column: span 2; border-top: 1px solid hsl(var(--border)); }
