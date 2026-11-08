@@ -216,7 +216,7 @@ test("delete confirmation and undo show the designed overlays", async ({ page })
     element.getBoundingClientRect().x + Number.parseFloat(getComputedStyle(element).paddingLeft))).toBeCloseTo(1289, 0);
   expect((await toast.locator(".fidelity-undo-action").boundingBox())!.width).toBeCloseTo(67, 0);
   await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("border", "1px solid rgb(58, 58, 62)");
+  await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("border", "1px solid rgb(59, 59, 63)");
   await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("color", "rgb(154, 156, 162)");
   expect((await page.locator(".fidelity-history-list th").first().boundingBox())!.width).toBeCloseTo(147.83, 0);
   expect((await page.locator(".fidelity-history-detail th").nth(2).boundingBox())!.x)

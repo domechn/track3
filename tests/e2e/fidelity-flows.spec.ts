@@ -281,7 +281,7 @@ test("phone toast stack shows the stored snapshot and refresh outcomes", async (
   await page.screenshot({ path: "/tmp/fidelity/flows/toasts-ok-phone.png" });
   const okBox = await page.locator(".mobile-toast").boundingBox();
   expect(okBox && [okBox.x, okBox.y, okBox.width, okBox.height].map(Math.round)).toEqual([16, 710, 358, 62]);
-  await expect(page.locator(".mobile-toast")).toHaveCSS("border-left-color", "rgb(95, 195, 156)");
+  await expect(page.locator(".mobile-toast")).toHaveCSS("border-left-color", "rgb(95, 196, 155)"); // Shared --positive token RGB.
   await captureLong(page, "/tmp/fidelity/flows/toasts-ok-phone-long.png");
   await page.evaluate(async () => {
     const reactPath = "/node_modules/.vite/deps/react.js";
@@ -322,7 +322,7 @@ test("phone toast stack shows the stored snapshot and refresh outcomes", async (
   for (const [label, width] of [["Retry", 42], ["Details", 50], ["Undo", 40]] as const) {
     expect((await page.getByRole("button", { name: label }).boundingBox())?.width).toBeGreaterThanOrEqual(width);
   }
-  await expect(page.getByRole("button", { name: "Details" })).toHaveCSS("color", "rgb(180, 182, 188)");
+  await expect(page.getByRole("button", { name: "Details" })).toHaveCSS("color", "rgb(180, 182, 187)"); // Shared --muted-foreground token RGB.
   await captureLong(page, "/tmp/fidelity/flows/toasts-stack-phone-long.png");
   writeFileSync("/tmp/fidelity/flows/toasts-stack-geometry.json", JSON.stringify(await page.evaluate(() =>
     Array.from(document.querySelectorAll(".ios-d3-toast-viewport, .mobile-toast"), (element) => ({

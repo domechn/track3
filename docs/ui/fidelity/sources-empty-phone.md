@@ -53,11 +53,9 @@ The source depicts the **empty** state. Inputs and buttons retain their existing
 
 ## Remaining differences
 
-The zero-source view now uses the shared centred icon and substantial empty-state height. Its source page predates the UI18 shared component, so the icon and vertical space remain visible differences.
-
-- The remaining difference is minor icon stroke and text rasterization; it could be matched but is below the 3% threshold. The copy, dashed panel, actions, and measured block positions match.
+The zero-source view uses the required shared empty-state component. Its icon and taller centred panel shift the read-only banner below the source position; the source page predates that shared component. The app's touch scroller does not paint the source browser's small visible scrollbar. Text and icon rasterization differ. The light-theme card now uses foreground text on the light popover surface, including its title and onboarding steps.
 
 ## Pixel difference
 
-- Difference ratio: **2.878%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel.
-- Design viewport: `/tmp/fidelity/settings-a/design-sources-empty.png` (top 780×1688); app viewport: `/tmp/fidelity/settings-a/sources-empty.png` (780×1688).
+- Fresh difference ratio: **21.184%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel. The required shared empty-state height accounts for most of the increase from the older 2.878% capture.
+- Design viewport: `/tmp/wui30-design/sources-empty.png` (780×1688); app viewport: `/tmp/fidelity/settings-a/sources-empty.png` (780×1688).
