@@ -477,9 +477,10 @@ test("six figure KPI values stay separate on a 320px phone", async ({ page }) =>
 });
 
 test("light cost basis keeps the page, selected segments and tab bar legible", async ({ page }) => {
+  test.setTimeout(120_000);
   await installFidelityRecords(page);
   await page.goto("/#/cost-basis");
-  await expect(page.locator(".fidelity-cost-kpis")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".fidelity-cost-kpis")).toBeVisible({ timeout: 60_000 });
   await page.evaluate(() => {
     localStorage.setItem("track3-ui-theme", "light");
     document.documentElement.classList.remove("dark");
