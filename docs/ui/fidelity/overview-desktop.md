@@ -39,6 +39,25 @@ The type face is Public Sans with tabular numbers. Tokens: `--ground #0d0d0e`, `
 
 ## Remaining differences
 
+The current dark 1440 × 900 saved-summary viewport differs from the
+`core-overview.html` source by **6.94%** at RGB-sum threshold 60.
+The source insight area begins at x=105, y=658 and is 390 × 296px;
+the app's saved-text area begins at x=105, y=654 and is 385 × 287px.
+The source has illustrative insight metrics absent from the persisted
+summary text, and it assumes a latest all-time high and configured sync.
+The app shows the actual earlier high and local sync state. The
+owner-required rail tile and offline font rendering remain visible.
+Captures and computed bounds are in `.local/tag-theme/desktop-overview-summary-*`.
+
+The earlier 8 Nov 2026 saved-summary review compares the 1440 × 900 app
+viewport with the matching area of the rendered `core-overview.html` source:
+**7.536%** differs at RGB-sum threshold 60. The app screenshot is
+`.local/tag-theme/desktop-overview-summary-app.png`; the source render is
+`/tmp/fidelity-desktop/design/overview-base-1440.png`. The saved summary
+has one footer Regenerate control, and its lines fill the card. The live
+total, summary metrics unavailable in persisted text, chart rendering,
+portfolio rank and sync data listed below explain the larger screen ratio.
+
 The 8 Nov 2026 Sync-open captures differ by **7.458%** at the RGB-sum threshold of 60 over the shared 1440 × 900 viewport. The source popover is 360 × 336 px at (1010, 55); the app keeps its real sync report and opens a scrollable diagnostics panel when Details is selected. The source page shows only the collapsed Details link, so the expanded phase and request rows and their scroll rail have no matching source pixels. The app's shared definition rows have a 32px pitch under the Details specification, while the source's five summary rows are 40px. The saved product data, chart and controls below also account for the page difference as described here.
 The shared rail's measured source differences, including its owner-required active tile, are recorded in [navigation.md](navigation.md).
 

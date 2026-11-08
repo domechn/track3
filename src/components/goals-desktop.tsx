@@ -260,7 +260,7 @@ export default function GoalsDesktop(props: Props) {
                 <strong>{measurement.status === "ready" ? raw >= 100 ? "100%+" : `${fixed(raw)}%` : "–"}</strong></div>
                 <small>{describeProgress(rule, measurement.value, raw)}</small></div>
               <div className="t3-fidelity-goal-kind">{kindName(rule.kind, t)}<small>{t("goals.fidelity.cooldownShort").replace("{window}", cooldownLabel(Number(alertDraftFromRule(rule).cooldownMinutes)))}</small></div>
-              <div className={`t3-fidelity-pill ${!rule.enabled ? "" : triggered ? "warning" : "info"}`}>{t(!rule.enabled ? "goals.fidelity.status.off" : triggered ? "goals.fidelity.status.triggered" : "goals.fidelity.status.watching")}</div>
+              <div className="t3-tag" data-tone={!rule.enabled ? "neutral" : triggered ? "warning" : "accent"}>{t(!rule.enabled ? "goals.fidelity.status.off" : triggered ? "goals.fidelity.status.triggered" : "goals.fidelity.status.watching")}</div>
               <div className="t3-fidelity-goal-actions"><button aria-label={t("goals.fidelity.editAction")} onClick={(event) => openEdit(rule, event.currentTarget)}><FidelityIcon name="edit" /></button>
                 <button aria-label={t("goals.fidelity.deleteAction")} onClick={() => setDeleteRule(rule)}><FidelityIcon name="trash" /></button></div>
             </div>;

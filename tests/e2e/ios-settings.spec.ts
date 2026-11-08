@@ -381,7 +381,7 @@ test("rebalance suggestions use readable trade rows at 375px when a profile has 
   await expect(page.getByRole("table", { name: "Suggested trades" })).toHaveCount(0);
   const first = cards.locator(".pf-trade").first();
   await expect(first).toContainText(/BTC|ETH/);
-  await expect(first.locator(".pf-pill")).toHaveText(/Sell|Buy/);
+  await expect(first.locator(".t3-tag")).toHaveText(/Sell|Buy/);
   await expect(first.locator("strong")).toHaveText(/^\$[0-9]/);
   await expect(first.locator("small")).toContainText(/(BTC|ETH) at \$[0-9]/);
   await expect(first).toContainText("→");

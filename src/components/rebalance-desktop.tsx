@@ -202,7 +202,7 @@ export default function RebalanceDesktop(props: Props) {
         <div className={`t3-fidelity-allocation-row t3-fidelity-total ${bad ? "bad" : ""}`}>
           <b>{t("rebalance.fidelity.total")}</b><span /><span className="t3-fidelity-num">{fixed(100)}%</span>
           <strong className={bad ? "t3-fidelity-negative" : empty ? "t3-fidelity-muted" : "t3-fidelity-positive"}>{fixed(targetTotal)}%</strong>
-          <span className={`t3-fidelity-pill ${bad ? "negative" : empty ? "" : "positive"}`}>
+          <span className="t3-tag" data-tone={bad ? "negative" : empty ? "neutral" : "positive"}>
             {bad ? t("rebalance.fidelity.ptsOver").replace("{value}", fixed(targetTotal - 100)) : empty ? t("rebalance.fidelity.needs100") : t("rebalance.fidelity.sums100")}
           </span>
         </div>
@@ -246,7 +246,7 @@ export default function RebalanceDesktop(props: Props) {
         </tr></thead><tbody>
           {tradeRows.map((row, index) => <Fragment key={`${row.assetType}:${row.symbol}`}>
             {index === sells.length && <tr className="subtotal" key="sells"><td /><td colSpan={2}>{t("rebalance.fidelity.totalSells")}</td><td className="t3-fidelity-amount">{money(sellTotal)}</td><td colSpan={3} /></tr>}
-            <tr key={`${row.assetType}:${row.symbol}`}><td>{index + 1}</td><td><span className={`t3-fidelity-pill ${row.tradeValue > 0 ? "info" : ""}`}>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}</span></td>
+            <tr key={`${row.assetType}:${row.symbol}`}><td>{index + 1}</td><td><span className="t3-tag" data-tone={row.tradeValue > 0 ? "accent" : "neutral"}>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}</span></td>
               <td><b>{row.symbol}</b></td><td>{money(Math.abs(row.tradeValue))}</td><td>{unit(row.tradeQuantity)}</td><td>{money(row.price)}</td><td>{fixed(row.currentPercent)}% <span className="t3-fidelity-share-arrow">→</span> {fixed(row.targetPercent)}%</td></tr>
           </Fragment>)}
           {sells.length > 0 && buys.length === 0 && <tr className="subtotal"><td /><td colSpan={2}>{t("rebalance.fidelity.totalSells")}</td><td className="t3-fidelity-amount">{money(sellTotal)}</td><td colSpan={3} /></tr>}

@@ -34,17 +34,6 @@ import ProfitAttribution from "@/mobile/components/profit-attribution";
 import { profitRanks } from "@/components/analyze-values";
 import { DeltaPill, ListRow, SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
 
-function getToneBadgeClass(value: number, quoteColor: QuoteColor) {
-  const tone = positiveNegativeTone(value, quoteColor);
-  if (tone === "green") {
-    return "bg-positive/15 text-positive";
-  }
-  if (tone === "red") {
-    return "bg-negative/15 text-negative";
-  }
-  return "bg-muted text-muted-foreground";
-}
-
 const App = ({
   currency,
   dateRange,
@@ -146,7 +135,7 @@ const App = ({
     [profit, quoteColor],
   );
   const totalToneBadgeClass = useMemo(
-    () => profit === null ? "bg-muted text-muted-foreground" : getToneBadgeClass(profit, quoteColor),
+    () => profit === null ? "neutral" : positiveNegativeTone(profit, quoteColor) === "green" ? "positive" : positiveNegativeTone(profit, quoteColor) === "red" ? "negative" : "neutral",
     [profit, quoteColor],
   );
   const totalPercentageLabel = profitPercentage === null ? "—" : profitPercentage === undefined
@@ -332,7 +321,7 @@ const App = ({
           </div>
           <div>
             {isMobile && profit !== null ? <DeltaPill value={profit} quoteColor={quoteColor}>{totalPercentageLabel}</DeltaPill>
-              : <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${totalToneBadgeClass}`}>
+              : <span className="t3-tag" data-tone={totalToneBadgeClass}>
                 {totalPercentageLabel}
               </span>}
           </div>

@@ -445,7 +445,7 @@ export default function GoalsFidelity({
               <small>{currentText}</small></div>
             <div className="pf-goal-kind">{kindFor(rule.kind)}<small>{t("fidelity.goals.cooldownShort")
               .replace("{duration}", cooldownShort(cooldownMinutes))}</small></div>
-            <span className={`pf-pill pf-goal-status ${!rule.enabled ? "" : triggered ? "pf-warn" : "pf-info"}`}>
+            <span className="t3-tag pf-goal-status" data-tone={!rule.enabled ? "neutral" : triggered ? "warning" : "accent"}>
               {t(!rule.enabled ? "fidelity.goals.off" : triggered ? "fidelity.goals.triggered" : "fidelity.goals.watching")}</span>
             <div className="pf-goal-actions"><button aria-label={t("fidelity.goals.editNamed").replace("{rule}", titleFor(rule))} onClick={() => openEdit(rule)}><PlanIcon name="edit" /></button>
               <button aria-label={t("fidelity.goals.deleteNamed").replace("{rule}", titleFor(rule))} onClick={() => setDeleteRule(rule)}><PlanIcon name="trash" /></button></div>

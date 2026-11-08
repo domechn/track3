@@ -745,7 +745,7 @@ const App = ({
         <button ref={phoneBackRef} type="button" className="fidelity-history-back" aria-label={t("common.back")}
           onClick={() => closeDetail(false)}><ChevronLeftIcon aria-hidden="true" /></button>
         <h2>{selectedData ? `${phoneDate(selectedData.createdAt, true)}, ${phoneTime(selectedData.createdAt)}` : t("history.snapshotDetails")}</h2>
-        {phoneSelectedRow?.edited && <span className="fidelity-history-edited">{t("history.editLog.edited")}</span>}
+        {phoneSelectedRow?.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}
       </div>
       {detailLoading && <p role="status">{t("common.loading")}</p>}
       {detailError && <p role="alert">{t("history.detailLoadFailed")}</p>}
@@ -1175,7 +1175,7 @@ const App = ({
               <span className="sr-only">{t("history.viewSnapshot").replace("{date}", phoneDate(row.createdAt, true))}</span>
               <span className="history-mobile-snapshot-date"><strong>{phoneDate(row.createdAt)}</strong>
                 <span>{phoneTime(row.createdAt)}</span>
-                {row.edited && <span className="fidelity-history-edited">{t("history.editLog.edited")}</span>}
+                {row.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}
               </span>
               <span className="history-mobile-snapshot-total ios-money">{phoneMoney(row.total)}</span>
               <span className="fidelity-history-sources">
@@ -1355,7 +1355,7 @@ const App = ({
                             locale === "zh" ? "zh-CN" : "en-US",
                             { month: "short", day: "numeric" },
                           ).format(new Date(row.createdAt))}</span>
-                          {row.edited ? <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                          {row.edited ? <span className="t3-tag" data-tone="accent">
                             {t("history.editLog.edited")}
                           </span> : null}
                           <HistoryPartialPill row={row} t={t} />
@@ -1411,7 +1411,7 @@ const App = ({
                                 aria-label={t("history.viewSnapshot").replace("{date}", `${timeToDateStr(new Date(row.createdAt).getTime(), true)} · ${displayDate}`)}
                                 className="flex touch:min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <span>{displayDate}</span>
-                                {row.edited ? <span className="mt-1 w-fit rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                {row.edited ? <span className="t3-tag mt-1 w-fit" data-tone="accent">
                                   {t("history.editLog.edited")}
                                 </span> : null}
                                 <HistoryPartialPill row={row} t={t} />

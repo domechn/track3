@@ -274,7 +274,7 @@ for (const state of states) {
         await page.locator(".t3-sync-connection").getByRole("button", { name: "Test connection" }).click();
         await expect(page.locator(".t3-sync-connection").getByLabel("Endpoint")).not.toHaveAttribute("aria-invalid", "true");
         await expect(page.locator(".ios-d3-toast-viewport")).toContainText("Access denied");
-        await expect(page.locator(".t3-sync-connection .fidelity-b-pill")).toHaveText("Failed");
+        await expect(page.locator('.t3-sync-connection .t3-tag[data-tone="negative"]')).toHaveText("Failed");
         await page.locator(".ios-d3-toast-viewport li[data-state='open']").waitFor({ state: "hidden", timeout: 15_000 });
         await page.evaluate(() => {
           for (const element of document.querySelectorAll<HTMLElement>("*")) {
@@ -311,11 +311,11 @@ for (const state of states) {
       await expect(page.getByRole("alert")).toContainText("Pro expired on 14 Oct 2026");
       await expect(page.getByText("Yearly, not renewed")).toBeVisible();
       await expect(page.locator(".fidelity-b-pro [data-ui-system-card] > div:first-child > div:first-child > div:first-child > span"))
-        .toHaveCSS("color", "rgb(238, 106, 130)");
+        .toHaveCSS("color", "rgb(239, 103, 128)"); // --negative token
     }
     if (state === "pro-free" || state === "pro-ios-free") {
       await expect(page.locator(".fidelity-b-pro [data-ui-system-card] > div:first-child > div:first-child > div:first-child > span"))
-        .toHaveCSS("color", "rgb(180, 182, 188)");
+        .toHaveCSS("color", "rgb(180, 182, 187)"); // --muted-foreground token
     }
     if (state === "about") {
       await expect(page.getByRole("heading", { name: "Track3", exact: true })).toBeVisible();

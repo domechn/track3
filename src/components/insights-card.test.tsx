@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import InsightsCard from "./insights-card";
 import { dismissInsight, formatInsight, loadInsightCard, refreshInsights, INSIGHTS_CHANGED_EVENT } from "@/middlelayers/insights-service";
@@ -65,6 +65,18 @@ describe("InsightsCard", () => {
     fireEvent.click(screen.getByRole("link", { name: "Ask the assistant" }));
     expect(takePendingAssistantQuestion()?.question)
       .toContain("BTC drove the week");
+  });
+  it("offers one footer Regenerate control for a saved Overview summary", async () => {
+    vi.mocked(loadInsightCard).mockResolvedValue({ ...card,
+      summary: "BTC drove the week", summaryLocale: "en", summarySnapshotUuid: "snapshot-a" });
+    vi.mocked(loadAIConfig).mockResolvedValue({} as never);
+    render(<InsightsCard overviewFidelity />);
+    const region = await screen.findByRole("region", { name: "AI insights" });
+    const controls = within(region).getAllByRole("button", { name: "Regenerate" });
+    expect(controls).toHaveLength(1);
+    expect(controls[0].closest("footer")).not.toBeNull();
+    fireEvent.click(controls[0]);
+    await waitFor(() => expect(refreshInsights).toHaveBeenCalledOnce());
   });
   it("shows three saved Overview insights at first and reveals the full summary on request", async () => {
     vi.mocked(loadInsightCard).mockResolvedValue({ ...card,

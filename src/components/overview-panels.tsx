@@ -299,7 +299,7 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
           <small>{source.lastSuccessAt && source.status !== "ok"
             ? t("overview.design.lastGood").replace("{time}", new Date(source.lastSuccessAt).toLocaleString())
             : source.provider ?? ""}</small></span>
-        <span className={`t3-source-condition ${source.status}`}>{t(`refresh.status.${source.status}`)}</span>
+        <span className="t3-tag" data-tone={source.status === "ok" ? "positive" : source.status === "failed" ? "negative" : "warning"}>{t(`refresh.status.${source.status}`)}</span>
       </div>)}
     </div> : <p className="t3-panel-empty">{t("overview.design.sourceEmpty")}</p>}
     <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration">{t("overview.design.manageSources")}</a>
@@ -349,7 +349,7 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
               detail: { sourceId: status.sourceId },
             }))}><UpdateIcon aria-hidden="true" />{t("refresh.retryButton")}</button>}
           {currency && sources.length > 0 && <span className="t3-source-value"><strong>{money(source.value, currency)}</strong><small>{source.percentage.toFixed(1)}%</small></span>}
-          {!currency && status && <span className={`t3-source-condition ${status.status}`}>{t(`refresh.status.${status.status}`)}</span>}
+          {!currency && status && <span className="t3-tag" data-tone={status.status === "ok" ? "positive" : status.status === "failed" ? "negative" : "warning"}>{t(`refresh.status.${status.status}`)}</span>}
         </div>;
       })}
     </div> : <p className="t3-panel-empty">{t("overview.design.sourceEmpty")}</p>}

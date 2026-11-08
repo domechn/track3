@@ -24,8 +24,7 @@
 .t3-fidelity-goal-progress u.warn { background: #d9a441; }
 .t3-fidelity-goal-progress strong { width: 48px; font-weight: 500; text-align: right; white-space: nowrap; }
 .t3-fidelity-goal-kind { color: #b4b6bc; font-size: 12px; line-height: 16px; }
-.t3-fidelity-goal-row > .t3-fidelity-pill { min-width: 84px; justify-content: flex-start; }
-.t3-fidelity-pill.warning { background: #2a2416; color: #d9a441; }
+.t3-fidelity-goal-row > .t3-tag { justify-self: start; }
 .t3-fidelity-goal-actions { display: flex; justify-content: flex-end; gap: 2px; }
 .t3-fidelity-goal-actions button { display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 999px; background: transparent; color: #b4b6bc; cursor: pointer; }
 .t3-fidelity-goal-actions button:hover { background: #18181c; color: #fff; }
@@ -34,7 +33,7 @@
 .t3-fidelity-goal-rules .t3-fidelity-empty p { max-width: none; }
 .t3-fidelity-goal-rules .t3-empty-state-chips button { height: 28px; padding: 0 10px; font-size: 12px; }
 .t3-fidelity-goals .t3-fidelity-goal-history-actions button:disabled { cursor: default; opacity: .45; }
-.t3-fidelity-badge { display: grid !important; min-width: 18px; height: 18px; place-items: center; margin-left: 0 !important; padding: 0 5px; border-radius: 9px; background: #ee6a82; color: #1a0509 !important; font-size: 11px !important; font-weight: 700; }
+.t3-fidelity-badge { display: grid !important; min-width: 18px; height: 18px; place-items: center; margin-left: 0 !important; padding: 0 5px; border-radius: 9px; background: var(--sidebar-badge); color: hsl(var(--background)) !important; font-size: 11px !important; font-weight: 700; }
 .t3-fidelity-triggered .t3-fidelity-card-head:has(.t3-fidelity-badge) :is(h2,.t3-fidelity-badge) { position: relative; top: -3px; }
 .t3-fidelity-goal-history-actions { display: flex !important; align-items: center; gap: 6px; margin-left: auto !important; }
 .t3-fidelity-goal-history-actions button,.t3-fidelity-history-row button,.t3-fidelity-goal-delete button,.t3-fidelity-drawer-foot button { display: inline-flex; height: 28px; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; border: 1px solid hsl(var(--control)); border-radius: 999px; background: transparent; color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer; }

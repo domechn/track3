@@ -538,7 +538,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
               {blacklist.map((symbol) => (
                 <div
                   key={symbol}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-background/30 px-3 py-1 text-sm"
+                  className="t3-tag" data-tone="outline"
                 >
                   <span>{symbol}</span>
                   <ConfirmDeleteDialog
