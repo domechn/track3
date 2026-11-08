@@ -216,7 +216,7 @@ for (const state of states) {
           await expect(page.locator(".fidelity-b-sync-status")).toContainText("Sync stopped");
           await expect(page.getByRole("dialog").getByRole("heading", { name: "Sync stopped" })).toBeVisible();
           await expect(page.getByRole("dialog")).toContainText("Needs attention");
-          await expect(page.getByRole("dialog").locator("details").first()).not.toHaveAttribute("open");
+          await expect(page.getByRole("dialog").locator(".t3-sync-details-toggle")).toHaveAttribute("aria-expanded", "false");
         }
       }
       if (state === "sync-confirm-use") {
