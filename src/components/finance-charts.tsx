@@ -95,7 +95,7 @@ export function CostCharts({ report, quoteColor }: { report: CostBasisReport; qu
           role="img" data={{ labels: visual.cumulative.map((row) => row.date), datasets: [{
             data: visual.cumulative.map((row) => row.value), borderColor: directionChartColor(1, quoteColor, resolvedTheme),
             backgroundColor: directionChartColor(1, quoteColor, resolvedTheme, 0.12), fill: true, tension: 0.2, pointRadius: 2,
-          }] }} options={chartOptions} plugins={[{
+          }] }} options={{ ...chartOptions, layout: { padding: { top: 20 } } }} plugins={[{
             id: "tax-year-markers",
             afterDraw(chart: ChartJS<"line">) {
               const { ctx, chartArea, scales } = chart;
@@ -111,7 +111,7 @@ export function CostCharts({ report, quoteColor }: { report: CostBasisReport; qu
                 ctx.moveTo(x, chartArea.top);
                 ctx.lineTo(x, chartArea.bottom);
                 ctx.stroke();
-                ctx.fillText(marker.year, Math.min(x + 4, chartArea.right - 28), chartArea.top + 12);
+                ctx.fillText(marker.year, Math.min(x + 4, chartArea.right - 28), chartArea.top - 4);
               }
               ctx.restore();
             },

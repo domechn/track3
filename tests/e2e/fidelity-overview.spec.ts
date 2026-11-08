@@ -326,7 +326,11 @@ test("Overview chart reveals the stored value on pointer hover", async ({ browse
     const tooltip = page.locator("[data-chart-tooltip]");
     await expect(tooltip).toBeVisible();
     await expect(tooltip).toContainText(/Oct/);
-    await expect(tooltip).toContainText(/\$[\d,]+/);
+    await expect(tooltip).toContainText(/Value: \$[\d,]+\.\d\d/);
+    await expect(tooltip).toContainText(/Change:/);
+    const crosshair = Number(await chart.locator("[data-chart-crosshair]").getAttribute("x1"));
+    const point = Number(await chart.locator("[data-chart-active-point]").getAttribute("cx"));
+    expect(Math.abs(crosshair - point)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: `${dir}/overview-hover-phone.png` });
   } finally { await context.close(); }
 });

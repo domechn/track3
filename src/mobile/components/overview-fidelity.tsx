@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { ChevronLeftIcon, ChevronRightIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { Link } from "react-router-dom";
 import type { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
 import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
-import { queryAssetChange, queryHistoricalData, queryLatestAssetsPercentage, queryTotalValue, queryTotalValues } from "@/middlelayers/charts";
+import { queryAllDataDates, queryAssetChange, queryAssetsByUUIDs, queryHistoricalData, queryLatestAssetsPercentage, queryTotalValue, queryTotalValues } from "@/middlelayers/charts";
+import { deriveContributions, selectBestDayContributionSnapshots } from "@/components/overview-derived";
 import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { overviewUseLastKnownEvent, sourceStatusesChangedEvent } from "@/components/source-status-event";
@@ -35,7 +36,8 @@ import "@/mobile/components/mobile/fidelity.css";
 import { directionColorVar, directionTone } from "@/utils/color";
 import { dailyChangeTooltip, type DailyChange } from "@/components/daily-change-tooltip";
 import { useChartHitArea } from "@/components/chart-tooltip";
-import { formatTotalValueTooltip } from "@/components/total-value-tooltip";
+import { buildOverviewTooltip } from "@/components/overview-chart-tooltip";
+import { useOverviewTopMover } from "@/components/overview-top-mover";
 
 type Snapshot = Awaited<ReturnType<typeof queryHistoricalData>>[number];
 type Asset = Awaited<ReturnType<typeof queryLatestAssetsPercentage>>[number];
@@ -97,14 +99,15 @@ function Icon({ name, size = 18 }: { name: "clock" | "chevron" | "cloud" | "refr
   return <svg width={size} height={size} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
 
-function Chart({ points, values, formatValue, formatExactValue, formatTick, change, best }: {
-  points: Point[]; values: number[]; formatValue: (value: number) => string; formatExactValue: (value: number) => string;
-  formatTick: (value: number) => string; change: string;
-  best: { date: Date; change: string; symbol: string; symbolChange: string } | null;
+function Chart({ points, values, formatTick, change, best, currency, quoteColor, mode }: {
+  points: Point[]; values: number[]; formatTick: (value: number) => string; change: string;
+  currency: CurrencyRateDetail; quoteColor: QuoteColor; mode: "fiat" | "btc" | "percent";
+  best: { date: Date; change: string; value: number; symbol?: string; symbolChange?: string; symbolValue?: number } | null;
 }) {
   const { t, locale } = useTranslation();
   const chart = useChartHitArea();
   const [selected, setSelected] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const min = Math.min(...values), max = Math.max(...values);
   const targetStep = Math.max((max - min) / 4, 1e-8);
   const power = 10 ** Math.floor(Math.log10(targetStep));
@@ -112,51 +115,87 @@ function Chart({ points, values, formatValue, formatExactValue, formatTick, chan
   const step = (fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10) * power;
   const low = Math.floor((min - step / 2) / step) * step;
   const high = Math.ceil((max + step / 2) / step) * step;
-  const x = (index: number) => 44 + index / Math.max(1, points.length - 1) * 210;
   const y = (value: number) => 164 - (value - low) / Math.max(1, high - low) * 138;
   const ticks = Array.from({ length: Math.floor((high - low) / step) + 1 }, (_, index) => low + index * step);
   const roundedLabels = ticks.map(formatTick);
   const tickLabels = new Set(roundedLabels).size === roundedLabels.length ? roundedLabels :
     formatOverviewAxisTicks(ticks).map((label) => formatTick(0).endsWith("%") ? `${label}%` :
       formatTick(0).endsWith("K") ? label.replace(/k$/, "K") : label);
+  const measure = useMemo(() => document.createElement("canvas").getContext("2d"), []);
+  if (measure) measure.font = '12px "Public Sans Variable", "Public Sans", sans-serif';
+  const plotLeft = Math.max(44, Math.ceil(Math.max(...tickLabels.map((label) => measure?.measureText(label).width ?? label.length * 7))) + 8);
+  const x = (index: number) => plotLeft + index / Math.max(1, points.length - 1) * (254 - plotLeft);
   const labelIndices = [...new Set([0, Math.round((points.length - 1) / 3), Math.round(2 * (points.length - 1) / 3), points.length - 1])];
-  const bestIndex = best ? points.findIndex((point) => new Date(point.timestamp).toDateString() === best.date.toDateString()) : -1;
+  const bestIndex = best ? points.map((point) => new Date(point.timestamp).toDateString()).lastIndexOf(best.date.toDateString()) : -1;
   const pick = (clientX: number, left: number, width: number) =>
-    Math.max(0, Math.min(points.length - 1, Math.round(((clientX - left) * 324 / width - 44) / 210 * (points.length - 1))));
+    Math.max(0, Math.min(points.length - 1, Math.round(((clientX - left) * 324 / width - plotLeft) / (254 - plotLeft) * (points.length - 1))));
+  const dayMover = useOverviewTopMover(selected === null ? undefined : points[selected]?.timestamp, points[0]?.timestamp);
+  const select = (index: number) => {
+    setSelected(index);
+    chart.select(index, svgRef.current?.querySelectorAll("[data-chart-mark]")[index] ?? null);
+  };
+  useEffect(() => {
+    if (selected !== null) chart.select(selected, svgRef.current?.querySelectorAll("[data-chart-mark]")[selected] ?? null);
+  }, [selected, dayMover, best?.symbolValue, chart.select]);
+  const caption = best && t(best.symbol ? "fidelity.overview.bestDayChart" : "overview.design.bestDay")
+    .replace("{date}", shortDate(best.date, locale)).replace("{day}", shortDate(best.date, locale))
+    .replace("{change}", best.change).replace("{amount}", best.change)
+    .replace("{symbol}", best.symbol ?? "").replace("{symbolChange}", best.symbolChange ?? "");
   const scrub = (event: React.PointerEvent<SVGSVGElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    const index = pick(event.clientX, bounds.left, bounds.width);
-    setSelected(index);
-    chart.select(index, event.currentTarget.querySelectorAll("[data-chart-mark]")[index]);
+    select(pick(event.clientX, bounds.left, bounds.width));
   };
-  return <><svg className="fd-overview-chart" viewBox="0 0 324 190" role="group" data-chart-group="" aria-label={t("fidelity.overview.totalValueChart")}
+  return <div className="fd-overview-chart-wrap">
+    {bestIndex >= 0 && caption && <button type="button" className="fd-overview-chart-caption" title={caption}
+      onPointerEnter={() => select(bestIndex)} onPointerLeave={() => { setSelected(null); chart.clear(); }}
+      onFocus={() => select(bestIndex)} onBlur={() => { setSelected(null); chart.clear(); }}>{caption}</button>}
+    <svg ref={svgRef} className="fd-overview-chart" viewBox="0 0 324 190" role="group" data-chart-group=""
+      aria-label={t("fidelity.overview.totalValueChart")}
     aria-description={t("fidelity.overview.chartChange").replace("{start}", shortDate(new Date(points[0].timestamp), locale)).replace("{end}", shortDate(new Date(points.at(-1)!.timestamp), locale)).replace("{change}", change)}
     onContextMenu={(event) => event.preventDefault()}
     onPointerDown={scrub}
     onPointerMove={scrub}
-    onPointerLeave={(event) => { if (event.pointerType === "mouse") setSelected(null); }}>
-    {ticks.map((value, index) => <g key={value}><line x1="44" x2="324" y1={y(value)} y2={y(value)} stroke="#262629" shapeRendering="crispEdges" /><text x="36" y={y(value) + 4} textAnchor="end" fill="var(--fd-faint)" fontSize="12">{tickLabels[index]}</text></g>)}
-    {bestIndex >= 0 && best && <><line x1={x(bestIndex)} x2={x(bestIndex)} y1="29" y2="166" stroke="var(--fd-faint)" opacity=".45" shapeRendering="crispEdges" />
-      <line x1={x(bestIndex)} x2={x(bestIndex)} y1="22" y2="29" stroke="var(--fd-faint)" opacity=".45" shapeRendering="crispEdges" />
-      <text x="11" y="17" fill="var(--fd-faint)" fontSize="11">{t("fidelity.overview.bestDayChart").replace("{date}", shortDate(best.date, locale)).replace("{change}", best.change).replace("{symbol}", best.symbol).replace("{symbolChange}", best.symbolChange)}</text></>}
+    onPointerLeave={(event) => { if (event.pointerType === "mouse") { setSelected(null); chart.clear(); } }}>
+    {ticks.map((value, index) => <g key={value}><line x1={plotLeft} x2="324" y1={y(value)} y2={y(value)} stroke="#262629" shapeRendering="crispEdges" /><text x={plotLeft - 8} y={y(value) + 4} textAnchor="end" fill="var(--fd-faint)" fontSize="12">{tickLabels[index]}</text></g>)}
     {/* color-semantics: neutral total-value line shows level, not change. */}
     <path d={values.map((value, index) => `${index ? "L" : "M"}${x(index).toFixed(2)} ${y(value).toFixed(2)}`).join(" ")} fill="none" stroke="var(--fd-accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+    {bestIndex >= 0 && best && <circle data-best-day-marker="" cx={x(bestIndex)} cy={y(values[bestIndex])} r="4"
+      fill={directionColorVar(best.value, quoteColor)} pointerEvents="none" />}
     {points.map((point, index) => {
       const date = shortDate(new Date(point.timestamp), locale);
-      const label = `${date}: ${formatExactValue(values[index])}`;
+      const detail = buildOverviewTooltip(
+        { timestamp: point.timestamp, value: mode === "fiat" ? point.totalValue : values[index] },
+        index > 0 ? { timestamp: points[index - 1].timestamp,
+          value: mode === "fiat" ? points[index - 1].totalValue : values[index - 1] } : undefined,
+        currency, locale, index === bestIndex && best?.symbol && best.symbolValue !== undefined
+          ? { symbol: best.symbol, value: best.symbolValue } : index === selected ? dayMover : undefined,
+        mode,
+      );
+      const label = `${date}: ${detail?.value}`;
+      const content = <><div>{detail?.date}</div><div>{t("common.valueLabel")}: <strong>{detail?.value}</strong></div>
+        {detail?.change && <div data-tone={detail.direction > 0 ? "gain" : detail.direction < 0 ? "loss" : "neutral"}>
+          {t("common.changeLabel")}: {detail.change}</div>}
+        {detail?.mover && <div>{t("overview.chart.topMover")}: {detail.mover}</div>}</>;
       const left = index === 0 ? x(0) - 6 : (x(index - 1) + x(index)) / 2;
       const right = index === points.length - 1 ? x(index) + 6 : (x(index) + x(index + 1)) / 2;
+      const mark = chart.markProps(index, label, content);
       return <rect key={point.timestamp} x={left} y="20" width={right - left} height="146" fill="transparent"
-        role="button" {...chart.markProps(index, label, <><div>{date}</div><div>{formatExactValue(values[index])}</div></>)} />;
+        role="button" {...mark} onFocus={(event) => { mark.onFocus(event); setSelected(index); }}
+        onBlur={(event) => { mark.onBlur(event); setSelected(null); }}
+        onKeyDown={(event) => { mark.onKeyDown(event); if (event.key === "Escape") setSelected(null); }} />;
     })}
     {labelIndices.map((index, order) => <text key={index} x={x(index) - (order === 0 ? 0 : order === labelIndices.length - 1 ? 40 : 20)} y="182" fill="var(--fd-faint)" fontSize="12">{shortDate(new Date(points[index].timestamp), locale)}</text>)}
-    <text x="320" y={y(values.at(-1) ?? 0) + 4} textAnchor="end" fill="var(--fd-text)" fontSize="12" fontWeight="600">{formatValue(values.at(-1) ?? 0)}</text>
+    {/* color-semantics: neutral end dot marks the latest level on the total-value line. */}
+    <circle cx={x(points.length - 1)} cy={y(values.at(-1) ?? 0)} r="3" fill="var(--fd-accent)" pointerEvents="none" />
     {selected !== null && points[selected] && <>
-      <line x1={x(selected)} x2={x(selected)} y1="29" y2="166" stroke="var(--fd-faint)" opacity=".35" pointerEvents="none" />
+      <line data-chart-crosshair="" x1={x(selected)} x2={x(selected)} y1="29" y2="166"
+        stroke="var(--fd-faint)" opacity=".35" pointerEvents="none" />
       {/* color-semantics: neutral selection ring marks a point on the total-value line. */}
-      <circle cx={x(selected)} cy={y(values[selected])} r="3.5" fill="var(--fd-surface)" stroke="var(--fd-accent)" strokeWidth="2" pointerEvents="none" />
+      <circle data-chart-active-point="" cx={x(selected)} cy={y(values[selected])} r="3.5" fill="var(--fd-surface)"
+        stroke="var(--fd-accent)" strokeWidth="2" pointerEvents="none" />
     </>}
-  </svg>{chart.tooltip}</>;
+    </svg>{chart.tooltip}
+  </div>;
 }
 
 function DailyChart({ daily, currency, quoteColor }: { daily: DailyChange[]; currency: CurrencyRateDetail; quoteColor: QuoteColor }) {
@@ -323,12 +362,8 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
     currencyWrapper(currency)(point.totalValue));
   const chartBase = chartRaw[0] ?? 0;
   const chartValues = percentChart ? chartRaw.map((value) => chartBase ? (value / chartBase - 1) * 100 : 0) : chartRaw;
-  const formatChartValue = (value: number) => percentChart ? `${value >= 0 ? "+" : ""}${value.toFixed(1)}%` :
-    btcBase ? `₿${value.toFixed(8)}` : `${currency.symbol}${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-  const formatExactChartValue = (value: number) => formatTotalValueTooltip(value,
-    btcBase ? "₿" : currency.symbol, percentChart, btcBase);
   const formatChartTick = (value: number) => percentChart ? `${value.toFixed(0)}%` :
-    btcBase ? value.toFixed(1) : `${Math.round(value / 1000)}K`;
+    btcBase ? value.toFixed(1) : formatOverviewAxisTicks([value])[0];
   const chartDelta = (chartValues.at(-1) ?? 0) - (chartValues[0] ?? 0);
   const formatChartChange = percentChart ? `${chartDelta > 0 ? "+" : chartDelta < 0 ? "−" : ""}${Math.abs(chartDelta).toFixed(1)}%` :
     btcBase ? `${chartDelta > 0 ? "+" : chartDelta < 0 ? "−" : ""}₿${Math.abs(chartDelta).toFixed(8)}` :
@@ -369,15 +404,33 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
     return previous ? [{ timestamp: point.timestamp, value: point.totalValue - previous.totalValue,
       previousTotal: previous.totalValue, total: point.totalValue }] : [];
   });
-  const best = daily.reduce<(typeof daily)[number] | null>((a, b) => !a || b.value > a.value ? b : a, null);
-  const bestContributor = best && view?.latest ? (() => {
-    const index = points.findIndex((point) => point.timestamp === best.timestamp);
-    const atBest = assetMap(nearest(view.snapshots, best.timestamp));
-    const before = index > 0 ? assetMap(nearest(view.snapshots, points[index - 1].timestamp)) : new Map();
-    const item = [...atBest.entries()].map(([key, value]) => ({ key, value: value.value - (before.get(key)?.value ?? 0) }))
-      .sort((a, b) => b.value - a.value)[0];
-    return item ?? null;
-  })() : null;
+  const closesByDay = new Map<string, Point>();
+  for (const point of points) closesByDay.set(new Date(point.timestamp).toDateString(), point);
+  const closes = [...closesByDay.values()];
+  const visibleStart = chartPoints[0]?.timestamp ?? Infinity;
+  const visibleEnd = chartPoints.at(-1)?.timestamp ?? -Infinity;
+  const bestDaily = closes.flatMap((point, index) => index > 0 &&
+    point.timestamp >= visibleStart && point.timestamp <= visibleEnd
+    ? [{ timestamp: point.timestamp, value: point.totalValue - closes[index - 1].totalValue }] : []).slice(-31);
+  const best = bestDaily.reduce<(typeof bestDaily)[number] | null>((a, b) => !a || b.value > a.value ? b : a, null);
+  const [bestContribution, setBestContribution] = useState<{ timestamp: number; symbol: string; value: number } | null>(null);
+  useEffect(() => {
+    let active = true;
+    setBestContribution(null);
+    if (best) void (async () => {
+      try {
+        const pair = selectBestDayContributionSnapshots(await queryAllDataDates(),
+          best.timestamp, new Date(points[0]?.timestamp ?? best.timestamp));
+        if (!pair) return;
+        const assets = await queryAssetsByUUIDs([pair.fromId, pair.toId]);
+        const mover = deriveContributions(assets, pair.fromId, pair.toId)
+          .filter((row) => row.value > 0).sort((a, b) => b.value - a.value)[0];
+        if (active && mover) setBestContribution({ timestamp: best.timestamp, symbol: mover.symbol, value: mover.value });
+      } catch { if (active) setBestContribution(null); }
+    })();
+    return () => { active = false; };
+  }, [best?.timestamp, points]);
+  const bestContributor = bestContribution?.timestamp === best?.timestamp ? bestContribution : null;
   const high = Math.max(0, ...points.map((point) => point.totalValue));
   const highPoint = points.find((point) => point.totalValue === high);
   const sourceValues = new Map<string, number>();
@@ -484,9 +537,14 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
             <span>{item.base ? amt(item.value, currency, 2, true) : dash}</span><small>{item.date ? t("fidelity.overview.vsDate").replace("{date}", shortDate(item.date, locale)) : dash}</small></div>)}
         </div>
         {btcBase && !btcData ? <div className="fd-empty">{t("common.loading")}</div> :
-          chartPoints.length > 1 ? <Chart points={chartPoints} values={chartValues} formatValue={formatChartValue}
-            formatExactValue={formatExactChartValue} formatTick={formatChartTick} change={formatChartChange}
-          best={!percentChart && !btcBase && best && bestContributor ? { date: new Date(best.timestamp), change: amt(best.value, currency, 0, true), symbol: bestContributor.key.split(":")[1], symbolChange: amt(bestContributor.value, currency, 0, true) } : null} /> : <div className="fd-empty">{t("overview.design.needTwoSnapshots")}</div>}
+          chartPoints.length > 1 ? <Chart points={chartPoints} values={chartValues} formatTick={formatChartTick}
+            change={formatChartChange} currency={currency} quoteColor={quoteColor}
+            mode={percentChart ? "percent" : btcBase ? "btc" : "fiat"}
+            best={!percentChart && !btcBase && best ? { date: new Date(best.timestamp),
+              change: amt(best.value, currency, 0, true), value: best.value, symbol: bestContributor?.symbol,
+              symbolChange: bestContributor ? amt(bestContributor.value, currency, 0, true) : undefined,
+              symbolValue: bestContributor?.value } : null}
+          /> : <div className="fd-empty">{t("overview.design.needTwoSnapshots")}</div>}
         <div className="fd-overview-ath"><span><span className="fd-label">{t("overview.design.ath")}</span> <strong>{amt(high, currency)}</strong></span>
           <span>{highPoint && t(highPoint.timestamp === lastAt ? "fidelity.overview.athReached" : "fidelity.overview.athReachedEarlier").replace("{date}", shortDate(new Date(highPoint.timestamp), locale))}</span>
           <span>{pct(ratio(high - current, high), 2, false)} {t("fidelity.overview.belowHigh")}</span></div>

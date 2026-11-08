@@ -8,6 +8,14 @@ it("keeps the final date without crowding it with a nearby regular tick", () => 
   expect(shouldShowOverviewDateTick(25, 33)).toBe(true);
 });
 
+it("bounds dense history date labels while keeping both range endpoints", () => {
+  const labels = Array.from({ length: 520 }, (_, index) => index)
+    .filter((index) => shouldShowOverviewDateTick(index, 520, 10));
+  expect(labels.length).toBeLessThanOrEqual(10);
+  expect(labels[0]).toBe(0);
+  expect(labels.at(-1)).toBe(519);
+});
+
 it.each([
   [[1_690_000, 1_720_000, 1_750_000, 1_780_000, 1_810_000], ["1.69m", "1.72m", "1.75m", "1.78m", "1.81m"]],
   [[1_745_000, 1_747_500, 1_750_000, 1_752_500, 1_755_000], ["1.745m", "1.7475m", "1.75m", "1.7525m", "1.755m"]],

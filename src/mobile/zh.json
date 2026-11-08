@@ -1573,6 +1573,7 @@
   "overview.design.plusWord": "增加",
   "overview.design.minusWord": "减少",
   "overview.design.bestDay": "{day}：{amount}，最佳单日",
+  "overview.chart.topMover": "当日主要变动资产",
   "overview.design.needTwoSnapshots": "至少需要两次快照才能显示变化。",
   "overview.design.whatMoved": "变化来源",
   "overview.design.snapshotCount": "最近 {count} 次快照",
