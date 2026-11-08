@@ -311,13 +311,13 @@ test("Overview chart reveals the stored value on pointer hover", async ({ browse
   const { context, page } = await samplePage(browser);
   try {
     const chart = page.locator(".fd-overview-chart");
-    await expect(chart.locator("rect")).toHaveCount(0);
+    await expect(chart.locator("rect:not([data-chart-mark])")).toHaveCount(0);
     await chart.hover({ position: { x: 145, y: 90 } });
-    await expect(chart.locator("rect")).toHaveCount(1);
-    const tooltip = chart.locator("g:has(> rect[rx='6'])");
-    await expect(tooltip.locator("text")).toHaveCount(2);
-    await expect(tooltip.locator("text").first()).toContainText(/Oct/);
-    await expect(tooltip.locator("text").last()).toContainText(/\$[\d,]+/);
+    await expect(chart.locator("rect:not([data-chart-mark])")).toHaveCount(0);
+    const tooltip = page.locator("[data-chart-tooltip]");
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(/Oct/);
+    await expect(tooltip).toContainText(/\$[\d,]+/);
     await page.screenshot({ path: `${dir}/overview-hover-phone.png` });
   } finally { await context.close(); }
 });

@@ -10,7 +10,7 @@ it("keeps the shared daily chart scaled to its own values by default", () => {
     { timestamp: Date.parse("2026-10-29"), value: 120 },
     { timestamp: Date.parse("2026-10-30"), value: -30 },
   ]} />);
-  const up = screen.getByRole("img", { name: /daily change chart/i }).querySelector(".t3-daily-up") as HTMLElement;
+  const up = screen.getByRole("group", { name: /daily change chart/i }).querySelector(".t3-daily-up") as HTMLElement;
   expect(up.style.height).toBe("48%");
   expect(screen.queryByText("overview.fidelity.up")).not.toBeInTheDocument();
 });

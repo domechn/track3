@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Comparison from "@/mobile/components/comparison";
@@ -75,6 +75,8 @@ describe("Comparison page", () => {
       render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
       await waitFor(() => expect(document.querySelector(".fd-comparison-movers.percent p"))
         .toHaveTextContent("XUSD moved"));
+      fireEvent.pointerEnter(document.querySelector(".fd-comparison-movers:not(.percent) .fd-comparison-mover span")!);
+      expect(screen.getByRole("tooltip")).toHaveTextContent("+$20.00");
     } finally {
       stableQuery.mockRestore();
       savedStable.mockRestore();
