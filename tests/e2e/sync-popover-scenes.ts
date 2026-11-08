@@ -76,4 +76,3 @@ export async function checkTextContrast(popover: ReturnType<Page["locator"]>) {
     expect(value.ratio, value.text ?? "").toBeGreaterThanOrEqual(4.5);
   }
 }
-
