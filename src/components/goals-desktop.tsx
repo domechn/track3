@@ -16,6 +16,7 @@ import { AttributionPager, useAttributionPage } from "./attribution-pager";
 import { alertTemplateDraft, alertTemplates } from "./goals-alert-templates";
 import "./rebalance-desktop.css";
 import "./goals-desktop.css";
+import { useChartHitArea } from "./chart-tooltip";
 
 const kinds: AlertKind[] = ["total_value_target", "asset_value_target", "asset_price_target", "asset_price_move", "allocation_deviation", "period_pnl", "portfolio_value_change"];
 const fixed = (value: number, digits = 1) => value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -87,6 +88,7 @@ type Props = {
 
 export default function GoalsDesktop(props: Props) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const rules = [...props.rules].sort((a, b) => a.id - b.id);
   const history = [...props.history].sort((a, b) => b.triggeredAt.localeCompare(a.triggeredAt) || a.id - b.id);
   const rulePaging = useAttributionPage(rules, rules.map((rule) => rule.id).join(","), 20);
@@ -242,9 +244,9 @@ export default function GoalsDesktop(props: Props) {
       <section className="t3-fidelity-card t3-fidelity-goal-rules">
         <div className="t3-fidelity-card-head"><h2>{t("goals.rules")}</h2><span>{rules.length ? t("goals.fidelity.rulesHint").replace("{on}", String(onCount)).replace("{off}", String(rules.length - onCount)).replace("{time}", time(latest?.at)) : t("goals.fidelity.zeroRules")}</span></div>
         {props.loading ? <div className="t3-fidelity-empty" role="status">{t("goals.loading")}</div> : rules.length ? <>
-          <div className="t3-fidelity-rule-list">
+          <div className="t3-fidelity-rule-list" data-chart-group="">
           <div className="t3-fidelity-goal-row t3-fidelity-table-head"><span /><span>{t("goals.fidelity.column.rule")}</span><span>{t("goals.fidelity.column.progress")}</span><span>{t("goals.fidelity.kind")}</span><span>{t("goals.fidelity.column.status")}</span><span /></div>
-          {rulePaging.rows.map((rule) => {
+          {rulePaging.rows.map((rule, index) => {
             const measurement = measurements[rules.indexOf(rule)];
             const raw = rule.threshold !== 0 && measurement.value !== undefined
               ? rule.kind === "portfolio_value_change" && rule.comparator === "lte" && measurement.value > rule.threshold ? 0
@@ -255,7 +257,10 @@ export default function GoalsDesktop(props: Props) {
                 aria-label={t("goals.enableRule").replace("{kind}", t(`goals.kind.${rule.kind}`))}
                 onChange={(event) => props.onToggle(rule, event.target.checked)} /></label>
               <div className="t3-fidelity-goal-name"><b>{ruleTitle(rule, t)}</b><small>{ruleDescription(rule, t, money)}</small></div>
-              <div className="t3-fidelity-goal-progress"><div><i><u className={triggered ? "warn" : ""} style={{ width: `${Math.min(100, Math.max(0, raw))}%` }} /></i>
+              <div className="t3-fidelity-goal-progress"><div><i role="button"
+                {...chart.markProps(index, `${ruleTitle(rule, t)}: ${fixed(raw, 2)}%, ${measurement.value === undefined ? t("goals.unavailable") : fixed(measurement.value, 2)}`,
+                  <><div>{ruleTitle(rule, t)}</div><div>{fixed(raw, 2)}%</div><div>{measurement.value === undefined ? t("goals.unavailable") : fixed(measurement.value, 2)}</div></>)}>
+                <u className={triggered ? "warn" : ""} style={{ width: `${Math.min(100, Math.max(0, raw))}%` }} /></i>
                 <strong>{measurement.status === "ready" ? raw >= 100 ? "100%+" : `${fixed(raw)}%` : "–"}</strong></div>
                 <small>{describeProgress(rule, measurement.value, raw)}</small></div>
               <div className="t3-fidelity-goal-kind">{kindName(rule.kind, t)}<small>{t("goals.fidelity.cooldownShort").replace("{window}", cooldownLabel(Number(alertDraftFromRule(rule).cooldownMinutes)))}</small></div>
@@ -343,6 +348,7 @@ export default function GoalsDesktop(props: Props) {
         </div>
       </DialogContent>
     </Dialog>
+    {chart.tooltip}
   </div>;
 }
 

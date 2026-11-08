@@ -155,6 +155,7 @@ test("Wallets opens with the saved shared date range", async ({ browser }) => {
   test.setTimeout(120_000);
   const { context, page } = await openWallets(browser);
   try {
+    await expect(page.locator(".fd-wallets")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
     await page.evaluate(() => localStorage.setItem("track3-assistant-date-range", '{"from":"2026-10-24","to":"2026-10-31"}'));
     await page.reload();
     await expect(page.locator(".fd-wallet-range").getByRole("radio", { name: "7D" })).toHaveAttribute("aria-checked", "true", { timeout: 30_000 });

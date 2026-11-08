@@ -12,6 +12,7 @@ import { axisForValues, boundedMonthTimestamps, compactMoney, hasProfitLine } fr
 import { requestFullRefresh } from "./refresh-request";
 import { directionColorVar } from "@/utils/color";
 import { splitDirectionLine } from "@/components/direction-line";
+import { useChartHitArea } from "./chart-tooltip";
 
 type Point = { timestamp: number; value: number | null };
 type SummaryData = {
@@ -35,6 +36,7 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
   currency: CurrencyRateDetail; dateRange: TDateRange; quoteColor: QuoteColor; oneSnapshot?: boolean;
 }) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const date = (value: Date) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(value);
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const dataVersion = useDataChangedVersion();
@@ -124,24 +126,27 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
       !hasLine ? <div className="fidelity-empty fidelity-summary-chart-empty"><div>{t("summary.fidelity.lineStarts")}</div><button type="button" onClick={requestFullRefresh}><svg aria-hidden="true" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3h-3" /></svg>{t("summary.fidelity.refreshNow")}</button></div> :
       <>
         <p className="fidelity-caption">{t("summary.fidelity.chartCaption").replace("{date}", date(dateRange.start))}</p>
-        <svg className="fidelity-summary-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={t("summary.fidelity.chartCaption").replace("{date}", date(dateRange.start))}>
+        <svg className="fidelity-summary-chart" viewBox={`0 0 ${width} ${height + 8}`} preserveAspectRatio="none" role="group"
+          data-chart-group="" aria-label={t("summary.fidelity.chartCaption").replace("{date}", date(dateRange.start))}>
           {ticks.map((tick, index) => <g key={index}><line x1={left} x2={width} y1={y(tick)} y2={y(tick)} stroke="#262629" shapeRendering="crispEdges" /><text x={left - 8} y={y(tick) + 4} textAnchor="end" fill="#9b9da3" fontSize="12">{compactMoney(currencyWrapper(currency)(tick), currency.symbol).replace(currency.symbol, "")}</text></g>)}
           {lineSegments.map(({ start, end, value }, index) => <line key={index} data-direction={value > 0 ? "gain" : value < 0 ? "loss" : "neutral"}
             x1={start.x} y1={start.y} x2={end.x} y2={end.y}
             stroke={directionColorVar(value, quoteColor)} strokeWidth="2" />)}
           {usablePoints.map((point, index) => {
             const label = `${date(new Date(point.timestamp))}: ${money(point.value, currency)}`;
-            return <circle key={point.timestamp} data-point cx={x(index)} cy={y(point.value)} r="6" fill="transparent" role="img" tabIndex={0} aria-label={label}><title>{label}</title></circle>;
+            return <circle key={point.timestamp} data-point cx={x(index)} cy={y(point.value)} r="10"
+              fill="transparent" role="button" {...chart.markProps(index, label, label)} />;
           })}
-          {best && <g><line x1={x(best.index)} x2={x(best.index)} y1="9" y2={height-bottom} stroke="#9b9da3" opacity=".45" strokeWidth="1" shapeRendering="crispEdges" /><text x={x(best.index)+4} y="17" fill="#9b9da3" fontSize="11">{t("summary.fidelity.bestMonth").replace("{month}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(best.point.timestamp)).replace("{amount}", money(best.change, currency, 0))}</text></g>}
+          {best && <g pointerEvents="none"><line x1={x(best.index)} x2={x(best.index)} y1="9" y2={height-bottom} stroke="#9b9da3" opacity=".45" strokeWidth="1" shapeRendering="crispEdges" /><text x={x(best.index)+4} y="17" fill="#9b9da3" fontSize="11">{t("summary.fidelity.bestMonth").replace("{month}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(best.point.timestamp)).replace("{amount}", money(best.change, currency, 0))}</text></g>}
           {usablePoints.filter((_, index) => index === 0 || index === usablePoints.length - 1 || index % Math.max(1, Math.floor(usablePoints.length / 4)) === 0).map((point) => {
             const index = usablePoints.indexOf(point);
-            return <text key={index} x={x(index)} y={height - 8} textAnchor={index === 0 ? "start" : index === usablePoints.length - 1 ? "end" : "middle"} fill="#9b9da3" fontSize="12">{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { ...(index === 0 ? { day: "numeric" as const } : {}), month: "short", year: "2-digit" }).format(point.timestamp)}</text>;
+            return <text key={index} x={x(index)} y={height} textAnchor={index === 0 ? "start" : index === usablePoints.length - 1 ? "end" : "middle"} fill="#9b9da3" fontSize="12">{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { ...(index === 0 ? { day: "numeric" as const } : {}), month: "short", year: "2-digit" }).format(point.timestamp)}</text>;
           })}
           <text data-direction-end="" x={x(usablePoints.length - 1) + 6} y={y(usablePoints.at(-1)!.value) + 4}
             textAnchor="start" fill={directionColorVar(usablePoints.at(-1)!.value, quoteColor)}
             fontSize="12" fontWeight="600">{money(usablePoints.at(-1)!.value, currency, 0).replace(/^[+−]/, "")}</text>
         </svg>
+        {chart.tooltip}
       </>}
   </section>;
 }

@@ -1006,17 +1006,17 @@ export async function seedDesktopSourceStatuses(page: Page) {
   )), sample.sources);
 }
 
-export async function seedDesktopAiSummary(page: Page) {
-  await page.evaluate(async () => (window as any).__e2eInvoke("plugin:sql|execute", {
+export async function seedDesktopAiSummary(page: Page, summary = "BTC drove the week — it added $12,286.29 of the $26,010.84 gain: 47% of it.\nStablecoins are 29.1% of the portfolio — USDT and USDC total $222,446.74.\nAAPL is the one position down — it is −3.8% over 7 days while the total is +3.5%.") {
+  await page.evaluate(async (summary) => (window as any).__e2eInvoke("plugin:sql|execute", {
     query: "INSERT OR REPLACE INTO configuration (id, data) VALUES (992, ?)",
     values: [`!ent:e2e:${JSON.stringify({
       snapshotUuid: "fidelity-day-30", dismissedIds: [],
       insights: [{ id: "week:btc", severity: "info", messageKey: "insights.newAsset",
         data: { symbol: "BTC", value: 205737.58 } }],
-      summary: "BTC drove the week — it added $12,286.29 of the $26,010.84 gain: 47% of it.\nStablecoins are 29.1% of the portfolio — USDT and USDC total $222,446.74.\nAAPL is the one position down — it is −3.8% over 7 days while the total is +3.5%.",
+      summary,
       summaryLocale: "en", summarySnapshotUuid: "fidelity-day-30",
     })}`],
-  }));
+  }), summary);
 }
 
 export async function installTauriBridge(page: Page, options: BaseOptions & { fidelitySample?: SampleMode; slowBackup?: boolean; fidelitySlowSummary?: boolean; fidelitySlowCoin?: boolean; slowRefreshPersist?: boolean; firstRunBinance?: boolean; keyRecoveryNeeded?: boolean; quotaUsageFixture?: "near" | "exhausted"; routeDemoR2ToFakeS3?: boolean } = {}) {

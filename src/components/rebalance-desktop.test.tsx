@@ -23,6 +23,13 @@ function props(overrides: Partial<ComponentProps<typeof RebalanceDesktop>> = {})
   };
 }
 
+it("fills the allocation card with guidance when a new portfolio has no assets", () => {
+  render(<RebalanceDesktop {...props({ holdings: [], targets: [] })} />);
+  expect(screen.getByText("No assets to allocate yet")).toBeInTheDocument();
+  expect(screen.getByText("Add a source and refresh to see its assets here.")).toBeInTheDocument();
+  expect(document.querySelector(".t3-fidelity-allocation-empty")).toBeInTheDocument();
+});
+
 it("shows and changes stored mode, injected cash, and custom ignore threshold", () => {
   const onMode = vi.fn();
   const onInjectedCash = vi.fn();
@@ -43,6 +50,21 @@ it("shows and changes stored mode, injected cash, and custom ignore threshold", 
   expect(ignore).toHaveValue(3200);
   fireEvent.change(ignore, { target: { value: "4000" } });
   expect(onIgnoreBelow).toHaveBeenCalledWith(4000);
+});
+
+it("reveals exact current, target, and drift for a rebalance bar", () => {
+  const { container } = render(<RebalanceDesktop {...props({
+    holdings: [
+      { assetType: "crypto", symbol: "BTC", amount: 1, value: 60.37, price: 60.37 },
+      { assetType: "crypto", symbol: "ETH", amount: 1, value: 39.63, price: 39.63 },
+    ],
+    targets: [{ kind: "asset", assetType: "crypto", symbol: "BTC", percent: 50 }],
+  })} />);
+  fireEvent.pointerEnter(container.querySelector(".t3-fidelity-allocation-bar")!, { pointerType: "mouse" });
+  expect(container.querySelector(".t3-fidelity-allocation-bar")).toHaveAttribute("role", "button");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("60.37%");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("50.00%");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("+10.37");
 });
 
 it("shows validation errors even when target weights add to 100", () => {

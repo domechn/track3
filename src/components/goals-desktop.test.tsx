@@ -118,6 +118,15 @@ it("formats stored history values and firing thresholds for each rule kind", () 
   expect(screen.getByText("$752,683.57 on the 27 Oct refresh")).toBeInTheDocument();
 });
 
+it("shows a rule's exact measured value on its progress bar", () => {
+  render(<GoalsDesktop {...props({ rules: [rule] })} />);
+  const mark = document.querySelector(".t3-fidelity-goal-progress [data-chart-mark]");
+  expect(mark).not.toBeNull();
+  fireEvent.pointerEnter(mark!);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("-100.00%");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("-10.00");
+});
+
 it("keeps deleted move and allocation alerts readable when their rule details are gone", () => {
   render(<GoalsDesktop {...props({
     rules: [],

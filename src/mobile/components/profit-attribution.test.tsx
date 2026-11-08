@@ -24,6 +24,33 @@ beforeEach(() => vi.clearAllMocks());
 function view() { return <ProfitAttribution currency={currency} dateRange={range} quoteColor="red-up-green-down" />; }
 
 describe("profit attribution", () => {
+  it("keeps a shorter detractor list in the Tab order after a contributor is focused", async () => {
+    vi.mocked(queryAttribution).mockResolvedValue({
+      attribution: {
+        entries: [
+          ...filled.attribution.entries,
+          { symbol: "SOL", assetType: "crypto", wallet: "s",
+            priceEffect: 10, flowEffect: 0, residual: 0, totalChange: 10 },
+        ],
+        totals: filled.attribution.totals, startValue: 100, endValue: 180,
+      },
+      aliases: filled.aliases,
+    });
+    render(view());
+    const figure = await screen.findByRole("figure", { name: "Top attribution contributors and detractors" });
+    const [contributors, detractors] = within(figure).getAllByRole("list");
+    const contributorMarks = within(contributors).getAllByRole("button");
+    contributorMarks[1].focus();
+    expect(within(detractors).getByRole("button")).toHaveAttribute("tabindex", "0");
+  });
+
+  it("shows the precise market effect on a phone attribution bar", async () => {
+    vi.mocked(queryAttribution).mockResolvedValue(filled);
+    const { container } = render(view());
+    await screen.findByText("Top contributors");
+    fireEvent.pointerEnter(container.querySelector("ol .h-4")!, { pointerType: "mouse" });
+    expect(screen.getByRole("tooltip")).toHaveTextContent("+€40.00");
+  });
   it("renders a sub-unit rank amount as neutral zero", async () => {
     vi.mocked(queryAttribution).mockResolvedValue({
       attribution: {

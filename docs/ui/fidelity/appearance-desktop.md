@@ -4,6 +4,8 @@ See [Settings A shell](settings-a-shell-desktop.md). Viewed `appearance-default`
 
 Theme card top row says “Theme” and right-aligned “Applies instantly”. Three preview tiles are each 219×240px with a 12px gap, 12px padding, `--sunken` fill and 1px border. Previews are a small light, dark, and split-system app with the same $763,809.27 total and blue mini chart. Labels below are Light / Bright surfaces, Dark / Terminal, true neutral, System / Follows your device. Selected tile has a blue border, blue-soft fill, and blue selected radio. Below them, an info icon precedes “Design note: every screen in this set is drawn in the dark theme. The light and system previews above only show the choice.”
 
+Opening `/settings/appearance` without a `section` query now shows this Theme design at desktop widths as well; the route previously had an empty content area at 1500px and wider.
+
 Right card title “Gain and loss colours”, description “Pick which colour means up. Gains and losses everywhere follow it.” Two stacked selectable tiles: “Green up, red down / Common in Europe and the US” and “Red up, green down / Common in China, Japan and Korea”. Each has BTC today +2.14% / +$1,320.40 and AAPL today −1.07% / −$265.10 example cells. The selected first option uses `--positive` #5fc39c for BTC and `--negative` #ee6a82 for AAPL; the second reverses the two colors. `appearance-default` has Dark and green-up selected. `appearance-redup` selects the second colour convention and keeps Dark. `appearance-system` selects System and green-up, but the design screenshot itself remains dark. Theme and quote-color selections use the existing app preferences and retain keyboard radio behaviour and live quote colors.
 
 ## Remaining differences
