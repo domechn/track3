@@ -62,10 +62,15 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         await expect(page.locator(".fd-coin-trend > .fd-outline-pill")).toHaveCSS("font-weight", "500");
       }
       if (symbol !== "NOVA") {
-        expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(symbol === "BTC" ? 2509 : 1965);
+        const stats = await page.locator(".fd-coin-stats .fd-coin-metric").evaluateAll((metrics) =>
+          metrics.map((metric) => metric.getBoundingClientRect().top));
+        if (symbol === "BTC") expect(Math.max(...stats) - Math.min(...stats)).toBeGreaterThan(1);
+        else expect(Math.max(...stats) - Math.min(...stats)).toBeLessThanOrEqual(1);
+        expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(symbol === "BTC" ? 2578 : 1964);
       }
-      mkdirSync(`/tmp/fidelity/coin-${symbol.toLowerCase()}`, { recursive: true });
-      writeFileSync(`/tmp/fidelity/coin-${symbol.toLowerCase()}/geometry.json`, JSON.stringify(await page.evaluate(() => ({
+      const captureOutput = process.env.WUI18_CAPTURE_DIR ?? `/tmp/fidelity/coin-${symbol.toLowerCase()}`;
+      mkdirSync(captureOutput, { recursive: true });
+      writeFileSync(`${captureOutput}/geometry.json`, JSON.stringify(await page.evaluate(() => ({
         cards: [...document.querySelectorAll(".fd-coin>.fd-card,.fd-coin-detail-grid .fd-card")].map((element) => {
           const rect = element.getBoundingClientRect();
           return { y: rect.y, height: rect.height, width: rect.width };
@@ -80,11 +85,15 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         }),
         height: document.getElementById("app-main-content")!.scrollHeight,
       })), null, 2));
-      const captureOutput = process.env.WUI18_CAPTURE_DIR ?? `/tmp/fidelity/coin-${symbol.toLowerCase()}`;
-      mkdirSync(captureOutput, { recursive: true });
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: `${captureOutput}/coin-${symbol.toLowerCase()}-phone-long.png`, fullPage: true });
       await page.screenshot({ path: `${captureOutput}/coin-${symbol.toLowerCase()}-phone.png` });
+      if (symbol !== "NOVA") {
+        const valueCard = page.locator(".fd-coin-trend");
+        await valueCard.evaluate((node) => document.getElementById("app-main-content")!.scrollTo(
+          0, node.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100));
+        await valueCard.screenshot({ path: `${captureOutput}/coin-${symbol.toLowerCase()}-value-card.png` });
+      }
       if (symbol === "BTC") {
         await expect(page.locator(".fd-coin-head h1")).toContainText("Bitcoin BTC");
         await expect(page.locator(".fd-coin-head p")).toHaveText("Held on Binance and a Ledger cold wallet");
@@ -98,13 +107,13 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         await page.getByRole("button", { name: "Price", exact: true }).click();
         await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
         await expect(page.locator("#app-top-bar")).toBeHidden();
-        await page.screenshot({ path: "/tmp/fidelity/coin-btc/coin-btc-price-phone.png" });
+        await page.screenshot({ path: `${captureOutput}/coin-btc-price-phone.png` });
         const priceCard = page.locator(".fd-coin-trend");
         expect(Math.round((await priceCard.boundingBox())!.height)).toBe(378);
         expect(Math.round((await page.locator(".fd-coin-chart").boundingBox())!.y)).toBe(820);
         expect(Math.round((await page.locator(".fd-coin-stats").boundingBox())!.y)).toBe(1034);
         expect(Math.round((await page.locator(".fd-coin-chart text").filter({ hasText: "24 Oct" }).boundingBox())!.y)).toBe(1001);
-        writeFileSync("/tmp/fidelity/coin-btc/price-card-geometry.json", JSON.stringify(await page.evaluate(() =>
+        writeFileSync(`${captureOutput}/price-card-geometry.json`, JSON.stringify(await page.evaluate(() =>
           Object.fromEntries([".fd-coin-trend", ".fd-coin-trend .fd-card-heading", ".fd-coin-trend .fd-sub", ".fd-coin-chart", ".fd-coin-stats"].map((selector) => {
             const element = document.querySelector(selector)!;
             const rect = element.getBoundingClientRect();
@@ -112,7 +121,7 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
             return [selector, { y: rect.y, height: rect.height, margin: style.margin, padding: style.padding }];
           }))), null, 2));
         await priceCard.evaluate((node) => document.getElementById("app-main-content")!.scrollTo(0, node.getBoundingClientRect().top + document.getElementById("app-main-content")!.scrollTop - 100));
-        await priceCard.screenshot({ path: "/tmp/fidelity/coin-btc/coin-btc-price-card.png" });
+        await priceCard.screenshot({ path: `${captureOutput}/coin-btc-price-card.png` });
         await page.getByRole("button", { name: "Value", exact: true }).click();
         await page.locator(".fd-tx-row").nth(1).click();
         await expect(page.getByRole("dialog")).toBeVisible();
@@ -121,10 +130,10 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         await expect(page.getByRole("dialog")).toHaveCount(0);
         await expect(page.locator(".fd-tx-row").nth(1)).toBeFocused();
         await page.locator(".fd-tx-row").nth(1).click();
-        await page.screenshot({ path: "/tmp/fidelity/coin-btc/coin-btc-sheet-phone.png" });
+        await page.screenshot({ path: `${captureOutput}/coin-btc-sheet-phone.png` });
         await expect(page.locator(".fd-sheet.detail .mobile-sheet-heading h2")).toHaveCSS("text-transform", "capitalize");
         await expect(page.locator(".fd-detail-list>div:first-child strong")).toHaveCSS("background-color", "rgb(33, 32, 35)");
-        writeFileSync("/tmp/fidelity/coin-btc/sheet-geometry.json", JSON.stringify(await page.evaluate(() =>
+        writeFileSync(`${captureOutput}/sheet-geometry.json`, JSON.stringify(await page.evaluate(() =>
           Object.fromEntries([".fd-sheet", ".mobile-sheet-handle-area", ".mobile-sheet-heading", ".mobile-sheet-heading h2", ".mobile-sheet-body", ".fd-detail-list", ".fd-sheet.detail .fd-primary-pill", ".fd-sheet.detail .fd-outline-pill"].map((selector) => {
             const element = document.querySelector(selector);
             const rect = element?.getBoundingClientRect();
@@ -137,8 +146,8 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         await page.locator(".fd-sheet.detail .fd-outline-pill").click();
         await page.locator(".fd-tx-row").nth(2).click();
         await page.getByRole("button", { name: "Edit type or price" }).click();
-        await page.screenshot({ path: "/tmp/fidelity/coin-btc/coin-btc-edit-phone.png" });
-        writeFileSync("/tmp/fidelity/coin-btc/edit-geometry.json", JSON.stringify(await page.evaluate(() =>
+        await page.screenshot({ path: `${captureOutput}/coin-btc-edit-phone.png` });
+        writeFileSync(`${captureOutput}/edit-geometry.json`, JSON.stringify(await page.evaluate(() =>
           ({ labels: [...document.querySelectorAll(".fd-sheet.edit .fd-edit-label")].map(node => ({ text: node.textContent, y: node.getBoundingClientRect().y })),
             ...Object.fromEntries([".fd-sheet.edit .fd-sheet-content>p", ".fd-sheet.edit .fd-edit-summary",
             ".fd-sheet.edit .fd-edit-label", ".fd-sheet.edit .fd-edit-footer"].map((selector) => {
@@ -165,8 +174,8 @@ for (const symbol of ["BTC", "NVDA", "NOVA"] as const) {
         await page.locator(".fd-edit-types").getByRole("button", { name: "deposit" }).click();
         await page.locator(".fd-edit-types").getByRole("button", { name: "buy" }).click();
         await page.locator("#fd-edit-price").fill("0.3600");
-        await page.screenshot({ path: "/tmp/fidelity/coin-nova/coin-nova-edit-phone.png" });
-        writeFileSync("/tmp/fidelity/coin-nova/edit-geometry.json", JSON.stringify(await page.evaluate(() =>
+        await page.screenshot({ path: `${captureOutput}/coin-nova-edit-phone.png` });
+        writeFileSync(`${captureOutput}/edit-geometry.json`, JSON.stringify(await page.evaluate(() =>
           ({ labels: [...document.querySelectorAll(".fd-sheet.edit .fd-edit-label")].map(node => ({ text: node.textContent, y: node.getBoundingClientRect().y })),
             ...Object.fromEntries([".fd-sheet.edit .fd-sheet-content>p", ".fd-sheet.edit .fd-edit-summary",
             ".fd-sheet.edit .fd-info-banner", ".fd-sheet.edit .fd-edit-label",

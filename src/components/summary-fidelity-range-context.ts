@@ -4,7 +4,10 @@ import type { TDateRange } from "@/middlelayers/types";
 export const SummaryFidelityRangeContext = createContext<{
   range?: TDateRange;
   setRange: (range: TDateRange | undefined) => void;
-}>({ setRange: () => {} });
+  label: string;
+  setLabel: (label: string) => void;
+  availableDates: Date[];
+}>({ setRange: () => {}, label: "All", setLabel: () => {}, availableDates: [] });
 
 export const SummaryFidelityYearContext = createContext<{
   year: number;

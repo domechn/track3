@@ -170,8 +170,8 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 - App capture: `/tmp/fidelity/summary/summary-empty-phone-long.png`.
 - Reference render: `/tmp/rev-fa3/design/analyze-summary-empty-long.png`.
-- Fresh 390 × 844 first-screen pixel difference: **2.45%** (RGB difference >20/255 in any channel).
-- Full-page overlap pixel difference: **0.97%** (source 2,237px; app 2,237px high).
+- Fresh 8 Nov 2026 comparison at 390 × 844: **6.299%** of first-screen pixels differ (RGB difference >20/255 in any channel). Source: `/tmp/fidelity/summary/ui44-source-empty-phone.png`; app: `/tmp/fidelity/summary/summary-empty-phone.png`.
+- Earlier full-page overlap pixel difference: **0.97%** (source 2,237px; app 2,237px high).
 
 ## Real-data limits
 
@@ -183,4 +183,5 @@ The phone reads existing SQLite snapshots, transactions, configuration, and wall
 
 - The source empty state labels attribution with a start date of 1 Jul 2025, although its only snapshot is 31 Oct 2026. The app reports the stored snapshot date.
 - The source HTML compresses six disabled range labels into an unreadable cluster. The app keeps each label readable within the segmented control for accessibility.
+- The current first viewport has a 6.299% raw pixel difference. The remaining text edges differ because the static source loads Public Sans through Google's stylesheet and Track3 uses its bundled offline face; the card content and order are the same. The source's unreadable range cluster also accounts for visible pixels.
 - The Analytics tab has a small upward chevron to reveal the existing tap-again destinations. The static source has no navigation hint.

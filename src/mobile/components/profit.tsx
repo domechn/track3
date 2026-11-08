@@ -10,7 +10,9 @@ import {
   prettyNumberKeepNDigitsAfterDecimalPoint,
   prettyNumberToLocaleString,
 } from "@/utils/currency";
-import { calculateTotalProfit } from "@/middlelayers/charts";
+import { calculateTotalProfit, queryLatestAssets, queryTotalValue } from "@/middlelayers/charts";
+import type { SummaryPreset, SummaryRange } from "@/middlelayers/summary-range";
+import { summaryProfitPercentage } from "@/middlelayers/summary-breakdown";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import bluebird from "bluebird";
@@ -39,14 +41,21 @@ const App = ({
   showCoinsProfitPercentage,
   showRangeControl = false,
   quoteColor,
+  rangeValue,
+  onRangeValueChange,
+  summaryRange,
 }: {
   currency: CurrencyRateDetail;
   showCoinsProfitPercentage?: boolean;
   showRangeControl?: boolean;
   dateRange: TDateRange;
   quoteColor: QuoteColor;
+  rangeValue?: SummaryPreset;
+  onRangeValueChange?: (range: SummaryPreset) => void;
+  summaryRange?: SummaryRange;
 }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const dateLabel = (value: Date) => value.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
   const isMobile = useIsMobile();
   const [profit, setProfit] = useState<number | null>(0);
   // note: undefined means infinite
@@ -63,25 +72,33 @@ const App = ({
   >([]);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [view, setView] = useState<"summary" | "attribution">("summary");
-  const [profitRange, setProfitRange] = useState<"7D" | "1M" | "1Y" | "ALL">("ALL");
+  const [localProfitRange, setLocalProfitRange] = useState<"7D" | "1M" | "1Y" | "ALL">("ALL");
+  const profitRange = rangeValue ?? localProfitRange;
+  const [positions, setPositions] = useState<number>();
+  const [currentValue, setCurrentValue] = useState<number>();
+  const [loadError, setLoadError] = useState(false);
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
   const logoPathCacheRef = useRef<Map<string, string>>(new Map());
 
   const selectedDateRange = useMemo(() => {
+    if (rangeValue) return dateRange;
     if (!isMobile || !showRangeControl || profitRange === "ALL") return dateRange;
     const days = profitRange === "7D" ? 7 : profitRange === "1M" ? 30 : 365;
     const start = new Date(dateRange.end.getFullYear(), dateRange.end.getMonth(), dateRange.end.getDate() - days + 1);
     return { start: new Date(Math.max(dateRange.start.getTime(), start.getTime())), end: dateRange.end };
-  }, [dateRange.start, dateRange.end, isMobile, showRangeControl, profitRange]);
+  }, [dateRange.start, dateRange.end, isMobile, showRangeControl, profitRange, rangeValue]);
   const rangeKey = `${selectedDateRange.start.getTime()}-${selectedDateRange.end.getTime()}`;
   const dataChangedVersion = useDataChangedVersion();
 
   useEffect(() => {
     const gen = ++loadGenRef.current;
+    setLoadError(false);
 
-    calculateTotalProfit(selectedDateRange)
-      .then((res) => {
+    Promise.all([calculateTotalProfit(selectedDateRange),
+      summaryRange ? queryLatestAssets(selectedDateRange) : Promise.resolve(undefined),
+      summaryRange ? queryTotalValue(selectedDateRange) : Promise.resolve(undefined)])
+      .then(([res, assets, current]) => {
         if (gen !== loadGenRef.current) {
           return;
         }
@@ -90,7 +107,10 @@ const App = ({
         setProfit(res.total);
         setProfitPercentage(res.percentage);
         setCoinsProfit(sortedCoins);
+        setPositions(assets?.length);
+        setCurrentValue(current?.totalValue);
       })
+      .catch(() => { if (gen === loadGenRef.current) setLoadError(true); })
       .finally(() => {
         if (gen === loadGenRef.current) {
           reportLoaded();
@@ -137,9 +157,30 @@ const App = ({
     () => profit === null ? "neutral" : positiveNegativeTone(profit, quoteColor) === "green" ? "positive" : positiveNegativeTone(profit, quoteColor) === "red" ? "negative" : "neutral",
     [profit, quoteColor],
   );
-  const totalPercentageLabel = profitPercentage === null ? "—" : profitPercentage === undefined
+  const displayedPercentage = summaryRange && currentValue !== undefined
+    ? summaryProfitPercentage(profit, currentValue, profitPercentage) : profitPercentage;
+  const totalPercentageLabel = displayedPercentage === null ? "—" : displayedPercentage === undefined
     ? `${t("common.infinity")}%`
-    : `${profitPercentage < 0 ? "" : "+"}${prettyNumberKeepNDigitsAfterDecimalPoint(profitPercentage, 2)}%`;
+    : `${displayedPercentage < 0 ? "" : "+"}${prettyNumberKeepNDigitsAfterDecimalPoint(displayedPercentage, 2)}%`;
+  const missingReason = loadError ? t("fidelity.summary.error")
+    : summaryRange?.databaseCount !== undefined && summaryRange.databaseCount < 2
+    ? t("fidelity.summary.needsSecond")
+    : summaryRange && !summaryRange.baseline
+      ? t("fidelity.summary.noBaselineRange").replace("{range}", profitRange)
+      : profit === null ? t("fidelity.summary.unknownPnlRange").replace("{range}", profitRange) : "";
+  const missingValue = summaryRange && summaryRange.databaseCount < 2 ? "–" : t("fidelity.summary.notAvailable");
+  const unavailable = Boolean(summaryRange && (loadError || summaryRange.databaseCount < 2 || !summaryRange.baseline || profit === null));
+  const percentMissing = Boolean(summaryRange && displayedPercentage === null && !unavailable);
+  const percentReason = percentMissing
+    ? t("fidelity.summary.unknownPercentRange").replace("{range}", profitRange) : missingReason;
+  const breakeven = profit === null || currentValue === undefined ? undefined : currentValue - profit;
+  const positionNote = summaryRange ? summaryRange.databaseCount < 2 && summaryRange.snapshots.length === 1
+    ? t("fidelity.summary.inOneSnapshot")
+    : summaryRange.baseline && summaryRange.baseline < selectedDateRange.start
+      ? t("fidelity.summary.snapshotsSince")
+        .replace("{date}", dateLabel(summaryRange.baseline))
+        .replace("{count}", String(summaryRange.snapshots.length))
+      : t("fidelity.summary.snapshotsInRange").replace("{count}", String(summaryRange.snapshots.length)) : "";
   const positiveCount = useMemo(
     () => coinsProfit.filter((coin) => coin.value !== null && coin.value > 0).length,
     [coinsProfit],
@@ -303,29 +344,41 @@ const App = ({
         {view === "summary" && <>
         <div className="flex flex-wrap items-end justify-between gap-3 mobile-movers-total">
           <div className="space-y-1">
-            <div className={`text-xl font-semibold tracking-tight ios-money ${totalToneClass}`}>
-              {profit === null ? "—" : (profit < 0 ? "-" : "+") +
+            <div className={`text-xl font-semibold tracking-tight ios-money ${unavailable ? "text-muted-foreground" : totalToneClass}`}>
+              {unavailable ? missingValue : profit === null ? "—" : (profit < 0 ? "-" : "+") +
                 currency.symbol +
                 prettyNumberToLocaleString(
                   currencyWrapper(currency)(Math.abs(profit)),
                 )}
             </div>
             <div className="text-xs text-muted-foreground">
-              {t(showRangeControl ? "profit.netPnlShort" : "profit.netPnl")}
+              {summaryRange ? t(profitRange === "All" ? "fidelity.summary.netPnl" : "fidelity.summary.netPnl.range")
+                .replace("{range}", profitRange) : t(showRangeControl ? "profit.netPnlShort" : "profit.netPnl")}
             </div>
+            {summaryRange && <small className="block text-xs text-muted-foreground">
+              {unavailable ? missingReason : t("profitSummary.since").replace("{date}", dateLabel(summaryRange.baseline!))} · {t(positions === 1 ? "fidelity.summary.positionCountOne" : "fidelity.summary.positionCount").replace("{count}", String(positions ?? 0))} · {positionNote}
+            </small>}
+            {percentMissing && <small className="block text-xs text-muted-foreground">{percentReason}</small>}
+            {summaryRange && <small className="block text-xs text-muted-foreground"
+              title={unavailable || breakeven === undefined ? missingReason || t("fidelity.summary.loading") : undefined}>
+              {t("fidelity.summary.breakeven")} {unavailable || breakeven === undefined ? missingValue
+                : `${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(breakeven))}`}
+            </small>}
           </div>
           <div>
-            {isMobile && profit !== null ? <DeltaPill value={profit} quoteColor={quoteColor}>{totalPercentageLabel}</DeltaPill>
-              : <span className="t3-tag" data-tone={totalToneBadgeClass}>
-                {totalPercentageLabel}
+            {isMobile && profit !== null && !unavailable && !percentMissing ? <DeltaPill value={profit} quoteColor={quoteColor}>{totalPercentageLabel}</DeltaPill>
+              : <span className="t3-tag" data-tone={unavailable || percentMissing ? "neutral" : totalToneBadgeClass}
+                title={unavailable || percentMissing ? percentReason : undefined}>
+                {unavailable || percentMissing ? missingValue : totalPercentageLabel}
               </span>}
           </div>
         </div>
         {isMobile && showRangeControl && view === "summary" && <SegmentedControl
-          value={profitRange} onChange={setProfitRange} className="profit-range"
+          value={profitRange} onChange={(next) => rangeValue
+            ? onRangeValueChange?.(next as SummaryPreset) : setLocalProfitRange(next as typeof localProfitRange)} className="profit-range"
           label={t("profit.range")}
-          options={(["7D", "1M", "1Y", "ALL"] as const).map((value) => ({
-            value, label: t(value === "ALL" ? "comparison.all" : `comparison.${value}`),
+          options={(rangeValue ? ["1D", "7D", "30D", "90D", "1Y", "All"] as const : ["7D", "1M", "1Y", "ALL"] as const).map((value) => ({
+            value, label: rangeValue ? value : t(value === "ALL" ? "comparison.all" : `comparison.${value}`),
           }))} />}
         </>}
       </CardHeader>

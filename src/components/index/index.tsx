@@ -31,6 +31,7 @@ import DesktopOverviewSkeleton from "../desktop-overview-skeleton";
 import DesktopErrorBoundary from "../desktop-error-boundary";
 import { SummaryLoadingContext } from "../summary-loading-context";
 import { SummaryFidelityRangeContext } from "../summary-fidelity-range-context";
+import { summaryPresetRange } from "@/middlelayers/summary-range";
 import "./index.css";
 import { Route, Routes, HashRouter, Outlet, Navigate, useLocation, Link } from "react-router-dom";
 import { BellIcon } from "@radix-ui/react-icons";
@@ -151,8 +152,7 @@ function TopBar({
   const isOverview = pathname === "/overview";
   const recordsPage = pathname === "/history" || pathname === "/cost-basis";
   const planPage = pathname === "/rebalance" || pathname === "/goals" || pathname === "/goals/kinds";
-  const { range: fidelityRange, setRange: setSummaryRange } = React.useContext(SummaryFidelityRangeContext);
-  const [selectedFidelityRange, setSelectedFidelityRange] = useState("All");
+  const { range: fidelityRange, setRange: setSummaryRange, label: selectedFidelityRange, setLabel: setSelectedFidelityRange } = React.useContext(SummaryFidelityRangeContext);
   const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const selectedSnapshots = availableDates.filter((date) => dateRange?.from && dateRange.to && date >= dateRange.from && date <= dateRange.to).length;
@@ -179,19 +179,17 @@ function TopBar({
           {fidelityPage && liveTotal && <div className="t3-fidelity-live-control">{liveTotal}</div>}
           {fidelityPage === "summary" && <div className="t3-fidelity-ranges" role="group" aria-label={t("datePicker.predefined")}>
             {(["1D", "7D", "30D", "90D", "1Y", "All"] as const).map((label) => {
-              const latest = availableDates.at(-1);
-              const days = label === "1D" ? 1 : label === "7D" ? 7 : label === "30D" ? 30 : label === "90D" ? 90 : 365;
-              const start = latest ? new Date(latest.getTime() - days * 86400000) : undefined;
-              const selected = label === "All" ? availableDates : availableDates.filter((value) => start && value >= start);
-              const chosen = selected.length ? selected : latest ? [latest] : [];
+              const chosen = summaryPresetRange(availableDates, label);
               const isSelected = fidelityBusy ? label === "All"
                 : availableDates.length < 2 ? label === "1D"
                 : label === selectedFidelityRange;
-              return <button key={label} type="button" aria-pressed={!!isSelected} disabled={!latest || availableDates.length < 2 || fidelityBusy}
+              return <button key={label} type="button" aria-pressed={!!isSelected} disabled={!chosen || availableDates.length < 2 || fidelityBusy}
                 onClick={() => {
+                  if (!chosen) return;
                   setSelectedFidelityRange(label);
-                  setSummaryRange(label === "All" ? undefined : { start: chosen[0], end: chosen.at(-1)! });
-                  onDatePickerValueChange(chosen.length, { from: chosen[0], to: chosen.at(-1) });
+                  setSummaryRange(label === "All" ? undefined : chosen);
+                  onDatePickerValueChange(availableDates.filter((date) => date >= chosen.start && date <= chosen.end).length,
+                    { from: chosen.start, to: chosen.end });
                 }}>{label}</button>;
             })}
           </div>}
@@ -345,6 +343,7 @@ function Layout({
   const fidelityPage = location.pathname === "/summary" ? "summary" : location.pathname.startsWith("/coins/") ? "coin" : undefined;
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryRange, setSummaryRange] = useState<TDateRange>();
+  const [summaryRangeLabel, setSummaryRangeLabel] = useState("All");
   const [recordsToolsOpen, setRecordsToolsOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const previousRoute = useRef(location.pathname);
@@ -384,7 +383,8 @@ function Layout({
         style={{ marginLeft: sidebarWidth }}
         className={`t3-desktop-column transition-[margin-left] duration-300 ease-in-out ${recordsPage ? "t3-records-fidelity-shell" : ""}`}
       >
-        <SummaryFidelityRangeContext.Provider value={{ range: summaryRange, setRange: setSummaryRange }}>
+        <SummaryFidelityRangeContext.Provider value={{ range: summaryRange, setRange: setSummaryRange,
+          label: summaryRangeLabel, setLabel: setSummaryRangeLabel, availableDates }}>
         <SummaryLoadingContext.Provider value={setSummaryLoading}>
         {!assistantPage && <TopBar
           isProUser={isProUser}

@@ -28,14 +28,16 @@ const year = range("2024-01-01T00:00:00.000Z", "2024-12-31T23:59:59.999Z");
 beforeEach(() => fixture.reset());
 
 describe("numeric profit from refresh snapshots", () => {
-  it("counts a held BTC with no February transaction: 1 × (300 − 200) = 100", async () => {
+  it("counts a refresh at February's start in February so month cards add to the year", async () => {
     fixture.load([
       { at: "2024-01-15T00:00:00.000Z", holdings: [holding("w1", 1, 100)] },
       { at: "2024-02-01T00:00:00.000Z", holdings: [holding("w1", 1, 200)] },
       { at: "2024-02-28T00:00:00.000Z", holdings: [holding("w1", 1, 300)] },
     ], generate);
     const result = await calculateTotalProfit(range("2024-02-01T00:00:00.000Z", "2024-02-29T23:59:59.999Z"));
-    expect(result.total).toBe(100);
+    // The opening baseline is strictly before February; its midnight refresh belongs to February.
+    expect(result.total).toBe(200);
+    expect((await calculateTotalProfit(year)).total).toBe(200);
     expect(result.coins.map((coin) => coin.symbol)).toEqual(["BTC"]);
   });
 
@@ -202,13 +204,15 @@ describe("numeric profit from refresh snapshots", () => {
     expect((await calculateTotalProfit(range("2024-01-01T00:00:00.000Z", "2024-01-31T23:59:59.999Z"))).total).toBe(100);
   });
 
-  it("uses the midnight snapshot as the opening baseline when refresh is exactly at month start", async () => {
+  it("includes the midnight refresh in February's gain and the year's total", async () => {
     fixture.load([
       { at: "2024-01-31T12:00:00.000Z", holdings: [holding("w1", 1, 100)] },
       { at: "2024-02-01T00:00:00.000Z", holdings: [holding("w1", 1, 150)] },
       { at: "2024-02-28T12:00:00.000Z", holdings: [holding("w1", 1, 160)] },
     ], generate);
-    expect((await calculateTotalProfit(range("2024-02-01T00:00:00.000Z", "2024-02-29T23:59:59.999Z"))).total).toBe(10);
+    // January ends at 100, so February owns both the 50 midnight jump and the later 10.
+    expect((await calculateTotalProfit(range("2024-02-01T00:00:00.000Z", "2024-02-29T23:59:59.999Z"))).total).toBe(60);
+    expect((await calculateTotalProfit(year)).total).toBe(60);
   });
 
   it("shows only January, April and October for three snapshots", async () => {
@@ -313,7 +317,9 @@ describe("numeric profit from refresh snapshots", () => {
       expect(jan.lastRecordDate).toEqual(new Date(janLast));
       expect(jan.total).toBe(20);
       expect(feb.lastRecordDate).toEqual(new Date(at(1, 29, 23, 59, 59)));
-      expect(feb.total).toBe(10);
+      // January's 20 plus February's 40 equals the 60 all-time gain.
+      expect(feb.total).toBe(40);
+      expect((await calculateTotalProfit({ start: new Date(2024, 0, 1), end: new Date(2024, 2, 1) })).total).toBe(60);
     } finally {
       if (previousTZ === undefined) delete process.env.TZ;
       else process.env.TZ = previousTZ;

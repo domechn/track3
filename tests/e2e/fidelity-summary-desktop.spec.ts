@@ -93,7 +93,9 @@ for (const state of ["full", "empty", "loading"] as const) {
       await page.locator(".t3-fidelity-ranges").getByRole("button", { name: "7D" }).click();
       await expect(page.locator(".t3-fidelity-ranges").getByRole("button", { name: "7D" })).toHaveAttribute("aria-pressed", "true");
       await expect(page.locator(".t3-fidelity-ranges").getByRole("button", { name: "1D" })).toHaveAttribute("aria-pressed", "false");
-      await expect(page.locator(".fidelity-summary-chart-empty")).toBeVisible();
+      await expect(page.locator(".fidelity-summary-pnl-kpis > div").first()).toContainText("Net P&L (7D)");
+      await expect(page.locator(".fidelity-summary-chart line[data-direction]").first()).toBeVisible();
+      await expect(page.locator(".fidelity-summary-chart-empty")).toHaveCount(0);
       await page.locator(".t3-fidelity-ranges").getByRole("button", { name: "All" }).click();
       await expect(page.locator(".fidelity-summary-pnl strong.big")).toHaveText("+$188,809.27");
     }

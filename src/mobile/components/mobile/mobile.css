@@ -1161,7 +1161,8 @@
   .d2-summary .profit-metrics-mobile { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .d2-cost .cost-metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .d2-coin .coin-metric-grid > * { grid-column: span 2; }
-  .d2-coin .coin-metric-grid > :last-child:nth-child(odd) { grid-column: span 2; }
+  .d2-coin .coin-metric-grid > :nth-last-child(-n+2) { grid-column: span 3; }
+  .d2-coin .coin-metric-grid > :last-child:nth-child(odd) { grid-column: span 3; }
   .mobile-inset-group, .mobile-record-list { max-width: 100%; }
   #app-main-content:has(.ios-d3-chat) { padding-inline: max(24px, var(--mobile-safe-left)) max(24px, var(--mobile-safe-right)); }
   .d2-wallets .wallet-change-controls { flex: 1 1 360px; max-width: 360px; }

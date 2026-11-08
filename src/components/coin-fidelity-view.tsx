@@ -22,7 +22,7 @@ import { sourceDisplayNames } from "./source-display-name";
 import { CoinSourceSummary } from "./coin-source-summary";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { Pager, usePager } from "./ui/pager";
-import { CoinLotsTable, CoinSourcesTable, useStickyCoinChart, type CoinLotRow } from "./coin-detail-sections";
+import { CoinLotsTable, CoinSourcesTable, type CoinLotRow } from "./coin-detail-sections";
 import { ArchiveIcon, BackpackIcon, ClockIcon } from "@radix-ui/react-icons";
 import EmptyState from "./empty-state";
 import AssetLabel from "./common/asset-label";
@@ -76,7 +76,6 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const [range, setRange] = useState<"all" | "30d" | "1y">("all");
   const [filter, setFilter] = useState<"all" | TransactionType>("all");
   const transactionScrollArea = useRef<HTMLDivElement>(null);
-  const { mainRef, sideRef, sideColumnRef, chartRef, sticky, stickySide } = useStickyCoinChart();
   const [lotsExpanded, setLotsExpanded] = useState(false);
   const [edit, setEdit] = useState<Transaction>();
   const [sheet, setSheet] = useState<Transaction>();
@@ -190,12 +189,19 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
   const startValue = values[0], endValue = values.at(-1);
   const high = values.length ? Math.max(...values) : 0, low = values.length ? Math.min(...values) : 0;
   const { lower: axisLow, upper: axisHigh, ticks: axisTicks } = coinAxisForValues(values);
-  const axisLabels = [...axisTicks].reverse().map((tick) => values.length ? compactMoney(tick * currency.rate, currency.symbol).replace(currency.symbol, "") : "–");
+  let axisDigits = 3;
+  const labelTicks = () => [...axisTicks].reverse().map((tick) =>
+    values.length ? compactMoney(tick * currency.rate, currency.symbol, axisDigits).replace(currency.symbol, "") : "–");
+  let axisLabels = labelTicks();
+  while (values.length && new Set(axisLabels).size < axisLabels.length && axisDigits < 21) {
+    axisDigits += 1;
+    axisLabels = labelTicks();
+  }
   const endLabel = money(endValue, false, mode === "value" ? 0 : 2);
   const plotStyle = {
     "--coin-axis-pad": `${12 + Math.max(...axisLabels.map((label) => label.length)) * 8}px`,
     "--coin-end-pad": `${6 + endLabel.length * 8}px`,
-    "--coin-grid-pitch": `${(assetType === "stock" ? 165.6 : 334) / Math.max(1, axisTicks.length - 1)}px`,
+    "--coin-grid-pitch": `calc((100% - ${assetType === "stock" ? 3.4 : 3}px) / ${Math.max(1, axisTicks.length - 1)})`,
   } as CSSProperties;
   const xDates = (windowDays === 7 && series?.timestamps.length === 8
     ? [0, 2, 4, 7] : tickIndices(series?.timestamps.length ?? 0, windowDays === 30 ? 7 : 4))
@@ -282,15 +288,14 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
         {metric(t("coin.fidelity.unrealized"), custom && buyQty < amount ? "–" : money(unrealized, true), custom && buyQty < amount ? t("coin.fidelity.missingFirst") : t("coin.fidelity.openToday"), custom && buyQty < amount ? "" : signedTone(unrealized))}
       </div>
     </section>
-    <div className={`coin-fidelity-grid${sticky ? " sticky-chart" : ""}${stickySide ? " sticky-side" : ""}`}>
-      <div ref={mainRef} className="coin-fidelity-main-column">
-      {custom ? <section ref={chartRef} className="coin-fidelity-card coin-fidelity-chart coin-fidelity-manual-history">
+    <div className="coin-fidelity-grid">
+      {custom ? <section className="coin-fidelity-card coin-fidelity-chart coin-fidelity-manual-history">
         <div className="coin-fidelity-section-head"><h2>{t("coin.fidelity.price")}</h2><small>{t("coin.fidelity.manual")}</small></div>
         <div className="fidelity-empty">{t("coin.fidelity.noMarketHistory").replace("{symbol}", symbol)}</div>
         {manualPricePaging.rows.map((row) => <div key={row.id} className="coin-fidelity-price-history-row"><div>{date(row.at)}<small>{row.kind === "manual" ? t("coin.fidelity.manualPrice") : row.kind === "buy" ? t("coin.fidelity.fromBuy").replace("{amount}", num(row.amount, 0)).replace("{symbol}", symbol) : t("coin.fidelity.depositNoPrice")}</small></div><span className={row.kind === "deposit" ? "zero" : ""}>{row.kind === "deposit" ? "–" : money(row.price, false, 4)}</span></div>)}
         <Pager count={manualPriceRows.length} {...manualPricePaging} pageSizes={[25, 50, 100]} t={t} labelPrefix="coin.fidelity" ariaLabel={t("coin.fidelity.price")} />
         <button className="coin-fidelity-set-price" onClick={() => navigate("/settings/configuration")}><FidelityPencil />{t("coin.fidelity.setCurrentPrice")}</button>
-      </section> : <section ref={chartRef} className="coin-fidelity-card coin-fidelity-chart" style={plotStyle}>
+      </section> : <section className="coin-fidelity-card coin-fidelity-chart" style={plotStyle}>
         <div className="coin-fidelity-section-head"><div><h2>{t(mode === "value" ? "coin.fidelity.valueHoldings" : "coin.fidelity.price")}</h2><p>{mode === "value" ? t("coin.fidelity.currentHoldings").replace("{amount}", num(amount, assetType === "stock" ? 0 : 4)).replace("{symbol}", symbol) : t("coin.fidelity.inUsd").replace("{symbol}", symbol).replace("{currency}", currency.currency)}</p></div><div className="coin-fidelity-chart-controls">
           <div className="coin-fidelity-controls" role="group" aria-label={t("coin.fidelity.valueHoldings")}><button type="button" aria-pressed={mode === "value"} className={mode === "value" ? "active" : ""} onClick={() => setMode("value")}>{t("coin.fidelity.value")}</button><button type="button" aria-pressed={mode === "price"} className={mode === "price" ? "active" : ""} onClick={() => setMode("price")}>{t("coin.fidelity.price")}</button></div>
           <div className="coin-fidelity-controls" role="group" aria-label={t("datePicker.predefined")}><button type="button" aria-pressed={windowDays === 7} className={windowDays === 7 ? "active" : ""} onClick={() => setWindowDays(7)}>7D</button><button type="button" aria-pressed={windowDays === 30} className={windowDays === 30 ? "active" : ""} onClick={() => setWindowDays(30)}>30D</button></div>
@@ -303,15 +308,14 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
         <div className="coin-fidelity-xlabels">{xDates.map(({ timestamp, index }, tick) => <span key={index} style={{ left: `${index / Math.max(1, (series?.timestamps.length ?? 1) - 1) * 100}%`, transform: tick === 0 ? "none" : tick === xDates.length - 1 ? "translateX(-100%)" : "translateX(-50%)" }}>{tickDate(timestamp)}</span>)}</div>
         <div className="coin-fidelity-chart-stats">{metric(t("coin.fidelity.high"), money(high), values.length ? tickDate(series!.timestamps[values.indexOf(high)]) : "–")}{metric(t("coin.fidelity.low"), money(low), values.length ? tickDate(series!.timestamps[values.indexOf(low)]) : "–")}{metric(t("coin.fidelity.since").replace("{date}", tickDate(series?.timestamps[0])), startValue && endValue ? money(endValue-startValue, true) : "–", startValue && endValue ? `${endValue >= startValue ? "+" : "−"}${num(Math.abs((endValue/startValue-1)*100),2)}%` : "–")}</div>
       </section>}
-      <CoinLotsTable rows={displayLots} labels={tableLabels} lotCount={t("coin.fidelity.lotsCount").replace("{count}", String(lotRows.length))} expanded={lotsExpanded} onExpandedChange={setLotsExpanded}
-        emptyState={<EmptyState icon={ArchiveIcon} title={t("coin.lots.empty.title")} hint={t("coin.lots.empty.hint")} />} />
-      </div>
-      <div ref={sideColumnRef} className="coin-fidelity-side-column">
+      <div className="coin-fidelity-card coin-fidelity-side-column">
       <CoinSourcesTable sources={sources.map((row) => ({ id: row.wallet, label: sourceName(row.wallet), logoType: row.walletType,
         kind: assetType === "stock" ? t("coin.fidelity.broker") : isExchangeSource(row.walletType) ? t("coin.fidelity.exchange") : t("coin.fidelity.wallet"),
         amount: row.amount, value: row.value }))} labels={tableLabels} money={(value) => money(value)}
-        quantity={(value) => num(value, custom ? 2 : assetType === "stock" ? 0 : 4)} sectionRef={sideRef}
+        quantity={(value) => num(value, custom ? 2 : assetType === "stock" ? 0 : 4)}
         emptyState={<EmptyState icon={BackpackIcon} title={t("coin.sources.empty.title")} hint={t("coin.sources.empty.hint")} />} />
+      <CoinLotsTable rows={displayLots} labels={tableLabels} lotCount={t("coin.fidelity.lotsCount").replace("{count}", String(lotRows.length))} expanded={lotsExpanded} onExpandedChange={setLotsExpanded}
+        emptyState={<EmptyState icon={ArchiveIcon} title={t("coin.lots.empty.title")} hint={t("coin.lots.empty.hint")} />} />
       </div>
     </div>
     <section className="coin-fidelity-card coin-fidelity-transactions">

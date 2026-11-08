@@ -131,8 +131,8 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 - App capture: `/tmp/fidelity/summary/summary-loading-phone-long.png`.
 - Reference render: `/tmp/rev-fa3/design/analyze-summary-loading-long.png`.
-- Fresh 390 × 844 first-screen pixel difference: **0.96%** (RGB difference >20/255 in any channel).
-- Full-page overlap pixel difference: **0.31%** (source 2,597px; app 2,597px high).
+- Fresh 8 Nov 2026 comparison at 390 × 844: **2.364%** of first-screen pixels differ (RGB difference >20/255 in any channel). Source: `/tmp/fidelity/summary/ui44-source-loading-phone.png`; app: `/tmp/fidelity/summary/summary-loading-phone.png`.
+- Earlier full-page overlap pixel difference: **0.31%** (source 2,597px; app 2,597px high).
 
 ## Real-data limits
 
