@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 import { queryAttribution } from "@/middlelayers/charts-attribution-data";
-import { queryLatestAssets } from "@/middlelayers/charts";
+import { calculateTotalProfit, queryLatestAssets } from "@/middlelayers/charts";
 import { groupAttribution } from "@/middlelayers/charts-attribution";
 import type { AttributionDimension } from "@/middlelayers/charts-attribution";
 import type { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
@@ -38,6 +38,7 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
   const dataVersion = useDataChangedVersion();
   const [result, setResult] = useState<Result>();
   const [assetValues, setAssetValues] = useState<Record<string, number>>({});
+  const [unknownCoins, setUnknownCoins] = useState<Set<string>>(new Set());
   const [error, setError] = useState(false);
   const [dimension, setDimension] = useState<AttributionDimension>("coin");
   const [retry, setRetry] = useState(0);
@@ -45,15 +46,17 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
   useEffect(() => {
     let active = true;
     setError(false);
-    Promise.all([queryAttribution(dateRange), queryLatestAssets(dateRange)]).then(([value, assets]) => {
+    Promise.all([queryAttribution(dateRange), queryLatestAssets(dateRange),
+      mode === "leaders" ? calculateTotalProfit(dateRange) : Promise.resolve(undefined)]).then(([value, assets, profit]) => {
       if (!active) return;
       setResult(value);
       setAssetValues(Object.fromEntries(assets.map((asset) => [`${asset.assetType}:${asset.symbol}`, asset.value])));
+      setUnknownCoins(new Set(profit?.unknownCoins.map((coin) => `${coin.assetType}:${coin.symbol}`.toUpperCase()) ?? []));
     }).catch(() => {
       if (active) setError(true);
     }).finally(() => { if (active) reportLoaded(); });
     return () => { active = false; };
-  }, [rangeKey, dataVersion, retry]);
+  }, [rangeKey, dataVersion, retry, mode]);
 
   const groups = useMemo(() => result
     ? groupAttribution(result.attribution.entries, dimension, result.aliases, t("profit.attribution.stock"))
@@ -71,7 +74,7 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
     ? quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"
     : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive";
   const date = (value: Date) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(value);
-  const empty = !result || result.attribution.entries.length === 0;
+  const empty = oneSnapshot || !result || result.attribution.entries.length === 0;
   const emptyMessage = oneSnapshot ? t(mode === "leaders" ? "summary.fidelity.topEmpty" : "summary.fidelity.attributionEmpty")
     : !baseline ? t("summary.fidelity.noBaselineRange").replace("{range}", rangeLabel)
     : t("summary.fidelity.noMarketChangesRange").replace("{range}", rangeLabel);
@@ -88,14 +91,16 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
   }));
 
   if (mode === "leaders") {
-    const positives = coinGroups.filter((g) => cents(g.priceEffect) > 0).sort((a, b) => b.priceEffect - a.priceEffect).slice(0, 4);
-    const negatives = coinGroups.filter((g) => cents(g.priceEffect) < 0).sort((a, b) => a.priceEffect - b.priceEffect).slice(0, 4);
-    const flats = coinGroups.filter((g) => cents(g.priceEffect) === 0).slice(0, 4);
+    const isUnknown = (group: typeof coinGroups[number]) => unknownCoins.has(group.key.toUpperCase());
+    const positives = coinGroups.filter((g) => !isUnknown(g) && cents(g.priceEffect) > 0).sort((a, b) => b.priceEffect - a.priceEffect).slice(0, 4);
+    const negatives = coinGroups.filter((g) => !isUnknown(g) && cents(g.priceEffect) < 0).sort((a, b) => a.priceEffect - b.priceEffect).slice(0, 4);
+    const flats = coinGroups.filter((g) => !isUnknown(g) && cents(g.priceEffect) === 0).slice(0, 4);
+    const unknown = coinGroups.filter(isUnknown).slice(0, 4);
     const rows = (groups: typeof coinGroups) => groups.map((group) => {
       const value = cents(group.priceEffect);
       return {
         assetType: group.key.split(":")[0], symbol: group.label.split(" · ")[0], value,
-        stable: false, percentage: marketProfitPercentage(value, assetValues[group.key]),
+        stable: false, isUnknown: isUnknown(group), percentage: marketProfitPercentage(value, assetValues[group.key]),
       };
     });
     const scaleValues = coinGroups.map((group) => cents(group.priceEffect));
@@ -104,12 +109,13 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
       {error ? <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => setRetry((n) => n + 1)}>{t("summary.fidelity.retry")}</button></div> :
         empty ? <div className="fidelity-empty"><span className="fidelity-empty-message">{emptyMessage}</span></div> : <>
           <div role="table" className="summary-top-collection" aria-label={t("summary.fidelity.topCoins")}>
-          <div role="row" className="sr-only"><span role="columnheader">{t("summary.fidelity.asset")}</span><span role="columnheader">{t("summary.fidelity.market")}</span><span role="columnheader">%</span></div>
+          <div role="row" className="sr-only"><span role="columnheader">{t("summary.fidelity.asset")}</span><span role="columnheader">{t("profit.attribution.knownPnl")}</span><span role="columnheader">%</span></div>
           <SummaryTopList heading={t("summary.fidelity.topProfit")} rows={rows(positives)} scaleValues={scaleValues} amount={money} exactAmount={exactMoney} tone={tone} />
           <SummaryTopList heading={t("summary.fidelity.topLoss")} rows={rows(negatives)} scaleValues={scaleValues} amount={money} exactAmount={exactMoney} tone={tone} />
-          <SummaryTopList heading={t("summary.fidelity.noMarket")} rows={rows(flats)} scaleValues={scaleValues} amount={money} exactAmount={exactMoney} tone={tone} />
+          <SummaryTopList heading={t("summary.fidelity.noPnl")} rows={rows(flats)} scaleValues={scaleValues} amount={money} exactAmount={exactMoney} tone={tone} />
+          {unknown.length > 0 && <SummaryTopList heading={t("common.unknown")} rows={rows(unknown)} scaleValues={scaleValues} amount={money} exactAmount={exactMoney} tone={tone} />}
           </div>
-          <p className="fidelity-caption">{t("summary.fidelity.topNote").replace("{date}", date(baseline ?? dateRange.start))}</p>
+          <p className="fidelity-caption">{t("summary.fidelity.topNoteAdditive").replace("{date}", date(dateRange.start))}</p>
         </>}
     </section>;
   }
@@ -121,9 +127,9 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
     </details></div>
     {error ? <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => setRetry((n) => n + 1)}>{t("summary.fidelity.retry")}</button></div> :
       empty ? <div className="fidelity-empty"><span className="fidelity-empty-message">{emptyMessage}</span></div> : <>
-        <div className="fidelity-attribution-key"><span><i />{t("summary.fidelity.marketMove")}</span><span><i />{t("summary.fidelity.quantityChange")}</span></div>
+        <div className="fidelity-attribution-key"><span><i />{t("profit.attribution.knownPnl")}</span><span><i />{t("profit.attribution.recordedFlow")}</span></div>
         <div role="table" tabIndex={0} data-chart-group="" aria-label={t("summary.attributionTitle")} className={hasResidual ? "fidelity-attribution-table has-residual" : "fidelity-attribution-table"}>
-        <div className="fidelity-attribution-row head" role="row"><span role="columnheader">{t("summary.fidelity.asset")}</span><span role="columnheader"><span className="sr-only">{t("profit.attribution.chart")}</span></span><span role="columnheader">{t("summary.fidelity.market")}</span><span role="columnheader">{t("summary.fidelity.quantity")}</span>{hasResidual && <span role="columnheader">{t("profit.attribution.residual")}</span>}<span role="columnheader">{t("summary.fidelity.total")}</span></div>
+        <div className="fidelity-attribution-row head" role="row"><span role="columnheader">{t("summary.fidelity.asset")}</span><span role="columnheader"><span className="sr-only">{t("profit.attribution.chart")}</span></span><span role="columnheader">{t("profit.attribution.knownPnl")}</span><span role="columnheader">{t("profit.attribution.recordedFlow")}</span>{hasResidual && <span role="columnheader">{t("profit.attribution.residual")}</span>}<span role="columnheader">{t("summary.fidelity.total")}</span></div>
         {paging.rows.map((group, index) => {
           const quantityStart = group.priceEffect * group.flowEffect < 0 ? 0 : group.priceEffect;
           const name = group.label.split(" · ")[0];
@@ -135,8 +141,8 @@ export default function SummaryMarketCard({ mode, currency, dateRange, quoteColo
           return <div className="fidelity-attribution-row" role="row" key={group.key}>
           <b role="rowheader"><AssetLabel kind={kind} symbol={name} type={provider} name={name} size={20} quiet tag={kind === "stock" ? "stock" : undefined} /></b>
           <span className="fidelity-attribution-track" role="cell"
-            {...chart.markProps(index, `${group.label}: ${t("summary.fidelity.marketMove")} ${exactMoney(group.priceEffect)}, ${t("summary.fidelity.quantityChange")} ${exactMoney(group.flowEffect)}`,
-              <><div>{group.label}</div><div className={tone(group.priceEffect)}>{t("summary.fidelity.marketMove")} {exactMoney(group.priceEffect)}</div><div>{t("summary.fidelity.quantityChange")} {exactMoney(group.flowEffect)}</div></>)}>
+            {...chart.markProps(index, `${group.label}: ${t("profit.attribution.knownPnl")} ${exactMoney(group.priceEffect)}, ${t("profit.attribution.recordedFlow")} ${exactMoney(group.flowEffect)}`,
+              <><div>{group.label}</div><div className={tone(group.priceEffect)}>{t("profit.attribution.knownPnl")} {exactMoney(group.priceEffect)}</div><div>{t("profit.attribution.recordedFlow")} {exactMoney(group.flowEffect)}</div></>)}>
             <b style={{ left: `${zero}%` }} /><i className="market" style={{ left: `${axisPosition(Math.min(0, group.priceEffect))}%`, width: `${Math.abs(axisPosition(group.priceEffect) - zero)}%` }} /><i className="quantity" style={{ left: `${axisPosition(Math.min(quantityStart, quantityStart + group.flowEffect))}%`, width: `${Math.abs(axisPosition(group.flowEffect) - axisPosition(0))}%` }} />
           </span>
           <span role="cell" className={tone(group.priceEffect)} title={exactMoney(group.priceEffect)}>{money(group.priceEffect)}</span>

@@ -31,6 +31,14 @@ it("keeps gainers and decliners in their own rankings", () => {
   expect(profitRanks(rows).decliners.map((row) => row.symbol)).toEqual(["LOSS"]);
 });
 
+it("excludes a partly known coin from gain and loss rankings", () => {
+  const rows = [
+    { symbol: "PARTIAL", value: 20, isUnknown: true },
+    { symbol: "GAIN", value: 10 },
+  ];
+  expect(profitRanks(rows).gainers.map((row) => row.symbol)).toEqual(["GAIN"]);
+});
+
 describe("sourceRows", () => {
   const rows = [{ wallet: "binance", value: 1 }, { wallet: "okx", value: 2 }];
   it("keeps all sources when no source is selected", () => {

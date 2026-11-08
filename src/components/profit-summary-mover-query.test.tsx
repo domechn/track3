@@ -5,11 +5,12 @@ import { calculateTotalProfit } from "@/middlelayers/charts";
 import ProfitSummary from "./profit-summary";
 import { SummaryFidelityYearContext } from "./summary-fidelity-range-context";
 
+const profitMock = vi.hoisted(() => vi.fn().mockResolvedValue({
+  total: 10, knownTotal: 10, unknownCoins: [], lastRecordDate: new Date(2024, 9, 31),
+  coins: [{ symbol: "BTC", value: 10 }],
+}));
 vi.mock("@/middlelayers/charts", () => ({
-  calculateTotalProfit: vi.fn().mockResolvedValue({
-    total: 10, knownTotal: 10, unknownCoins: [], lastRecordDate: new Date(2024, 9, 31),
-    coins: [{ symbol: "BTC", value: 10 }],
-  }),
+  calculateTotalProfit: profitMock,
   queryLatestAssets: vi.fn().mockResolvedValue([{ symbol: "BTC", value: 100 }]),
 }));
 vi.mock("@/middlelayers/charts-attribution-data", () => ({
@@ -17,6 +18,7 @@ vi.mock("@/middlelayers/charts-attribution-data", () => ({
 }));
 vi.mock("@/middlelayers/charts-profit", () => ({
   queryPreviousProfitSnapshotDate: vi.fn().mockResolvedValue(undefined),
+  calculateTotalProfitBatch: vi.fn((ranges) => Promise.all(ranges.map(profitMock))),
 }));
 vi.mock("@/components/pnl-chart", () => ({ default: () => null }));
 

@@ -13,7 +13,7 @@ test("desktop month and year amounts compact only when the cell is too narrow", 
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
   const year = page.locator(".fidelity-year-card strong").first();
-  await expect(year).toHaveText("+¥206,596,023");
+  await expect(year).toHaveText("+¥170,976,019");
   const month = page.locator(".fidelity-month-value")
     .filter({ hasText: /¥/ }).first();
   const fit = await month.evaluate((element) => {

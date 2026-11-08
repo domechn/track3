@@ -70,6 +70,7 @@ import {
   CommandList,
 } from "./ui/command";
 import { cn } from "@/lib/utils";
+import { PartialProfitHint } from "./profit-summary-hints";
 import { StaggerContainer, FadeUp } from "./motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import AssetLabel from "./common/asset-label";
@@ -260,6 +261,8 @@ const App = ({
   const [sellAvgPrice, setSellAvgPrice] = useState<number>();
 
   const [profit, setProfit] = useState<number | null>(0);
+  const [knownProfit, setKnownProfit] = useState<number | null>(null);
+  const [unknownCoins, setUnknownCoins] = useState<Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"]>([]);
   const [profitPercentage, setProfitPercentage] = useState<
     number | null | undefined
   >();
@@ -509,11 +512,13 @@ const App = ({
     return indexMap;
   }, [transactions]);
 
+  const partialProfit = profit === null && unknownCoins.length > 0;
+  const shownProfit = partialProfit ? knownProfit : profit;
   const profitStr = useMemo(
     () =>
-      profit === null ? "—" : currency.symbol +
-      prettyNumberToLocaleString(currencyWrapper(currency)(profit)),
-    [currency, profit],
+      shownProfit === null ? "—" : currency.symbol +
+      prettyNumberToLocaleString(currencyWrapper(currency)(shownProfit)),
+    [currency, shownProfit],
   );
 
   const positionsStr = useMemo(
@@ -583,6 +588,8 @@ const App = ({
     }
 
     setProfit(tp.total);
+    setKnownProfit(tp.knownTotal ?? null);
+    setUnknownCoins(tp.unknownCoins ?? []);
     setProfitPercentage(tp.percentage);
     reportLoaded();
   }
@@ -1159,8 +1166,10 @@ const App = ({
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">
-                    {profitStr}
+                  <div className="flex items-center gap-1">
+                    <div className="min-w-0 text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">{profitStr}</div>
+                    {partialProfit && <PartialProfitHint names={unknownCoins.map((coin) => coin.symbol)} affected={unknownCoins} period={symbol ?? ""} t={t}
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground" />}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
                     <div>{t("coin.profitRate")}</div>

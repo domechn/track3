@@ -28,7 +28,7 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/mobile/i18n";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
-import { PartialProfitHint } from "@/components/profit-summary-hints";
+import { PartialProfitHint, hasVisibleUnrecordedChange } from "@/components/profit-summary-hints";
 import { HintPopover } from "@/components/ui/hint-popover";
 import { Pager, usePager } from "@/components/ui/pager";
 import { usePhoneWidth } from "@/mobile/components/mobile/size-class";
@@ -78,6 +78,7 @@ const App = ({
       monthFirstDate: Date;
       lastRecordDate?: Date;
       baselineDate?: Date;
+      unrecordedChange?: number;
     }[]
   >([]);
   const [loadedMonthlyKey, setLoadedMonthlyKey] = useState<string | null>(null);
@@ -88,6 +89,7 @@ const App = ({
       unknownCoins: UnknownCoins;
       year: number;
       hasData: boolean;
+      unrecordedChange?: number;
     }[]
   >([]);
   const [selectedYear, setSelectedYear] = useState(dateRange.end.getFullYear());
@@ -111,6 +113,7 @@ const App = ({
         monthFirstDate: Date;
         lastRecordDate?: Date;
         baselineDate?: Date;
+        unrecordedChange?: number;
       }[]
     >
   >(new Map());
@@ -123,6 +126,7 @@ const App = ({
         unknownCoins: UnknownCoins;
         year: number;
         hasData: boolean;
+        unrecordedChange?: number;
       }[]
     >
   >(new Map());
@@ -207,13 +211,12 @@ const App = ({
       const profits = await bluebird.map(
         dates.filter((d) => d.firstDay.getFullYear() === selectedYear),
         async (date) => {
-          const periodStart = clipToRange
-            ? new Date(Math.max(date.firstDay.getTime(), dateRange.start.getTime())) : date.firstDay;
+          const periodStart = new Date(Math.max(date.firstDay.getTime(), dateRange.start.getTime()));
           const monthEnd = new Date(date.lastDay.getFullYear(), date.lastDay.getMonth(),
             date.lastDay.getDate(), 23, 59, 59, 999);
-          const { total, knownTotal = null, unknownCoins = [], lastRecordDate } = await calculateTotalProfit({
+          const { total, knownTotal = null, unknownCoins = [], lastRecordDate, unrecordedChange } = await calculateTotalProfit({
             start: periodStart,
-            end: clipToRange ? new Date(Math.min(monthEnd.getTime(), dateRange.end.getTime())) : monthEnd,
+            end: new Date(Math.min(monthEnd.getTime(), dateRange.end.getTime())),
           });
 
           const lrd = lastRecordDate
@@ -224,7 +227,7 @@ const App = ({
           const baselineDate = lrd
             ? await queryPreviousProfitSnapshotDate(periodStart)
             : undefined;
-          return { total, knownTotal, unknownCoins, monthFirstDate: date.firstDay, lastRecordDate: lrd, baselineDate };
+          return { total, knownTotal, unknownCoins, monthFirstDate: date.firstDay, lastRecordDate: lrd, baselineDate, unrecordedChange };
         },
         { concurrency: 4 }
       );
@@ -257,12 +260,12 @@ const App = ({
       const profits = await bluebird.map(
         years,
         async (year) => {
-          const { total, knownTotal = null, unknownCoins = [], lastRecordDate } = await calculateTotalProfit({
-            start: clipToRange ? new Date(Math.max(new Date(year, 0, 1).getTime(), dateRange.start.getTime())) : new Date(year, 0, 1),
-            end: clipToRange ? new Date(Math.min(new Date(year, 11, 31, 23, 59, 59, 999).getTime(), dateRange.end.getTime())) : new Date(year, 11, 31, 23, 59, 59, 999),
+          const { total, knownTotal = null, unknownCoins = [], lastRecordDate, unrecordedChange } = await calculateTotalProfit({
+            start: new Date(Math.max(new Date(year, 0, 1).getTime(), dateRange.start.getTime())),
+            end: new Date(Math.min(new Date(year, 11, 31, 23, 59, 59, 999).getTime(), dateRange.end.getTime())),
           });
 
-          return { total, knownTotal, unknownCoins, year, hasData: Boolean(lastRecordDate) };
+          return { total, knownTotal, unknownCoins, year, hasData: Boolean(lastRecordDate), unrecordedChange };
         },
         { concurrency: 3 }
       );
@@ -346,6 +349,7 @@ const App = ({
           total: p.total,
           knownTotal: p.knownTotal,
           unknownCoins: p.unknownCoins,
+          unrecordedChange: p.unrecordedChange,
           hasData: Boolean(p.lastRecordDate),
           noSnapshot: Boolean(result && !result.lastRecordDate),
           inRange: new Date(selectedYear, month, 1) <= dateRange.end
@@ -362,6 +366,7 @@ const App = ({
       knownTotal: number | null;
       unknownCoins: UnknownCoins;
       hasData: boolean;
+      unrecordedChange?: number;
       noSnapshot: boolean;
       inRange: boolean;
       gapDate?: Date;
@@ -375,6 +380,7 @@ const App = ({
         total: yearlyProfitsMap[year] ? yearlyProfitsMap[year].total : 0,
         knownTotal: yearlyProfitsMap[year]?.knownTotal ?? null,
         unknownCoins: yearlyProfitsMap[year]?.unknownCoins ?? [],
+        unrecordedChange: yearlyProfitsMap[year]?.unrecordedChange,
         hasData: Boolean(yearlyProfitsMap[year]?.hasData),
       }));
   }, [availableYears, yearlyProfitsMap]);
@@ -435,7 +441,7 @@ const App = ({
   }
 
   function renderPartialInfo(coins: UnknownCoins, label: string) {
-    return <PartialProfitHint names={coins.map((coin) => coin.symbol)} period={label} t={t}
+    return <PartialProfitHint names={coins.map((coin) => coin.symbol)} affected={coins} period={label} t={t}
       className="absolute right-1 top-1 flex h-8 w-8 touch:h-11 touch:w-11 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />;
   }
 
@@ -483,6 +489,7 @@ const App = ({
               value === null ? "text-muted-foreground" : getToneClass(value, quoteColor))}>
               {item.hasData ? renderAmount(value) : "—"}
             </div>
+            {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <div className="mt-1 text-xs text-muted-foreground">{t("profitSummary.unrecordedChanges").replace("{amount}", renderAmount(item.unrecordedChange))}</div>}
             {item.gapDate && <div className="mt-1 text-xs text-muted-foreground">{gapHint(item.gapDate, selectedYear)}</div>}
           </>;
           return <div key={item.key} data-partial={partial} className={cn("profit-month-card relative rounded-lg border p-2",
@@ -525,6 +532,7 @@ const App = ({
             >
               {item.hasData ? renderAmount(value) : "—"}
             </div>
+            {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <div className="mt-1 text-xs text-muted-foreground">{t("profitSummary.unrecordedChanges").replace("{amount}", renderAmount(item.unrecordedChange))}</div>}
             {partial && renderPartialInfo(item.unknownCoins, String(item.year))}
           </div>
           );

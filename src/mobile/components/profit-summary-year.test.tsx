@@ -54,6 +54,18 @@ it("keeps an unknown yearly profit as a dash", async () => {
   expect(screen.getByText("Flat 0")).toBeInTheDocument();
 });
 
+it("clips a Returns year to the selected range like its months", async () => {
+  render(<ProfitSummary
+    dateRange={{ start: new Date(2024, 2, 15), end: new Date(2024, 3, 16) }}
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+    quoteColor="green-up-red-down"
+  />);
+  fireEvent.click(screen.getByRole("radio", { name: "Y" }));
+  await waitFor(() => expect(calculateTotalProfit).toHaveBeenCalledWith({
+    start: new Date(2024, 2, 15), end: new Date(2024, 3, 16),
+  }));
+});
+
 it("shows a dash for a year without a snapshot", async () => {
   vi.mocked(calculateTotalProfit).mockResolvedValue({
     total: 0,

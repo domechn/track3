@@ -263,16 +263,16 @@ describe("numeric profit from refresh snapshots", () => {
     expect(feb.lastRecordDate).toBeDefined();
     expect(feb.total).toBeNull();
     expect(feb.knownTotal).toBe(28);
-    expect(feb.unknownCoins).toEqual([{ symbol: "ETH", assetType: "crypto" }]);
+    expect(feb.unknownCoins).toEqual([{ symbol: "ETH", assetType: "crypto", intervals: ["2026-02-10T12:00:00.000Z"], months: 1 }]);
     expect(june.total).toBeNull();
     expect(june.knownTotal).toBe(30);
-    expect(june.unknownCoins).toEqual([{ symbol: "ETH", assetType: "crypto" }]);
+    expect(june.unknownCoins).toEqual([{ symbol: "ETH", assetType: "crypto", intervals: ["2026-06-10T12:00:00.000Z"], months: 1 }]);
     expect(march.total).toBe(31);
     expect(march.knownTotal).toBe(31);
     expect(march.unknownCoins).toEqual([]);
   });
 
-  it("returns no known amount when every coin has an unpaired withdrawal", async () => {
+  it("retains the known interval before an unpaired withdrawal", async () => {
     fixture.load([
       { at: "2026-01-01T12:00:00.000Z", holdings: [holding("w1", 2, 100)] },
       { at: "2026-01-02T12:00:00.000Z", holdings: [holding("w1", 1, 110)] },
@@ -281,8 +281,8 @@ describe("numeric profit from refresh snapshots", () => {
     });
     const result = await calculateTotalProfit(range("2026-01-01T00:00:00.000Z", "2026-01-31T23:59:59.999Z"));
     expect(result.total).toBeNull();
-    expect(result.knownTotal).toBeNull();
-    expect(result.unknownCoins).toEqual([{ symbol: "BTC", assetType: "crypto" }]);
+    expect(result.knownTotal).toBe(0);
+    expect(result.unknownCoins).toEqual([{ symbol: "BTC", assetType: "crypto", intervals: ["2026-01-02T12:00:00.000Z"], months: 1 }]);
   });
 
   it("uses the latest of several snapshots in each month", async () => {

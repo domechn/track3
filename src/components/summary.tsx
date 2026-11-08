@@ -66,15 +66,15 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
     queryAttribution(dateRange).then((data) => {
       if (!active) return;
       const amounts = roundedSummaryBreakdown(data.attribution.totals, currencyWrapper(currency)(1));
-      const value = (amount: number) => `${amount < 0 ? "−" : ""}${currency.symbol}${new Intl.NumberFormat("en-US").format(Math.abs(amount))}`;
-      const signedValue = (amount: number) => `${amount > 0 ? "+" : ""}${value(amount)}`;
-      setSubtitleEmphasis(signedValue(amounts.market));
-      setSubtitle(t(amounts.other === 0 ? "summary.fidelity.fullSubtitleNet" : "summary.fidelity.fullSubtitleOther")
-        .replace("{market}", signedValue(amounts.market))
-        .replace("{gain}", value(amounts.gain))
+      const displayValue = (amount: number) => `${amount < 0 ? "−" : ""}${currency.symbol}${new Intl.NumberFormat("en-US").format(Math.abs(amount))}`;
+      const displaySigned = (amount: number) => `${amount > 0 ? "+" : ""}${displayValue(amount)}`;
+      setSubtitleEmphasis(displaySigned(amounts.market));
+      setSubtitle(t(amounts.other === 0 ? "summary.fidelity.fullSubtitleAdditive" : "summary.fidelity.fullSubtitleAdditiveOther")
+        .replace("{market}", displaySigned(amounts.market))
+        .replace("{gain}", displayValue(amounts.gain))
         .replace("{date}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(selectedRange.baseline ?? dateRange.start))
-        .replace("{deposits}", value(amounts.added))
-        .replace("{other}", value(amounts.other)));
+        .replace("{deposits}", displayValue(amounts.added))
+        .replace("{other}", displayValue(amounts.other)));
     }).catch(() => {});
     return () => { active = false; };
   }, [rangeKey, dataVersion, hasValidRange, oneSnapshot, t, locale, selectedRange.baseline?.getTime()]);

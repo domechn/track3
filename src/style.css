@@ -1374,6 +1374,7 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-summary-pnl { min-height: 419px; }
 .fidelity-summary-pnl-kpis { min-height: 76px; margin-bottom: 18px; }
 .fidelity-summary-pnl-kpis { grid-auto-columns: minmax(max-content, 1fr); }
+@media (min-width: 1500px) { .fidelity-summary-pnl-kpis:not(:has(.fidelity-long-money)) { grid-auto-columns: 1fr; } }
 .fidelity-summary-pnl-kpis > div:first-child { min-width: auto; }
 .fidelity-summary-chart { display: block; width: 100%; height: 215px; overflow: visible; }
 .fidelity-summary-pnl .fidelity-caption { margin: 0 0 6px; line-height: 18px; }
@@ -1410,7 +1411,7 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-month-main:focus-visible, .fidelity-year-card:focus-visible { outline: 2px solid #4a8ad6; outline-offset: 2px; }
 .fidelity-month-head, .fidelity-year-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; width: 100%; }
 .fidelity-month-card[data-partial="true"] .fidelity-month-head { padding-right: 22px; }
-.fidelity-year-item[data-partial="true"] .fidelity-year-head { padding-right: 28px; }
+.fidelity-year-item[data-partial="true"] .fidelity-year-head { padding-right: 40px; }
 .fidelity-month-head b, .fidelity-year-head b { color: #fff; font-size: 15px; font-weight: 600; }
 .fidelity-month-head > span, .fidelity-year-head > span { color: #9b9da3; font-size: 13px; }
 .fidelity-month-value { margin-top: 6px; font-size: 17px; line-height: 24px; font-weight: 500; font-variant-numeric: normal; }
@@ -1427,12 +1428,14 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-year-stack[data-paged="true"] { min-height: 760px; }
 .fidelity-year-pager { min-height: 44px; margin-top: 12px; }
 .fidelity-year-item { position: relative; display: grid; grid-template-columns: minmax(0,1fr) 40px; min-width: 0; }
-.fidelity-year-card { display: flex; grid-column: 1/-1; grid-row: 1; flex-direction: column; gap: 2px; min-width: 0; padding: 14px 14px 12px; border: 1px solid #222224; border-radius: 6px; background: #0d0d0e; text-align: left; font-variant-numeric: inherit; }
+.fidelity-year-card { display: flex; grid-column: 1/-1; grid-row: 1; flex-direction: column; gap: 2px; min-width: 0; padding: 14px 14px 11px; border: 1px solid #222224; border-radius: 6px; background: #0d0d0e; text-align: left; font-variant-numeric: inherit; }
 .fidelity-year-badge { grid-column: 2; grid-row: 1; align-self: start; justify-self: center; margin-top: 6px; }
+.fidelity-year-breakdown-badge { margin-top: 48px; }
 .fidelity-year-card.selected { border-color: hsl(var(--accent-data)); background: var(--nav-selected-background); color: hsl(var(--foreground)); }
 .fidelity-year-card strong { margin-top: 6px; font-size: 22px; line-height: 28px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fidelity-year-percent { color: #b4b6bc; font-size: 12px; }
 .fidelity-year-deposits { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 9px 0; color: #b4b6bc; }
+.fidelity-year-card:has(.fidelity-year-unrecorded) .fidelity-year-deposits { margin-top: 1px; padding: 4px 0; }
 .fidelity-year-deposits span:last-child { color: #fff; }
 .fidelity-summary :is(.fidelity-kpis strong, .fidelity-month-value, .fidelity-year-card strong, .fidelity-year-deposits span:last-child) { white-space: nowrap; }
 .fidelity-year-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; padding-top: 4px; color: #9b9da3; font-size: 12px; }

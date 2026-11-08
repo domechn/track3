@@ -133,16 +133,15 @@ test("phone Top coins preview caps a populated group at four rows", async ({ bro
     await installTauriBridge(page, { fidelitySample: "full" });
     await page.evaluate(async () => {
       for (let index = 0; index < 6; index++) {
-        for (const [uuid, date, value] of [
-          ["fidelity-start", "2025-07-01T09:41:00.000Z", 100],
-          ["fidelity-day-30", "2026-10-31T09:41:00.000Z", 100_000 + index * 1000],
-        ] as const) {
-          await (window as any).__e2eInvoke("plugin:sql|execute", {
-            query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
-              VALUES (?, ?, ?, 'crypto', ?, 1, ?, ?)`,
-            values: [uuid, date, `preview-${index}`, `GAIN${index}`, value, value],
-          });
-        }
+        const endValue = 100_000 + index * 1000;
+        await (window as any).__e2eInvoke("plugin:sql|execute", {
+          query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+            SELECT uuid, MAX(createdAt), ?, 'crypto', ?, 1,
+              CASE WHEN uuid = 'fidelity-day-30' THEN ? ELSE 100 END,
+              CASE WHEN uuid = 'fidelity-day-30' THEN ? ELSE 100 END
+            FROM assets_v2 GROUP BY uuid`,
+          values: [`preview-${index}`, `GAIN${index}`, endValue, endValue],
+        });
       }
     });
     await page.goto("/#/summary");
@@ -218,14 +217,14 @@ test("Summary uses the same profit for All and 1Y when both cover every snapshot
     await page.goto("/#/summary");
     const main = page.locator(".fd-summary");
     await expect(main).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
-    await expect(main.locator(".fd-primary-stat strong")).toHaveText("+$4,368.50");
+    await expect(main.locator(".fd-primary-stat strong")).toHaveText("+$5,714.69");
     await main.getByRole("radio", { name: "1Y" }).click();
-    await expect(main.locator(".fd-primary-stat strong")).toHaveText("+$4,368.50");
+    await expect(main.locator(".fd-primary-stat strong")).toHaveText("+$5,714.69");
     await expect(main.locator(".fd-month").filter({ hasText: "Aug" })).toContainText("−$9,598");
-    await expect(main.locator(".fd-summary-chart")).toContainText("$4,369");
+    await expect(main.locator(".fd-summary-chart")).toContainText("$5,715");
     const topTotal = (await main.locator(".summary-top-row strong").allTextContents())
       .reduce((sum, text) => sum + Number(text.replace("−", "-").replace(/[^0-9.-]/g, "")), 0);
-    expect(Math.abs(topTotal - 4_368.50)).toBeLessThan(5);
+    expect(Math.abs(topTotal - 5_714.69)).toBeLessThan(5);
   } finally { await context.close(); }
 });
 
@@ -253,7 +252,7 @@ test("Chinese full Summary banner stays within three lines at 390px", async ({ b
     await installTauriBridge(page, { fidelitySample: "full" });
     await page.goto("/#/summary");
     await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
-    await expect(page.locator(".fd-page-head p")).toContainText("净转入");
+    await expect(page.locator(".fd-page-head p")).toContainText("已记录资金流");
     expect((await page.locator(".fd-page-head p").boundingBox())!.height).toBeLessThanOrEqual(54);
   } finally { await context.close(); }
 });
@@ -319,12 +318,14 @@ test("summary full state follows the approved card order and captures at 390px",
     await expect(page.getByText("All-time high", { exact: true })).toBeVisible();
     await expect(page.getByText("By year", { exact: true })).toBeVisible();
     await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+    await page.evaluate(() => document.fonts.ready);
+    mkdirSync("/tmp/fidelity/summary", { recursive: true });
+    await page.screenshot({ path: "/tmp/fidelity/summary/summary-phone.png" });
     const refresh = await page.locator(".fd-refresh").boundingBox();
     expect(refresh?.width).toBe(44);
     expect(refresh?.height).toBe(44);
     expect(refresh?.x).toBe(330);
     expect((await page.locator(".fd-range").boundingBox())?.width).toBe(306);
-    mkdirSync("/tmp/fidelity/summary", { recursive: true });
     await expect(page.locator(".fd-primary-stat")).toContainText("+$188,809.27");
     await expect(page.locator(".fd-page-head p strong")).toHaveText("+$188,809");
     await page.evaluate(() => document.fonts.ready);
@@ -346,18 +347,20 @@ test("summary full state follows the approved card order and captures at 390px",
     });
     expect(textWidths.title).toBeCloseTo(97.46875, 1);
     expect(textWidths.value).toBeCloseTo(205.328125, 1);
-    await expect(page.locator(".fd-page-head p")).toContainText("$453,809 since Jul 2025: +$188,809 market P&L, $138,463 net funding, $126,537 other (fees, transfers)");
-    await expect(page.locator(".fd-kpis")).toContainText("+32.84%");
-    await expect(page.locator(".fd-kpis")).toContainText("$575,000");
+    await expect(page.locator(".fd-page-head p")).toContainText("$265,000");
+    await expect(page.locator(".fd-kpis")).toContainText("+30.41%");
+    await expect(page.locator(".fd-kpis")).toContainText("on $620,892");
+    await expect(page.locator(".fd-kpis")).toContainText("Breakeven$575,000");
     expect((await page.locator(".fd-three>div:first-child small").boundingBox())!.y).toBe(382);
     expect((await page.locator(".fd-chart-caption").boundingBox())!.y).toBe(436);
-    expect((await page.locator(".fd-chart-caption").boundingBox())!.height).toBe(36);
-    expect((await page.locator(".fd-ath").boundingBox())!.y).toBe(697);
+    expect((await page.locator(".fd-chart-caption").boundingBox())!.height).toBe(18);
+    expect((await page.locator(".fd-ath").boundingBox())!.y).toBe(679);
     await expect(page.locator(".fd-year").first()).toContainText("+$60,109");
     await expect(page.locator(".fd-year").first()).toContainText("+$105,000");
     await expect(page.locator(".summary-top-row").filter({ hasText: "SOL" }).locator("strong")).toHaveText("−$9,300");
     await expect(page.locator(".fd-top-coins .summary-top-row").nth(6).locator(".t3-asset-label-name")).toHaveText("USDT");
-    await expect(page.locator(".fd-attribution .fd-attr-row").first()).toContainText("Quantity +$38,000");
+    await expect(page.locator(".fd-attribution .fd-attr-row").first()).toContainText("Known P&L +$104,329");
+    await expect(page.locator(".fd-attribution .fd-attr-row").first()).toContainText("Cash flow and other changes +$38,000");
     const totalRange = page.locator(".fd-attr-total > span").first();
     await expect(totalRange).toHaveText("$310K → $764K");
     await expect(totalRange).toHaveAttribute("title", "$310,000.00 → $763,809.27");
@@ -366,7 +369,7 @@ test("summary full state follows the approved card order and captures at 390px",
     await pnlHint.click();
     await expect(page.getByRole("tooltip")).toContainText("BTC");
     await expect(page.getByRole("tooltip")).not.toContainText(", and ");
-    await expect(page.getByRole("tooltip")).toContainText("stablecoins are excluded.");
+    await expect(page.getByRole("tooltip")).toContainText("Stablecoins are excluded from coin counts.");
     await pnlHint.click();
     expect(await page.locator(".fd-year-deposit span").first().evaluate((node) => parseFloat(getComputedStyle(node).fontSize))).toBe(13);
     const solBars = await page.locator(".fd-attribution .fd-attr-row").filter({ has: page.locator("b", { hasText: "SOL" }) }).evaluate((row) => {
@@ -381,7 +384,7 @@ test("summary full state follows the approved card order and captures at 390px",
       .evaluate((node) => parseFloat((node as HTMLElement).style.width))).toBeCloseTo(50, 0);
     await expect(page.locator(".fd-month").filter({ hasText: "Feb" }).locator(".fd-month-foot span").first()).toHaveCSS("color", "rgb(155, 157, 163)");
     await page.locator("#app-main-content").evaluate((node) => { node.scrollTop = 0; });
-    expect(Math.round((await page.locator(".fd-top-coins").boundingBox())!.y)).toBe(3165);
+    expect(Math.round((await page.locator(".fd-top-coins").boundingBox())!.y)).toBe(3181);
     await expect(page.locator(".fd-month").last()).toContainText("Oct");
     await expect(page.locator(".fd-month").last()).toContainText("up");
     await expect(page.locator(".fd-month").last()).toContainText("down");
@@ -510,7 +513,7 @@ test("summary converts stored USD values into the selected currency", async ({ b
     await expect(page.locator(".fd-attribution .fd-axis")).toContainText("HK$");
     await expect(page.locator(".fd-profit-loss .fd-three")).toContainText("P&L is HK$0");
     await expect(page.locator(".fd-summary")).not.toContainText("P&L is $0");
-    await expect(page.locator(".fd-top-coins .fd-footnote")).toContainText("Stablecoins are held at HK$8.");
+    await expect(page.locator(".fd-top-coins .fd-footnote")).toContainText("Known P&L per coin since 1 Jul 2025.");
   } finally { await context.close(); }
 });
 

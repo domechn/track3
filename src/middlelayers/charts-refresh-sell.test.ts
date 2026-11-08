@@ -23,13 +23,40 @@ vi.mock("./entities/assets", () => ({
       extreme("max", start, end, symbol),
     listAssetsMinCreatedAt: async (start?: Date, end?: Date, symbol?: string) =>
       extreme("min", start, end, symbol),
+    listAssetsByDateRange: async (start: Date, end: Date) => {
+      const groups = new Map<string, AssetModel[]>();
+      for (const row of db.assets.filter((asset) => asset.createdAt >= start.toISOString() && asset.createdAt <= end.toISOString())) {
+        groups.set(row.uuid, [...(groups.get(row.uuid) ?? []), row]);
+      }
+      return [...groups.values()];
+    },
+    listAssetsBySymbolByDateRange: async (symbol: string, start: Date, end: Date) => {
+      const groups = new Map<string, AssetModel[]>();
+      for (const row of db.assets.filter((asset) => asset.symbol === symbol && asset.createdAt >= start.toISOString() && asset.createdAt <= end.toISOString())) {
+        groups.set(row.uuid, [...(groups.get(row.uuid) ?? []), row]);
+      }
+      return [...groups.values()];
+    },
+    listSnapshotDatesByDateRange: async (start: Date, end: Date) => {
+      const rows = new Map<string, string>();
+      for (const asset of db.assets.filter((row) => row.createdAt >= start.toISOString() && row.createdAt <= end.toISOString())) {
+        rows.set(asset.uuid, asset.createdAt);
+      }
+      return [...rows].map(([uuid, createdAt]) => ({ uuid, createdAt }));
+    },
+    listLastSnapshotBefore: async (start: Date) => {
+      const row = db.assets.filter((asset) => asset.createdAt < start.toISOString())
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      return row ? db.assets.filter((asset) => asset.uuid === row.uuid) : [];
+    },
   },
 }));
 vi.mock("./entities/transactions", () => ({
   TRANSACTION_HANDLER: {
-    listTransactionsByDateRange: async (_start: Date, _end: Date, symbol?: string) => {
+    listTransactionsByDateRange: async (start: Date, end: Date, symbol?: string) => {
       const grouped = new Map<string, TransactionModel[]>();
-      for (const txn of db.txns.filter((row) => !symbol || row.symbol === symbol)) {
+      for (const txn of db.txns.filter((row) => (!symbol || row.symbol === symbol) &&
+        row.txnCreatedAt >= start.toISOString() && row.txnCreatedAt <= end.toISOString())) {
         grouped.set(txn.uuid, [...(grouped.get(txn.uuid) ?? []), txn]);
       }
       return [...grouped.values()];
@@ -127,9 +154,10 @@ describe("whole-position refresh pricing", () => {
     ]);
     expect(db.txns.at(-1)).toMatchObject({ txnType: "withdraw", price: 250 });
     const profit = await calculateTotalProfit(range, "BTC", "crypto");
-    expect(profit.coins[0]?.value).toBeNull();
+    expect(profit.coins[0]?.value).toBe(150);
     expect(profit.coins[0]?.percentage).toBeNull();
     expect(profit.total).toBeNull();
+    expect(profit.knownTotal).toBe(150);
     expect(profit.percentage).toBeNull();
   });
 
@@ -254,7 +282,8 @@ describe("whole-position refresh pricing", () => {
 
     db.txns.splice(db.txns.indexOf(deposit), 1);
     const unpaired = await calculateTotalProfit(range, "BTC", "crypto");
-    expect(unpaired.coins[0]?.value).toBeNull();
+    expect(unpaired.coins[0]?.value).toBe(190);
+    expect(unpaired.knownTotal).toBe(190);
     expect(unpaired.total).toBeNull();
   });
 

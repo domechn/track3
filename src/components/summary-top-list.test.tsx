@@ -42,3 +42,20 @@ it("spans the three accessible data columns with its section heading", () => {
   ]} amount={(value) => `$${value}`} tone={() => "gain"} /></div>);
   expect(screen.getByRole("row", { name: "Top profit" }).querySelector('[role="cell"]')).toHaveAttribute("aria-colspan", "3");
 });
+
+it("labels a partial coin's known amount as unknown", () => {
+  render(<SummaryTopList heading="Unknown" rows={[
+    { assetType: "crypto", symbol: "BTC", value: 20, percentage: null, stable: false, isUnknown: true },
+  ]} amount={(value) => `$${value}`} tone={() => "neutral"} />);
+  const row = screen.getByRole("row", { name: /BTC/ });
+  expect(row).toHaveTextContent("?");
+  expect(row).toHaveTextContent("$20");
+  expect(row.querySelector(".summary-top-track i")).not.toBeInTheDocument();
+});
+
+it("keeps the known part visible when an unknown coin is a stablecoin", () => {
+  render(<SummaryTopList heading="Unknown" rows={[
+    { assetType: "crypto", symbol: "USDT", value: 20, percentage: null, stable: true, isUnknown: true },
+  ]} amount={(value) => `$${value}`} tone={() => "neutral"} />);
+  expect(screen.getByRole("row", { name: /USDT/ })).toHaveTextContent("$20");
+});

@@ -65,8 +65,10 @@ vi.mock("./consts", () => ({
 vi.mock("./entities/assets", () => ({
   ASSET_HANDLER: {
     listAssets: vi.fn(),
-    listAssetsMaxCreatedAt: vi.fn(),
-    listAssetsMinCreatedAt: vi.fn(),
+    listAssetsByDateRange: vi.fn(),
+    listAssetsBySymbolByDateRange: vi.fn(),
+    listSnapshotDatesByDateRange: vi.fn(),
+    listLastSnapshotBefore: vi.fn(),
     listSymbolGroupedAssetsByDateRange: vi.fn(),
   },
 }));
@@ -146,61 +148,27 @@ describe("charts asset type handling", () => {
       end: new Date("2024-04-30T00:00:00.000Z"),
     };
 
-    vi.mocked(ASSET_HANDLER.listAssetsMaxCreatedAt).mockResolvedValueOnce([
-      {
-        id: 10,
-        uuid: "latest-stock",
-        createdAt: "2024-04-30T00:00:00.000Z",
-        symbol: "BTC",
-        assetType: "stock",
-        amount: 2,
-        value: 30,
-        price: 15,
-        wallet: "broker-1",
-      },
-      {
-        id: 11,
-        uuid: "latest-crypto",
-        createdAt: "2024-04-30T00:00:00.000Z",
-        symbol: "BTC",
-        assetType: "crypto",
-        amount: 1,
-        value: 100000,
-        price: 100000,
-        wallet: "wallet-1",
-      },
-    ] as never).mockResolvedValueOnce([]);
-
-    vi.mocked(ASSET_HANDLER.listAssetsMinCreatedAt).mockResolvedValue([
-      {
-        id: 1,
-        uuid: "earliest-stock",
-        createdAt: "2024-04-01T00:00:00.000Z",
-        symbol: "BTC",
-        assetType: "stock",
-        amount: 1,
-        value: 10,
-        price: 10,
-        wallet: "broker-1",
-      },
-      {
-        id: 2,
-        uuid: "earliest-crypto",
-        createdAt: "2024-04-01T00:00:00.000Z",
-        symbol: "BTC",
-        assetType: "crypto",
-        amount: 1,
-        value: 90000,
-        price: 90000,
-        wallet: "wallet-1",
-      },
+    vi.mocked(ASSET_HANDLER.listLastSnapshotBefore).mockResolvedValue([]);
+    vi.mocked(ASSET_HANDLER.listSnapshotDatesByDateRange).mockResolvedValue([
+      { uuid: "first", createdAt: "2024-04-01T00:00:00.000Z" },
+      { uuid: "last", createdAt: "2024-04-30T00:00:00.000Z" },
+    ]);
+    vi.mocked(ASSET_HANDLER.listAssetsBySymbolByDateRange).mockResolvedValue([
+      [
+        { id: 1, uuid: "first", createdAt: "2024-04-01T00:00:00.000Z", symbol: "BTC", assetType: "stock", amount: 1, value: 10, price: 10, wallet: "broker-1" },
+        { id: 2, uuid: "first", createdAt: "2024-04-01T00:00:00.000Z", symbol: "BTC", assetType: "crypto", amount: 1, value: 90000, price: 90000, wallet: "wallet-1" },
+      ],
+      [
+        { id: 10, uuid: "last", createdAt: "2024-04-30T00:00:00.000Z", symbol: "BTC", assetType: "stock", amount: 2, value: 30, price: 15, wallet: "broker-1" },
+        { id: 11, uuid: "last", createdAt: "2024-04-30T00:00:00.000Z", symbol: "BTC", assetType: "crypto", amount: 1, value: 100000, price: 100000, wallet: "wallet-1" },
+      ],
     ] as never);
 
     vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([
       [
         {
           id: 100,
-          uuid: "stock-buy",
+          uuid: "first",
           assetID: 1,
           assetType: "stock",
           wallet: "broker-1",
@@ -214,7 +182,7 @@ describe("charts asset type handling", () => {
         },
         {
           id: 101,
-          uuid: "crypto-buy",
+          uuid: "first",
           assetID: 2,
           assetType: "crypto",
           wallet: "wallet-1",
@@ -235,16 +203,18 @@ describe("charts asset type handling", () => {
       {
         symbol: "BTC",
         assetType: "stock",
-        value: 10,
+        value: 5,
         realSpentValue: 10,
+        unrecordedChange: 15,
         buyAmount: 1,
         sellAmount: 0,
         costAvgPrice: 10,
         sellAvgPrice: 0,
-        percentage: 100,
+        percentage: 50,
       },
     ]);
-    expect(result.total).toBe(10);
-    expect(result.percentage).toBe(100);
+    expect(result.total).toBe(5);
+    expect(result.unrecordedChange).toBe(15);
+    expect(result.percentage).toBe(50);
   });
 });

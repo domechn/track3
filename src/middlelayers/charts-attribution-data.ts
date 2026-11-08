@@ -14,29 +14,23 @@ const pageSize = 100;
 export async function queryAttribution(dateRange: TDateRange): Promise<{ attribution: AttributionResult; aliases: Record<string, WalletAlias | undefined> }> {
   const groupKey = CACHE_GROUP_KEYS.TOTAL_PROFIT_CACHE_GROUP_KEY;
   const cache = getMemoryCacheInstance(groupKey);
-  const key = `attribution-v4-${getCacheGroupEpoch(groupKey)}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
+  const key = `attribution-v5-${getCacheGroupEpoch(groupKey)}-${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   let attribution = cache.getCache<AttributionResult>(key);
 
   if (!attribution) {
     const blacklist = await getBlacklistCoins();
+    const transferContext = (await TRANSACTION_HANDLER.listTransactionsByDateRange(
+      new Date(dateRange.start.getTime() - 7 * 86_400_000),
+      new Date(dateRange.end.getTime() + 7 * 86_400_000),
+    )).flat();
     const entries = new Map<string, AttributionEntry>();
     const totals = { priceEffect: 0, flowEffect: 0, residual: 0, totalChange: 0 };
     let startValue = 0;
     let endValue = 0;
-    let previous: AttributionSnapshot | undefined;
-    const baselineRows = await selectFromDatabaseWithSql<{ uuid: string; createdAt: string }>(
-      `SELECT uuid, MAX(createdAt) AS createdAt FROM assets_v2
-       WHERE createdAt < ? GROUP BY uuid ORDER BY createdAt DESC, uuid DESC LIMIT 1`,
-      [dateRange.start.toISOString()],
-    );
-    if (baselineRows[0]) {
-      const baselineId = [baselineRows[0].uuid];
-      const [assets, transactions] = await Promise.all([
-        ASSET_HANDLER.listAssetsByUUIDs(baselineId),
-        TRANSACTION_HANDLER.listTransactionsByUUIDs(baselineId),
-      ]);
-      if (assets.length) previous = { createdAt: baselineRows[0].createdAt, assets, transactions };
-    }
+    const baseline = await ASSET_HANDLER.listLastSnapshotBefore(dateRange.start);
+    let previous: AttributionSnapshot | undefined = baseline.length
+      ? { createdAt: baseline[0].createdAt, assets: baseline, transactions: [] }
+      : undefined;
     let firstInterval = true;
     let cursor = { createdAt: dateRange.start.toISOString(), uuid: "" };
     while (true) {
@@ -73,7 +67,7 @@ export async function queryAttribution(dateRange: TDateRange): Promise<{ attribu
         assets: assetsByUuid.get(row.uuid)!,
         transactions: transactionsByUuid.get(row.uuid) ?? [],
       }));
-      const interval = attributeSnapshots(previous ? [previous, ...snapshots] : snapshots, blacklist);
+      const interval = attributeSnapshots(previous ? [previous, ...snapshots] : snapshots, blacklist, transferContext);
       if (interval.entries.length > 0) {
         if (firstInterval) startValue = interval.startValue;
         firstInterval = false;
@@ -92,7 +86,7 @@ export async function queryAttribution(dateRange: TDateRange): Promise<{ attribu
         totals.residual += interval.totals.residual;
         totals.totalChange += interval.totals.totalChange;
       }
-      previous = snapshots.at(-1) ?? previous;
+      previous = snapshots.at(-1) ? { ...snapshots.at(-1)!, transactions: [] } : previous;
       cursor = rows[rows.length - 1];
       if (rows.length < pageSize) break;
     }

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssetModel, TransactionModel } from "./types";
 
 const mocks = vi.hoisted(() => ({
-  listAssetsMaxCreatedAt: vi.fn(),
-  listAssetsMinCreatedAt: vi.fn(),
+  listAssetsByDateRange: vi.fn(),
+  listLastSnapshotBefore: vi.fn(),
   listTransactionsByDateRange: vi.fn(),
 }));
 
@@ -13,8 +13,12 @@ vi.mock("./database", () => ({
 
 vi.mock("./entities/assets", () => ({
   ASSET_HANDLER: {
-    listAssetsMaxCreatedAt: mocks.listAssetsMaxCreatedAt,
-    listAssetsMinCreatedAt: mocks.listAssetsMinCreatedAt,
+    listAssetsByDateRange: mocks.listAssetsByDateRange,
+    listAssetsBySymbolByDateRange: mocks.listAssetsByDateRange,
+    listSnapshotDatesByDateRange: vi.fn().mockResolvedValue([
+      { uuid: latestAsset.uuid, createdAt: latestAsset.createdAt },
+    ]),
+    listLastSnapshotBefore: mocks.listLastSnapshotBefore,
   },
 }));
 
@@ -60,10 +64,8 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   localStorage.clear();
-  mocks.listAssetsMaxCreatedAt.mockResolvedValue([latestAsset]);
-  mocks.listAssetsMinCreatedAt.mockResolvedValue([
-    { ...latestAsset, createdAt: "2024-04-01T00:00:00.000Z" },
-  ]);
+  mocks.listAssetsByDateRange.mockResolvedValue([[latestAsset]]);
+  mocks.listLastSnapshotBefore.mockResolvedValue([]);
   mocks.listTransactionsByDateRange.mockResolvedValue([[transaction]]);
 });
 
@@ -77,7 +79,7 @@ async function warmProfitCache() {
   const modules = await loadProfitModules();
   await modules.profit.calculateTotalProfit(dateRange, "BTC", "crypto");
   await modules.profit.calculateTotalProfit(dateRange, "BTC", "crypto");
-  expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+  expect(mocks.listAssetsByDateRange).toHaveBeenCalledTimes(1);
   return modules;
 }
 
@@ -104,7 +106,7 @@ describe("persistent total-profit cache epochs", () => {
       const second = await calculateTotalProfit(dateRange, "BTC", "crypto");
 
       expect(first.total).toBe(second.total);
-      expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
+      expect(mocks.listAssetsByDateRange).toHaveBeenCalledTimes(2);
       expect(consoleWarn).toHaveBeenCalledWith(
         "cache epoch persistence failed",
       );
@@ -155,7 +157,7 @@ describe("persistent total-profit cache epochs", () => {
       await expect(
         profit.calculateTotalProfit(dateRange, "BTC", "crypto"),
       ).resolves.toBeDefined();
-      expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
+      expect(mocks.listAssetsByDateRange).toHaveBeenCalledTimes(2);
       expect(consoleWarn).toHaveBeenCalledWith(
         "expired cache cleanup failed",
       );
@@ -191,7 +193,7 @@ describe("persistent total-profit cache epochs", () => {
     const restarted = await import("./charts-profit");
     await restarted.calculateTotalProfit(dateRange, "BTC", "crypto");
 
-    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
+    expect(mocks.listAssetsByDateRange).toHaveBeenCalledTimes(2);
   });
 
   it("fails closed across restart when persisting the new epoch fails", async () => {
@@ -223,7 +225,7 @@ describe("persistent total-profit cache epochs", () => {
     const restarted = await import("./charts-profit");
     await restarted.calculateTotalProfit(dateRange, "BTC", "crypto");
 
-    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
+    expect(mocks.listAssetsByDateRange).toHaveBeenCalledTimes(2);
   });
 
   it("misses a prior process cache after every invalidation storage operation fails", async () => {
@@ -251,7 +253,7 @@ describe("persistent total-profit cache epochs", () => {
     const restarted = await import("./charts-profit");
     await restarted.calculateTotalProfit(dateRange, "BTC", "crypto");
 
-    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
+    expect(mocks.listAssetsByDateRange).toHaveBeenCalledTimes(2);
   });
 
   it("ignores legacy unversioned permanent cache entries", async () => {
@@ -273,7 +275,7 @@ describe("persistent total-profit cache epochs", () => {
     const { calculateTotalProfit } = await import("./charts-profit");
     const result = await calculateTotalProfit(dateRange, "BTC", "crypto");
 
-    expect(mocks.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+    expect(mocks.listAssetsByDateRange).toHaveBeenCalledTimes(1);
     expect(result.total).not.toBe(999);
   });
 });

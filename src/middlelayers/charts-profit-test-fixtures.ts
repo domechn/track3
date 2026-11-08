@@ -81,6 +81,24 @@ function perSymbolExtreme(pick: "max" | "min", start?: Date, end?: Date, symbol?
 export const assetHandler = {
   listAssetsMaxCreatedAt: async (s?: Date, e?: Date, sym?: string) => perSymbolExtreme("max", s, e, sym),
   listAssetsMinCreatedAt: async (s?: Date, e?: Date, sym?: string) => perSymbolExtreme("min", s, e, sym),
+  listAssetsByDateRange: async (s?: Date, e?: Date) => {
+    const byUuid = new Map<string, AssetModel[]>();
+    for (const row of db.assets.filter((asset) => inRange(asset.createdAt, s, e))) {
+      byUuid.set(row.uuid, [...(byUuid.get(row.uuid) ?? []), row]);
+    }
+    return [...byUuid.values()];
+  },
+  listAssetsBySymbolByDateRange: async (symbol: string, s?: Date, e?: Date) =>
+    (await assetHandler.listAssetsByDateRange(s, e)).map((group) => group.filter((asset) => asset.symbol === symbol)).filter((group) => group.length > 0),
+  listSnapshotDatesByDateRange: async (s: Date, e: Date) =>
+    (await assetHandler.listAssetsByDateRange(s, e)).map((group) => ({
+      uuid: group[0].uuid, createdAt: group[0].createdAt,
+    })),
+  listLastSnapshotBefore: async (start: Date) => {
+    const row = db.assets.filter((asset) => asset.createdAt < start.toISOString())
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    return row ? db.assets.filter((asset) => asset.uuid === row.uuid) : [];
+  },
 };
 
 export const txnHandler = {

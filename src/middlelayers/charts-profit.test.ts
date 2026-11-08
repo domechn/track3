@@ -33,8 +33,10 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 vi.mock("./entities/assets", () => ({
   ASSET_HANDLER: {
-    listAssetsMaxCreatedAt: vi.fn(),
-    listAssetsMinCreatedAt: vi.fn(),
+    listAssetsByDateRange: vi.fn(),
+    listAssetsBySymbolByDateRange: vi.fn(),
+    listSnapshotDatesByDateRange: vi.fn(),
+    listLastSnapshotBefore: vi.fn(),
   },
 }));
 
@@ -49,6 +51,7 @@ vi.mock("./entities/transactions", () => ({
 
 import {
   calculateTotalProfit,
+  calculateTotalProfitBatch,
   queryPreviousProfitSnapshotDate,
   updateTransactionPrice,
   updateTransactionTxnType,
@@ -84,7 +87,7 @@ const earliestAsset: AssetModel = {
 
 const transaction: TransactionModel = {
   id: 42,
-  uuid: "refresh-1",
+  uuid: "refresh-0",
   assetID: 7,
   assetType: "crypto",
   wallet: "wallet-1",
@@ -97,16 +100,99 @@ const transaction: TransactionModel = {
   updatedAt: "2024-04-01T00:00:00.000Z",
 };
 
+it("loads overlapping year and month profits from one snapshot query", async () => {
+  vi.mocked(ASSET_HANDLER.listLastSnapshotBefore).mockResolvedValue([
+    { ...earliestAsset, uuid: "prior", createdAt: "2023-12-31T00:00:00.000Z", value: 100, price: 100 },
+  ]);
+  vi.mocked(ASSET_HANDLER.listAssetsByDateRange).mockResolvedValue([
+    [{ ...earliestAsset, uuid: "jan", createdAt: "2024-01-31T00:00:00.000Z", value: 110, price: 110 }],
+    [{ ...earliestAsset, uuid: "feb", createdAt: "2024-02-28T00:00:00.000Z", value: 120, price: 120 }],
+  ]);
+  vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([]);
+  const ranges = [
+    { start: new Date("2024-01-01T00:00:00.000Z"), end: new Date("2024-02-29T23:59:59.999Z") },
+    { start: new Date("2024-01-01T00:00:00.000Z"), end: new Date("2024-01-31T23:59:59.999Z") },
+    { start: new Date("2024-02-01T00:00:00.000Z"), end: new Date("2024-02-29T23:59:59.999Z") },
+  ];
+  expect((await calculateTotalProfitBatch(ranges)).map((profit) => profit.knownTotal)).toEqual([20, 10, 10]);
+  expect(ASSET_HANDLER.listAssetsByDateRange).toHaveBeenCalledTimes(1);
+  expect(TRANSACTION_HANDLER.listTransactionsByDateRange).toHaveBeenCalledTimes(1);
+});
+
+it("retains later known intervals after a batched unpaired withdrawal", async () => {
+  const make = (uuid: string, createdAt: string, amount: number, price: number): AssetModel => ({
+    ...earliestAsset, uuid, createdAt, symbol: "ETH", amount, price, value: amount * price,
+  });
+  vi.mocked(ASSET_HANDLER.listLastSnapshotBefore).mockResolvedValue([make("prior", "2023-12-15T12:00:00.000Z", 1, 100)]);
+  vi.mocked(ASSET_HANDLER.listAssetsByDateRange).mockResolvedValue([
+    [make("jan", "2024-01-15T12:00:00.000Z", 1, 100)],
+    [make("march", "2024-03-15T12:00:00.000Z", .75, 120)],
+    [make("april", "2024-04-15T12:00:00.000Z", .75, 130)],
+  ]);
+  vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([[
+    { ...transaction, uuid: "march", symbol: "ETH", amount: .25, price: 100,
+      txnType: "withdraw", txnCreatedAt: "2024-03-15T12:00:00.000Z" },
+  ]]);
+  const year = { start: new Date("2024-01-01T00:00:00.000Z"), end: new Date("2024-12-31T23:59:59.999Z") };
+  const april = { start: new Date("2024-04-01T00:00:00.000Z"), end: new Date("2024-04-30T23:59:59.999Z") };
+  const [annual, month] = await calculateTotalProfitBatch([year, april]);
+  expect(annual.knownTotal).toBe(7.5);
+  expect(month.knownTotal).toBe(7.5);
+  expect(annual.unknownCoins).toHaveLength(1);
+});
+
+it("sums the additive 2024 fixture across twelve batched months", async () => {
+  const snapshots = Array.from({ length: 13 }, (_, index) => {
+    const month = index - 1;
+    const createdAt = new Date(Date.UTC(2024, month, 15, 12)).toISOString();
+    const uuid = `additive-${month}`;
+    const btcPrice = month < 0 ? 42_265 : 42_265 + (93_430 - 42_265) * (month + 1) / 12;
+    const assets: AssetModel[] = [
+      { ...earliestAsset, uuid, createdAt, wallet: "btc-wallet", symbol: "BTC", amount: 8, price: btcPrice, value: 8 * btcPrice },
+      { ...earliestAsset, uuid, createdAt, wallet: "eth-wallet", symbol: "ETH", amount: month < 2 ? 1 : .75,
+        price: month < 2 ? 100 : month === 2 ? 120 : 130,
+        value: month < 2 ? 100 : month === 2 ? 90 : 97.5 },
+    ];
+    if (month >= 0) {
+      const quantity = 217_677 * (month + 1) / 12;
+      assets.push({ ...earliestAsset, uuid, createdAt, wallet: "cash-wallet", symbol: "USDT",
+        amount: quantity, price: 1, value: quantity });
+    }
+    return assets;
+  });
+  vi.mocked(ASSET_HANDLER.listLastSnapshotBefore).mockResolvedValue(snapshots[0]);
+  vi.mocked(ASSET_HANDLER.listAssetsByDateRange).mockResolvedValue(snapshots.slice(1).reverse());
+  vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue(snapshots.slice(1).map((assets, month) => {
+    const createdAt = assets[0].createdAt;
+    const uuid = assets[0].uuid;
+    return [
+      { ...transaction, id: 100 + month, uuid, wallet: "cash-wallet", symbol: "USDT",
+        amount: 217_677 / 12, price: 1, txnType: "deposit", txnCreatedAt: createdAt },
+      ...(month === 2 ? [{ ...transaction, id: 200, uuid, wallet: "eth-wallet", symbol: "ETH",
+        amount: .25, price: 100, txnType: "withdraw" as const, txnCreatedAt: createdAt }] : []),
+    ];
+  }));
+  const year = { start: new Date(2024, 0, 1), end: new Date(2024, 11, 31, 23, 59, 59, 999) };
+  const months = Array.from({ length: 12 }, (_, month) => ({
+    start: new Date(2024, month, 1),
+    end: new Date(2024, month + 1, 1, 0, 0, 0, -1),
+  }));
+  const [annual, ...monthly] = await calculateTotalProfitBatch([year, ...months]);
+  expect(annual.knownTotal).toBeCloseTo(409_327.5, 2);
+  expect(annual.knownTotal).toBeCloseTo(monthly.reduce((sum, profit) => sum + (profit.knownTotal ?? 0), 0), 2);
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   cache.values.clear();
   cache.epoch = 0;
-  vi.mocked(ASSET_HANDLER.listAssetsMaxCreatedAt).mockResolvedValue([
-    latestAsset,
+  vi.mocked(ASSET_HANDLER.listAssetsByDateRange).mockResolvedValue([[{ ...earliestAsset, uuid: "refresh-0" }], [latestAsset]]);
+  vi.mocked(ASSET_HANDLER.listAssetsBySymbolByDateRange).mockResolvedValue([[{ ...earliestAsset, uuid: "refresh-0" }], [latestAsset]]);
+  vi.mocked(ASSET_HANDLER.listSnapshotDatesByDateRange).mockResolvedValue([
+    { uuid: "refresh-0", createdAt: earliestAsset.createdAt },
+    { uuid: "refresh-1", createdAt: latestAsset.createdAt },
   ]);
-  vi.mocked(ASSET_HANDLER.listAssetsMinCreatedAt).mockResolvedValue([
-    earliestAsset,
-  ]);
+  vi.mocked(ASSET_HANDLER.listLastSnapshotBefore).mockResolvedValue([]);
   vi.mocked(
     TRANSACTION_HANDLER.listTransactionsByDateRange,
   ).mockResolvedValue([[transaction]]);
@@ -117,7 +203,42 @@ beforeEach(() => {
   vi.mocked(invoke).mockResolvedValue(undefined);
 });
 
-it("finds the snapshot strictly before a selected start", async () => {
+it("limits a coin profit query to that symbol's snapshot and transaction rows", async () => {
+  const result = await calculateTotalProfit(dateRange, "BTC", "crypto");
+  expect(result.coins.map((coin) => coin.symbol)).toEqual(["BTC"]);
+  expect(ASSET_HANDLER.listAssetsBySymbolByDateRange).toHaveBeenCalledWith("BTC", dateRange.start, dateRange.end);
+  expect(TRANSACTION_HANDLER.listTransactionsByDateRange).toHaveBeenCalledWith(
+    new Date(dateRange.start.getTime() - 7 * 86_400_000),
+    new Date(dateRange.end.getTime() + 7 * 86_400_000),
+    "BTC",
+  );
+});
+
+it("matches the portfolio coin P&L when a snapshot between holdings has no coin row", async () => {
+  const prior = { ...earliestAsset, uuid: "prior", createdAt: "2024-03-31T00:00:00.000Z" };
+  const gap = { ...earliestAsset, uuid: "gap", createdAt: "2024-04-15T00:00:00.000Z", symbol: "ETH", price: 150, value: 150 };
+  const returnAsset = { ...latestAsset, uuid: "return", createdAt: "2024-04-30T00:00:00.000Z", price: 200, value: 200 };
+  const buy = { ...transaction, uuid: "return", txnCreatedAt: returnAsset.createdAt, price: 190 };
+  vi.mocked(ASSET_HANDLER.listLastSnapshotBefore).mockResolvedValue([prior]);
+  vi.mocked(ASSET_HANDLER.listAssetsByDateRange).mockResolvedValue([[returnAsset], [gap]]);
+  vi.mocked(ASSET_HANDLER.listAssetsBySymbolByDateRange).mockResolvedValue([[returnAsset]]);
+  vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([[buy]]);
+  vi.mocked(ASSET_HANDLER.listSnapshotDatesByDateRange).mockResolvedValue([
+    { uuid: "return", createdAt: returnAsset.createdAt },
+    { uuid: "gap", createdAt: gap.createdAt },
+  ]);
+
+  const portfolio = await calculateTotalProfit(dateRange);
+  const coinPage = await calculateTotalProfit(dateRange, "BTC", "crypto");
+  expect(portfolio.coins.find((coin) => coin.symbol === "BTC")).toMatchObject({
+    value: 10, unrecordedChange: -100,
+  });
+  expect(coinPage.coins.find((coin) => coin.symbol === "BTC")).toMatchObject({
+    value: 10, unrecordedChange: -100,
+  });
+});
+
+it("finds the opening baseline before the requested start", async () => {
   vi.mocked(selectFromDatabaseWithSql).mockResolvedValueOnce([
     { createdAt: "2026-04-04T12:00:00.000Z" },
   ]);
@@ -129,17 +250,15 @@ it("finds the snapshot strictly before a selected start", async () => {
   );
 });
 
-it("uses a snapshot strictly before the selected start as its cost baseline", async () => {
+it("requests the snapshot strictly before the selected start as its cost baseline", async () => {
   await calculateTotalProfit(dateRange, "BTC", "crypto");
-  expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledWith(
-    undefined, new Date(dateRange.start.getTime() - 1), "BTC",
-  );
+  expect(ASSET_HANDLER.listLastSnapshotBefore).toHaveBeenCalledWith(dateRange.start);
 });
 
 async function warmProfitCache() {
   await calculateTotalProfit(dateRange, "BTC", "crypto");
   await calculateTotalProfit(dateRange, "BTC", "crypto");
-  expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+  expect(ASSET_HANDLER.listAssetsBySymbolByDateRange).toHaveBeenCalledTimes(1);
   expect(
     TRANSACTION_HANDLER.listTransactionsByDateRange,
   ).toHaveBeenCalledTimes(1);
@@ -161,7 +280,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
 
     expect(cache.clearCache).toHaveBeenCalledTimes(1);
     await calculateTotalProfit(dateRange, "BTC", "crypto");
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
+    expect(ASSET_HANDLER.listAssetsBySymbolByDateRange).toHaveBeenCalledTimes(2);
     expect(
       TRANSACTION_HANDLER.listTransactionsByDateRange,
     ).toHaveBeenCalledTimes(2);
@@ -174,7 +293,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
 
     expect(cache.clearCache).toHaveBeenCalledTimes(1);
     await calculateTotalProfit(dateRange, "BTC", "crypto");
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
+    expect(ASSET_HANDLER.listAssetsBySymbolByDateRange).toHaveBeenCalledTimes(2);
     expect(
       TRANSACTION_HANDLER.listTransactionsByDateRange,
     ).toHaveBeenCalledTimes(2);
@@ -193,7 +312,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
 
     expect(cache.clearCache).not.toHaveBeenCalled();
     await calculateTotalProfit(dateRange, "BTC", "crypto");
-    expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(2);
+    expect(ASSET_HANDLER.listAssetsBySymbolByDateRange).toHaveBeenCalledTimes(1);
     expect(
       TRANSACTION_HANDLER.listTransactionsByDateRange,
     ).toHaveBeenCalledTimes(1);
@@ -213,7 +332,7 @@ describe("transaction mutations invalidate the total-profit cache", () => {
       await expect(update()).resolves.toBeUndefined();
 
       await calculateTotalProfit(dateRange, "BTC", "crypto");
-      expect(ASSET_HANDLER.listAssetsMaxCreatedAt).toHaveBeenCalledTimes(4);
+      expect(ASSET_HANDLER.listAssetsBySymbolByDateRange).toHaveBeenCalledTimes(2);
       expect(
         TRANSACTION_HANDLER.listTransactionsByDateRange,
       ).toHaveBeenCalledTimes(2);
@@ -229,11 +348,17 @@ it("counts a sale before a later same-snapshot transfer in Profit", async () => 
     { ...transaction, id: 4, assetID: 2, uuid: "r2", wallet: "w3", amount: 1, price: 210, txnType: "sell", txnCreatedAt: "2024-04-03T00:00:00.000Z" },
     { ...transaction, id: 5, assetID: 3, uuid: "r2", wallet: "w2", amount: 1, price: 210, txnType: "buy", txnCreatedAt: "2024-04-03T00:00:00.000Z" },
   ];
-  vi.mocked(ASSET_HANDLER.listAssetsMaxCreatedAt).mockImplementation(async (start) =>
-    start === undefined ? [] : [
-      { ...latestAsset, id: 3, uuid: "r2", wallet: "w2", price: 210, value: 210, createdAt: "2024-04-03T00:00:00.000Z" },
-    ]);
-  vi.mocked(ASSET_HANDLER.listAssetsMinCreatedAt).mockResolvedValue([]);
+  vi.mocked(ASSET_HANDLER.listAssetsBySymbolByDateRange).mockResolvedValue([
+    [{ ...latestAsset, id: 1, uuid: "r0", wallet: "w1", price: 100, value: 100, createdAt: "2024-04-01T00:00:00.000Z" },
+      { ...latestAsset, id: 2, uuid: "r0", wallet: "w3", price: 100, value: 100, createdAt: "2024-04-01T00:00:00.000Z" }],
+    [{ ...latestAsset, id: 2, uuid: "r1", wallet: "w3", price: 200, value: 200, createdAt: "2024-04-02T00:00:00.000Z" }],
+    [{ ...latestAsset, id: 3, uuid: "r2", wallet: "w2", price: 210, value: 210, createdAt: "2024-04-03T00:00:00.000Z" }],
+  ]);
+  vi.mocked(ASSET_HANDLER.listSnapshotDatesByDateRange).mockResolvedValue([
+    { uuid: "r0", createdAt: "2024-04-01T00:00:00.000Z" },
+    { uuid: "r1", createdAt: "2024-04-02T00:00:00.000Z" },
+    { uuid: "r2", createdAt: "2024-04-03T00:00:00.000Z" },
+  ]);
   vi.mocked(TRANSACTION_HANDLER.listTransactionsByDateRange).mockResolvedValue([transactions]);
 
   const result = await calculateTotalProfit(dateRange, "BTC", "crypto");

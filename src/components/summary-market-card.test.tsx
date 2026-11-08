@@ -1,11 +1,37 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { queryAttribution } from "@/middlelayers/charts-attribution-data";
-import { queryLatestAssets } from "@/middlelayers/charts";
+import { calculateTotalProfit, queryLatestAssets } from "@/middlelayers/charts";
 import SummaryMarketCard from "./summary-market-card";
 
 vi.mock("@/middlelayers/charts-attribution-data", () => ({ queryAttribution: vi.fn() }));
-vi.mock("@/middlelayers/charts", () => ({ queryLatestAssets: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/middlelayers/charts", () => ({
+  queryLatestAssets: vi.fn().mockResolvedValue([]),
+  calculateTotalProfit: vi.fn().mockResolvedValue({ unknownCoins: [] }),
+}));
+
+it("separates a partly known coin from Summary's gainers", async () => {
+  vi.mocked(queryAttribution).mockResolvedValue({
+    attribution: {
+      entries: [{ symbol: "BTC", assetType: "crypto", wallet: "w",
+        priceEffect: 20, flowEffect: 0, residual: 0, totalChange: 20 }],
+      totals: { priceEffect: 20, flowEffect: 0, residual: 0, totalChange: 20 },
+      startValue: 100, endValue: 120,
+    },
+    aliases: {},
+  });
+  vi.mocked(calculateTotalProfit).mockResolvedValue({
+    total: null, knownTotal: 20, percentage: null, coins: [],
+    unknownCoins: [{ symbol: "BTC", assetType: "crypto" }],
+  });
+  render(<SummaryMarketCard mode="leaders"
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }}
+    dateRange={{ start: new Date("2026-10-01T00:00:00Z"), end: new Date("2026-10-31T23:59:59Z") }}
+    quoteColor="green-up-red-down" />);
+  const row = await screen.findByRole("row", { name: /BTC/ });
+  expect(row.closest('[role="rowgroup"]')).toHaveTextContent("Unknown");
+  expect(row).toHaveTextContent("?");
+});
 
 it("includes an unrecorded quantity addition in a large Summary loss percentage", async () => {
   vi.mocked(queryAttribution).mockResolvedValue({

@@ -12,13 +12,17 @@ import { axisForValues, boundedMonthTimestamps, compactMoney, hasProfitLine } fr
 import { requestFullRefresh } from "./refresh-request";
 import { directionColorVar } from "@/utils/color";
 import { splitDirectionLine } from "@/components/direction-line";
-import { summaryProfitPercentage } from "@/middlelayers/summary-breakdown";
+import { PartialProfitHint, hasVisibleUnrecordedChange } from "./profit-summary-hints";
 import { useChartHitArea } from "./chart-tooltip";
 
 type Point = { timestamp: number; value: number | null };
 type SummaryData = {
   total: number | null;
+  knownTotal: number | null;
+  unknownCoins: Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"];
+  unrecordedChange: number;
   percentage: number | null | undefined;
+  investedCapital: number;
   positions: number;
   currentValue: number;
   up: number;
@@ -68,21 +72,32 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
         chartTimestamps.unshift(snapshots[0].timestamp);
       }
       const boundedTimestamps = boundedMonthTimestamps(chartTimestamps);
-      const monthly = await bluebird.map(boundedTimestamps, async (timestamp) => {
-        const cumulative = await calculateTotalProfit({ start: dateRange.start, end: new Date(timestamp) });
-        return { timestamp, value: cumulative.total };
-      }, { concurrency: 4 });
-      points.push(...monthly);
+      const intervals = await bluebird.map(boundedTimestamps, (timestamp, index) =>
+        calculateTotalProfit({
+          start: new Date(index === 0 ? dateRange.start.getTime() : boundedTimestamps[index - 1] + 1),
+          end: new Date(timestamp),
+        }), { concurrency: 4 });
+      let runningKnown = 0;
+      const monthly = boundedTimestamps.map((timestamp, index) => {
+        const interval = intervals[index];
+        runningKnown += interval.knownTotal ?? 0;
+        return { timestamp, value: interval.total === null && interval.knownTotal === null ? null : runningKnown };
+      });
+      points.push(...monthly.filter((point) => point.timestamp !== points[0].timestamp));
       const stableCoins = new Set(await new StableCoinsQuery().listAllStableCoins());
       const movers = profit.coins.filter((coin) => !stableCoins.has(coin.symbol));
       if (!active) return;
       setData({
         total: profit.total,
-        percentage: summaryProfitPercentage(profit.total, current.totalValue, profit.percentage),
+        knownTotal: profit.knownTotal,
+        unknownCoins: profit.unknownCoins,
+        unrecordedChange: profit.unrecordedChange ?? 0,
+        percentage: profit.percentage,
+        investedCapital: profit.coins.reduce((sum, coin) => sum + (coin.realSpentValue ?? 0), 0),
         positions: assets.length,
         currentValue: current.totalValue,
-        up: movers.filter((coin) => coin.value !== null && coin.value > 0.005).length,
-        down: movers.filter((coin) => coin.value !== null && coin.value < -0.005).length,
+        up: movers.filter((coin) => !coin.isUnknown && coin.value !== null && coin.value > 0.005).length,
+        down: movers.filter((coin) => !coin.isUnknown && coin.value !== null && coin.value < -0.005).length,
         points,
         snapshotTimestamps: [...(baseline ? [baseline.getTime()] : []), ...snapshots.map((point) => point.timestamp)],
         sampled: boundedTimestamps.length < chartTimestamps.length,
@@ -115,8 +130,9 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
     : data?.total === null ? t("summary.fidelity.unknownPnlRange").replace("{range}", rangeLabel)
     : data ? t("summary.fidelity.noPnlPointsRange").replace("{range}", rangeLabel)
     : t("summary.fidelity.loadingSubtitle");
-  const unavailable = noComparison || data?.total == null;
-  const tone = unavailable ? "fidelity-faint" : data!.total! >= 0
+  const displayedTotal = data?.total ?? (data?.unknownCoins.length ? data.knownTotal : null);
+  const unavailable = noComparison || displayedTotal == null;
+  const tone = unavailable ? "fidelity-faint" : displayedTotal! >= 0
     ? quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"
     : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive";
   const missing = oneSnapshot ? "–" : t("summary.fidelity.notAvailable");
@@ -126,23 +142,26 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
   const percentage = data?.percentage;
   const percentageText = unavailable || percentage === null ? missing : percentage === undefined
     ? "∞" : `${percentage >= 0 ? "+" : "−"}${number(Math.abs(percentage))}%`;
-  const netPnlFull = data?.total == null ? null : money(data.total, currency);
+  const netPnlFull = displayedTotal == null ? null : money(displayedTotal, currency);
   const netPnlLong = netPnlFull !== null && netPnlFull.length > 12;
   const netPnlText = unavailable || netPnlFull === null ? missing : netPnlLong
-    ? `${data!.total! > 0 ? "+" : ""}${compactMoney(currencyWrapper(currency)(data!.total!), currency.symbol)}`
+    ? `${displayedTotal! > 0 ? "+" : ""}${compactMoney(currencyWrapper(currency)(displayedTotal!), currency.symbol)}`
     : netPnlFull;
 
   return <section className="fidelity-card fidelity-summary-pnl">
     <div className="fidelity-card-head"><h2>{t("summary.fidelity.profitLoss")}</h2><span>{t("summary.fidelity.netPnlUsd").replace("{currency}", currency.currency)}</span></div>
     <div className="fidelity-kpis fidelity-summary-pnl-kpis">
-      <div><span>{rangeLabel === "All" ? t("summary.fidelity.netPnlAll") : t("summary.fidelity.netPnlRange").replace("{range}", rangeLabel)}</span><strong className={cn("big", tone, netPnlLong && "fidelity-long-money")} title={unavailable ? missingReason : netPnlFull ?? undefined}>{netPnlLong && !unavailable ? <span className="whitespace-nowrap">{netPnlText}</span> : netPnlText}</strong><small>{unavailable ? missingReason : t("summary.fidelity.since").replace("{date}", date(baseline ?? dateRange.start))}</small></div>
-      <div><span>{t("summary.fidelity.pnlPercent")}</span><strong className={tone} title={unavailable || percentMissing ? percentMissingReason : undefined}>{percentageText}</strong><small>{unavailable || percentMissing ? percentMissingReason : t("summary.fidelity.onInvested").replace("{amount}", money(data.currentValue - data.total!, currency, 0).replace(/^[+−]/, ""))}</small></div>
-      <div><span>{t("summary.fidelity.breakeven")}</span><strong className={unavailable ? "fidelity-faint" : undefined} title={unavailable ? missingReason : undefined}>{unavailable ? missing : money(data.currentValue - data.total!, currency, 0).replace(/^[+−]/, "")}</strong><small>{unavailable ? missingReason : t("summary.fidelity.breakevenNote").replace("{symbol}", currency.symbol)}</small></div>
+      <div><span>{rangeLabel === "All" ? t("summary.fidelity.netPnlAll") : t("summary.fidelity.netPnlRange").replace("{range}", rangeLabel)}</span><strong className={cn("big", tone, netPnlLong && "fidelity-long-money")} title={unavailable ? missingReason : netPnlFull ?? undefined}>{netPnlLong && !unavailable ? <span className="whitespace-nowrap">{netPnlText}</span> : netPnlText}</strong><small>{unavailable ? missingReason : t("summary.fidelity.since").replace("{date}", date(baseline ?? dateRange.start))}</small>
+      </div>
+      <div><span>{t("summary.fidelity.pnlPercent")}</span><strong className={tone} title={unavailable || percentMissing ? percentMissingReason : undefined}>{percentageText}</strong><small>{unavailable || percentMissing ? percentMissingReason : t("summary.fidelity.onInvested").replace("{amount}", money(data?.investedCapital ?? 0, currency, 0).replace(/^[+−]/, ""))}</small></div>
+      <div><span>{t("summary.fidelity.breakeven")}</span><strong className={unavailable || data?.total == null ? "fidelity-faint" : undefined} title={unavailable ? missingReason : undefined}>{unavailable || !data || data.total == null ? missing : money(data.currentValue - data.total, currency, 0).replace(/^[+−]/, "")}</strong><small>{unavailable ? missingReason : t("summary.fidelity.breakevenNote").replace("{symbol}", currency.symbol)}</small></div>
       <div><span>{t("summary.fidelity.positions")}</span><strong>{data?.positions ?? missing}</strong><small className={rangeLabel === "All" ? "whitespace-nowrap" : undefined}>{data && !oneSnapshot && <><span className={data.up === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"}>{data.up} {t("summary.fidelity.up")}</span> · <span className={data.down === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive"}>{data.down} {t("summary.fidelity.down")}</span> · {Math.max(0, data.positions - data.up - data.down)} {t("summary.fidelity.flat")}</>}{snapshotCount !== undefined && <>{data && !oneSnapshot && " · "}<span>{oneSnapshot && snapshotCount === 1 ? t("summary.fidelity.oneSnapshot") : baseline && snapshotCount > 0 && baseline < dateRange.start
         ? t("summary.fidelity.snapshotsSince").replace("{date}", date(baseline)).replace("{count}", String(snapshotCount))
         : snapshotCount === 1 ? t("summary.fidelity.snapshotInRangeOne")
         : t("summary.fidelity.snapshotsInRange").replace("{count}", String(snapshotCount))}</span></>}</small></div>
     </div>
+    {data?.unknownCoins.length ? <PartialProfitHint names={data.unknownCoins.map((coin) => coin.symbol)} affected={data.unknownCoins} period={date(dateRange.start)} t={t} /> : null}
+    {!oneSnapshot && data && hasVisibleUnrecordedChange(data.unrecordedChange, currency) && <small className="block text-muted-foreground">{t("profitSummary.unrecordedChanges").replace("{amount}", money(data.unrecordedChange, currency))}</small>}
     {error ? <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => setRetry((n) => n + 1)}>{t("summary.fidelity.retry")}</button></div> :
       !hasLine ? <div className="fidelity-empty fidelity-summary-chart-empty"><div>{missingReason || t("summary.fidelity.lineStarts")}</div><button type="button" onClick={requestFullRefresh}><svg aria-hidden="true" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3h-3" /></svg>{t("summary.fidelity.refreshNow")}</button></div> :
       <>

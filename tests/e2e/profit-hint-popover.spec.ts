@@ -106,7 +106,7 @@ for (const width of [1100, 1280, 1440]) for (const theme of ["dark", "light"] as
       }
       await panel.getByRole("button", { name: "How P&L % is calculated" }).click();
       await expect(page.getByRole("tooltip")).toHaveCount(1);
-      await expect(page.getByRole("tooltip")).toContainText("opening value plus deposits");
+      await expect(page.getByRole("tooltip")).toContainText("opening value plus recorded buys and deposits");
       await page.locator(".fidelity-year-section").getByRole("button", { name: "How P&L % is calculated" }).click();
       await expect(page.getByRole("tooltip")).toContainText("BTC");
       await page.keyboard.press("Escape");
