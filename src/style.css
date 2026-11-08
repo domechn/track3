@@ -635,9 +635,13 @@ body:not(:has(.app-layout)) .t3-grid-moved > .t3-overview-panel { height: 100%; 
 .t3-pnl-compact-card > div > div > div > div:nth-child(2) { font-size: 17px; }
 .t3-ath-note { display: flex; align-items: baseline; gap: 8px 16px; flex-wrap: wrap; border-top: 1px solid hsl(var(--border)); padding-top: 11px; color: hsl(var(--muted-foreground)); font-size: 12px; }
 .t3-ath-note strong { color: hsl(var(--foreground)); font-size: 13px; }
-.t3-chart-best-day { position: absolute; top: 2px; right: 10px; z-index: 1; max-width: 70%; overflow: hidden; color: hsl(var(--muted-foreground)); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.t3-chart-best-day { display: block; flex: none; width: max-content; max-width: 100%; min-height: 22px; overflow: hidden; margin-bottom: 10px; padding: 2px 4px; background: hsl(var(--card)); color: hsl(var(--muted-foreground)); font-size: 11px; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .t3-chart-end-value { position: absolute; z-index: 1; transform: translateY(-50%); padding: 0 3px; background: hsl(var(--card)); color: hsl(var(--foreground)); font-size: 12px; font-weight: 600; pointer-events: none; }
-.t3-total-overview .t3-hero-chart { position: relative; }
+.t3-total-overview .t3-hero-chart { position: relative; display: flex; min-width: 0; flex-direction: column; }
+.t3-chart-plot { position: relative; flex: 1; min-height: 120px; }
+.t3-chart-active-point { position: absolute; z-index: 2; width: 8px; height: 8px; transform: translate(-50%, -50%); border: 2px solid hsl(var(--accent-data)); border-radius: 50%; background: hsl(var(--card)); pointer-events: none; }
+[data-chart-tooltip] [data-tone="gain"] { color: hsl(var(--gain)); }
+[data-chart-tooltip] [data-tone="loss"] { color: hsl(var(--loss)); }
 .t3-holdings-head, .t3-holdings-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(70px, .65fr) minmax(90px, .9fr); align-items: center; gap: 8px; }
 .t3-holdings-head, .t3-top-head { min-height: 28px; border-bottom: 1px solid hsl(var(--border)); color: hsl(var(--faint)); font-size: 11px; text-transform: uppercase; letter-spacing: .03em; }
 .t3-holdings-head > :not(:first-child), .t3-holdings-row > :not(:first-child) { text-align: right; }

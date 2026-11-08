@@ -593,6 +593,8 @@ body:has(.fd-page), .app-layout:has(.fd-page) { background:hsl(var(--background)
 .fd-overview-kpis strong { display:block; margin-top:2px; font:500 17px/22px "Public Sans Variable","Public Sans",sans-serif; overflow-wrap:anywhere; }
 .fd-overview-kpis>div>span:not(.fd-label),.fd-overview-kpis small { display:block; font-size:12px; line-height:18px; overflow-wrap:anywhere; }
 .fd-overview-kpis small { color:var(--fd-faint); }
+.fd-overview-chart-wrap { position:relative; display:flow-root; min-width:0; }
+.fd-overview-chart-caption { position:absolute; top:0; left:0; z-index:1; display:block; max-width:100%; overflow:hidden; padding:0 4px; background:var(--fd-surface); color:var(--fd-faint); font-size:11px; line-height:18px; text-align:left; text-overflow:ellipsis; white-space:nowrap; }
 .fd-overview-chart { display:block; width:100%; height:190px; margin-top:18px; overflow:visible; font-family:"Public Sans Variable","Public Sans",sans-serif; touch-action:pan-y; }
 .fd-overview-ath { display:grid; gap:4px; min-height:79px; margin-top:14px; padding-top:12px; border-top:1px solid var(--fd-rule); color:var(--fd-muted); }
 .fd-overview-ath strong { margin-left:8px; color:var(--fd-text); font-weight:600; }

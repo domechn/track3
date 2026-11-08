@@ -17,19 +17,26 @@ export function ChartTooltip({ anchor, children }: { anchor: Element | null; chi
         ? { left: Math.max(card.left + 8, viewport.left), right: Math.min(card.right - 8, viewport.right),
             top: Math.max(card.top + 8, viewport.top), bottom: Math.min(card.bottom - 8, viewport.bottom) }
         : viewport;
-      const above = target.top - tip.height - 6;
-      const below = target.bottom + 6;
+      const plot = anchor.closest(".t3-chart-plot, .fd-overview-chart")?.getBoundingClientRect();
+      if (plot && Math.min(bound.bottom, plot.bottom - 8) - Math.max(bound.top, plot.top + 8) >= tip.height) {
+        bound.top = Math.max(bound.top, plot.top + 8);
+        bound.bottom = Math.min(bound.bottom, plot.bottom - 8);
+      }
+      const above = target.top - tip.height - 12;
+      const below = target.bottom + 12;
       const clamp = (value: number, start: number, end: number) => Math.max(start, Math.min(value, end));
-      const sideRight = target.right + tip.width + 6 <= bound.right;
-      const sideLeft = target.left - tip.width - 6 >= bound.left;
+      const sideRight = target.right + tip.width + 12 <= bound.right;
+      const sideLeft = target.left - tip.width - 12 >= bound.left;
+      const fitsAbove = above >= bound.top;
+      const fitsBelow = below + tip.height <= bound.bottom;
       let left: number;
       let top: number;
-      if (target.height > tip.height && (sideRight || sideLeft)) {
-        left = sideRight ? target.right + 6 : target.left - tip.width - 6;
+      if ((plot || target.height > tip.height || !fitsAbove && !fitsBelow) && (sideRight || sideLeft)) {
+        left = sideRight ? target.right + 12 : target.left - tip.width - 12;
         top = clamp(target.top + target.height / 2 - tip.height / 2, bound.top, bound.bottom - tip.height);
       } else {
         left = clamp(target.left + target.width / 2 - tip.width / 2, bound.left, bound.right - tip.width);
-        top = above >= bound.top ? above : below + tip.height <= bound.bottom ? below
+        top = fitsAbove ? above : fitsBelow ? below
           : above >= viewport.top ? above : below + tip.height <= viewport.bottom ? below
           : clamp(above, viewport.top, viewport.bottom - tip.height);
       }
@@ -59,8 +66,9 @@ export function useChartHitArea() {
   const select = useCallback((index: number, anchor: Element | null) => {
     if (!anchor) return;
     setRoving(index);
-    setSelection((current) => current?.index === index && current.anchor === anchor ? current
-      : { index, anchor, content: contentByIndex.current.get(index) });
+    const content = contentByIndex.current.get(index);
+    setSelection((current) => current?.index === index && current.anchor === anchor && current.content === content
+      ? current : { index, anchor, content });
   }, []);
   const clear = useCallback(() => {
     touchInteraction.current = false;

@@ -1573,6 +1573,7 @@
   "overview.design.plusWord": "plus",
   "overview.design.minusWord": "minus",
   "overview.design.bestDay": "{day}: {amount}, best day",
+  "overview.chart.topMover": "Day's top mover",
   "overview.design.needTwoSnapshots": "Two snapshots are needed to show changes.",
   "overview.design.whatMoved": "What moved",
   "overview.design.snapshotCount": "Last {count} snapshots",
