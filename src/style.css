@@ -650,8 +650,9 @@ body:not(:has(.app-layout)) .t3-grid-moved .t3-moved-list { height: auto; align-
 .t3-holdings-row small { display: block; color: hsl(var(--faint)); }
 .t3-daily-chart { position: relative; display: flex; height: 152px; align-items: stretch; justify-content: space-around; padding: 7px 0; }
 .t3-daily-zero { position: absolute; top: 50%; right: 0; left: 0; height: 1px; background: hsl(var(--border)); }
-.t3-daily-column { position: relative; flex: 1 1 0; min-width: 0; max-width: 16px; }
-.t3-daily-column span { position: absolute; left: 0; width: calc(100% - 1px); min-height: 2px; border-radius: 2px; }
+.t3-daily-column { position: relative; flex: 1 1 0; min-width: 0; height: 100%; }
+.t3-daily-column:focus-visible { outline: 2px solid hsl(var(--foreground)); outline-offset: -2px; }
+.t3-daily-column span { position: absolute; left: 50%; width: min(100%, 15px); min-height: 2px; border-radius: 2px; transform: translateX(-50%); pointer-events: none; }
 .t3-daily-up { background: hsl(var(--gain)); }
 .t3-daily-down { background: hsl(var(--loss)); }
 .t3-daily-column .t3-daily-up { bottom: 50%; }

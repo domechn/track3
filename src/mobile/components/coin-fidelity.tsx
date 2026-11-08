@@ -22,6 +22,7 @@ import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import { Pager, usePager } from "@/components/ui/pager";
 import { groupCoinSources } from "@/components/coin-detail-sections";
 import "@/mobile/components/mobile/fidelity.css";
+import { useChartHitArea } from "@/components/chart-tooltip";
 
 type Source = { name: string; amount: number; value: number; wallet: string };
 type Point = { date: Date; amount: number; value: number; price: number };
@@ -66,6 +67,7 @@ function importedEdits(transactions: Transaction[], logs: SnapshotEdit[]): Recor
 
 function CoinChart({ points, mode, symbol, currency, shortDate, emptyText }: { points: Point[]; mode: "value" | "price"; symbol: string; currency: CurrencyRateDetail; shortDate: (value: string | Date) => string; emptyText: string }) {
   const { t } = useTranslation();
+  const chart = useChartHitArea();
   const values = points.map((point) => currencyWrapper(currency)(mode === "value" ? point.value : point.price));
   if (values.length === 0) return <EmptyState icon={ClockIcon} className="fd-empty fd-coin-chart-empty"
     title={t("coin.market.history.empty.title")} hint={emptyText} />;
@@ -91,13 +93,19 @@ function CoinChart({ points, mode, symbol, currency, shortDate, emptyText }: { p
   const labelIndices = (points.length <= 8 ? [0, 2, 4, points.length - 1] : [0, 10, 20, points.length - 1])
     .filter((index, position, indices) => index < points.length && indices.indexOf(index) === position);
   const axisDate = (i: number) => shortDate(points[i].date);
-  return <svg viewBox="0 0 324 200" className="fd-coin-chart" role="img" aria-label={`${symbol} ${mode} chart`}>
+  return <><svg viewBox="0 0 324 200" className="fd-coin-chart" role="group"
+    data-chart-group="" aria-label={`${symbol} ${mode} chart`}>
     {ticks.map(n=><g key={n}><line x1={padL} y1={y(n)} x2="324" y2={y(n)} stroke="var(--fd-border)"/><text x={padL-8} y={y(n)+4} textAnchor="end" fill="var(--fd-faint)" fontSize="12">{tickLabel(n)}</text></g>)}
     {/* color-semantics: neutral this path shows price over time. */}
     <path fill="none" stroke="var(--fd-accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" d={values.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join("")}/>
+    {values.map((value, index) => {
+      const detail = `${axisDate(index)}: ${money(value, false, 2, currency.symbol)}`;
+      return <circle key={index} role="button" {...chart.markProps(index, detail, detail)}
+        cx={x(index)} cy={y(value)} r="10" fill="transparent" />;
+    })}
     {labelIndices.map(i=><text key={i} x={x(i)} y="192" fill="var(--fd-faint)" fontSize="12" textAnchor={i===0?"start":i===points.length-1?"end":"middle"}>{axisDate(i)}</text>)}
     <text x={x(values.length-1)+6} y={y(values.at(-1)!)+4} fill="var(--fd-text)" fontSize="12" fontWeight="600">{endLabel}</text>
-  </svg>;
+  </svg>{chart.tooltip}</>;
 }
 
 function Metric({ label, value, detail, valueTone, help }: { label: string; value: string; detail?: React.ReactNode; valueTone?: string; help?: string }) {

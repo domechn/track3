@@ -12,6 +12,7 @@ import {
   prettyNumberToLocaleString,
   simplifyNumber,
 } from "@/utils/currency";
+import { formatTotalValueTooltip } from "./total-value-tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -484,14 +485,8 @@ const App = ({
           filter: (item: { datasetIndex: number }) => item.datasetIndex === 0,
           callbacks: {
             label: (context: { parsed: { y: number } }) => {
-              const v = metrics ? Math.round(context.parsed.y).toLocaleString() : context.parsed.y.toLocaleString();
-              if (showPercentageInChart) {
-                return `${v}%`;
-              }
-              if (btcAsBase) {
-                return `${btcSymbol}${v}`;
-              }
-              return currency.symbol + v;
+              return formatTotalValueTooltip(context.parsed.y, btcAsBase ? btcSymbol : currency.symbol,
+                showPercentageInChart, btcAsBase);
             },
           },
         },
