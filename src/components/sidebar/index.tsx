@@ -55,9 +55,7 @@ function NavItem({ item, collapsed, unread, fidelity }: { item: NavEntry; collap
     aria-label={unreadText ? `${label} ${unreadText}` : collapsed ? label : undefined}
     aria-current={current ? "page" : undefined}
     className={cn(
-      "group relative flex h-9 touch:min-h-11 items-center gap-3 rounded-md px-[9px] text-[13px] font-medium whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-      "hover:bg-raised hover:text-foreground",
-      current ? "bg-raised text-foreground before:absolute before:-left-[10px] before:top-2 before:bottom-2 before:w-[2px] before:bg-accent-data" : "text-muted-foreground",
+      "t3-nav-item group relative flex items-center gap-3 px-[9px] text-[13px] font-medium whitespace-nowrap",
       collapsed && "justify-center px-0",
     )}>
     <svg aria-hidden="true" className="h-[18px] w-[18px] shrink-0" viewBox="0 0 18 18"
@@ -77,7 +75,7 @@ function NavItem({ item, collapsed, unread, fidelity }: { item: NavEntry; collap
 function NavGroup({ label, items, collapsed, unread, fidelity }: {
   label: string; items: NavEntry[]; collapsed: boolean; unread: number; fidelity?: boolean;
 }) {
-  return <div className={cn("mt-2 border-t border-border pt-2 fidelity-records-rail-group", fidelity && "t3-fidelity-nav-group")}>
+  return <div className={cn("t3-nav-divider fidelity-records-rail-group", fidelity && "t3-fidelity-nav-group")}>
     {!collapsed && <div className="px-[9px] pb-1 text-xs text-muted-foreground">{label}</div>}
     {items.map((item) => <NavItem key={item.to} item={item} collapsed={collapsed} fidelity={fidelity}
       unread={item.to === "/goals" ? unread : undefined} />)}
@@ -92,17 +90,19 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
   const { pathname } = useLocation();
   const records = pathname === "/history" || pathname === "/cost-basis";
   const recordsControlLabel = t(pathname === "/history" ? "records.historyFilters" : "records.controls");
-  const recordsControl = records && <button type="button" aria-label={recordsControlLabel} aria-haspopup="true"
+  const recordsControlIcon = <svg aria-hidden="true" className="h-[18px] w-[18px] shrink-0" viewBox="0 0 18 18"
+    fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    {recordsControlsSliders}
+  </svg>;
+  const recordsControl = records ? <button type="button" aria-label={recordsControlLabel} aria-haspopup="true"
     aria-expanded={recordsToolsOpen} aria-pressed={recordsToolsOpen} aria-controls="t3-records-toolbar-panel"
     onClick={() => window.dispatchEvent(new Event("records-controls-toggle"))}
-    className={cn("group relative flex h-9 w-full touch:min-h-11 items-center gap-3 rounded-md px-[9px] text-[13px] font-medium whitespace-nowrap text-muted-foreground hover:bg-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    className={cn("t3-nav-item t3-records-control group relative flex w-full items-center gap-3 px-[9px] text-[13px] font-medium whitespace-nowrap",
       collapsed && "justify-center px-0")}>
-    <svg aria-hidden="true" className="h-[18px] w-[18px] shrink-0" viewBox="0 0 18 18"
-      fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      {recordsControlsSliders}
-    </svg>
+    {recordsControlIcon}
     {!collapsed && <span>{recordsControlLabel}</span>}
-  </button>;
+  </button> : <span aria-hidden="true" className={cn("t3-nav-item t3-records-control invisible flex w-full items-center gap-3 px-[9px]",
+    collapsed && "justify-center px-0")}>{recordsControlIcon}</span>;
   return <aside style={{ width: collapsed ? "var(--sidebar-collapsed-width)" : "var(--sidebar-width)" }}
     aria-keyshortcuts="Alt+ArrowRight Alt+ArrowLeft"
     onKeyDown={(event) => {
@@ -112,6 +112,7 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
       }
     }}
     className={cn("t3-desktop-rail fixed inset-y-0 left-0 z-20 flex flex-col overflow-hidden border-r bg-background transition-[width] duration-300 ease-in-out",
+      collapsed && "t3-rail-collapsed",
       !fidelity && "fidelity-records-rail", !fidelity && collapsed && "fidelity-records-rail-collapsed", fidelity && "t3-fidelity-sidebar")}>
     <div className="flex h-14 shrink-0 items-center gap-2 px-[6px]">
       <Link to="/overview" aria-label={collapsed ? "Track3" : undefined}
@@ -125,9 +126,8 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
       <NavItem item={overview} collapsed={collapsed} fidelity={fidelity} />
       <NavGroup label={t("nav.analyze", "Analyze")} items={analyze} collapsed={collapsed} unread={unread} fidelity={fidelity} />
       <NavGroup label={t("nav.manage", "Manage")} items={isProUser ? manage : manage.slice(0, -1)} collapsed={collapsed} unread={unread} fidelity={fidelity} />
-    </nav><div className={cn("shrink-0 border-t border-border px-[10px] touch:px-[5px] pt-2 pb-2",
-      collapsed && "-mx-[10px] px-[5px] touch:-mx-[5px]")}>
-      {collapsed && recordsControl ? <Tooltip><TooltipTrigger asChild>{recordsControl}</TooltipTrigger>
+    </nav><div className="t3-nav-divider shrink-0">
+      {collapsed && records ? <Tooltip><TooltipTrigger asChild>{recordsControl}</TooltipTrigger>
         <TooltipContent side="right" sideOffset={10}>{recordsControlLabel}</TooltipContent></Tooltip> : recordsControl}
       <NavItem item={settings} collapsed={collapsed} fidelity={fidelity} />
     </div></TooltipProvider>

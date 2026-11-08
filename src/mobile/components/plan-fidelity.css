@@ -14,19 +14,10 @@
     padding: calc(14px + var(--mobile-safe-top)) max(16px, var(--mobile-safe-right))
       calc(88px + var(--mobile-safe-bottom)) max(16px, var(--mobile-safe-left));
   }
-  .app-layout[data-width-class="compact"]:has(.pf-page) .mobile-tab-bar {
-    display: grid; grid-template-columns: 105.75fr 94.75fr 105.75fr 83.75fr; padding-top: 0;
-  }
-  .app-layout:has(.pf-page) .mobile-tab { min-width: 44px; }
-  .dark .app-layout:has(.pf-page) .mobile-tab { color: hsl(var(--faint)); font-size: 11px; font-weight: 400; }
-  .light .app-layout:has(.pf-page) .mobile-tab { color: hsl(var(--muted-foreground)); font-size: 11px; font-weight: 400; }
-  .app-layout:has(.pf-page) .mobile-tab[aria-current="page"] { color: hsl(var(--foreground)); }
-  .light .app-layout:has(.pf-page) .mobile-tab[aria-current="page"] { color: hsl(var(--foreground)); }
   .app-layout:has(.pf-page) .mobile-tab-badge {
     top: -5px; left: calc(100% - 4px); min-width: 17px; padding: 0 5px;
     background: var(--sidebar-badge); color: var(--mobile-tab-badge-foreground); font-size: 10px; font-weight: 700;
   }
-  .app-layout:has(.pf-page) .mobile-tab-icon > svg { transform: translateY(-1px); }
   #app-main-content:has(.pf-page) + * { color: inherit; }
   .pf-page {
     --pf-ground: hsl(var(--background));
@@ -126,7 +117,7 @@
   .pf-segment button { flex: 1; align-self: flex-start; height: 44px; margin-block: -4px; padding: 0; border: 0; border-radius: 99px; background: transparent; color: var(--pf-faint); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; position: relative; isolation: isolate; }
   .pf-segment button::before { content: ""; position: absolute; z-index: -1; inset: 4px 0; border-radius: inherit; }
   .pf-segment button.active { color: #fff; }
-  .pf-segment button.active::before { background: #2a2a30; }
+  .pf-segment button.active::before { background: var(--nav-selected-background); }
   .pf-money-input { display: flex; align-items: center; height: 44px; padding: 0 12px; border: 1px solid var(--pf-control); border-radius: 6px; background: var(--pf-sunken); }
   .pf-money-input input { min-width: 0; width: 100%; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; font: inherit; }
   .pf-switch-row { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; }
@@ -305,7 +296,7 @@
   .light .pf-segment, .light .pf-trade-sub { background: hsl(var(--secondary)); }
   .light .pf-alloc-bar u { background: hsl(var(--foreground)); }
   .light .pf-segment button.active { color: hsl(var(--foreground)); }
-  .light .pf-segment button.active::before { background: hsl(var(--card)); box-shadow: 0 1px 3px #0002; }
+  .light .pf-segment button.active::before { background: var(--nav-selected-background); }
   .light .pf-pill { background: hsl(var(--secondary)); color: hsl(var(--muted-foreground)); }
   .light .pf-pill.pf-positive { background: #e2f3eb; color: hsl(var(--positive)); }
   .light .pf-pill.pf-negative { background: #fae8ed; color: hsl(var(--negative)); }

@@ -36,7 +36,7 @@ test("phone list aligns values and uses the source text hierarchy", async ({ pag
     const text = document.createRange();
     text.selectNodeContents(badge);
     return text.getBoundingClientRect().x;
-  }))).toBe(359);
+  }))).toBe(354);
 });
 
 test("light history and detail keep backgrounds and text legible", async ({ page }) => {
@@ -73,7 +73,12 @@ test("light history and detail keep backgrounds and text legible", async ({ page
   };
   const title = await page.locator(".fidelity-history h1").evaluate((node) => getComputedStyle(node).color);
   const selectedTab = await page.locator(".mobile-tab[aria-current='page']").evaluate((node) => getComputedStyle(node).color);
-  expect(Math.min(contrast(title, ground), contrast(selectedTab, tab), contrast(chip.color, chip.background)))
+  const tint = (chip.background.match(/[\d.]+/g) ?? []).map(Number);
+  const surface = (ground.match(/[\d.]+/g) ?? []).map(Number);
+  const alpha = tint[3] ?? 1;
+  const chipGround = `rgb(${tint.slice(0, 3).map((value, index) =>
+    Math.round(value * alpha + surface[index] * (1 - alpha))).join(", ")})`;
+  expect(Math.min(contrast(title, ground), contrast(selectedTab, tab), contrast(chip.color, chipGround)))
     .toBeGreaterThanOrEqual(4.5);
   mkdirSync(dir, { recursive: true });
   await page.screenshot({ path: `${dir}/history-light-phone.png` });
@@ -219,13 +224,13 @@ test("list, filter, swipe, delete, undo", async ({ page }) => {
     buttons.map((button) => Math.round(button.getBoundingClientRect().width)));
   expect(chipWidths).toEqual([118, 134, 69]);
   await expect(page.locator(".fidelity-history-chips button").first()).toHaveCSS("font-variant-numeric", "tabular-nums");
-  expect(Math.round((await page.locator(".mobile-tab-badge").boundingBox())!.y)).toBe(790);
+  expect(Math.round((await page.locator(".mobile-tab-badge").boundingBox())!.y)).toBe(791);
   const tabCenters = await page.locator(".mobile-tab-bar .mobile-tab").evaluateAll((tabs) =>
     tabs.map((tab) => Math.round(tab.getBoundingClientRect().x + tab.getBoundingClientRect().width / 2)));
-  for (const [index, target] of [53, 153, 253, 348].entries()) {
+  for (const [index, target] of [49, 146, 244, 341].entries()) {
     expect(Math.abs(tabCenters[index] - target)).toBeLessThanOrEqual(1);
   }
-  await expect(page.locator(".mobile-tab-bar .mobile-tab").first()).toHaveCSS("line-height", "18px");
+  await expect(page.locator(".mobile-tab-bar .mobile-tab").first()).toHaveCSS("line-height", "16.5px");
   const partial = page.locator(".history-mobile-snapshot").filter({ hasText: "4 of 5 sources" }).first();
   await expect(partial.locator(".fidelity-history-sources")).not.toHaveCSS("color", "rgb(216, 163, 65)");
   await expect(partial.locator(".fidelity-history-source-count")).toHaveCSS("color", "rgb(216, 163, 65)");
