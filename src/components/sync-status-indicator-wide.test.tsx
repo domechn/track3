@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import SyncStatusIndicator from "./sync-status-indicator";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import type { SyncDiagnostics } from "@/middlelayers/sync/diagnostics";
@@ -60,6 +60,21 @@ it("keeps the connection error and error report alongside wide diagnostics", asy
   fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
   expect(await screen.findByText("Sync timed out. Check your connection and try again.")).toBeInTheDocument();
   expect(screen.getByText("Error details")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Details" })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getAllByText("Phase timings")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: /Error details/ }));
   expect(screen.getAllByText("Phase timings")).toHaveLength(2);
   expect(vi.mocked(syncRuntime.syncNow)).not.toHaveBeenCalled();
+});
+
+it("uses a button to open stopped wide diagnostics", async () => {
+  wide();
+  current.value = { mode: "ready", sync: { phase: "error", retryStopped: true, report, diagnostics, lastSync: Date.now() } };
+  render(<SyncStatusIndicator />);
+  fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
+  const toggle = screen.getByRole("button", { name: "Details" });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(within(toggle.closest(".t3-b-sync-pop-diagnostics") as HTMLElement).getByText("Phase timings")).toBeVisible();
 });

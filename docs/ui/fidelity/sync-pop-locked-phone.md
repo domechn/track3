@@ -144,4 +144,4 @@ Capture: `/tmp/fidelity/settings-b/sync-pop-locked.png` (full page: `sync-pop-lo
 
 ## Pixel difference
 
-Viewport: **10.061%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).
+Viewport: **11.138%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture, measured 8 Nov 2026).
