@@ -312,6 +312,8 @@ for (const width of [375, 390, 430]) {
     await installTauriBridge(page);
     await page.goto("/#/overview");
     await page.locator(".fd-overview-refresh, .fd-partial-refresh").click();
+    await expect(page.getByRole("alertdialog", { name: "Source status" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Source status" }).click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   });

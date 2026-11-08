@@ -340,6 +340,9 @@ test("refreshes configured sources when no snapshot has been saved", async ({ pa
   await executeSceneSql(page, "DELETE FROM assets_v2");
   await page.goto("/#/history");
   await page.getByRole("button", { name: "Refresh now" }).click();
+  await expect(page.getByRole("alertdialog", { name: "Source status" })).toHaveCount(0);
+  await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
+  await page.getByRole("button", { name: "Source status" }).click();
   await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
 });
 

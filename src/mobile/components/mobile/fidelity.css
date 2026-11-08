@@ -505,7 +505,6 @@ body:has(.fd-page), .app-layout:has(.fd-page) { background:hsl(var(--background)
     position:absolute; top:-2px; right:-2px; display:grid; place-items:center; min-width:17px; height:17px;
     padding:0 3px; border-radius:999px; background:var(--sidebar-badge); color:var(--sidebar-badge-foreground); font-size:10px;
   }
-  #app-top-bar.fidelity-overview-topbar:has(.t3-topbar-sync) .t3-refresh-source-trigger { display:none; }
   #app-top-bar.fidelity-overview-topbar .t3-refresh-source-trigger .t3-refresh-source-label { display:none; }
   #app-top-bar.fidelity-overview-topbar .t3-refresh-source-trigger .t3-refresh-source-icon { display:block; width:18px; height:18px; margin:0; }
   #app-top-bar.fidelity-overview-topbar.mobile-topbar-root:not(.mobile-topbar-collapsed) .mobile-header-total {

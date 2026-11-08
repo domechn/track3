@@ -102,9 +102,14 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   await page.goto("/#/overview");
   await (phoneLayout ? page.locator(".fd-partial-refresh") : page.getByRole("button", { name: "Refresh", exact: true })).click();
   const status = page.getByRole("alertdialog", { name: shell === "desktop" ? "Refresh finished" : "Source status" });
-  await expect(status.getByRole("button", { name: "Use last known values" })).toBeVisible();
+  await expect(status).toHaveCount(0);
+  if (!phoneLayout) await page.getByRole("button", { name: "Source status" }).click();
+  const useLastKnown = phoneLayout
+    ? page.locator(".fd-partial-banner").getByRole("button", { name: "Use last known values" })
+    : status.getByRole("button", { name: "Use last known values" });
+  await expect(useLastKnown).toBeVisible();
   if (phoneLayout) {
-    await expect(page.locator(".fd-partial-total")).not.toHaveText("$75,048.19");
+    await expect(page.locator(".fd-partial-total")).toHaveText("$84,000.00");
     await expect(page.locator(".fd-partial-pill")).toHaveText("Partial");
   } else {
     await expect(page.locator(".overview-loading")).toBeHidden();
@@ -113,7 +118,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   }
   if (shell === "desktop") await expect(page.locator(".desktop-toast-viewport > li[data-state='open']")).toHaveCount(0, { timeout: 15_000 });
   await capture("refresh-offer");
-  await status.getByRole("button", { name: "Use last known values" }).click();
+  await useLastKnown.click();
   if (shell === "desktop") await expect(status).toHaveCount(0);
   else if (phoneLayout) {
     await expect(page.locator(".fd-partial-total")).toHaveText("$142,648.20");

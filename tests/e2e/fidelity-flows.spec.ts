@@ -492,19 +492,23 @@ test("real Overview exposes idle, pull, and source progress on phone", async ({ 
   });
   await page.locator(".fd-overview-refresh, .fd-partial-refresh").click();
   const sourceSheet = page.getByRole("alertdialog", { name: "Source status" });
+  await expect(sourceSheet).toHaveCount(0);
+  await page.getByRole("button", { name: "Source status" }).click();
   await expect(sourceSheet).toBeVisible();
   await expect(sourceSheet).toContainText("Refreshing sources");
-  await expect(sourceSheet.getByRole("progressbar", { name: "Refreshing portfolio" })).toBeVisible();
+  await expect(sourceSheet.getByRole("progressbar")).toHaveCount(0);
   await expect.poll(() => sourceSheet.locator("[data-source-status-row]").count()).toBeGreaterThanOrEqual(5);
   await expect(sourceSheet.locator("[data-source-status-row]")).toHaveCount(5);
   await expect.poll(() => sourceSheet.locator("[data-source-status-row]").evaluateAll((rows) =>
     rows.slice(0, 5).map((row) => row.getAttribute("aria-label"))))
     .toEqual(["Binance", "OKX", "Ledger cold wallet", "0x4f…a91c", "Interactive Brokers"]);
+  await expect(sourceSheet.getByRole("group", { name: "Binance" })).toContainText("Refreshing");
+  await expect(sourceSheet.getByRole("group", { name: "OKX" })).toContainText("Refreshing");
   await expect(sourceSheet.locator('[data-source-status-row][aria-label="Ledger cold wallet"] > span')).toHaveText("Lg");
   await expect(sourceSheet.locator('[data-source-status-row][aria-label="0x4f…a91c"] > span')).toHaveText("0x");
   await expect(sourceSheet).toContainText("0 of 5 finished · 0 failed");
   await expect(sourceSheet.locator(".fd-refresh-progress-row small")).toHaveText([
-    /Reading balances/, /Reading balances/, /Reading balances/, /Reading balances/, /Reading balances/,
+    /Refreshing|Waiting/, /Refreshing|Waiting/, /Refreshing|Waiting/, /Refreshing|Waiting/, /Refreshing|Waiting/,
   ]);
   await page.screenshot({ path: "/tmp/fidelity/flows/refresh-progress-phone.png" });
   await captureLong(page, "/tmp/fidelity/flows/refresh-progress-phone-long.png");
