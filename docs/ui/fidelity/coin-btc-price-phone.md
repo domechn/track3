@@ -231,10 +231,9 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 ## Captured comparison
 
-- App capture: `/tmp/fidelity/coin-btc/coin-btc-price-phone.png`.
-- Reference render: `/tmp/rev-fa3/design/records-coin-btc-price.png`.
-- Chart-card comparison: `/tmp/fidelity/coin-btc/coin-btc-price-card.png` against `/tmp/fa-current/design/btc-price-card-unobscured.png` (bottom navigation hidden in the source to expose the card).
-- Fresh 390 × 844 first-screen pixel difference: **0.44%** (RGB difference >20/255 in any channel).
+- App capture: `/tmp/ui39-app-final/coin-btc-price-phone.png`; chart card: `/tmp/ui39-app-final/coin-btc-price-card.png`.
+- Reference render: `/tmp/ui39-source-final/btc-price-phone.png`; chart card: `/tmp/ui39-source-final/btc-price-card.png`.
+- 8 Nov 390 × 844 first-screen pixel difference at DPR 2: **5.207%** (any RGB channel differs by more than 20); the chart card differs by **4.188%**.
 
 ## Real-data limits
 
@@ -242,4 +241,6 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
-- No missing product data or feature remains in this state. The chart card itself differs by 4.48% of pixels at the stated threshold, mostly along rendered text and SVG edges.
+- The chart card's 4.188% difference is mostly along rendered text and SVG edges.
+- Selected chart controls use the owner's shared active tint; the older source uses a solid grey selected fill.
+- The owner's shared active navigation style paints an Overview tab tile and edge; the older Coin source highlights only the tab text.

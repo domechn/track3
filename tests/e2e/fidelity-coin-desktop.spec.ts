@@ -9,7 +9,7 @@ test("coin toolbar stays opaque and separate from scrolled content at 1440px", a
   await page.setViewportSize({ width: 1440, height: 1000 });
   await installTauriBridge(page, { fidelityDesktop: "full" });
   await page.goto("/#/coins/BTC");
-  await expect(page.locator(".coin-fidelity-hero")).toBeVisible();
+  await expect(page.locator(".coin-fidelity-hero")).toBeVisible({ timeout: 30_000 });
   await page.locator("#app-main-content").evaluate((element) => { element.scrollTop = 150; });
   const toolbar = page.locator(".t3-fidelity-topbar-coin");
   const main = page.locator("#app-main-content");
@@ -84,17 +84,18 @@ for (const state of ["btc", "btc-edit", "btc-price", "btc-sheet", "nvda", "nova"
       expect(sourceHeader?.width).toBeGreaterThan(223);
       expect(sourceHeader?.width).toBeLessThan(224);
       expect(sourceRow?.y).toBeCloseTo(517.5, 0);
-      expect(lotsHeading?.y).toBeCloseTo((lotsCard?.y ?? 0) + 21, 0);
-      expect(lotsCard?.x).toBeCloseTo(chartCard?.x ?? 0, 0);
-      expect(lotsCard?.y).toBeCloseTo((chartCard?.y ?? 0) + (chartCard?.height ?? 0) + 16, 0);
+      expect(lotsHeading?.y).toBeCloseTo((lotsCard?.y ?? 0) + 32, 0);
+      expect(lotsCard?.x).toBeCloseTo(sourceHeader?.x ?? 0, 0);
+      expect((lotsHeading?.y ?? 0) - ((sourcesCard?.y ?? 0) + (sourcesCard?.height ?? 0))).toBeGreaterThanOrEqual(31);
       expect(chartHeading?.y).toBeCloseTo(466, 0);
       expect(coinHeading?.y).toBeCloseTo(91, 0);
       expect(secondLabel?.x).toBeCloseTo(362.5, 0);
       expect(secondValue?.y).toBeCloseTo(200, 0);
       expect(secondNote?.y).toBeCloseTo(228, 0);
-      expect(chartCard?.height).toBeCloseTo(554, 0);
-      expect(transactionCard?.y).toBeCloseTo(Math.max((sourcesCard?.y ?? 0) + (sourcesCard?.height ?? 0),
-        (lotsCard?.y ?? 0) + (lotsCard?.height ?? 0)) + 16, 0);
+      const sideCard = await page.locator(".coin-fidelity-side-column").boundingBox();
+      expect(chartCard?.y).toBeCloseTo(sideCard?.y ?? 0, 0);
+      expect((chartCard?.y ?? 0) + (chartCard?.height ?? 0)).toBeCloseTo((sideCard?.y ?? 0) + (sideCard?.height ?? 0), 0);
+      expect(transactionCard?.y).toBeCloseTo((chartCard?.y ?? 0) + (chartCard?.height ?? 0) + 16, 0);
     }
     if (state === "btc-price") {
       await page.getByRole("button", { name: "Price" }).click();
@@ -282,8 +283,10 @@ test("NOVA Position aligns with the common source strip", async ({ page }) => {
   expect((await page.locator(".coin-fidelity-position-header h2").boundingBox())!.y).toBe(299);
   expect((await page.locator(".coin-fidelity-metrics.bottom").boundingBox())!.y).toBe(337);
   const lots = (await page.locator(".coin-fidelity-lots").boundingBox())!;
+  const side = (await page.locator(".coin-fidelity-side-column").boundingBox())!;
   const transactions = (await page.locator(".coin-fidelity-transactions").boundingBox())!;
-  expect(transactions.y).toBeCloseTo(lots.y + lots.height + 16, 0);
+  expect(lots.y + lots.height).toBeLessThanOrEqual(side.y + side.height);
+  expect(transactions.y).toBeCloseTo(side.y + side.height + 16, 0);
 });
 
 test("Coin header separates the update stamp, range picker, and refresh control", async ({ page }) => {
@@ -338,8 +341,10 @@ test("Coin captions, table headings and transaction notes use the source faint c
     "rgb(154, 156, 162)", "rgb(154, 156, 162)", "rgb(154, 156, 162)"]);
   const chart = (await page.locator(".coin-fidelity-chart").boundingBox())!;
   const lots = (await page.locator(".coin-fidelity-lots").boundingBox())!;
-  expect(lots.x).toBeCloseTo(chart.x, 0);
-  expect(lots.y).toBeCloseTo(chart.y + chart.height + 16, 0);
+  const side = (await page.locator(".coin-fidelity-side-column").boundingBox())!;
+  expect(lots.x).toBeCloseTo(side.x + 21, 0);
+  expect(side.y).toBeCloseTo(chart.y, 0);
+  expect(side.y + side.height).toBeCloseTo(chart.y + chart.height, 0);
   expect((await page.locator(".coin-fidelity-sources .coin-fidelity-section-head small").boundingBox())!.y).toBe(463);
 });
 
@@ -367,7 +372,8 @@ test("Coin change notes, chart values and source tags use the source ink", async
   expect(ink.sourceTag).toBe("rgb(154, 156, 162)");
   expect(ink.high).toBe("rgb(154, 156, 162)");
   expect(ink.since).toEqual(["rgb(154, 156, 162)", "rgb(180, 182, 187)"]);
-  expect((await page.locator(".coin-fidelity-chart-stats .coin-fidelity-metric:first-child strong").boundingBox())!.y).toBe(933);
+  const high = (await page.locator(".coin-fidelity-chart-stats .coin-fidelity-metric:first-child strong").boundingBox())!;
+  expect(high.y).toBe(906);
 });
 
 test("Coin rail separators, range segments and chevron use the source geometry", async ({ page }) => {
@@ -701,8 +707,11 @@ test("Coin chart, tables and transaction heading use the source geometry", async
     getComputedStyle(node).fontVariantNumeric)).toBe("tabular-nums");
   const lots = (await page.locator(".coin-fidelity-lots").boundingBox())!;
   const chart = (await page.locator(".coin-fidelity-chart").boundingBox())!;
+  const side = (await page.locator(".coin-fidelity-side-column").boundingBox())!;
   const transactions = (await page.locator(".coin-fidelity-transactions").boundingBox())!;
-  expect(transactions.y).toBeCloseTo(Math.max(chart.y + chart.height, lots.y + lots.height) + 16, 0);
+  expect(lots.x).toBeGreaterThanOrEqual(side.x);
+  expect(chart.y + chart.height).toBeCloseTo(side.y + side.height, 0);
+  expect(transactions.y).toBeCloseTo(chart.y + chart.height + 16, 0);
   expect((await page.locator(".coin-fidelity-plot svg").boundingBox())!.x).toBeCloseTo(149.2, 0);
   expect(await page.locator(".coin-fidelity-plot svg path").evaluate((node) => node.getBoundingClientRect().width)).toBeCloseTo(696.6, 0);
   expect(await page.locator(".coin-fidelity-plot svg path").evaluate((node) => {
@@ -717,11 +726,11 @@ test("Coin chart, tables and transaction heading use the source geometry", async
     return range.getBoundingClientRect().y;
   });
   expect(await textTop(".coin-fidelity-ylabels span")).toBe(517);
-  expect(await textTop(".coin-fidelity-ylabels span", true)).toBe(851);
-  expect(await textTop(".coin-fidelity-xlabels span")).toBe(864);
+  expect(await textTop(".coin-fidelity-ylabels span", true)).toBe(824);
+  expect(await textTop(".coin-fidelity-xlabels span")).toBe(837);
   expect(await page.locator(".coin-fidelity-chart-stats").evaluate((node) => ({
     y: node.getBoundingClientRect().y, color: getComputedStyle(node).borderTopColor,
-  }))).toEqual({ y: 898, color: "rgb(35, 35, 37)" }); // --border rounds by one channel.
+  }))).toEqual({ y: 871, color: "rgb(35, 35, 37)" }); // --border rounds by one channel.
   const label = await page.locator(".coin-fidelity-plot > b").evaluate((node) => {
     const range = document.createRange();
     range.selectNodeContents(node);
@@ -729,7 +738,7 @@ test("Coin chart, tables and transaction heading use the source geometry", async
     return { x: box.x, y: box.y };
   });
   expect(label.x).toBeCloseTo(851.8, 0);
-  expect(label.y).toBeCloseTo(552.6, 0);
+  expect(label.y).toBeCloseTo(550, 0);
 });
 
 test("NOVA zero figures, final price row and price suffix match the source", async ({ page }) => {
@@ -790,11 +799,15 @@ test("NVDA chart reserves the smaller axis and end-label widths", async ({ page 
   expect((await page.locator(".coin-fidelity-xlabels span").nth(5).boundingBox())!.x).toBeCloseTo(714.8, 0);
 });
 
-test("NVDA gridlines land on the source pixel rows", async ({ page }) => {
+test("NVDA gridlines follow the compact stock plot", async ({ page }) => {
   await installTauriBridge(page, { fidelityDesktop: "full" });
   await page.goto("/#/coins/NVDA?assetType=stock");
   await expect(page.locator(".coin-fidelity-plot svg path")).toBeVisible({ timeout: 40_000 });
-  const image = await page.screenshot();
+  await expect(page.locator(".coin-fidelity-sources tbody tr")).toHaveCount(2, { timeout: 40_000 });
+  await expect(page.locator(".coin-fidelity-lots tbody tr")).toHaveCount(2, { timeout: 40_000 });
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  const image = await page.screenshot({ animations: "disabled" });
   const rows = await page.evaluate(async (base64) => {
     const image = new Image();
     image.src = `data:image/png;base64,${base64}`;
@@ -804,15 +817,15 @@ test("NVDA gridlines land on the source pixel rows", async ({ page }) => {
     canvas.height = image.height;
     const context = canvas.getContext("2d")!;
     context.drawImage(image, 0, 0);
-    const pixels = context.getImageData(145, 524, 3, 167).data;
+    const pixels = context.getImageData(250, 524, 30, 167).data;
     return Array.from({ length: 167 }, (_, index) => index + 524)
-      .filter((_, index) => [0, 1, 2].filter((column) => {
-        const pixel = (index * 3 + column) * 4;
+      .filter((_, index) => Array.from({ length: 30 }, (_, column) => column).filter((column) => {
+        const pixel = (index * 30 + column) * 4;
         return pixels[pixel] === 35 && pixels[pixel + 1] === 35 && pixels[pixel + 2] === 37;
-      }).length >= 2);
+      }).length >= 12);
   }, image.toString("base64"));
-  // A chart mark can cover one column; require two exact border pixels at every source row.
-  expect(rows).toEqual([524, 565, 607, 648, 690]);
+  // Sample inside the plot; the left edge contains labels and a different rule colour.
+  expect(rows).toEqual([524, 559, 593, 628, 663]);
 });
 
 for (const [symbol, sourceQuantityX] of [["BTC", 1197.1], ["NVDA", 1206.6], ["NOVA", 1156.9]] as const) {

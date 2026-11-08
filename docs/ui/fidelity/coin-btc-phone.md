@@ -235,9 +235,9 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 ## Captured comparison
 
-- App capture: `/tmp/wui18-final-screens/coin-btc-phone.png`.
-- Reference render: `/tmp/wui18-source/coin-btc-phone-viewport.png`.
-- 6 Nov 390 × 844 first-screen pixel difference at DPR 2: **3.262%** (any RGB channel differs by more than 20); **1.894%** at a 40-channel threshold.
+- App capture: `/tmp/ui39-app-final/coin-btc-phone.png`; value card: `/tmp/ui39-app-final/coin-btc-value-card.png`.
+- Reference render: `/tmp/ui39-source-final/btc-phone.png`; value card: `/tmp/ui39-source-final/btc-card.png`.
+- 8 Nov 390 × 844 first-screen pixel difference at DPR 2: **5.282%** (any RGB channel differs by more than 20). The value cards differ by **19.141%** when their 417/489 px heights are included; their common area differs by **5.179%**.
 - A full-page PNG comparison is not equivalent because the app scrolls inside its main landmark and the source scrolls the document.
 
 ## Real-data limits
@@ -246,6 +246,10 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
+- The reference value-chart stat row is 324 px wide at 390 px, but its third 17 px value extends to about x=380, beyond the card's x=374 right edge. The product keeps the full values and divider clearance within the card's 16 px content inset by placing the third stat on a second row. This makes the live value card taller than the reference. The shorter Price-chart values keep one row.
+- The first-screen 5.282% difference includes the owner's shared active Overview tile; the older Coin source highlights only the tab text.
 - The source full-page capture is 392px wide despite its 390px viewport; the app remains 390px wide to avoid horizontal scrolling.
 - The production cost-basis calculator differs from the invented reference by one cent for one lot and two cents for Unrealized P&L.
 - The product's scroll container preserves route scroll position; Chromium antialiases small text in that layer differently from the standalone source page.
+- Selected chart and transaction filters use the owner's shared active tint; the older source uses a solid grey selected fill.
+- The owner's shared active navigation style paints an Overview tab tile and edge; the older Coin source highlights only the tab text.
