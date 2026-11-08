@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { installTauriBridge } from "./tauri-bridge";
+import { contrast } from "./overlay-theme-scenes";
 import { installPlanFidelityScene } from "./plan-fidelity-scenes";
 
 test.beforeEach(({}, info) => test.skip(info.project.name !== "mobile", "Phone empty states"));
@@ -142,15 +143,60 @@ test("a phone coin with no transactions shows lots and transaction empty states"
   }
 });
 
-test("light phone Data sources hints stay readable in every empty tab", async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "light"));
+for (const theme of ["light", "dark"]) test(`${theme} phone Data sources actions and hints stay readable`, async ({ page }) => {
+  await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
   await installTauriBridge(page, { emptyPortfolio: true });
   await page.goto("/#/settings/configuration?section=sources");
   const tabs = page.getByRole("tablist", { name: "Data sources" });
+  const emptyCard = page.locator(".fidelity-source-empty");
+  const title = emptyCard.getByRole("heading");
+  const titleColors = await title.evaluate((heading) => {
+    const card = heading.closest(".fidelity-source-empty")!;
+    return { text: getComputedStyle(heading).color, background: getComputedStyle(card).backgroundColor };
+  });
+  expect(contrast(titleColors.text, titleColors.background)).toBeGreaterThanOrEqual(4.5);
+  await expect(title).toHaveCSS("color", theme === "light" ? "rgb(23, 23, 28)" : "rgb(255, 255, 255)");
+  await mkdir("/tmp/track3-overlay-theme", { recursive: true });
+  await page.screenshot({ path: `/tmp/track3-overlay-theme/phone-${theme}-sources-empty.png`, animations: "disabled" });
+  const addExchange = page.locator(".fidelity-source-empty button").first();
+  const buttonColors = await addExchange.evaluate((button) => {
+    const style = getComputedStyle(button);
+    return { text: style.color, background: getComputedStyle(button, "::before").backgroundColor };
+  });
+  expect(contrast(buttonColors.text, buttonColors.background)).toBeGreaterThanOrEqual(4.5);
   for (const name of ["Exchanges", "Wallets", "Brokers", "Custom assets"]) {
     await tabs.getByRole("tab", { name }).click();
     const hint = page.locator("main [data-empty-state] p");
     await expect(hint).toBeVisible();
-    await expect(hint).toHaveCSS("color", "rgb(180, 182, 188)");
+    await expect(hint).toHaveCSS("color", theme === "light" ? "rgb(83, 83, 90)" : "rgb(180, 182, 187)");
+  }
+  if (theme === "light") {
+    await tabs.getByRole("tab", { name: "Exchanges" }).click();
+    await addExchange.click();
+    const editor = page.locator(".fidelity-editor-drawer");
+    await expect(editor).toBeVisible();
+    await expect(editor.locator(".fidelity-editor-heading h2")).toHaveCSS("color", "rgb(23, 23, 28)");
+    await expect(editor.locator(".fidelity-editor-pick").first()).toHaveCSS("color", "rgb(23, 23, 28)");
+  }
+});
+
+for (const theme of ["light", "dark"]) test(`${theme} phone Language and Currency cards use readable theme colors`, async ({ page }) => {
+  await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
+  await installTauriBridge(page);
+  for (const [route, selector, screenshot] of [
+    ["/#/settings/appearance?section=language", ".fidelity-language-card", "language"],
+    ["/#/settings/configuration?section=currency", ".fidelity-currency-card", "currency"],
+  ]) {
+    await page.goto(route);
+    const card = page.locator(selector).first();
+    await expect(card).toBeVisible();
+    const colors = await card.evaluate((node) => ({
+      text: getComputedStyle(node).color,
+      background: getComputedStyle(node).backgroundColor,
+    }));
+    expect(contrast(colors.text, colors.background)).toBeGreaterThanOrEqual(4.5);
+    if (theme === "light") await expect(card).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await mkdir("/tmp/track3-overlay-theme", { recursive: true });
+    await page.screenshot({ path: `/tmp/track3-overlay-theme/phone-${theme}-${screenshot}.png`, animations: "disabled" });
   }
 });

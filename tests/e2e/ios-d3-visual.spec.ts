@@ -203,14 +203,14 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await page.locator(".pf-alloc-row").first().scrollIntoViewIfNeeded();
     await capture(page, phone.name, theme, "rebalance-targets");
     await page.locator(".pf-trade").first().scrollIntoViewIfNeeded();
-    const sell = page.locator(".pf-trade").filter({ has: page.locator(".pf-pill", { hasText: "Sell" }) }).first();
-    const buy = page.locator(".pf-trade").filter({ has: page.locator(".pf-pill", { hasText: "Buy" }) }).first();
+    const sell = page.locator(".pf-trade").filter({ has: page.locator(".t3-tag", { hasText: "Sell" }) }).first();
+    const buy = page.locator(".pf-trade").filter({ has: page.locator(".t3-tag", { hasText: "Buy" }) }).first();
     await expect(sell.locator("strong")).toHaveText(/^\$[0-9]/);
     await expect(buy.locator("strong")).toHaveText(/^\$[0-9]/);
     await expect(sell.locator("strong")).toHaveAttribute("aria-label", /^−\$[0-9]/);
     await expect(buy.locator("strong")).toHaveAttribute("aria-label", /^\+\$[0-9]/);
-    expect(await sell.locator(".pf-pill").evaluate((element) => getComputedStyle(element).color))
-      .not.toBe(await buy.locator(".pf-pill").evaluate((element) => getComputedStyle(element).color));
+    expect(await sell.locator(".t3-tag").evaluate((element) => getComputedStyle(element).color))
+      .not.toBe(await buy.locator(".t3-tag").evaluate((element) => getComputedStyle(element).color));
     const tradeSymbol = page.locator(".pf-trade b").first();
     const symbolBounds = await tradeSymbol.boundingBox();
     const tradeBounds = await page.locator(".pf-trade").first().boundingBox();
@@ -282,15 +282,18 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
 
     await page.goto("/#/overview");
     await page.locator(".fd-overview-refresh, .fd-partial-refresh").click();
+    await expect(page.getByRole("alertdialog", { name: "Source status" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Source status" }).click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     await expect(page.locator("[data-source-status-row]").first()).toBeVisible();
     await expect(page.locator(".ios-d3-refresh-sheet [data-source-status-row]").first()).not.toContainText("Waiting…");
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-refresh.png` });
-    await expect(page.locator(".ios-d3-refresh-sheet [role='progressbar']")).toHaveCount(0, { timeout: 90_000 });
+    await expect(page.getByRole("progressbar", { name: "Refresh progress" })).toHaveCount(0, { timeout: 90_000 });
+    await expect(page.locator(".ios-d3-refresh-sheet [role='progressbar']")).toHaveCount(0);
     if (!await page.getByRole("alertdialog", { name: "Source status" }).isVisible()) {
       await page.getByRole("button", { name: "Source status" }).click();
     }
-    await expect(page.locator("[data-source-status-row]").first()).toBeVisible();
+    await expect(page.locator(".ios-d3-refresh-sheet .ios-d3-refresh-row").first()).toBeVisible();
     await expect(page.locator(".ios-d3-refresh-sheet p.sr-only")).toHaveCount(0);
     await expect(page.locator(".ios-d3-toast-viewport")).toHaveCount(1);
     await expect(page.locator(".ios-d3-toast-viewport")).toBeHidden();

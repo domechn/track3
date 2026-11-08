@@ -82,7 +82,7 @@ export default function PartialOverviewFidelity({ view, statuses, currency, quot
     <main className="fd-partial-grid">
       <section className="fd-card fd-partial-hero"><div className="fd-card-heading"><h3>{t("fidelity.firstRun.portfolioValue")}</h3><span>{currency.currency} · {t("fidelity.refresh.completeSnapshots")}</span></div>
         <span className="fd-label">{t(withLastKnown ? "fidelity.refresh.withLastKnown" : "fidelity.refresh.totalExcluding").replace("{source}", provider)}</span>
-        <strong className="fd-partial-total">{amount(total, currency)}</strong><span className="fd-partial-pill">{t("history.partial.label")}</span>
+        <strong className="fd-partial-total">{amount(total, currency)}</strong><span className="t3-tag" data-tone="warning">{t("history.partial.label")}</span>
         <span className="fd-sub">{provider} {t("fidelity.refresh.lastKnown")} {amount(excludedValue, currency)}</span>
         <div className="fd-partial-kpis">{["fidelity.firstRun.today", "fidelity.overview.sevenDays", "fidelity.overview.thirtyDays"].map((key) =>
           <div key={key}><span>{t(key)}</span><b>—</b><small>{t("fidelity.refresh.incomplete")}</small></div>)}</div>

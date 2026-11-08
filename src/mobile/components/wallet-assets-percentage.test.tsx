@@ -380,6 +380,7 @@ describe("WalletAssetsPercentage treemap", () => {
     });
 
     expect(screen.getByTestId("type-pill-cex").textContent).toContain("57.29%");
+    expect(screen.getByTestId("type-pill-cex")).toHaveClass("t3-tag");
     expect(screen.getByTestId("type-pill-broker").textContent).toContain(
       "13.44%",
     );

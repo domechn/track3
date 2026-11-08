@@ -140,4 +140,4 @@ Capture: `/tmp/fidelity/settings-b/sync-locked.png` (full page: `sync-locked-lon
 
 ## Pixel difference
 
-Viewport: **8.561%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).
+Viewport: **17.756%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus the latest app Chromium capture). The owner-requested passphrase-first order and runtime data limitations above account for the difference beyond the visual acceptance threshold.

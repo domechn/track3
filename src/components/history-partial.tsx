@@ -6,7 +6,7 @@ type Translate = (key: string) => string;
 export function HistoryPartialPill({ row, t }: { row: HistoricalPageRow; t: Translate }) {
   if (row.sourcesTotal === undefined) return null;
   const ready = Math.max(0, row.sourcesTotal - (row.missingCount ?? 0));
-  return <span className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs text-foreground">
+  return <span className="t3-tag mt-1 w-fit" data-tone="warning">
     <span>{t("history.partial.label")}</span>
     <span className="text-muted-foreground">
       {t("history.partial.count").replace("{ready}", String(ready)).replace("{total}", String(row.sourcesTotal))}

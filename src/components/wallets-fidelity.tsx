@@ -15,6 +15,7 @@ import { matchSourceStatus } from "./source-status-match";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { overviewRefreshRequestedEvent } from "./source-status-event";
 import SyncStatusIndicator from "./sync-status-indicator";
+import { useChartHitArea } from "./chart-tooltip";
 
 type Source = ReturnType<typeof deriveSourceChanges>["sources"][number];
 type Matrix = ReturnType<typeof deriveSourceChanges>;
@@ -53,6 +54,8 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
   onLoaded?: () => void;
 }) {
   const { t } = useTranslation();
+  const chart = useChartHitArea();
+  const moverChart = useChartHitArea();
   const version = useDataChangedVersion();
   const walletOrdinals = useLatestWalletOrdinals();
   const [data, setData] = useState<SnapshotData | null>(null);
@@ -172,14 +175,17 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
     return kind === "exchange" ? t("wallets.fidelity.apiReadOnly")
       : kind === "broker" ? t("wallets.fidelity.flexQuery") : t("wallets.fidelity.publicAddress");
   };
-  const renderMovers = (items: typeof movers) => <div className="t3-wallet-movers">
-    {items.map((asset) => <div key={asset.symbol}>
-      <strong>{asset.symbol}</strong><span className="t3-wallet-mover-track" style={{ "--zero": `${moverZero}%` } as CSSProperties}><i className={tone(asset.delta)}
+  const renderMovers = (items: typeof movers) => <div className="t3-wallet-movers" data-chart-group="">
+    {items.map((asset, index) => <div key={asset.symbol}>
+      <strong>{asset.symbol}</strong><span className="t3-wallet-mover-track" role="button"
+        {...moverChart.markProps(index, `${asset.symbol}: ${signedMoney(asset.delta)}`,
+          <><div>{asset.symbol}</div><div className={tone(asset.delta)}>{signedMoney(asset.delta)}</div></>)}
+        style={{ "--zero": `${moverZero}%` } as CSSProperties}><i className={tone(asset.delta)}
         style={{ width: `${Math.max(.5, Math.abs(asset.delta) * moverUnit)}%`,
           left: asset.delta >= 0 ? `${moverZero}%` : undefined,
           right: asset.delta < 0 ? `${100 - moverZero}%` : undefined }} /></span>
       <span className={tone(asset.delta)}>{signedMoney(asset.delta, 0)}</span>
-    </div>)}
+    </div>)}{moverChart.tooltip}
   </div>;
 
   return <div className="t3-wallet-fidelity" aria-busy={loading}>
@@ -253,8 +259,12 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
                 ? t("wallets.fidelity.ofSource").replace("{share}", `${(largestAsset.value / allocationTotal * 100).toFixed(1)}%`)
                 : t("wallets.fidelity.currentCount").replace("{current}", currentCount).replace("{total}", String(sources.length))}</small></div>
           </div>
-          <div className="t3-wallet-split">{allocation.map((item, index) => <i key={item.name}
-            style={{ width: `${allocationTotal ? item.value / allocationTotal * 100 : 0}%`, background: sourceColors[index % sourceColors.length] }} />)}</div>
+          <div className="t3-wallet-split" data-chart-group="">{allocation.map((item, index) => {
+            const detail = `${item.name}: ${money(item.value)} · ${allocationTotal ? (item.value / allocationTotal * 100).toFixed(2) : "0.00"}%`;
+            return <i key={item.name} role="button" {...chart.markProps(index, detail, detail)}
+              style={{ width: `${allocationTotal ? item.value / allocationTotal * 100 : 0}%`, background: sourceColors[index % sourceColors.length] }} />;
+          })}</div>
+          {chart.tooltip}
           <div className="t3-wallet-legend">{allocation.map((item, index) => <span key={item.name}><i style={{ background: sourceColors[index % sourceColors.length] }} />
             {item.name} <b>{allocationTotal ? `${(item.value / allocationTotal * 100).toFixed(1)}%` : "—"}</b></span>)}</div>
         </section>
@@ -287,7 +297,7 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
               const status = statusFor(source);
               const bad = status?.status === "failed" || status?.status === "stale";
               return <div key={source.id} className={bad ? "failed" : ""}><div><i className={bad ? "err" : ""} /><strong>{source.label}</strong>
-                {bad ? <b>{t("wallets.fidelity.failed")}</b> : <time>{formatTime(status?.finishedAt)}</time>}</div>
+                {bad ? <b className="t3-tag" data-tone="negative">{t("wallets.fidelity.failed")}</b> : <time>{formatTime(status?.finishedAt)}</time>}</div>
                 {bad ? <><p>{!status?.detail && status?.category === "rateLimit" && status.lastSuccessAt
                   ? t("wallets.fidelity.rateLimitWithLastGood").replace("{time}", formatTime(status.lastSuccessAt))
                   : <>{status?.detail || t(`wallets.failure.${status?.category ?? "other"}`)}

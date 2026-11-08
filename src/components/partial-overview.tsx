@@ -165,7 +165,7 @@ export default function PartialOverview({ view, statuses, currency, bannerOnly =
           <div><span>{t(includeLastKnown ? "refresh.fidelity.withLastKnown" : "refresh.fidelity.totalExcluding")
             .replace("{source}", sourceLabel)}</span>
             <strong className="t3-hero-value">{money(includeLastKnown ? includedTotal + lastGoodTotal : includedTotal)}</strong>
-            <small className="t3-flow-partial-pill">{t("history.partial.label")}</small>
+            <small className="t3-tag t3-flow-partial-pill" data-tone="warning">{t("history.partial.label")}</small>
             <small>{t("refresh.fidelity.sourceLastKnown").replace("{source}", sourceLabel)
               .replace("{value}", lastGoodValue)}</small></div>
           {["today", "sevenDaysLong", "thirtyDays"].map((key) => <div key={key}>

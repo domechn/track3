@@ -86,7 +86,7 @@ beforeEach(() => {
   localStorage.removeItem(localeLocalStorageKey);
   vi.mocked(queryTotalValue).mockResolvedValue({ totalValue: 1250 });
   vi.mocked(queryAssetChange).mockResolvedValue({
-    timestamps: [1713158400, 1713244800],
+    timestamps: [Date.parse("2024-04-15T00:00:00Z"), Date.parse("2024-04-16T00:00:00Z")],
     data: [
       { usdValue: 1000, btcPrice: 50000 },
       { usdValue: 1250, btcPrice: 62500 },
@@ -249,6 +249,16 @@ describe("Overview semantic controls", () => {
       expect.objectContaining({ label: "All-time high", data: [1300, 1300] }),
     ]));
     expect(screen.getByText(/best day/i)).toHaveTextContent("250");
+  });
+
+  it("places a loss sign before the currency in a chart contribution annotation", async () => {
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" metrics={<div>Metrics</div>}
+      bestDay={{ timestamp: Date.parse("2024-04-16"), value: 250 }}
+      bestDayContribution={{ symbol: "ETH", value: -25 }} />);
+    const annotation = await screen.findByText(/best day \(ETH/);
+    expect(annotation).toHaveTextContent("(ETH −$25)");
   });
 
   it("fits the overview value axis to a small portfolio", async () => {

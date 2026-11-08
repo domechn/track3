@@ -1011,7 +1011,7 @@ const App = ({
                                 aria-label={t("history.viewSnapshot").replace("{date}", `${timeToDateStr(new Date(row.createdAt).getTime(), true)} · ${displayDate}`)}
                                 className="t3-history-date-button flex touch:min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <span>{displayDate}</span>
-                                {row.edited ? <span className="mt-1 w-fit rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                {row.edited ? <span className="t3-tag mt-1 w-fit" data-tone="accent">
                                   {t("history.editLog.edited")}
                                 </span> : null}
                                 <HistoryPartialPill row={row} t={t} />

@@ -2,6 +2,7 @@ import { useEffect, useState, type ButtonHTMLAttributes, type HTMLAttributes, ty
 import { cn } from "@/lib/utils";
 import type { QuoteColor } from "@/middlelayers/types";
 import { directionPhysicalTone } from "@/utils/color";
+import { Tag } from "@/components/ui/tag";
 
 export function MobileCard({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("mobile-card", className)} {...props} />;
@@ -23,7 +24,7 @@ export function DeltaPill({ value, children, className, quoteColor = "green-up-r
 }
 
 export function Pill({ children, className }: PropsWithChildren<{ className?: string }>) {
-  return <span className={cn("mobile-pill", className)}>{children}</span>;
+  return <Tag className={className}>{children}</Tag>;
 }
 
 export function IconButton({ label, className, children, ...props }: PropsWithChildren<

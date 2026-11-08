@@ -53,7 +53,7 @@ export default function PhoneActionCard({ action, onDecide, canDecide = true }: 
     <div className="fidelity-action-head">
       {approved ? <CheckIcon aria-hidden="true" /> : <BellIcon aria-hidden="true" />}
       <span>{t(approved ? "fidelity.assistant.alertCreated" : "fidelity.assistant.approvalNeeded")}</span>
-      <span className={`fidelity-action-status${approved ? " is-approved" : ""}`}>
+      <span className="t3-tag fidelity-action-status" data-tone={approved ? "positive" : "warning"}>
         {t(approved ? "fidelity.assistant.approved" : pending ? "fidelity.assistant.waiting" : "assistant.action.status.expired")}
       </span>
     </div>

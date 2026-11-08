@@ -167,7 +167,7 @@ export function SourceEditorDesign({ tab, onClose, onSaveExchange, onSaveWallet,
         </>}
         {tab === "wallets" && <>
           <EditorField label={t("fidelity.editor.walletType")}><div className="t3-fidelity-editor-picks c3">
-            {walletTypes.map((option) => <button key={option.key} type="button" className={wallet.type === option.key ? "selected" : ""} onClick={() => setWallet({ ...wallet, type: option.key, address: "" })}><b>{option.code}{option.pro && <span className="t3-fidelity-source-pro">Pro</span>}</b><small>{option.name}</small></button>)}
+            {walletTypes.map((option) => <button key={option.key} type="button" className={wallet.type === option.key ? "selected" : ""} onClick={() => setWallet({ ...wallet, type: option.key, address: "" })}><b>{option.code}{option.pro && <span className="t3-tag" data-tone="accent">Pro</span>}</b><small>{option.name}</small></button>)}
           </div></EditorField>
           <EditorField label={t("fidelity.editor.address")} hint={!wallet.address ? t("fidelity.editor.addressHint") : undefined}
             error={wallet.address && !addressValid ? wallet.type === "erc20" ? t("fidelity.editor.ethereumInvalid") : t("fidelity.editor.addressInvalid").replace("{chain}", wallet.type.toUpperCase()) : undefined}

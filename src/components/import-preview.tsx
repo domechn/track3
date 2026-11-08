@@ -71,7 +71,7 @@ export default function ImportPreview({ rows, busy, result, onImport, onCancel, 
         const recordedAt = Number.isNaN(date.getTime()) ? String(row.createdAt) : dateFormatter.format(date);
         return <div key={row.uuid} data-testid={`import-row-${row.uuid}`} className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card p-3">
           <div className="min-w-0 flex-1">
-            <p className="font-medium">{recordedAt} <span className="ml-2 rounded-full border border-border px-2 py-0.5 text-xs">{t(`data.importPreview.status.${row.status}`)}</span></p>
+            <p className="font-medium">{recordedAt} <span className="t3-tag ml-2" data-tone="outline">{t(`data.importPreview.status.${row.status}`)}</span></p>
             <p className="text-xs text-muted-foreground">{t("data.importPreview.rowDetail").replace("{total}", `${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(row.total))}`).replace("{assets}", String(row.assetCount))}</p>
           </div>
           <select

@@ -31,10 +31,30 @@ The segmented controls, rank sort buttons, and insight dismiss icon have at leas
 
 App: `/tmp/fidelity/overview/overview-phone.png`. Source: `/tmp/fidelity/overview/design-overview.png`. The current 390px dark viewport comparison differs by **6.30%** at the threshold of 20 in any RGB channel; both captures are 844px high. The earlier 2.27% measurement used a prior app capture. The authoritative Chromium HTML render governs both comparisons.
 
+A fresh 8 Nov source-page render at 390 × 844 differs from the same dark app capture by **7.254%** at a 16/255 RGB threshold (**6.969%** at 20/255). The source range remains 306 × 44px with a dark selected fill. The app now inherits that fill in Dark and the `--secondary` fill in Light; the light selected label has about **15.14:1** contrast.
+
 Earlier long capture: `/tmp/fidelity/overview/overview-phone-long.png` vs `/tmp/fidelity/overview/design-overview-long.png`; **7.02%** pixel difference by the same threshold, heights 3299/3299px.
 
 ## Remaining differences
 
+The latest dark 390 × 844 source and app viewport captures differ by
+**9.14%** at an RGB-channel threshold of 20. Both first cards have
+x=16, y=182, width 358px, height 516px, RGB (19, 18, 23) and 13px
+computed text. The static source assumes configured sync, whereas
+the app shows source status and a live price from its stored fixture.
+The owner-required selected tab tile and offline text rendering add
+visible pixels. Captures and computed bounds are in
+`.local/tag-theme/phone-overview-*`.
+
+The shared tab bar's measured source differences, including its owner-required selected tint and indicator, are recorded in [navigation.md](navigation.md).
+
+- The earlier 8 Nov source-page and dark app first-screen captures at 390 × 844
+  differ by **6.377%** at an RGB-channel threshold of 20. The tag-theme
+  fixture has no configured sync or saved AI observations. Its header
+  controls and insight content must reflect that local state, unlike
+  the source's configured sample. The Pro tag uses the shared accent
+  theme face, with a small border and text-size difference from the
+  static source pill.
 - The refreshed 7 Nov 2026 390px viewport capture differs by **6.30%** from the saved
   source-page render (any RGB channel differs by more than 20). The source
   assumes configured sync; the base app fixture has never configured sync, so

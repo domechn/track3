@@ -10,6 +10,7 @@ import {
   AlertDialogTitle, AlertDialogTrigger,
 } from "@/mobile/components/ui/alert-dialog";
 import "./plan-fidelity.css";
+import { useChartHitArea } from "@/components/chart-tooltip";
 
 type Draft = RebalanceTarget & { id: number };
 type Props = {
@@ -59,6 +60,7 @@ export default function RebalanceFidelity({
   onTarget, onPreset, onNormalize, onTolerance, onMinimum, onIgnore, onStablecoins, onExport,
 }: Props) {
   const { t } = useTranslation();
+  const chart = useChartHitArea();
   const pts = (value: number) => t("fidelity.rebalance.points").replace("{value}",
     `${value > 0 ? "+" : value < 0 ? "−" : ""}${nf(1).format(Math.abs(value))}`);
   const absPts = (value: number) => t("fidelity.rebalance.points").replace("{value}", nf(1).format(Math.abs(value)));
@@ -108,7 +110,7 @@ export default function RebalanceFidelity({
   const tradeRow = (row: typeof sells[number], index: number) =>
     <div className="pf-trade" key={`${row.assetType}:${row.symbol}`}>
       <span className="pf-step">{index}</span>
-      <span className={`pf-pill ${row.tradeValue > 0 ? "pf-info" : ""}`}>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}</span>
+      <span className="t3-tag" data-tone={row.tradeValue > 0 ? "accent" : "neutral"}>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}</span>
       <b>{row.symbol}</b>
       <strong aria-label={`${row.tradeValue > 0 ? "+" : "−"}${money(row.tradeValue, currency.symbol)}`}>
         {money(row.tradeValue, currency.symbol)}</strong>
@@ -154,10 +156,15 @@ export default function RebalanceFidelity({
             .replace("{minimum}", money(minimumTradeValue, currency.symbol))
           : t("fidelity.rebalance.pausedUntil"), hasPlan ? "" : "pf-zero")}
     </section>
-    <section className="pf-card pf-allocation">
+    <section className="pf-card pf-allocation" data-chart-group="">
       <div className="pf-card-head"><h2>{t("fidelity.rebalance.allocation")}</h2><small>{t(allUnset ? "fidelity.rebalance.barScale" : "fidelity.rebalance.tickScale")}</small></div>
-      <div className="pf-alloc-list">{rows.map(({ holding, current, target, drift }) =>
-        <div className="pf-alloc-row" key={`${holding.assetType}:${holding.symbol}`}>
+      <div className="pf-alloc-list">{rows.map(({ holding, current, target, drift }, index) => {
+        const detail = <div><strong>{holding.symbol}</strong><div>{t("rebalance.current")} {current.toFixed(2)}%</div>
+          <div>{t("rebalance.target")} {target ? `${target.percent.toFixed(2)}%` : "–"}</div>
+          <div>{t("fidelity.rebalance.largestDrift")} {target
+            ? t("fidelity.rebalance.points").replace("{value}",
+              `${drift > 0 ? "+" : drift < 0 ? "−" : ""}${Math.abs(drift).toFixed(2)}`) : "–"}</div></div>;
+        return <div className="pf-alloc-row" key={`${holding.assetType}:${holding.symbol}`}>
           <div className="pf-asset"><b>{holding.symbol}</b><small>{planAssetName(holding)}</small></div>
           <span className="pf-current">{pct(current)}</span>
           <label className="pf-target">
@@ -176,18 +183,20 @@ export default function RebalanceFidelity({
               }} />
             {target && <span>%</span>}
           </label>
-          <div className="pf-alloc-bar" aria-label={t("fidelity.rebalance.barLabel")
-            .replace("{asset}", holding.symbol).replace("{current}", pct(current))
-            .replace("{target}", target ? pct(target.percent) : t("fidelity.rebalance.notSetLower"))}>
+          <div className="pf-alloc-bar" role="button" {...chart.markProps(index,
+            t("fidelity.rebalance.barLabel").replace("{asset}", holding.symbol)
+              .replace("{current}", `${current.toFixed(2)}%`)
+              .replace("{target}", target ? `${target.percent.toFixed(2)}%` : t("fidelity.rebalance.notSetLower")), detail)}>
             <i style={{ width: `${Math.min(100, current / 40 * 100)}%` }} />
             {target && <u style={{ left: `${Math.min(100, target.percent / 40 * 100)}%` }} />}
           </div>
           <span className={`pf-drift ${target && Math.abs(drift) > tolerance ? "pf-warning" : ""}`}>{target ? pts(drift) : "–"}</span>
-        </div>)}</div>
+        </div>; })}</div>
+      {chart.tooltip}
       <div className={`pf-alloc-total ${!valid && !allUnset ? "pf-bad" : ""}`}>
         <b>{t("fidelity.rebalance.total")}</b><span>{pct(rows.reduce((sum, row) => sum + row.current, 0))}</span>
         <strong className={allUnset ? "pf-zero" : valid ? "pf-positive" : "pf-negative"}>{pct(totalTarget)}</strong>
-        <em className={`pf-pill ${allUnset ? "" : valid ? "pf-positive" : "pf-negative"}`}>
+        <em className="t3-tag" data-tone={allUnset ? "neutral" : valid ? "positive" : "negative"}>
           {allUnset ? t("fidelity.rebalance.needs100") : valid ? t("fidelity.rebalance.sums100")
             : t("fidelity.rebalance.over").replace("{difference}", absPts(totalTarget - 100))}
         </em>

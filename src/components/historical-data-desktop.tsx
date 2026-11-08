@@ -451,7 +451,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
             <td><button type="button" onClick={() => selectSnapshot(row.id)}
               aria-label={`${dateShort(row.createdAt)} · ${t("history.viewSnapshot").replace("{date}", dateLong(row.createdAt))}`}>
               {dateDay(row.createdAt)} <span className="fidelity-history-row-time">{dateTime(row.createdAt)}</span>
-              {row.edited && <span className="fidelity-edit-pill">{t("history.editLog.edited")}</span>}
+              {row.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}
             </button></td>
             <td>{money(row.total)}</td>
             <td style={{ color: row.change === null ? undefined : color(row.change) }}>
@@ -489,9 +489,9 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
       </section> : <section className="fidelity-card fidelity-history-detail" data-testid="history-desktop-detail" ref={detailPaneRef} tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") returnToList(); }}>
         {selected && detail && <>
           <div className="fidelity-history-detail-header">
-          <button type="button" className="fidelity-history-back"
-            onClick={returnToList}>{t("history.fidelity.backToSnapshots")}</button>
-          <h2>{dateLong(selected.createdAt)} {selected.edited && <span className="fidelity-edit-pill">{t("history.editLog.edited")}</span>}</h2>
+            <button type="button" className="fidelity-history-back"
+              onClick={returnToList}>{t("history.fidelity.backToSnapshots")}</button>
+            <h2>{dateLong(selected.createdAt)} {selected.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}</h2>
           <div className="fidelity-history-detail-kpis">
             <div><span>{t("history.fidelity.totalValue")}</span><strong>{money(valueTotal)}</strong>
               <small>{edits?.length ? t("history.fidelity.includesEdits").replace("{count}", String(edits.length)) : t("history.fidelity.asOfRefresh")}</small></div>

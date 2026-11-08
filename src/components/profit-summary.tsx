@@ -74,6 +74,7 @@ const App = ({
   fidelity,
   initialType = "month",
   oneSnapshot = false,
+  unavailableReason,
 }: {
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
@@ -81,6 +82,7 @@ const App = ({
   fidelity?: boolean;
   initialType?: SummaryType;
   oneSnapshot?: boolean;
+  unavailableReason?: string;
 }) => {
   const [monthlyProfits, setMonthlyProfits] = useState<
     {
@@ -159,7 +161,7 @@ const App = ({
     if (!fidelity || initialType === "year") return;
     let active = true;
     sharedYear.setMoverNames([]);
-    Promise.all([calculateTotalProfit(dateRange), new StableCoinsQuery().listAllStableCoins(), queryLatestAssets()]).then(([profit, stable, assets]) => {
+    Promise.all([calculateTotalProfit(dateRange), new StableCoinsQuery().listAllStableCoins(), queryLatestAssets(dateRange)]).then(([profit, stable, assets]) => {
       if (!active) return;
       const stableSymbols = new Set(stable);
       const holdings = new Map<string, number>();
@@ -245,17 +247,11 @@ const App = ({
       const profits = await bluebird.map(
         dates.filter((d) => d.firstDay.getFullYear() === selectedYear),
         async (date) => {
+          const periodStart = fidelity ? new Date(Math.max(date.firstDay.getTime(), dateRange.start.getTime())) : date.firstDay;
+          const monthEnd = new Date(date.lastDay.getFullYear(), date.lastDay.getMonth(), date.lastDay.getDate(), 23, 59, 59, 999);
           const { total, knownTotal = null, unknownCoins = [], lastRecordDate, percentage, coins } = await calculateTotalProfit({
-            start: date.firstDay,
-            end: new Date(
-              date.lastDay.getFullYear(),
-              date.lastDay.getMonth(),
-              date.lastDay.getDate(),
-              23,
-              59,
-              59,
-              999
-            ),
+            start: periodStart,
+            end: fidelity ? new Date(Math.min(monthEnd.getTime(), dateRange.end.getTime())) : monthEnd,
           });
 
           const lrd = lastRecordDate
@@ -264,7 +260,7 @@ const App = ({
               : lastRecordDate
             : undefined;
           const baselineDate = lrd
-            ? await queryPreviousProfitSnapshotDate(date.firstDay)
+            ? await queryPreviousProfitSnapshotDate(periodStart)
             : undefined;
           return { total, knownTotal, unknownCoins, monthFirstDate: date.firstDay, lastRecordDate: lrd, baselineDate,
             percentage, count: { up: coins.filter((coin) => !stableCoins.has(coin.symbol) && coin.value !== null && coin.value > 0.005).length,
@@ -303,8 +299,8 @@ const App = ({
         years,
         async (year) => {
           const yearRange = {
-            start: new Date(year, 0, 1),
-            end: new Date(year, 11, 31, 23, 59, 59, 999),
+            start: fidelity ? new Date(Math.max(new Date(year, 0, 1).getTime(), dateRange.start.getTime())) : new Date(year, 0, 1),
+            end: fidelity ? new Date(Math.min(new Date(year, 11, 31, 23, 59, 59, 999).getTime(), dateRange.end.getTime())) : new Date(year, 11, 31, 23, 59, 59, 999),
           };
           const [{ total, knownTotal = null, unknownCoins = [], lastRecordDate, percentage, coins }, attribution] = await Promise.all([
             calculateTotalProfit(yearRange),
@@ -526,7 +522,7 @@ const App = ({
     }
 
     if (fidelity) return (
-      oneSnapshot ? <div className="fidelity-empty fidelity-period-empty">{t("summary.fidelity.monthEmpty")}</div> :
+      oneSnapshot || unavailableReason ? <div className="fidelity-empty fidelity-period-empty">{unavailableReason || t("summary.fidelity.monthEmpty")}</div> :
       <div className="fidelity-month-grid">
         {monthCards.filter((item) => item.inRange).map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
@@ -583,7 +579,7 @@ const App = ({
   }
 
   function renderYearSummary() {
-    if (fidelity) return oneSnapshot ? <div className="fidelity-empty fidelity-period-empty">{t("summary.fidelity.yearEmpty")}</div> : <>
+    if (fidelity) return oneSnapshot || unavailableReason ? <div className="fidelity-empty fidelity-period-empty">{unavailableReason || t("summary.fidelity.yearEmpty")}</div> : <>
       <div className="fidelity-year-stack" data-paged={yearCards.length > 2}>{yearPaging.rows.map((item) => {
       const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
       const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;

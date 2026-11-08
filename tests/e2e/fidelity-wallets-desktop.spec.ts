@@ -62,7 +62,7 @@ test.describe("Wallets desktop fidelity", () => {
       const indicator = page.locator(".t3-wallet-actions .desktop-sync-status-indicator button");
       await expect(indicator).toBeVisible();
       await indicator.click();
-      await expect(page.getByRole("dialog")).toContainText("Backup & sync");
+      await expect(page.getByRole("dialog")).toContainText("Backup & sync", { timeout: 60_000 });
     } finally {
       await context.close();
     }

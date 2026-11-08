@@ -76,7 +76,7 @@ export function ProDesign(p: Props) {
     {exhausted && <div className="t3-b-banner negative"><ExclamationTriangleIcon /><div><b>{t("fidelity.settingsB.pro.limitBanner")}</b><span>{t("fidelity.settingsB.pro.limitBannerDesc")}</span></div></div>}
     {expired && <div className="t3-b-banner warning"><ExclamationTriangleIcon /><div><b>{t("fidelity.settingsB.pro.expiredBannerDated").replace("{date}", formatDate(end))}</b><span>{t("fidelity.settingsB.pro.expiredBannerDesignDesc")}</span></div></div>}
     <section className="t3-b-card t3-b-pro-plan">
-      <div className="t3-b-card-head"><h3>{t("fidelity.settingsB.pro.track3Pro")}</h3><span className={`t3-b-pill ${active ? "connected" : expired ? "failed" : ""}`}>{t(active ? "fidelity.settingsB.pro.active" : expired ? "fidelity.settingsB.pro.expired" : "fidelity.settingsB.pro.free")}</span></div>
+      <div className="t3-b-card-head"><h3>{t("fidelity.settingsB.pro.track3Pro")}</h3><span className="t3-tag" data-tone={active ? "positive" : expired ? "negative" : "neutral"}>{t(active ? "fidelity.settingsB.pro.active" : expired ? "fidelity.settingsB.pro.expired" : "fidelity.settingsB.pro.free")}</span></div>
       <div className="t3-b-kpis">
         <div><small>{t("fidelity.settingsB.pro.plan")}</small><strong>{name}</strong></div>
         <div><small>{t(expired ? "fidelity.settingsB.pro.expired" : "fidelity.settingsB.pro.renews")}</small><strong>{active || expired ? formatDate(end) : "—"}</strong></div>

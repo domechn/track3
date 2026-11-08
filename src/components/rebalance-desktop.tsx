@@ -5,9 +5,9 @@ import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
-import FidelityRail from "./fidelity-rail";
 import FidelityIcon from "./fidelity-icon";
 import "./rebalance-desktop.css";
+import { useChartHitArea } from "./chart-tooltip";
 
 type Props = {
   holdings: RebalanceHolding[];
@@ -68,6 +68,7 @@ function DraftInput({ value, format, parse, onValue, ...inputProps }: {
 
 export default function RebalanceDesktop(props: Props) {
   const { t } = useTranslation();
+  const chart = useChartHitArea();
   const pts = (value: number) => t("rebalance.fidelity.pts")
     .replace("{value}", `${value > 0 ? "+" : value < 0 ? "−" : ""}${fixed(Math.abs(value))}`);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -144,7 +145,6 @@ export default function RebalanceDesktop(props: Props) {
   const canSave = complete && !props.validation && !optionsInvalid;
 
   return <div className="t3-fidelity-page t3-fidelity-rebalance">
-    <FidelityRail isProUser={props.isProUser} />
     <header className="t3-fidelity-head">
       <div><h1>{t("rebalance.title")}</h1><p>{subtitle}</p></div>
       {refreshTime && <span className={`t3-fidelity-stamp ${refreshStale ? "stale" : ""}`}><i />{t("rebalance.fidelity.pricesAsOf")} {refreshLabel}</span>}
@@ -156,17 +156,31 @@ export default function RebalanceDesktop(props: Props) {
       <section className="t3-fidelity-card t3-fidelity-kpis" data-testid="rebalance-summary" data-valid={complete}>
         {summary.map((item) => <div key={item.label}><span>{item.label}</span><strong data-tone={item.tone}>{item.value}</strong><small>{item.note}</small></div>)}
       </section>
-      <section className="t3-fidelity-card t3-fidelity-allocation">
+      <section className="t3-fidelity-card t3-fidelity-allocation" data-chart-group="">
         <div className="t3-fidelity-card-head"><h2>{t("rebalance.targets")}</h2><span>{t(empty ? "rebalance.fidelity.barScale" : "rebalance.fidelity.tickScale").replace("{scale}", fixed(barScale, 0))}</span></div>
         <div className="t3-fidelity-allocation-row t3-fidelity-table-head">
           <span>{t("rebalance.fidelity.asset")}</span><span>{t("rebalance.fidelity.currentVsTarget")}</span>
           <span>{t("rebalance.fidelity.current")}</span><span>{t("rebalance.fidelity.target")}</span><span>{t("rebalance.fidelity.drift")}</span>
         </div>
-        {props.loading ? <div className="t3-fidelity-empty" role="status">{t("rebalance.fidelity.loading")}</div> : allocation.map((row) => {
+        {props.loading ? <div className="t3-fidelity-empty" role="status">{t("rebalance.fidelity.loading")}</div>
+          : allocation.length === 0 ? <div className="t3-fidelity-empty t3-fidelity-allocation-empty">
+            <b>{t("rebalance.fidelity.noAssets")}</b><span>{t("rebalance.fidelity.addSourceHint")}</span>
+          </div> : allocation.map((row, index) => {
           const targetIndex = targets.indexOf(row.target!);
+          const detail = <div><strong>{row.symbol}</strong><div>{t("rebalance.fidelity.current")} {fixed(row.current, 2)}%</div>
+            <div>{t("rebalance.fidelity.target")} {row.target ? `${fixed(row.target.percent, 2)}%` : "–"}</div>
+            <div>{t("rebalance.fidelity.drift")} {row.drift === undefined ? "–"
+              : t("rebalance.fidelity.pts").replace("{value}", `${row.drift > 0 ? "+" : row.drift < 0 ? "−" : ""}${fixed(Math.abs(row.drift), 2)}`)}</div></div>;
           return <div className="t3-fidelity-allocation-row" key={`${row.assetType}:${row.symbol}`}>
             <div className="t3-fidelity-asset"><b>{row.symbol}</b><small>{t(`rebalance.${row.assetType}`)}</small></div>
-            <div className="t3-fidelity-allocation-bar" aria-label={`${row.symbol}: ${fixed(row.current)}% current${row.target && Number.isFinite(row.target.percent) ? `, ${fixed(row.target.percent)}% target` : ""}`}>
+            <div className="t3-fidelity-allocation-bar" role="button"
+              {...chart.markProps(index, t("rebalance.fidelity.chartMark").replace("{asset}", row.symbol)
+                .replace("{current}", `${fixed(row.current, 2)}%`)
+                .replace("{target}", row.target ? `${fixed(row.target.percent, 2)}%` : t("rebalance.fidelity.notSet")), detail)}
+              aria-label={`${row.symbol}: ${fixed(row.current)}% current${row.target && Number.isFinite(row.target.percent) ? `, ${fixed(row.target.percent)}% target` : ""}`}
+              aria-description={t("rebalance.fidelity.chartMark").replace("{asset}", row.symbol)
+                .replace("{current}", `${fixed(row.current, 2)}%`)
+                .replace("{target}", row.target ? `${fixed(row.target.percent, 2)}%` : t("rebalance.fidelity.notSet"))}>
               <i style={{ width: `${row.current / barScale * 100}%` }} />
               {row.target && Number.isFinite(row.target.percent) && <u style={{ left: `${row.target.percent / barScale * 100}%` }} />}
             </div>
@@ -184,10 +198,11 @@ export default function RebalanceDesktop(props: Props) {
             </span>
           </div>;
         })}
+        {chart.tooltip}
         <div className={`t3-fidelity-allocation-row t3-fidelity-total ${bad ? "bad" : ""}`}>
           <b>{t("rebalance.fidelity.total")}</b><span /><span className="t3-fidelity-num">{fixed(100)}%</span>
           <strong className={bad ? "t3-fidelity-negative" : empty ? "t3-fidelity-muted" : "t3-fidelity-positive"}>{fixed(targetTotal)}%</strong>
-          <span className={`t3-fidelity-pill ${bad ? "negative" : empty ? "" : "positive"}`}>
+          <span className="t3-tag" data-tone={bad ? "negative" : empty ? "neutral" : "positive"}>
             {bad ? t("rebalance.fidelity.ptsOver").replace("{value}", fixed(targetTotal - 100)) : empty ? t("rebalance.fidelity.needs100") : t("rebalance.fidelity.sums100")}
           </span>
         </div>
@@ -231,7 +246,7 @@ export default function RebalanceDesktop(props: Props) {
         </tr></thead><tbody>
           {tradeRows.map((row, index) => <Fragment key={`${row.assetType}:${row.symbol}`}>
             {index === sells.length && <tr className="subtotal" key="sells"><td /><td colSpan={2}>{t("rebalance.fidelity.totalSells")}</td><td className="t3-fidelity-amount">{money(sellTotal)}</td><td colSpan={3} /></tr>}
-            <tr key={`${row.assetType}:${row.symbol}`}><td>{index + 1}</td><td><span className={`t3-fidelity-pill ${row.tradeValue > 0 ? "info" : ""}`}>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}</span></td>
+            <tr key={`${row.assetType}:${row.symbol}`}><td>{index + 1}</td><td><span className="t3-tag" data-tone={row.tradeValue > 0 ? "accent" : "neutral"}>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}</span></td>
               <td><b>{row.symbol}</b></td><td>{money(Math.abs(row.tradeValue))}</td><td>{unit(row.tradeQuantity)}</td><td>{money(row.price)}</td><td>{fixed(row.currentPercent)}% <span className="t3-fidelity-share-arrow">→</span> {fixed(row.targetPercent)}%</td></tr>
           </Fragment>)}
           {sells.length > 0 && buys.length === 0 && <tr className="subtotal"><td /><td colSpan={2}>{t("rebalance.fidelity.totalSells")}</td><td className="t3-fidelity-amount">{money(sellTotal)}</td><td colSpan={3} /></tr>}

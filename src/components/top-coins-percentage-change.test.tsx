@@ -154,6 +154,26 @@ describe("TopCoinsPercentageChange", () => {
     expect(within(rows[1]).queryByTestId("tcpc-badge")).toBeNull();
   });
 
+  it.each([
+    { changes: [-1, -2], tone: "negative", badge: "Top Gainer", row: 0 },
+    { changes: [2, 1], tone: "positive", badge: "Top Loser", row: 1 },
+  ])("colors $badge by its value when all changes have the same sign", async ({ changes, tone, badge, row }) => {
+    vi.mocked(queryTopCoinsPercentageChangeData).mockResolvedValue({
+      timestamps: [1],
+      coins: changes.map((value, index) => ({
+        coin: `COIN${index}`,
+        assetType: "crypto" as const,
+        lineColor: "red",
+        percentageData: [{ timestamp: 1, value, price: value }],
+      })),
+    });
+    const { getAllByTestId } = renderChart();
+    await waitFor(() => expect(getAllByTestId("tcpc-row")).toHaveLength(2));
+    const tag = within(getAllByTestId("tcpc-row")[row]).getByTestId("tcpc-badge");
+    expect(tag).toHaveTextContent(badge);
+    expect(tag).toHaveAttribute("data-tone", tone);
+  });
+
   it("renders both value and price percentages with sign formatting", async () => {
     vi.mocked(queryTopCoinsPercentageChangeData).mockResolvedValue({
       timestamps: [1713158400000, 1713244800000],
