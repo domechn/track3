@@ -106,6 +106,7 @@ describe("overview panels", () => {
     expect(screen.getByText("Last 3 snapshots")).toBeInTheDocument();
     expect(screen.getByText("+$40.00")).toBeInTheDocument();
     expect(screen.getByText("−$25.00")).toBeInTheDocument();
+    expect(document.querySelectorAll(".t3-moved-list .t3-asset-icon[data-size='20']")).toHaveLength(2);
   });
   it("pages through desktop movers without stretching the chart row", () => {
     const rows = Array.from({ length: 11 }, (_, index) => ({

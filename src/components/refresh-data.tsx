@@ -12,10 +12,11 @@ import { bindRefreshRetry, refreshRetryScheduler } from "@/middlelayers/refresh-
 import { useToast } from "@/components/ui/use-toast";
 import { overviewRefreshActivityEvent, overviewRefreshRequestedEvent, overviewUseLastKnownEvent, publishSourceStatuses } from "./source-status-event";
 import { Button } from "./ui/button";
+import AssetLabel from "@/components/common/asset-label";
 import { ToastAction } from "./ui/toast";
 import {
-  ArchiveIcon, BackpackIcon, CheckIcon, CrossCircledIcon, CubeIcon,
-  ExclamationTriangleIcon, GlobeIcon, InfoCircledIcon, ReloadIcon, UpdateIcon,
+  CheckIcon, CrossCircledIcon,
+  ExclamationTriangleIcon, InfoCircledIcon, ReloadIcon, UpdateIcon,
 } from "@radix-ui/react-icons";
 import { RefreshButtonLoadingContext } from "./index/index";
 import { getMemoryCacheInstance } from "@/middlelayers/datafetch/utils/cache";
@@ -465,7 +466,6 @@ const App = ({
     ? t("refresh.autoRetry.next").replace("{time}", new Date(nextRetryAt).toLocaleTimeString(
       locale === "zh" ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false }))
     : retrySchedule.stopped ? t("refresh.autoRetry.stopped") : "";
-  const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
   const statusStyle = {
     ok: "t3-tag t3-refresh-status-pill",
     stale: "t3-tag t3-refresh-status-pill",
@@ -596,8 +596,8 @@ const App = ({
               source, name: storedNameById.get(source.sourceId) ?? sourceLabel(source),
               result: source, previous: undefined, startedAt: undefined,
             }))).map(({ source, name, result, previous, startedAt }) => <div key={source.sourceId} data-source-status-row className="t3-refresh-flow-row" role="group" aria-label={name}>
-              <i aria-hidden="true">{name.slice(0, 2)}</i>
-              <div><strong>{name}</strong><small className={`tabular-nums ${result?.category === "quota" ? "quota" : result && result.status !== "ok" ? "failed" : ""}`}>
+              <AssetLabel kind={result?.kind === "exchange" ? "exchange" : result?.kind === "wallet" ? "wallet" : result?.kind === "broker" ? "broker" : "custom"} type={result?.provider ?? source.sourceId.split(":")[0]} name={name} size={20} />
+              <div><small className={`tabular-nums ${result?.category === "quota" ? "quota" : result && result.status !== "ok" ? "failed" : ""}`}>
                 {!result ? <><ReloadIcon aria-hidden="true" className="inline-block h-3 w-3 animate-spin motion-reduce:animate-none" />{" "}
                   {startedAt ? t("refresh.fidelity.refreshingElapsed").replace("{seconds}",
                     Math.max(0, (now - Date.parse(startedAt)) / 1000).toFixed(0)) : t("refresh.fidelity.waiting")}
@@ -632,17 +632,15 @@ const App = ({
             </div>)}
           </div> : <div className="t3-refresh-status-list my-2 max-h-80 overflow-y-auto" role="status" aria-live="polite" aria-busy={false}>
             {sortedStatuses.map((source) => {
-              const Icon = kindIcon[source.kind ?? "others"];
               const StatusIcon = statusIcon[source.status];
               return (
               <div key={source.sourceId} role="group" aria-label={storedNameById.get(source.sourceId) ?? displayIdentity(source)}
                 data-source-status-row className="t3-refresh-source-row flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold break-all">{storedNameById.get(source.sourceId) ?? displayIdentity(source)}</div>
-                  {source.provider && <div className="text-xs text-muted-foreground">
-                    <Icon aria-hidden="true" className="mr-1 inline-block h-3.5 w-3.5" />
-                    {source.provider}{source.hint && ` · ${displayHint(source)}`}
-                  </div>}
+                  <AssetLabel kind={source.kind === "exchange" ? "exchange" : source.kind === "broker" ? "broker" :
+                    source.kind === "wallet" ? "wallet" : "custom"}
+                    type={source.provider ?? source.sourceId.split(":")[0]} name={sourceLabel(source)} size={20}
+                    secondary={source.provider ? `${source.provider}${source.hint ? ` · ${displayHint(source)}` : ""}` : undefined} />
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
                     <span data-tone={source.status === "ok" ? "positive" : source.status === "failed" ? "negative" : "warning"} className={`inline-flex items-center gap-1 font-medium ${statusStyle[source.status]}`}>
                       <StatusIcon aria-hidden="true" className="h-3.5 w-3.5" />

@@ -15,11 +15,13 @@ it("keeps the shared daily chart scaled to its own values by default", () => {
   expect(screen.queryByText("overview.fidelity.up")).not.toBeInTheDocument();
 });
 
-it("keeps the shared coin row structure by default", () => {
+it("shows the shared coin row with a 20px asset tile by default", () => {
   render(<MemoryRouter><TopCoinsCard currency={usd} rows={[
     { symbol: "BTC", assetType: "crypto", value: 100, amount: 1, priceChange: 5 },
   ]} /></MemoryRouter>);
-  expect(screen.getByTestId("overview-coin-row").firstElementChild?.tagName).toBe("STRONG");
+  const row = screen.getByTestId("overview-coin-row");
+  expect(row.querySelector(".t3-asset-icon")).toHaveAttribute("data-size", "20");
+  expect(row.querySelector(".t3-asset-label-name")).toHaveTextContent("BTC");
 });
 
 it("keeps the shared coin change sign for a small nonzero change", () => {

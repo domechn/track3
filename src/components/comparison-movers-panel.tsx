@@ -5,6 +5,8 @@ import { directionBackgroundClass, directionClass } from "@/utils/color";
 import { comparisonMovers } from "./comparison-movers";
 import { barGeometry, divergingScale } from "./comparison-fidelity-movers";
 import { boundedPercentText } from "./profit-percentage";
+import AssetLabel from "./common/asset-label";
+
 import { useChartHitArea } from "./chart-tooltip";
 
 type Row = {
@@ -41,7 +43,7 @@ export default function ComparisonMoversPanel({ rows, currency, quoteColor, t, s
       const exact = shouldMaskValue ? `${row.symbol}: ***`
         : `${row.symbol}: ${money(difference)} · ${row.value.changePercent > 0 ? "+" : ""}${row.value.changePercent.toFixed(2)}%`;
       return <li key={`${row.assetType}:${row.symbol}`}>
-        <strong>{row.symbol}</strong>
+        <strong><AssetLabel asset={row} size={20} quiet /></strong>
         <span className="comparison-mover-track" role="button" {...chart.markProps(index, exact, exact)}
           style={{ "--zero": `${scale.zero}%` } as CSSProperties}>
           {bar && <span className={directionBackgroundClass(value, quoteColor)}

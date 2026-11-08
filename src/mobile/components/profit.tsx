@@ -27,7 +27,6 @@ import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
-  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useDataChangedVersion } from "@/contexts/data-changed";
@@ -264,13 +263,11 @@ const App = ({
               "{asset}",
               formatAssetLabel(d),
             )}</span>
-            <img
-              className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-              src={resolveAssetLogoSrc(d, logoMap[getAssetLogoKey(d)])}
-              alt=""
-            />
             <AssetLabel
               asset={d}
+              src={logoMap[getAssetLogoKey(d)]}
+              size={20}
+              quiet
               className="min-w-0"
               labelClassName="font-medium text-sm"
             />
@@ -316,9 +313,7 @@ const App = ({
         </span>}>
         <span className="flex min-w-0 items-center gap-2">
           <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground mobile-mover-rank">#{index + 1}</span>
-          <img className="h-6 w-6 shrink-0 rounded-full"
-            src={resolveAssetLogoSrc(row, logoMap[key])} alt="" />
-          <AssetLabel asset={row} labelClassName="truncate text-sm font-medium"
+          <AssetLabel asset={row} src={logoMap[key]} size={20} quiet labelClassName="truncate text-sm font-medium"
             badgeClassName="hidden" />
         </span>
       </ListRow>;

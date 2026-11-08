@@ -21,7 +21,8 @@ for (const sources of [3, 8, 16, 30]) {
     const rendered = await page.locator(".analyze-wallets").textContent();
     expect(rendered).not.toMatch(/[0-9a-f]{12,}/i);
     expect(rendered).not.toMatch(/[0-9a-f]{6,}…[0-9a-f]{4,}/i);
-    const text = await scroll.locator("thead th").allTextContents();
+    const text = await scroll.locator("thead th").evaluateAll((cells) =>
+      cells.map((cell) => cell.querySelector(".t3-asset-label-name")?.textContent ?? cell.textContent ?? ""));
     expect(text).not.toContainEqual(expect.stringMatching(/[0-9a-f]{12,}/i));
     await expect(scroll.locator("thead th").nth(1)).toHaveAttribute("title", /^[0-9a-f]{32}$/i);
     await expect(scroll.locator("thead th").nth(1)).toHaveAttribute("aria-label", text[1]);
@@ -54,14 +55,14 @@ test("long phone source names stay inside the viewport and their header cell", a
   await page.goto("/#/wallets");
   const chip = page.locator(".fd-wallet-chips button").nth(1);
   await expect(chip).toBeVisible({ timeout: 30_000 });
-  await chip.locator("span").evaluate((node, name) => { node.textContent = name; }, longName);
+  await chip.locator(".t3-asset-label-name").evaluate((node, name) => { node.textContent = name; }, longName);
   expect((await chip.boundingBox())!.width).toBeLessThanOrEqual(390);
-  expect(await chip.locator("span").evaluate((node) => getComputedStyle(node).textOverflow)).toBe("ellipsis");
+  expect(await chip.locator(".t3-asset-label-name").evaluate((node) => getComputedStyle(node).textOverflow)).toBe("ellipsis");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.getByRole("button", { name: "Detailed analysis" }).click();
   const header = page.locator(".d2-wallets .wallet-asset-change-scroll thead th").nth(1);
   await expect(header).toBeVisible({ timeout: 30_000 });
-  const label = header.locator("span");
+  const label = header.locator(".t3-asset-label-name");
   await label.evaluate((node, name) => { node.textContent = name; }, longName);
   expect((await header.boundingBox())!.width).toBeLessThanOrEqual(160);
   expect(await label.evaluate((node) => getComputedStyle(node).textOverflow)).toBe("ellipsis");
@@ -119,7 +120,7 @@ test("opaque wallet keeps its number from phone Wallets to coin detail", async (
   await page.goto("/#/wallets");
   const chip = page.locator(`.fd-wallet-chips button[title="${id}"]`);
   await expect(chip).toBeVisible();
-  const name = (await chip.textContent())?.trim();
+  const name = (await chip.locator(".t3-asset-label-name").textContent())?.trim();
   expect(name).toMatch(/^Wallet \d+$/);
   await page.goto("/#/coins/COIN01");
   await expect(page.locator(".fd-source-list")).toContainText(name!);

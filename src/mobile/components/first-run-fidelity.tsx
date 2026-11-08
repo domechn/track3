@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ClockIcon, InfoCircledIcon, ReloadIcon, UploadIcon } from "@radix-ui/react-icons";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { useTranslation } from "@/mobile/i18n";
-import SourceMark from "@/mobile/components/source-mark";
+import AssetLabel from "@/components/common/asset-label";
 import "@/mobile/components/mobile/fidelity.css";
 
 type Source = { sourceId: string; label: string; kind?: string; provider?: string };
@@ -50,7 +50,14 @@ export default function FirstRunFidelity({ sources, currency, onRefresh }: {
           <div className="fd-first-run-chart fd-empty"><b>{t("fidelity.firstRun.chartStart")}</b><span>{t("fidelity.firstRun.lineStart")}</span></div>
         </section>
         <section className="fd-card fd-first-run-sources"><div className="fd-card-heading"><h3>{t("overview.design.sources")}</h3><span>{sources.length === 1 ? t("fidelity.firstRun.sourceCount") : t("fidelity.firstRun.multipleSourceCount").replace("{count}", String(sources.length))}</span></div>
-          {sources.map((source) => <div className="fd-first-run-source" key={source.sourceId}><SourceMark source={source} /><div><b>{source.label}</b><small><ClockIcon aria-hidden="true" />{t("fidelity.firstRun.neverRefreshed")}</small></div><strong>—</strong></div>)}
+          {sources.map((source) => <div className="fd-first-run-source" key={source.sourceId}>
+            <AssetLabel kind={source.kind === "exchange" || source.kind === "broker" ? source.kind :
+              source.kind === "others" || source.sourceId === "others" ? "custom" :
+                source.sourceId.startsWith("cex:") ? "exchange" : source.sourceId.startsWith("stock:") ? "broker" : "wallet"}
+              type={source.provider ?? (source.sourceId.startsWith("cex:") ? source.label :
+                source.sourceId.startsWith("stock:") ? "ibkr" : source.sourceId.split(":")[0])}
+              name={source.label} size={20}
+              secondary={t("fidelity.firstRun.neverRefreshed")} /><strong>—</strong></div>)}
           <div className="fd-first-run-source-footer"><i />{t("fidelity.firstRun.zeroRefreshed")}</div>
         </section>
         <section className="fd-card fd-first-run-bottom"><div className="fd-card-heading"><h3>{t("overview.design.holdings")}</h3><span>{t("fidelity.firstRun.zeroAssets")}</span></div>

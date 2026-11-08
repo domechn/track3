@@ -1,3 +1,4 @@
+import AssetLabel from "./common/asset-label";
 import { useState } from "react";
 import type { AlertHistory, AlertKind, AlertPrices, AlertRule, AlertSnapshot, AlertWindow } from "@/middlelayers/alerts";
 import { measureRule } from "@/middlelayers/alerts";
@@ -252,7 +253,7 @@ export default function GoalsDesktop(props: Props) {
               <label className="t3-fidelity-goal-switch"><input type="checkbox" checked={rule.enabled}
                 aria-label={t("goals.enableRule").replace("{kind}", t(`goals.kind.${rule.kind}`))}
                 onChange={(event) => props.onToggle(rule, event.target.checked)} /></label>
-              <div className="t3-fidelity-goal-name"><b>{ruleTitle(rule, t)}</b><small>{ruleDescription(rule, t, money)}</small></div>
+              <div className="t3-fidelity-goal-name"><AssetLabel kind={rule.symbol ? rule.assetType === "stock" ? "stock" : "coin" : "custom"} symbol={rule.symbol ?? ""} name={ruleTitle(rule, t)} size={20} secondary={ruleDescription(rule, t, money)} /></div>
               <div className="t3-fidelity-goal-progress"><div><i role="button"
                 {...chart.markProps(index, `${ruleTitle(rule, t)}: ${fixed(raw, 2)}%, ${measurement.value === undefined ? t("goals.unavailable") : fixed(measurement.value, 2)}`,
                   <><div>{ruleTitle(rule, t)}</div><div>{fixed(raw, 2)}%</div><div>{measurement.value === undefined ? t("goals.unavailable") : fixed(measurement.value, 2)}</div></>)}>

@@ -5,10 +5,11 @@ import { useTranslation } from "@/i18n";
 import { directionPhysicalTone } from "@/utils/color";
 import { currencyWrapper } from "@/utils/currency";
 import SyncStatusIndicator from "./sync-status-indicator";
+import AssetLabel from "./common/asset-label";
+import { Tag } from "./ui/tag";
 import { barGeometry, comparisonMoverFacts, divergingScale } from "./comparison-fidelity-movers";
 import { boundedPercentText } from "./profit-percentage";
 import { useChartHitArea } from "./chart-tooltip";
-import { Tag } from "./ui/tag";
 
 export type FidelityComparisonRow = {
   symbol: string;
@@ -105,7 +106,7 @@ export default function ComparisonFidelity({
         const detail = mask ? `${row.symbol}: ***`
           : `${row.symbol}: ${signedMoney(delta)} · ${pct(row.value.changePercent)}`;
         return <li key={`${row.assetType}:${row.symbol}`}>
-          <strong>{row.symbol}</strong>
+          <strong><AssetLabel asset={row} size={20} quiet /></strong>
           <span className="t3-cmp-mover-track" role="button" {...chart.markProps(index, detail, detail)}
             style={{ "--zero": `${scale.zero}%` } as CSSProperties}>
             {bar && <i className={tone(metric)} style={{
@@ -201,8 +202,8 @@ export default function ComparisonFidelity({
             <tbody>{sorted.map((row, index) => {
               const delta = row.value.head - row.value.base;
               return <tr key={`${row.assetType}:${row.symbol}`} className={index < 2 ? "top" : ""}>
-                <th><span className="t3-cmp-asset-label"><span className="t3-cmp-asset-ticker">{row.symbol}</span>
-                  {index < 2 && <Tag tone="accent">{t("comparison.fidelity.topMover")}</Tag>}</span></th>
+                <th><span className="t3-cmp-asset-label"><AssetLabel asset={row} size={20} quiet />
+                  {index < 2 && <Tag tone="accent" className="t3-cmp-top-mover">{t("comparison.fidelity.topMover")}</Tag>}</span></th>
                 <td>{amount(row.amount.base, row.symbol)}</td><td>{amount(row.amount.head, row.symbol)}</td>
                 <td>{price(row.price.base)}</td><td>{price(row.price.head)}</td>
                 <td>{money(row.value.base)}</td><td>{money(row.value.head)}</td>

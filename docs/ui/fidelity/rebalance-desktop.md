@@ -38,6 +38,8 @@ At 1600 px in dark mode, target inputs update the actual validated profile; `+ S
 
 ## Remaining differences
 
+UI42 uses the approved website-style neutral tile for asset marks. The older Rebalance page design renders those marks differently.
+
 The zero-target trade area uses the shared centred icon and explanation; the source's empty panel predates this UI18 requirement. Target inputs, reserve calculation, and CSV content are unchanged.
 
 The wide dark page places Refresh, sync and the Pro live-value control in the unified rail without taking a 50 px strip above the content. Its regular TopBar remains visible in light mode and below 1500 px; those layouts have no matching 1600 px dark source capture. The 10/30/50/100/All presets and date picker are hidden only in the wide dark plan because its calculation always uses the latest snapshot. The shared rail's tile, logo and control differences from the illustrative source are detailed in [navigation.md](../navigation.md).

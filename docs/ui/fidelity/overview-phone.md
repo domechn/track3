@@ -37,6 +37,8 @@ Earlier long capture: `/tmp/fidelity/overview/overview-phone-long.png` vs `/tmp/
 
 ## Remaining differences
 
+- UI42 uses the approved website-style neutral tile for asset and source marks. The older phone Overview page design renders those marks differently.
+
 The latest dark 390 × 844 source and app viewport captures differ by
 **9.14%** at an RGB-channel threshold of 20. Both first cards have
 x=16, y=182, width 358px, height 516px, RGB (19, 18, 23) and 13px

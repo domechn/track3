@@ -35,9 +35,12 @@ test("custom price screens work in both shells, themes, and languages", async ({
     await page.goto("/#/settings/configuration?section=sources");
     if (mobile) await page.getByRole("tab").last().click();
     else await page.locator(".t3-settings-source-tabs button").last().click();
-    await expect(page.locator('button[aria-label*="NOVA"]').first()).toBeVisible();
+    const editNova = page.getByRole("button", { name: locale === "en"
+      ? /^(?:Edit NOVA|Set price for NOVA)/
+      : /^(?:编辑 NOVA|设置 NOVA 的价格)/ });
+    await expect(editNova).toBeVisible();
     await capture(page, `${prefix}-sources.png`);
-    await page.locator('button[aria-label*="NOVA"]').first().click();
+    await editNova.click();
     await expect(page.getByRole("radio", { name: locale === "en" ? "Your price" : "自行设定价格" })).toBeVisible();
     await capture(page, `${prefix}-manual.png`);
     await page.getByRole("radio", { name: locale === "en" ? "Follow a listed asset" : "跟随已上市资产" }).click();
@@ -48,6 +51,8 @@ test("custom price screens work in both shells, themes, and languages", async ({
     await page.getByRole("button", { name: locale === "en" ? (mobile ? "Add symbol" : "Add Symbol") : "新增币种" }).click();
     await expect(page.getByRole("radio", { name: locale === "en" ? "Market" : "市场价格" })).toBeVisible();
     await capture(page, `${prefix}-add.png`);
+    if (mobile) await page.getByRole("button", { name: locale === "en" ? "Cancel" : "取消" }).click();
+    else await page.keyboard.press("Escape");
     await page.goto("/#/coins/NOVA");
     if (mobile) {
       await expect(page.getByText(width < 700

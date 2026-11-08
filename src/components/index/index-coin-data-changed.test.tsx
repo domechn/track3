@@ -101,8 +101,8 @@ vi.mock("@/middlelayers/cost-basis-data", () => ({
   loadCostBasisReport: mocks.loadCostBasisReport,
 }));
 vi.mock("../common/asset-label", () => ({
-  default: ({ asset }: { asset: { symbol: string } }) => (
-    <span>{asset.symbol}</span>
+  default: ({ asset, symbol, name }: { asset?: { symbol: string }; symbol?: string; name?: string }) => (
+    <span>{name ?? asset?.symbol ?? symbol}</span>
   ),
 }));
 

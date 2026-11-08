@@ -46,7 +46,8 @@ async function samplePage(browser: Browser, s3?: FakeS3) {
 test("Overview matches the approved phone card order and sample values", async ({ browser }) => {
   const { context, page } = await samplePage(browser);
   try {
-    await expect(page.locator(".fd-overview-source [aria-label='Ledger cold wallet wallet']")).toHaveText("Lg");
+    await expect(page.locator(".fd-overview-source").filter({ hasText: "Ledger cold wallet" })
+      .locator(".t3-asset-icon[data-kind='wallet'] img")).toHaveCount(1);
     await page.screenshot({ path: `${dir}/overview-phone.png` });
     writeFileSync(`${dir}/geometry.json`, JSON.stringify(await page.evaluate(() => ({
       height: document.getElementById("app-main-content")!.scrollHeight,
@@ -205,9 +206,9 @@ test("Overview expanded rankings capture six coins and show fewer", async ({ bro
     await page.locator(".fd-overview-rank").evaluate((element) =>
       document.getElementById("app-main-content")!.scrollTo(0, document.getElementById("app-main-content")!.scrollTop + element.getBoundingClientRect().top - 16));
     await expect(page.locator("#app-top-bar")).toBeHidden();
-    expect((await page.locator(".fd-overview-rank").boundingBox())?.height).toBe(520);
-    expect((await page.locator(".fd-overview-more").boundingBox())?.y).toBe(429);
-    expect((await page.locator(".fd-overview-sources").boundingBox())?.y).toBe(548);
+    expect((await page.locator(".fd-overview-rank").boundingBox())?.height).toBe(609);
+    expect((await page.locator(".fd-overview-more").boundingBox())?.y).toBe(518);
+    expect((await page.locator(".fd-overview-sources").boundingBox())?.y).toBe(637);
     await page.screenshot({ path: `${dir}/overview-more-phone.png` });
   } finally { await context.close(); }
 });

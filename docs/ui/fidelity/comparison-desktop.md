@@ -23,6 +23,8 @@ With fewer than two stored snapshots, the page shows an empty explanation and no
 
 ## Remaining differences
 
+- UI42's approved neutral logo tiles replace the bare marks in the older design page. On the iPad mover rows, the STOCK tag sits below its ticker so the ticker, movement bar and signed value remain visible within the available columns.
+
 After merging the active-navigation change, the dark 1440 × 900 source
 and app viewports differ by **5.51%** at RGB-sum threshold 60. The
 callout still shares x=105, y=853.5, and height 62px; the source is

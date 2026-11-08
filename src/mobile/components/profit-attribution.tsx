@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { useEffect, useMemo, useState } from "react";
 import type { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
 import type { AttributionDimension } from "@/middlelayers/charts-attribution";
@@ -9,7 +10,7 @@ import { directionClass, directionColorVar } from "@/utils/color";
 import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
-import { getAssetLogoKey, resolveAssetLogoSrc } from "@/utils/assets";
+import { getAssetLogoKey } from "@/utils/assets";
 import { AttributionPager, useAttributionPage } from "@/components/attribution-pager";
 import { sourceDisplayNames } from "@/components/source-display-name";
 import { useLatestWalletOrdinals } from "@/components/source-name-order";
@@ -69,6 +70,18 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
   const displayGroup = (group: { key: string; label: string }) =>
     dimension === "wallet" ? walletLabels[group.key] ?? t("common.unknown")
       : dimension === "source" && group.label === "unknown" ? t("common.unknown") : group.label;
+  const groupLabel = (group: { key: string; label: string }) => {
+    const asset = dimension === "coin" ? {
+      assetType: group.key.startsWith("stock:") ? "stock" as const : "crypto" as const,
+      symbol: group.key.slice(group.key.indexOf(":") + 1),
+    } : undefined;
+    const type = data?.aliases[group.key]?.type ?? group.key;
+    const kind = dimension === "wallet" ? "wallet" : type === "ibkr" ? "broker" :
+      dimension === "source" ? "exchange" : "custom";
+    return <AssetLabel asset={asset} kind={asset ? undefined : kind} type={type}
+      src={asset ? logoMap[getAssetLogoKey(asset)] : undefined} name={displayGroup(group)}
+      tag={asset?.assetType === "stock" ? "" : undefined} size={20} quiet />;
+  };
   const error = <div role="alert" className="py-8 text-center text-sm text-muted-foreground">{label("error")}</div>;
 
   if (status === "loading" && !data) return <div role="status" aria-live="polite" className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</div>;
@@ -85,15 +98,8 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
     <ol className="space-y-2" data-chart-group="">
       {(detail || isMobile ? items : items.slice(0, 5)).map((group, index) => {
         const key = `${detail ? "detail" : "preview"}:${dimension}:${group.key}`;
-        const asset = dimension === "coin" ? {
-          assetType: group.key.startsWith("stock:") ? "stock" as const : "crypto" as const,
-          symbol: group.key.slice(group.key.indexOf(":") + 1),
-        } : null;
         const content = <>
-          {isMobile && (asset
-            ? <img className="attribution-rank-logo" src={resolveAssetLogoSrc(asset, logoMap[getAssetLogoKey(asset)])} alt="" />
-            : <span className="attribution-rank-logo attribution-rank-mark" aria-hidden="true">{displayGroup(group).slice(0, 1).toUpperCase()}</span>)}
-          <span className="truncate font-medium" title={displayGroup(group)}>{displayGroup(group)}</span>
+          <span className="truncate font-medium" title={displayGroup(group)}>{groupLabel(group)}</span>
           <span className="h-4 rounded-full bg-muted" {...(!isMobile ? { role: "button" as const, ...chart.markProps(index, `${displayGroup(group)}: ${exact(group.priceEffect)}`,
             <><span>{displayGroup(group)}</span><div className={tone(group.priceEffect)}>{exact(group.priceEffect)}</div></>) } : {})}>
             <span className="block h-full rounded-full" style={{ width: `${Math.abs(group.priceEffect) / max * 100}%`, background: barTone(group.priceEffect) }} />
@@ -155,7 +161,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
           <TableHead className="whitespace-nowrap text-right">{label("totalChange")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>{paging.rows.map((group) => <TableRow key={group.key} className="h-[52px]">
-          <TableCell className="max-w-[130px] truncate py-2 font-medium" title={displayGroup(group)}>{displayGroup(group)}</TableCell>
+          <TableCell className="max-w-[130px] truncate py-2 font-medium" title={displayGroup(group)}>{groupLabel(group)}</TableCell>
           {(["priceEffect", "flowEffect", "residual", "totalChange"] as const).map((key) => <TableCell key={key} className={`whitespace-nowrap py-2 text-right tabular-nums ${tone(group[key])}`} title={exact(group[key])}>{format(group[key])}</TableCell>)}
         </TableRow>)}</TableBody>
       </Table>

@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { useRef, useState } from "react";
 import type { RebalanceHolding, RebalanceResult, RebalanceTarget } from "@/middlelayers/rebalance";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
@@ -111,7 +112,7 @@ export default function RebalanceFidelity({
     <div className="pf-trade" key={`${row.assetType}:${row.symbol}`}>
       <span className="pf-step">{index}</span>
       <span className="t3-tag" data-tone={row.tradeValue > 0 ? "accent" : "neutral"}>{t(row.tradeValue > 0 ? "rebalance.buy" : "rebalance.sell")}</span>
-      <b>{row.symbol}</b>
+      <b><AssetLabel asset={row} size={20} quiet /></b>
       <strong aria-label={`${row.tradeValue > 0 ? "+" : "−"}${money(row.tradeValue, currency.symbol)}`}>
         {money(row.tradeValue, currency.symbol)}</strong>
       <small>{t("fidelity.rebalance.tradeDetail")
@@ -165,7 +166,7 @@ export default function RebalanceFidelity({
             ? t("fidelity.rebalance.points").replace("{value}",
               `${drift > 0 ? "+" : drift < 0 ? "−" : ""}${Math.abs(drift).toFixed(2)}`) : "–"}</div></div>;
         return <div className="pf-alloc-row" key={`${holding.assetType}:${holding.symbol}`}>
-          <div className="pf-asset"><b>{holding.symbol}</b><small>{planAssetName(holding)}</small></div>
+          <div className="pf-asset"><AssetLabel asset={holding} size={20} quiet secondary={planAssetName(holding)} /></div>
           <span className="pf-current">{pct(current)}</span>
           <label className="pf-target">
             <span className="sr-only">{t("rebalance.percentFor").replace("{asset}", holding.symbol)}</span>

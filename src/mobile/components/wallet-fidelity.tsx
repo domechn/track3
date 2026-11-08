@@ -19,6 +19,9 @@ import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import { matchSourceStatus } from "@/components/source-status-match";
 import "@/mobile/components/mobile/fidelity.css";
 import { directionTone } from "@/utils/color";
+import AssetLabel from "@/components/common/asset-label";
+import { sourceIconKind } from "@/components/source-allocation-list";
+
 import { useChartHitArea } from "@/components/chart-tooltip";
 
 const WalletAssetsPercentage = lazy(() => import("@/mobile/components/wallet-assets-percentage"));
@@ -27,7 +30,7 @@ const WalletSourceChanges = lazy(() => import("@/components/wallet-source-change
 
 type Snap = Awaited<ReturnType<typeof queryHistoricalPage>>["rows"][number];
 type Row = { symbol: string; assetType: string; amount: number; value: number };
-type Source = { id: string; label: string; kind: string; value: number; baseValue: number; rows: Row[]; baseRows: Row[]; status?: PortfolioSourceStatus };
+type Source = { id: string; label: string; kind: string; provider?: string; value: number; baseValue: number; rows: Row[]; baseRows: Row[]; status?: PortfolioSourceStatus };
 type WalletView = { latest: Snap; base: Snap | null; sources: Source[]; total: number; baseTotal: number; allQuantityEqual: boolean };
 // color-semantics: neutral the palette separates wallet sources by category.
 const colors = ["#4a8ad6", "#86b4ea", "#d4d6da", "#8c8e95", "#55575d"];
@@ -108,8 +111,10 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
         const baseRows = groupRows(prior, id);
         const label = labels[index];
         const status = matchSourceStatus(sourceLabels[index], aliases, sourceLabels, statuses);
-        const kind = status?.kind ?? (rows.every((row) => row.assetType === "stock") ? "broker" : "wallet");
-        return { id, label, kind, rows, baseRows, value: sum(rows), baseValue: sum(baseRows), status };
+        const provider = status?.provider ?? aliases[id]?.type;
+        const kind = status?.kind ?? (sourceIconKind(provider) === "exchange" ? "exchange" :
+          rows.every((row) => row.assetType === "stock") ? "broker" : "wallet");
+        return { id, label, kind, provider, rows, baseRows, value: sum(rows), baseValue: sum(baseRows), status };
       }).sort((a, b) => b.value - a.value);
       const priorIds = new Set(prior.map((asset) => asset.wallet).filter((wallet): wallet is string => !!wallet));
       const allQuantityEqual = !!base && ids.length === priorIds.size && sources.every((source) =>
@@ -195,7 +200,9 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
         title={t("common.noData")} hint={t("wallets.empty.hint")} /></div> : <>
       <div className="fd-wallet-chips">{[{ id: null, label: t("fidelity.wallets.allSources") }, ...sources].map((source) =>
         <button key={source.id ?? "all"} type="button" className={selected === source.id ? "selected" : ""}
-          onClick={() => setSelected(source.id)} title={source.id ?? undefined} aria-label={source.label}>{source.id !== null && source.status?.status === "failed" && <i />}<span>{source.label}</span></button>)}</div>
+          onClick={() => setSelected(source.id)} title={source.id ?? undefined} aria-label={source.label}>{source.id !== null && source.status?.status === "failed" && <i />}
+          {source.id === null ? <span>{source.label}</span> : <AssetLabel kind={source.kind === "exchange" || source.kind === "broker" ? source.kind : "wallet"}
+            type={source.provider} name={source.label} size={16} />}</button>)}</div>
       {selectedFailed && chosen && <div className="fd-wallet-failure" role="alert"><ExclamationTriangleIcon aria-hidden="true" /><div><b>{t("fidelity.wallets.failedTitle").replace("{source}", chosen.label)}</b>
         <p>{t(chosen.status?.category === "rateLimit" ? "fidelity.wallets.failedRateLimit" : "fidelity.wallets.failedDescription").replace("{attempt}", time(chosen.status?.finishedAt)).replace("{last}", time(lastGood))}
           {nextRetry && ` ${t("fidelity.wallets.nextRetry").replace("{time}", time(new Date(nextRetry).toISOString()))}`}</p></div>
@@ -227,15 +234,19 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
         <section className="fd-card fd-wallet-balances"><div className="fd-card-heading"><h3>{chosen ? t("fidelity.wallets.balances") : t("fidelity.wallets.balancesBySource")}</h3><span>{chosen ? selectedFailed ? t("fidelity.wallets.asOf").replace("{time}", time(lastGood)) : t("fidelity.wallets.refreshedLower").replace("{time}", time(chosen.status?.lastSuccessAt)) : t("fidelity.wallets.changeVs").replace("{date}", date)}</span></div>
           {chosen ? chosen.rows.map((row, index) => { const change = assetDiff(row, chosen.baseRows); const old = chosen.baseRows.find((item) => rowKey(item) === rowKey(row));
             const price = row.amount ? row.value / row.amount : 0; const oldPrice = old?.amount ? old.value / old.amount : 0;
-            return <div key={rowKey(row)} className="fd-wallet-balance"><b><i style={{ background: colors[index % colors.length] }} />{row.symbol} <em>{qty(row.amount, row.symbol === "USDT" || row.symbol === "USDC")}</em></b><strong>{money(row.value, currency)}</strong>
+            return <div key={rowKey(row)} className="fd-wallet-balance"><b><AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }}
+              size={20} quiet /> <em>{qty(row.amount, row.symbol === "USDT" || row.symbol === "USDC")}</em></b><strong>{money(row.value, currency)}</strong>
               <small>{money(price, currency)} · {percent(row.value / chosen.value)}</small><small data-tone={directionTone(view.base ? change : null)}>{view.base ? `${money(change, currency, 0, true)} · ${percent(oldPrice ? price / oldPrice - 1 : 0, 2, true)}` : "—"}</small></div>; }) :
             sources.map((source, index) => { const change = source.value - source.baseValue; return <button type="button" key={source.id} className="fd-wallet-balance" onClick={() => setSelected(source.id)}>
-              <b><i style={{ background: colors[index % colors.length] }} />{source.label}</b><strong>{money(source.value, currency)}</strong>
+              <b><AssetLabel kind={source.kind === "exchange" || source.kind === "broker" ? source.kind : "wallet"}
+                type={source.provider} name={source.label} size={20} /></b><strong>{money(source.value, currency)}</strong>
               <small>{t(`fidelity.overview.kind.${source.kind}`)} · {percent(share(source))}</small><small data-tone={directionTone(view.base ? change : null)}>{view.base ? `${money(change, currency, 0, true)} · ${percent(source.baseValue ? change / source.baseValue : 0, 2, true)}` : "—"}</small></button>; })}
         </section>
         {!chosen && <section className="fd-card fd-wallet-status"><div className="fd-card-heading"><h3>{t("fidelity.wallets.sourceStatus")}</h3><span>{t("fidelity.wallets.today")}</span></div>
           {sources.map((source) => { const sourceFailed = source.status?.status === "failed" || source.status?.status === "stale"; const next = source.status && retry.nextBySource[source.status.sourceId];
-            return <div className="fd-wallet-status-row" key={source.id}><i className={sourceFailed ? "error" : ""} /><div><b>{source.label}</b>
+            return <div className="fd-wallet-status-row" key={source.id}><i className={sourceFailed ? "error" : ""} /><div><b>
+              <AssetLabel kind={source.kind === "exchange" || source.kind === "broker" ? source.kind : "wallet"}
+                type={source.provider} name={source.label} size={20} /></b>
               {sourceFailed ? <><small>{t(source.status?.category === "rateLimit" ? "fidelity.wallets.rateLimitStatus" : "fidelity.wallets.genericFailedStatus").replace("{last}", time(source.status?.lastSuccessAt))}</small>
                 <div className="fd-wallet-retry"><button type="button" onClick={() => source.status && requestRefreshSource(source.status.sourceId)}><ReloadIcon aria-hidden="true" />{t("refresh.retryButton")}</button>
                   {next && <span>{t("fidelity.wallets.nextRetry").replace("{time}", time(new Date(next).toISOString()))}</span>}</div></> :
@@ -249,7 +260,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
           {quantityEqual && <p className="fd-wallet-note">{t("fidelity.wallets.priceMovement")}</p>}
         </section> : <>
           <section className="fd-card fd-wallet-matrix"><div className="fd-card-heading wallet-source-change-heading"><h3 aria-label={t("fidelity.wallets.assetChangesPerSource")}>{t("fidelity.wallets.assetChangesPerSource")}</h3><span>{t("fidelity.wallets.matrixSubtitle").replace("{range}", range).replace("{date}", date).replace("{currency}", currency.currency)}</span></div>
-            <div className="wallet-asset-change-mobile">{allAssets.map((item) => <div key={item.symbol} className="fd-wallet-matrix-row"><b>{item.symbol}</b><strong data-tone={directionTone(item.value)}>{money(item.value, currency, 2, true)}</strong><small>{item.details.map((detail, index) => <span key={`${detail.source}-${index}`}>{index > 0 && " · "}{detail.source} <span data-tone={directionTone(detail.change)}>{money(detail.change, currency, 0, true)}</span></span>)}</small></div>)}</div>
+            <div className="wallet-asset-change-mobile">{allAssets.map((item) => <div key={item.symbol} className="fd-wallet-matrix-row"><b><AssetLabel symbol={item.symbol} size={20} quiet /></b><strong data-tone={directionTone(item.value)}>{money(item.value, currency, 2, true)}</strong><small>{item.details.map((detail, index) => <span key={`${detail.source}-${index}`}>{index > 0 && " · "}{detail.source} <span data-tone={directionTone(detail.change)}>{money(detail.change, currency, 0, true)}</span></span>)}</small></div>)}</div>
           </section>
           <section className="fd-card fd-wallet-moved"><div className="fd-card-heading wallet-source-change-heading"><h3>{t("overview.design.whatMoved")}</h3><span>{range}, {t("fidelity.wallets.allSources").toLowerCase()}</span></div>
             <MoverList items={movers} currency={currency} />
@@ -275,7 +286,7 @@ function MoverList({ items, currency }: { items: { symbol: string; value: number
   const negative = Math.max(0, ...items.map((item) => -item.value));
   const zero = negative / (positive + negative || 1) * 92 + 4;
   const unit = (100 - zero - 4) / (positive || 1);
-  return <div className="fd-wallet-movers" data-chart-group="">{items.map((item, index) => <div className="fd-wallet-mover" key={item.symbol}><b>{item.symbol}</b>
+  return <div className="fd-wallet-movers" data-chart-group="">{items.map((item, index) => <div className="fd-wallet-mover" key={item.symbol}><b><AssetLabel symbol={item.symbol} size={20} quiet /></b>
     <span role="button" {...chart.markProps(index, `${item.symbol}: ${money(item.value, currency, 2, true)}`,
       <><div>{item.symbol}</div><div data-tone={directionTone(item.value)}>{money(item.value, currency, 2, true)}</div></>)}
       style={{ "--fd-zero": `${zero}%` } as CSSProperties}>{item.value !== 0 && <i data-tone={directionTone(item.value)} style={item.value > 0

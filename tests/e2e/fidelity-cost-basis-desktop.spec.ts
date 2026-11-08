@@ -87,7 +87,7 @@ test("FIFO report and data gaps table", async ({ page }) => {
     .toHaveCSS("background-color", "rgb(42, 42, 46)");
   const rowLabels = await page.getByTestId("cost-desktop-table").locator("tbody tr td:first-child").allTextContents();
   expect(rowLabels.slice(0, 3)).toEqual(["BTC", "BTC subtotal", "ETH"]);
-  expect(await page.locator(".fidelity-cost-averages tbody td:first-child").allTextContents())
+  expect(await page.locator(".fidelity-cost-averages tbody .t3-asset-label-name").allTextContents())
     .toEqual(["BTC", "ETH", "SOL", "BNB", "AAPL", "NVDA"]);
   const subtotal = page.locator(".fidelity-subtotal").first();
   await expect(subtotal.locator("td").first()).toHaveAttribute("colspan", "3");
@@ -112,8 +112,8 @@ test("FIFO report and data gaps table", async ({ page }) => {
     .toBeEmpty();
   const acquired = (await page.locator(".fidelity-cost-table th").nth(1).boundingBox())!;
   await expect(page.locator(".fidelity-cost-table th").first()).toHaveCSS("font-size", "12px");
-  expect(acquired.x).toBeCloseTo(185, 0);
-  expect((await page.locator(".fidelity-cost-table th").first().boundingBox())!.width).toBeCloseTo(80, 0);
+  expect(acquired.x).toBeCloseTo(222, 0);
+  expect((await page.locator(".fidelity-cost-table th").first().boundingBox())!.width).toBeCloseTo(117, 0);
   expect((await page.locator(".fidelity-cost-table th").last().boundingBox())!.width).toBeCloseTo(90, 0);
   const chartTrack = page.locator(".fidelity-cost-chart-track").first();
   await expect(chartTrack).toHaveCSS("--zero-at", "4%");
@@ -149,10 +149,10 @@ test("custom range keeps dates and HIFO", async ({ page }) => {
   await expect(page.locator(".fidelity-cost-filters .fidelity-segment").first()).toHaveCSS("gap", "0px");
   await expect(page.getByTestId("cost-desktop-table")).toContainText("Dispositions 5");
   await page.getByRole("heading", { name: "Cost basis" }).click();
-  const eth = (await page.locator(".fidelity-cost-chart li").filter({ hasText: /^ETH/ }).locator("i").boundingBox())!;
-  const nvda = (await page.locator(".fidelity-cost-chart li").filter({ hasText: /^NVDA/ }).locator("i").boundingBox())!;
+  const eth = (await page.locator(".fidelity-cost-chart li").filter({ has: page.locator(".t3-asset-label-name", { hasText: /^ETH$/ }) }).locator("i").boundingBox())!;
+  const nvda = (await page.locator(".fidelity-cost-chart li").filter({ has: page.locator(".t3-asset-label-name", { hasText: /^NVDA$/ }) }).locator("i").boundingBox())!;
   expect(eth.x + eth.width).toBeLessThanOrEqual(nvda.x + 1);
-  const unknownTrack = page.locator(".fidelity-cost-chart li").filter({ hasText: /^SOL/ }).locator(".fidelity-cost-chart-track");
+  const unknownTrack = page.locator(".fidelity-cost-chart li").filter({ has: page.locator(".t3-asset-label-name", { hasText: /^SOL$/ }) }).locator(".fidelity-cost-chart-track");
   expect(await unknownTrack.evaluate((node) => getComputedStyle(node, "::before").left)).toBe("0px");
   await capture(page, "cost-basis-custom");
 });
@@ -163,7 +163,7 @@ test("empty tax year retains open lots and chart empty state", async ({ page }) 
   await page.getByLabel("Tax year").fill("2025");
   await expect(page.getByText("No sales in 2025")).toBeVisible();
   await expect(page.getByTestId("cost-desktop-table")).toContainText("Open lots");
-  expect(await page.locator(".fidelity-cost-averages tbody td:first-child").allTextContents())
+  expect(await page.locator(".fidelity-cost-averages tbody .t3-asset-label-name").allTextContents())
     .toEqual(["BTC", "ETH", "SOL", "BNB", "AAPL", "NVDA"]);
   await page.getByRole("button", { name: /Open lots/ }).click();
   await expect(page.getByTestId("cost-desktop-table")).not.toContainText("2026");
@@ -210,7 +210,7 @@ test("open lots uses the held and unrealized columns", async ({ page }) => {
     .toHaveText("Mixed");
   await expect(page.locator(".fidelity-subtotal").filter({ hasText: "SOL subtotal" }).getByText("withdrawal unmatched"))
     .toHaveCSS("color", "rgb(155, 157, 163)");
-  expect((await page.locator(".fidelity-cost-table th").nth(1).boundingBox())!.x).toBeCloseTo(185, 0);
+  expect((await page.locator(".fidelity-cost-table th").nth(1).boundingBox())!.x).toBeCloseTo(222, 0);
   await capture(page, "cost-basis-open");
 });
 
