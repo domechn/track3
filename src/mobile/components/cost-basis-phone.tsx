@@ -419,7 +419,7 @@ export function PhoneCostBasis({
               <small>{t("fidelity.cost.unknownLotNote")}</small>
             </div>
             : <div className="fidelity-lot-row" key={`${key}:${index}`}>
-              <div><strong>{lotAmount(item.row.amount, item.row.assetType)}</strong>{method !== "AVERAGE" && <span className="fidelity-term-pill">
+              <div><strong>{lotAmount(item.row.amount, item.row.assetType)}</strong>{method !== "AVERAGE" && <span className="t3-tag">
                 {t(("term" in item.row ? item.row.term === "long" :
                   differenceInCalendarDays(new Date(), new Date(item.row.acquiredAt)) > Number(holdingDays))
                   ? "fidelity.cost.termLong" : "fidelity.cost.termShort")}</span>}

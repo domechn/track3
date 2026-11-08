@@ -304,20 +304,27 @@ test("Coin transaction dates, counts and pills use the source numeric type and t
   await expect(page.locator(".coin-fidelity-transactions tbody tr")).toHaveCount(8, { timeout: 40_000 });
   const styles = await page.locator(".coin-fidelity").evaluate((root) => {
     const style = (selector: string) => getComputedStyle(root.querySelector(selector)!);
-    const pill = style(".coin-fidelity-transactions .coin-fidelity-pill");
-    const pillBox = root.querySelector(".coin-fidelity-transactions .coin-fidelity-pill")!.getBoundingClientRect();
+    const pill = style(".coin-fidelity-transactions .t3-tag");
+    const pillBox = root.querySelector(".coin-fidelity-transactions .t3-tag")!.getBoundingClientRect();
     return {
       dateFigures: style(".coin-fidelity-detail-link").fontVariantNumeric,
       countFigures: style(".coin-fidelity-transactions .coin-fidelity-controls button").fontVariantNumeric,
-      pill: [pillBox.height, pill.padding, pill.fontWeight, pill.backgroundColor, pill.color],
+      pill: [pillBox.height, pill.padding, pill.fontWeight],
+      colors: [pill.color, pill.backgroundColor],
     };
   });
-  // Shared HSL tokens round differently from the source hex while preserving the pill hierarchy.
-  expect(styles).toEqual({
+  expect(styles).toMatchObject({
     dateFigures: "tabular-nums",
     countFigures: "tabular-nums",
-    pill: [20, "0px 8px", "500", "rgb(26, 25, 31)", "rgb(180, 182, 187)"],
+    pill: [20, "0px 6px", "500"],
   });
+  const luminance = (color: string) => color.match(/[\d.]+/g)!.slice(0, 3).reduce((sum, value, index) => {
+    const channel = Number(value) / 255;
+    const linear = channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    return sum + linear * [0.2126, 0.7152, 0.0722][index];
+  }, 0);
+  const [low, high] = styles.colors.map(luminance).sort((a, b) => a - b);
+  expect((high + 0.05) / (low + 0.05)).toBeGreaterThanOrEqual(4.5);
 });
 
 test("Coin captions, table headings and transaction notes use the source faint colour", async ({ page }) => {
@@ -530,7 +537,7 @@ test("sell details retain that sale's realized gain outside the position range",
   await expect(sheet).toContainText("+$15,610.00");
   expect((await sheet.locator("h2").boundingBox())!.y).toBeCloseTo(29, 0);
   expect((await sheet.locator("button").last().boundingBox())!.width).toBe(34);
-  expect((await sheet.locator(".coin-fidelity-pill").boundingBox())!.height).toBe(20);
+  expect((await sheet.locator(".t3-tag").boundingBox())!.height).toBe(20);
   expect(await sheet.locator(".coin-fidelity-sheet-row").first().evaluate((node) => getComputedStyle(node).borderTopWidth)).toBe("0px");
   expect(await sheet.locator(".coin-fidelity-sheet-row").nth(1).evaluate((node) => {
     const style = getComputedStyle(node);
@@ -607,10 +614,43 @@ test("edit price digits and changed pill use the source type", async ({ page }) 
   const dialog = page.getByRole("dialog", { name: "Edit transaction" });
   await dialog.getByRole("button", { name: "Sell" }).click();
   expect(await dialog.locator("#fidelity-edit-price").evaluate((node) => getComputedStyle(node).fontVariantNumeric)).toBe("tabular-nums");
-  expect(await dialog.locator(".coin-fidelity-changed").evaluate((node) => {
+  const changedTag = await dialog.locator("label .t3-tag").evaluate((node) => {
     const style = getComputedStyle(node);
-    return [style.fontSize, style.color];
-  })).toEqual(["12px", "rgb(127, 176, 238)"]);
+    const parse = (value: string) => {
+      const values = [...value.matchAll(/[\d.]+/g)].map(([number]) => Number(number));
+      return {
+        channels: value.startsWith("color(srgb ") ? values.slice(0, 3).map((channel) => channel * 255) : values.slice(0, 3),
+        alpha: values[3] ?? 1,
+      };
+    };
+    const paint = parse(style.backgroundColor);
+    const surface = parse(getComputedStyle(node.closest('[role="dialog"]')!).backgroundColor);
+    const background = paint.channels.map((channel, index) =>
+      channel * paint.alpha + surface.channels[index] * (1 - paint.alpha));
+    const light = (value: number) => {
+      const channel = value / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = (channels: number[]) => channels.reduce((sum, channel, index) =>
+      sum + [0.2126, 0.7152, 0.0722][index] * light(channel), 0);
+    const [low, high] = [luminance(background), luminance(parse(style.color).channels)].sort((a, b) => a - b);
+    return { fontSize: style.fontSize, radius: style.borderRadius, contrast: (high + 0.05) / (low + 0.05) };
+  });
+  expect(changedTag).toMatchObject({ fontSize: "11px", radius: "999px" });
+  expect(changedTag.contrast).toBeGreaterThanOrEqual(4.5);
+  await expect(dialog.locator("label .t3-tag")).toHaveAttribute("data-tone", "accent");
+});
+
+test("coin heading type tag uses a light surface in light theme", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "light"));
+  await installTauriBridge(page, { fidelityDesktop: "full" });
+  await page.goto("/#/coins/BTC");
+  const tag = page.locator(".coin-fidelity-heading h1 b");
+  await expect(tag).toBeVisible({ timeout: 40_000 });
+  await expect(tag).toHaveClass(/t3-tag/);
+  const background = await tag.evaluate((node) =>
+    [...getComputedStyle(node).backgroundColor.matchAll(/\d+/g)].slice(0, 3).map(([value]) => Number(value)));
+  expect(Math.min(...background)).toBeGreaterThan(190);
 });
 
 test("Coin change signs and segments use the source glyph and tokens", async ({ page }) => {

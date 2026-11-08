@@ -60,3 +60,36 @@ test("all shell rails, chat headers, tab icons, and semantic shell elements reje
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("tag and count selectors reject raw hex, numeric HSL, and named colors", () => {
+  const directory = mkdtempSync(join(tmpdir(), "track3-tag-guard-"));
+  try {
+    const fixture = join(directory, "fixture.css");
+    for (const selector of [
+      ".t3-tag", ".fidelity-badge", ".fd-change-chip", ".fidelity-pill",
+      ".coin-fidelity-heading h1 b", ".fd-header-alerts span",
+    ]) {
+      for (const color of ["#fff", "hsl(120 50% 50%)", "white"]) {
+        writeFileSync(fixture, `${selector} { color: ${color}; }\n`);
+        const result = spawnSync(process.execPath, [guard, fixture], { encoding: "utf8" });
+        assert.equal(result.status, 1, `${selector}: ${color}: ${result.stderr}`);
+      }
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("non-tag names containing tag or age do not trigger the tag guard", () => {
+  const directory = mkdtempSync(join(tmpdir(), "track3-tag-guard-"));
+  try {
+    const fixture = join(directory, "fixture.css");
+    writeFileSync(fixture, ".percentage { color: #fff; }\n.stage { color: white; }\n.status-tag { color: #fff; }\n");
+    const result = spawnSync(process.execPath, [guard, fixture], { encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /status-tag/);
+    assert.doesNotMatch(result.stderr, /percentage|stage/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

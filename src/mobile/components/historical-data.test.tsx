@@ -87,4 +87,6 @@ it("maps history changes to physical tones under red-up and mutes zero", async (
   await screen.findByText("1–3 of 3");
   expect([...document.querySelectorAll(".history-mobile-snapshot-delta")].map((node) =>
     node.getAttribute("data-tone"))).toEqual(["loss", "gain", "neutral"]);
+  expect([...document.querySelectorAll(".history-mobile-snapshot-delta")].every((node) =>
+    !node.classList.contains("t3-tag"))).toBe(true);
 });

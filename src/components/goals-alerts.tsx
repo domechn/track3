@@ -352,7 +352,7 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] ${rule.enabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                      <span className="t3-tag" data-tone={rule.enabled ? "positive" : "neutral"}>
                         {t(rule.enabled ? "goals.enabled" : "finance.paused")}
                       </span>
                       <label className="flex items-center gap-1 text-xs">

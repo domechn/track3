@@ -87,10 +87,8 @@
   .pf-alloc-total.pf-bad { border-color: var(--pf-negative); }
   .pf-alloc-total b { font-weight: 600; }
   .pf-alloc-total strong { font-weight: 600; }
-  .pf-alloc-total em { grid-column: 1; justify-self: end; font-style: normal; }
-  .pf-pill { display: inline-flex; align-items: center; width: max-content; height: 20px; padding: 0 8px; border-radius: 99px; background: #212023; color: #bdbdc0; font-size: 12px; font-weight: 500; white-space: nowrap; }
-  .pf-pill.pf-positive { background: #1b2828; }.pf-pill.pf-negative { background: #2c1a20; }
-  .pf-pill.pf-info { background: #14243a; color: #7fb0ee; }
+  .pf-alloc-total em { grid-column: 1; justify-self: end; padding-inline: 9.5px; font-style: normal; }
+  .pf-alloc-total em[data-tone="neutral"] { padding-inline: 9px; }
   .pf-banner { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--pf-border); border-radius: 6px; }
   .pf-error { margin-top: 12px; border-color: #4a2530; background: #2c1a20; }
   .pf-error > span { color: var(--pf-negative); }
@@ -195,14 +193,12 @@
   .pf-goal-kind { grid-area: kd; align-self: center; color: var(--pf-muted); font-size: 12px; line-height: 16px; }
   .pf-goal-kind small { display: block; color: var(--pf-faint); font-size: 12px; line-height: 16px; }
   .pf-goal-status { grid-area: st; align-self: center; }
-  .pf-goal-status.pf-info { transform: translateY(2px); }
-  .pf-pill.pf-warn { background: #2a2416; color: var(--pf-warning); }
   .pf-goal-actions { grid-area: ac; display: flex; gap: 6px; }
   .pf-goal-actions button { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--pf-control); border-radius: 50%; color: var(--pf-muted); }
   .pf-goal-actions svg { width: 15px; height: 15px; }
   .pf-history .pf-card-head { align-items: baseline; column-gap: 12px; }
   .pf-history .pf-card-head h2 { width: auto; }
-  .pf-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--pf-negative); color: #1a0509; font-size: 11px; font-weight: 700; }
+  .pf-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: var(--pf-negative); color: hsl(var(--background)); font-size: 11px; font-weight: 700; }
   .pf-history-actions { flex-basis: 100%; display: flex; gap: 6px; align-items: center; }
   .pf-history-actions button { min-height: 44px; margin-block: -8px; padding: 0 12px; border: 0; border-radius: 99px; color: var(--pf-muted); font-size: 12px; font-weight: 500; position: relative; isolation: isolate; }
   .pf-history-actions button:first-child { color: var(--pf-faint); font-weight: 500; }
@@ -297,11 +293,6 @@
   .light .pf-alloc-bar u { background: hsl(var(--foreground)); }
   .light .pf-segment button.active { color: hsl(var(--foreground)); }
   .light .pf-segment button.active::before { background: var(--nav-selected-background); }
-  .light .pf-pill { background: hsl(var(--secondary)); color: hsl(var(--muted-foreground)); }
-  .light .pf-pill.pf-positive { background: #e2f3eb; color: hsl(var(--positive)); }
-  .light .pf-pill.pf-negative { background: #fae8ed; color: hsl(var(--negative)); }
-  .light .pf-pill.pf-info { background: #e7f1fd; color: hsl(var(--accent-data)); }
-  .light .pf-pill.pf-warn { background: #fff2d8; color: hsl(var(--warning)); }
   .light .pf-trade-net { color: hsl(var(--foreground)); }
   .light .pf-info { border-color: #bed7f2; background: #e7f1fd; }
   .light .pf-error { border-color: #efb9c7; background: #fae8ed; }

@@ -574,7 +574,8 @@ describe("System Info subscription management", () => {
       });
       const view = render(<SystemInfo onProStatusChange={vi.fn()} />);
       expect((await screen.findByText(/in 1 day/)).parentElement).toHaveTextContent("Monthly plan");
-      expect(screen.getByText("Past Due")).toHaveClass("text-amber-700");
+      expect(screen.getByText("Past Due")).toHaveClass("t3-tag");
+      expect(screen.getByText("Past Due")).toHaveAttribute("data-tone", "warning");
       view.unmount();
       mocks.getSubscriptionInfo.mockResolvedValue({
         planType: "monthly", status: "canceled", currentPeriodEnd: "2026-10-27T00:00:00.000Z",

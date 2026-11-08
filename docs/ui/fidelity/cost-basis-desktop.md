@@ -39,6 +39,12 @@ The selected range uses the report's calculator values. The desktop page reads t
 
 ## Remaining differences
 
+The 8 Nov source-page and current FIFO app viewports at 1600 × 1024
+measure **1.771%** different at an RGB-channel threshold of 20. Term and
+subtotal labels now use the shared theme tag. It retains 20 px height
+and readable contrast; its 11 px text, 6 px padding, and subtle border
+differ from the source's 12 px, 8 px dark pill.
+
 The 7 Nov 2026 FIFO capture is **3.86%** different from the saved
 1600 × 1728 source render at RGB-sum threshold 60 when the app's
 1600 × 1024 scroll viewport is padded to the source height. The required

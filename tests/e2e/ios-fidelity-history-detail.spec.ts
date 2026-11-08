@@ -18,7 +18,7 @@ test("detail labels and symbols follow the source hierarchy", async ({ page }) =
   await page.locator(".history-mobile-snapshot").filter({ hasText: "752,642.71" }).getByTestId("history-mobile-row").click();
   const detail = page.getByRole("dialog", { name: /snapshot details/i });
   await expect(detail.locator(".fidelity-history-detail-asset").first()).toBeVisible();
-  await expect(detail.locator(".fidelity-history-detail-head .fidelity-history-edited")).toHaveCSS("font-weight", "500");
+  await expect(detail.locator(".fidelity-history-detail-head .t3-tag")).toHaveCSS("font-weight", "500");
   await expect(detail.locator(".fidelity-history-detail-asset-body strong").first()).toHaveCSS("font-weight", "700");
   await expect(detail.locator(".fidelity-history-edit-row strong").first()).toHaveCSS("font-weight", "400");
   // Shared HSL tokens round one channel differently from the old fixed colors.
@@ -74,7 +74,7 @@ test("edited snapshot detail", async ({ page }) => {
   expect(Math.round((await detail.locator(".fidelity-history-detail-total small").boundingBox())!.y)).toBe(126);
   expect(Math.round((await detail.locator(".fidelity-history-detail-subkpis strong").first().boundingBox())!.y)).toBe(192);
   expect(Math.round((await detail.locator(".fidelity-history-detail-actions button").first().boundingBox())!.y)).toBe(249);
-  const editedTextX = await detail.locator(".fidelity-history-detail-head .fidelity-history-edited").evaluate((pill) => {
+  const editedTextX = await detail.locator(".fidelity-history-detail-head .t3-tag").evaluate((pill) => {
     const range = document.createRange();
     range.selectNodeContents(pill);
     return Math.round(range.getBoundingClientRect().x);
@@ -157,5 +157,5 @@ test("detail retains its change and edited status when the list returns to page 
   await page.evaluate(() => window.dispatchEvent(new Event("track3:soft-refresh")));
   await expect(page.locator(".fidelity-history-pager")).toContainText("1–50 of 1,284");
   await expect(detail.locator(".fidelity-history-detail-subkpis")).toContainText(expected!);
-  await expect(detail.locator(".fidelity-history-detail-head .fidelity-history-edited")).toBeVisible();
+  await expect(detail.locator(".fidelity-history-detail-head .t3-tag")).toBeVisible();
 });

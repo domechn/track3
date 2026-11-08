@@ -508,10 +508,10 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
       </section>
       {!insightsDismissed && (insightsEnabled
         ? <section className="fd-overview-insights"><InsightsCard currency={currency} overview fidelity />
-          {proUser && <span className="fd-overview-pro">{t("fidelity.overview.pro")}</span>}
+          {proUser && <span className="fd-overview-pro t3-tag" data-tone="accent">{t("fidelity.overview.pro")}</span>}
           <button className="fd-overview-dismiss" type="button" onClick={() => setInsightsDismissed(true)} aria-label={t("insights.dismiss")}>×</button>
         </section>
-        : <section className="fd-card fd-overview-insights off"><div className="fd-card-heading"><h3>{t("fidelity.overview.aiInsights")}</h3><span className="fd-overview-pro">{t("fidelity.overview.off")}</span></div>
+        : <section className="fd-card fd-overview-insights off"><div className="fd-card-heading"><h3>{t("fidelity.overview.aiInsights")}</h3><span className="fd-overview-pro t3-tag" data-tone="neutral">{t("fidelity.overview.off")}</span></div>
           <div className="fd-overview-insight-off"><div><b>{t("fidelity.overview.insightsOff")}</b>{t("fidelity.overview.insightsOffDescription")}</div><Link to="/settings/assistant">{t("fidelity.overview.openAiSettings")}</Link></div>
           <footer><span>{t("fidelity.overview.insightsSettingsNote")}</span></footer>
         </section>)}

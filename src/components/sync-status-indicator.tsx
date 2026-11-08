@@ -425,7 +425,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
                   : status.sync.phase === "error" ? t("fidelity.settingsB.sync.pop.failedTitle")
                     : phase === "conflict" ? t("sync.status.conflictSummary").replace("{count}", String(report?.conflicts.length ?? 0))
                     : report ? t("fidelity.settingsB.sync.pop.upToDate") : t("fidelity.settingsB.sync.pop.sync")}</h2>
-              <span className={`t3-b-sync-pop-badge ${status.sync.phase === "error" ? "negative" : phase === "conflict" ? "warning" : status.sync.phase === "syncing" ? "info" : report ? "positive" : ""}`}>
+              <span className="t3-tag" data-tone={status.sync.phase === "error" ? "negative" : phase === "conflict" ? "warning" : status.sync.phase === "syncing" ? "accent" : report ? "positive" : "neutral"}>
                 {status.sync.phase === "syncing" ? t(status.sync.progress?.phase === "pull" ? "fidelity.settingsB.sync.pop.downloading" : "fidelity.settingsB.sync.pop.uploading")
                   : status.sync.retryStopped ? t("fidelity.settingsB.sync.pop.needsAttention")
                     : status.sync.phase === "error" ? t("fidelity.settingsB.sync.pop.retrying")
@@ -485,8 +485,8 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
             <h2 id={locked ? "sync-locked-title" : undefined}>{t(locked ? "sync.fidelity.lockedTitle" : status.sync.retryStopped ? "fidelity.b.sync.stopped" : phase === "error" || phase === "unreadable"
               ? "fidelity.b.sync.sheetFailed" : phase === "syncing" ? "fidelity.b.sync.syncing"
                 : never ? "settings.tab.sync" : "fidelity.b.sync.sheetUpToDate")}</h2>
-            <span className={`fidelity-sync-sheet-pill${locked ? " is-warning" : phase === "error" || phase === "unreadable"
-              ? " is-error" : report && status.sync.phase === "idle" ? " is-positive" : ""}`}>
+            <span className="t3-tag" data-tone={locked ? "warning" : phase === "error" || phase === "unreadable"
+              ? "negative" : phase === "syncing" ? "accent" : report && status.sync.phase === "idle" ? "positive" : "neutral"}>
               {t(locked ? "fidelity.b.sync.sheetPassphraseNeeded" : status.sync.retryStopped
                 ? "fidelity.b.sync.sheetNeedsAttention" : phase === "error" || phase === "unreadable"
                   ? "fidelity.b.sync.sheetRetrying"

@@ -467,10 +467,10 @@ const App = ({
     : retrySchedule.stopped ? t("refresh.autoRetry.stopped") : "";
   const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
   const statusStyle = {
-    ok: "t3-pill t3-refresh-status-pill",
-    stale: "t3-pill t3-refresh-status-pill",
-    partial: "t3-pill t3-refresh-status-pill",
-    failed: "t3-pill t3-refresh-status-pill",
+    ok: "t3-tag t3-refresh-status-pill",
+    stale: "t3-tag t3-refresh-status-pill",
+    partial: "t3-tag t3-refresh-status-pill",
+    failed: "t3-tag t3-refresh-status-pill",
   };
   const statusIcon = { ok: CheckIcon, stale: ExclamationTriangleIcon,
     partial: ExclamationTriangleIcon, failed: CrossCircledIcon };
@@ -644,7 +644,7 @@ const App = ({
                     {source.provider}{source.hint && ` · ${displayHint(source)}`}
                   </div>}
                   <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                    <span data-tone={source.status === "ok" ? "ok" : source.status === "failed" ? "err" : "warn"} className={`inline-flex items-center gap-1 font-medium ${statusStyle[source.status]}`}>
+                    <span data-tone={source.status === "ok" ? "positive" : source.status === "failed" ? "negative" : "warning"} className={`inline-flex items-center gap-1 font-medium ${statusStyle[source.status]}`}>
                       <StatusIcon aria-hidden="true" className="h-3.5 w-3.5" />
                       {t(`refresh.status.${source.status}`)}
                     </span>

@@ -120,7 +120,7 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
         <TrackLogo size={28} decorative />
         {!collapsed && <span className="truncate text-[15px] font-semibold">{t("app.brand")}</span>}
       </Link>
-      {isProUser && !collapsed && <span className="rounded-pill bg-accent-data/15 px-2 text-xs text-foreground dark:text-accent-data">{t("app.proBadge")}</span>}
+      {isProUser && !collapsed && <span className="t3-tag" data-tone="accent">{t("app.proBadge")}</span>}
     </div>
     <TooltipProvider delayDuration={220}><nav aria-label={t("nav.main", "Main navigation")} className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-[10px] touch:px-[5px] pb-2">
       <NavItem item={overview} collapsed={collapsed} fidelity={fidelity} />

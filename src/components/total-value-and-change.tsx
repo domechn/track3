@@ -677,7 +677,7 @@ const App = ({
         <CardContent className="flex flex-1 flex-col t3-hero-content">
           <div className="text-2xl font-semibold font-mono tabular-nums tracking-tight t3-hero-value">
             {getTotalValueShower(btcAsBase, firstTotalValue, shownTotalValue, assetChangeData).formatTotalValue()}
-            {totalValueData.partial && <span className="ml-2 inline-flex align-middle rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 font-sans text-xs font-medium tracking-normal text-foreground">
+            {totalValueData.partial && <span className="t3-tag ml-2 align-middle" data-tone="warning">
               {t("history.partial.label")}
             </span>}
           </div>

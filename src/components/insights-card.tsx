@@ -232,7 +232,7 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
     return <Card className="t3-insights-card t3-insights-summary" role="region" aria-label={t("overview.fidelity.aiInsights")}>
       <header>
         <h2>{t("overview.fidelity.aiInsights")}</h2>
-        <span>{t("overview.fidelity.pro")}</span>
+        <span className="t3-tag" data-tone="accent">{t("overview.fidelity.pro")}</span>
       </header>
       <div className="t3-insights-summary-lines">
         {summaryLines.slice(0, showAll ? undefined : 3).map((line, index) => {

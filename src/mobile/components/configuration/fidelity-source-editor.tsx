@@ -141,7 +141,7 @@ export function FidelitySourceEditor({
               <button key={option.type} type="button" aria-pressed={draft.type === option.type} disabled={!!original}
                 className={`fidelity-editor-pick${draft.type === option.type ? " is-selected" : ""}`}
                 onClick={() => onChoose(option.type)}>{draft.type === option.type && <i className="fidelity-editor-selected-dot" />}
-                <span><strong>{option.title} {option.pro && <em>Pro</em>}</strong>
+                <span><strong>{option.title} {option.pro && <em className="t3-tag" data-tone="accent">Pro</em>}</strong>
                   <small>{option.detail}</small></span></button>)}</div>
           </div>
           <EditorField id="fidelity-wallet-address" label={t("config.formAddress")} value={wallet.address} mono

@@ -4,7 +4,8 @@ import { extname, join, relative } from "node:path";
 import postcss from "postcss";
 
 const shellSelector = /\.(?:t3-desktop-rail|t3-fidelity-sidebar|t3-fidelity-rail(?:-[\w-]+)?|t3-fidelity-topbar(?:-[\w-]+)?|t3-fidelity-ranges|t3-fidelity-stamp|t3-topbar(?:-[\w-]+)?|t3-records-toolbar(?:-[\w-]+)?|t3-overview-heading|fidelity-records-rail(?:-[\w-]+)?|fidelity-chat-header(?:-[\w-]+)?|mobile-sidebar(?:-collapse)?|mobile-rail-[\w-]+|mobile-tab(?:-bar|-badge|-icon)?|mobile-topbar(?:-[\w-]+)?|mobile-sheet-handle|mobile-sheet-heading)(?![\w-])|#app-top-bar(?![\w-])|(?:^|[,\s>+~])(?:nav|aside|header)\b/;
-const rawColor = /#[0-9a-fA-F]{3,8}\b|\brgba?\s*\(|\b(?:white|black)\b/i;
+const tagSelector = /\.(?:(?:[\w-]+-)?(?:badge|tag|chip|pill)(?:-[\w-]+)?|fd-header-alerts)(?![\w-])|\.coin-fidelity-heading\s+h1\s+b\b/;
+const rawColor = /#[0-9a-fA-F]{3,8}\b|\brgba?\s*\(|\bhsla?\s*\(\s*(?:\d|\.)|\b(?:white|black)\b/i;
 const rawUtility = /\b(?:bg|text|border|ring|stroke|fill)-(?:white|black)(?:\/\d+)?\b/;
 const exemption = /theme-exempt:\s*\S+/;
 const errors = [];
@@ -30,7 +31,7 @@ for (const file of files) {
   const label = relative(process.cwd(), file) || file;
   if (extname(file) === ".css") {
     postcss.parse(text, { from: file }).walkRules((rule) => {
-      if (!shellSelector.test(rule.selector)) return;
+      if (!shellSelector.test(rule.selector) && !tagSelector.test(rule.selector)) return;
       rule.walkDecls((decl) => {
         if (!rawColor.test(decl.value)) return;
         const previous = decl.prev();
