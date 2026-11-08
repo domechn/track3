@@ -1,9 +1,31 @@
 import { expect, test } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { installTauriBridge } from "./fidelity-desktop-scenes";
 import AxeBuilder from "@axe-core/playwright";
 
 test.use({ viewport: { width: 1600, height: 1000 }, colorScheme: "dark", reducedMotion: "reduce", timezoneId: "UTC" });
+
+test("coin design source provides the comparison bounds", async ({ page }) => {
+  const path = "/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/records-coin-btc.html";
+  test.skip(!existsSync(path), "local design source is unavailable");
+  await page.goto(pathToFileURL(path).href, { waitUntil: "domcontentloaded" });
+  const metrics = page.locator(".kp6").first();
+  await expect(metrics).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const measurements = await metrics.evaluate((strip) => ({
+    strip: strip.getBoundingClientRect().toJSON(),
+    columns: [...strip.children].map((cell) => ({
+      box: cell.getBoundingClientRect().toJSON(),
+      padding: getComputedStyle(cell).padding,
+      fontSize: getComputedStyle(cell.querySelector(".v")!).fontSize,
+    })),
+  }));
+  expect(measurements.columns).toHaveLength(6);
+  mkdirSync("/tmp/history-kpi-overflow", { recursive: true });
+  writeFileSync("/tmp/history-kpi-overflow/design-coin-btc-bounds.json", JSON.stringify(measurements, null, 2));
+  await page.screenshot({ path: "/tmp/history-kpi-overflow/design-coin-btc-1600.png", fullPage: true });
+});
 
 test("coin toolbar stays opaque and separate from scrolled content at 1440px", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -779,6 +801,17 @@ test("Coin chart, tables and transaction heading use the source geometry", async
   });
   expect(label.x).toBeCloseTo(851.8, 0);
   expect(label.y).toBeCloseTo(550, 0);
+});
+
+test("short coin chart stats stay in three columns at 1280px", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await installTauriBridge(page, { fidelityDesktop: "full" });
+  await page.goto("/#/coins/BTC");
+  const stats = page.locator(".coin-fidelity-chart-stats .coin-fidelity-metric");
+  await expect(stats).toHaveCount(3);
+  await expect(stats.first().locator("strong")).toBeVisible();
+  const tops = await stats.evaluateAll((cells) => cells.map((cell) => cell.getBoundingClientRect().top));
+  expect(new Set(tops).size).toBe(1);
 });
 
 test("NOVA zero figures, final price row and price suffix match the source", async ({ page }) => {

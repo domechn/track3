@@ -45,8 +45,9 @@ test("edited snapshot detail", async ({ page }) => {
   });
   expect(headingWidth).toBeGreaterThanOrEqual(154);
   expect(headingWidth).toBeLessThanOrEqual(156);
-  expect(totalWidth).toBeGreaterThanOrEqual(97);
-  expect(totalWidth).toBeLessThanOrEqual(99);
+  expect(totalWidth).toBeGreaterThanOrEqual(117);
+  expect(totalWidth).toBeLessThanOrEqual(119);
+  await expect(detail.locator(".fidelity-history-detail-total strong")).toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(detail.locator(".fidelity-history-detail-asset").filter({ hasText: "SOL" })).toContainText("410.0000");
   await expect(detail.locator(".fidelity-history-detail-asset").filter({ hasText: "USDC" })).toContainText("39,850.00");
   await expect(detail.locator(".fidelity-history-detail-asset").filter({ hasText: "USDC" })).toContainText("$1.0001");
@@ -70,7 +71,7 @@ test("edited snapshot detail", async ({ page }) => {
   await expect(detail.locator(".fidelity-history-detail-edits .fidelity-history-section-head span")).toHaveText("2 edits");
   expect(Math.round((await detail.locator(".fidelity-history-detail-sum strong").boundingBox())!.y)).toBe(944);
   expect(Math.round((await detail.locator(".fidelity-history-detail-edits h3").boundingBox())!.y)).toBe(1017);
-  expect(Math.round((await detail.locator(".fidelity-history-detail-subkpis > :nth-child(2) span").boundingBox())!.x)).toBe(146);
+  expect(Math.round((await detail.locator(".fidelity-history-detail-subkpis > :nth-child(2) span").boundingBox())!.x)).toBe(169);
   expect(Math.round((await detail.locator(".fidelity-history-detail-total small").boundingBox())!.y)).toBe(126);
   expect(Math.round((await detail.locator(".fidelity-history-detail-subkpis strong").first().boundingBox())!.y)).toBe(192);
   expect(Math.round((await detail.locator(".fidelity-history-detail-actions button").first().boundingBox())!.y)).toBe(249);
