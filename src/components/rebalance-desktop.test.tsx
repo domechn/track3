@@ -4,7 +4,6 @@ import { expect, it, vi } from "vitest";
 import { I18nProvider, useTranslation } from "@/i18n";
 import RebalanceDesktop from "./rebalance-desktop";
 
-vi.mock("./fidelity-rail", () => ({ default: () => null }));
 
 function props(overrides: Partial<ComponentProps<typeof RebalanceDesktop>> = {}): ComponentProps<typeof RebalanceDesktop> {
   return {

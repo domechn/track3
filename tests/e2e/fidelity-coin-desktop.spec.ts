@@ -260,7 +260,7 @@ test("Coin rail, chart ranges and transaction filter follow source positions", a
   await page.evaluate(() => document.fonts.ready);
   const rail = await page.locator(".t3-fidelity-sidebar nav a svg").evaluateAll((nodes) =>
     nodes.slice(0, 9).map((node) => node.getBoundingClientRect().y));
-  expect(rail).toEqual([71, 128, 166, 204, 242, 290, 326, 362, 398]);
+  expect(rail).toEqual([79, 136, 180, 224, 268, 325, 369, 413, 457]);
   const range = (await page.locator(".coin-fidelity-chart-controls .coin-fidelity-controls").nth(1).boundingBox())!;
   expect([range.x, range.width]).toEqual([823.578125, 92]);
   const filter = (await page.locator(".coin-fidelity-transactions .coin-fidelity-controls").boundingBox())!;
@@ -375,7 +375,7 @@ test("Coin rail separators, range segments and chevron use the source geometry",
   await page.goto("/#/coins/BTC");
   await expect(page.locator(".coin-fidelity-chart-controls")).toBeVisible({ timeout: 40_000 });
   const separators = await page.locator(".t3-fidelity-nav-group").evaluateAll((nodes) =>
-    nodes.map((node) => node.getBoundingClientRect().y + parseFloat(getComputedStyle(node, "::before").top)));
+    nodes.map((node) => node.getBoundingClientRect().y));
   const segment = page.locator(".coin-fidelity-chart-controls .coin-fidelity-controls").nth(1);
   const first = (await segment.locator("button").first().boundingBox())!;
   const second = (await segment.locator("button").last().boundingBox())!;
@@ -383,7 +383,7 @@ test("Coin rail separators, range segments and chevron use the source geometry",
     const style = getComputedStyle(node, "::after");
     return [style.width, style.height, style.borderRightWidth, style.borderBottomWidth];
   });
-  expect(separators).toEqual([108, 279]);
+  expect(separators).toEqual([116, 305]);
   expect([first.width, second.x]).toEqual([40, first.x + 40]);
   expect(chevron).toEqual(["7px", "7px", "1px", "1px"]);
 });
@@ -626,8 +626,8 @@ test("Coin change signs and segments use the source glyph and tokens", async ({ 
     return [track.backgroundColor, active.backgroundColor, active.color, inactive.color];
   });
   expect(segmentStyles).toEqual([
-    "rgb(26, 26, 30)", "rgb(42, 42, 48)", "rgb(255, 255, 255)", "rgb(154, 156, 162)",
-  ]); // The selected fill must stay distinct from its track; --faint rounds by one channel.
+    "rgb(26, 26, 30)", "rgba(72, 136, 213, 0.16)", "rgb(255, 255, 255)", "rgb(155, 157, 163)",
+  ]);
   await page.getByRole("button", { name: /Edit.*transaction/i }).first().click();
   const dialog = page.getByRole("dialog", { name: "Edit transaction" });
   const type = dialog.locator(".coin-fidelity-type");
@@ -804,11 +804,14 @@ test("NVDA gridlines land on the source pixel rows", async ({ page }) => {
     canvas.height = image.height;
     const context = canvas.getContext("2d")!;
     context.drawImage(image, 0, 0);
-    const pixels = context.getImageData(145, 524, 1, 167).data;
+    const pixels = context.getImageData(145, 524, 3, 167).data;
     return Array.from({ length: 167 }, (_, index) => index + 524)
-      .filter((_, index) => pixels[index * 4] === 35 && pixels[index * 4 + 1] === 35 && pixels[index * 4 + 2] === 37);
+      .filter((_, index) => [0, 1, 2].filter((column) => {
+        const pixel = (index * 3 + column) * 4;
+        return pixels[pixel] === 35 && pixels[pixel + 1] === 35 && pixels[pixel + 2] === 37;
+      }).length >= 2);
   }, image.toString("base64"));
-  // --border rounds to rgb(35, 35, 37); the source's fixed grid line was rgb(38, 38, 41).
+  // A chart mark can cover one column; require two exact border pixels at every source row.
   expect(rows).toEqual([524, 565, 607, 648, 690]);
 });
 

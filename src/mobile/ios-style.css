@@ -172,7 +172,7 @@
     --sidebar-foreground: hsl(var(--foreground));
     --sidebar-muted: hsl(var(--muted-foreground));
     --sidebar-border: hsl(var(--border));
-    --sidebar-active-bg: #1c1c20;
+    --sidebar-active-bg: hsl(var(--accent-data) / .16);
     --sidebar-active-fg: #fff;
     --sidebar-hover-bg: hsl(var(--raised));
     --mobile-topbar-background: #0d0d0e;

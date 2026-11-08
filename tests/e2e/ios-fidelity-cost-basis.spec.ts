@@ -504,7 +504,13 @@ test("light cost basis keeps the page, selected segments and tab bar legible", a
     const ground = color("#app-main-content", "backgroundColor");
     const tab = color(".mobile-tab-bar", "backgroundColor");
     const segment = color(".fidelity-segments button.selected");
-    const segmentGround = getComputedStyle(document.querySelector(".fidelity-segments button.selected")!, "::before").backgroundColor;
+    const selected = document.querySelector<HTMLElement>(".fidelity-segments button.selected")!;
+    const tint = getComputedStyle(selected, "::before").backgroundColor;
+    const track = getComputedStyle(selected.parentElement!).backgroundColor;
+    const rgba = (value: string) => (value.match(/[\d.]+/g) ?? []).map(Number);
+    const alpha = rgba(tint)[3] ?? 1;
+    const segmentGround = `rgb(${rgba(tint).slice(0, 3).map((value, index) =>
+      Math.round(value * alpha + rgba(track)[index] * (1 - alpha))).join(", ")})`;
     return {
       ground, tab, segment, segmentGround,
       titleContrast: contrast(color(".mobile-route-heading h1"), ground),

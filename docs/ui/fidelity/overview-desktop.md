@@ -40,6 +40,7 @@ The type face is Public Sans with tabular numbers. Tokens: `--ground #0d0d0e`, `
 ## Remaining differences
 
 The 8 Nov 2026 Sync-open captures differ by **7.458%** at the RGB-sum threshold of 60 over the shared 1440 × 900 viewport. The source popover is 360 × 336 px at (1010, 55); the app keeps its real sync report and opens a scrollable diagnostics panel when Details is selected. The source page shows only the collapsed Details link, so the expanded phase and request rows and their scroll rail have no matching source pixels. The app's shared definition rows have a 32px pitch under the Details specification, while the source's five summary rows are 40px. The saved product data, chart and controls below also account for the page difference as described here.
+The shared rail's measured source differences, including its owner-required active tile, are recorded in [navigation.md](navigation.md).
 
 The 7 Nov 2026 UI27 captures compare the saved source page renders
 `/tmp/fidelity-desktop/design/overview-{base,sync}-1440.png` with
