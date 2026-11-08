@@ -282,15 +282,18 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
 
     await page.goto("/#/overview");
     await page.locator(".fd-overview-refresh, .fd-partial-refresh").click();
+    await expect(page.getByRole("alertdialog", { name: "Source status" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Source status" }).click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     await expect(page.locator("[data-source-status-row]").first()).toBeVisible();
     await expect(page.locator(".ios-d3-refresh-sheet [data-source-status-row]").first()).not.toContainText("Waiting…");
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-refresh.png` });
-    await expect(page.locator(".ios-d3-refresh-sheet [role='progressbar']")).toHaveCount(0, { timeout: 90_000 });
+    await expect(page.getByRole("progressbar", { name: "Refresh progress" })).toHaveCount(0, { timeout: 90_000 });
+    await expect(page.locator(".ios-d3-refresh-sheet [role='progressbar']")).toHaveCount(0);
     if (!await page.getByRole("alertdialog", { name: "Source status" }).isVisible()) {
       await page.getByRole("button", { name: "Source status" }).click();
     }
-    await expect(page.locator("[data-source-status-row]").first()).toBeVisible();
+    await expect(page.locator(".ios-d3-refresh-sheet .ios-d3-refresh-row").first()).toBeVisible();
     await expect(page.locator(".ios-d3-refresh-sheet p.sr-only")).toHaveCount(0);
     await expect(page.locator(".ios-d3-toast-viewport")).toHaveCount(1);
     await expect(page.locator(".ios-d3-toast-viewport")).toBeHidden();

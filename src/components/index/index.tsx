@@ -276,9 +276,9 @@ function TopBar({
           {recordsPage && <Link to="/settings" className="t3-records-settings-link">{t("nav.settings")}</Link>}
         </div>
       </div>
-      {refreshProgress > 0 && refreshButtonLoading && (
+      {refreshButtonLoading && (
         <div className={recordsPage ? "t3-records-refresh-progress absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none" : railFidelityPage ? "t3-fidelity-refresh-progress" : "absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none"}>
-          <Progress value={refreshProgress} className={railFidelityPage ? "h-1.5 w-full" : "w-[80%]"} />
+          <Progress value={refreshProgress} aria-label={t("refresh.fidelity.progressAria")} className={railFidelityPage ? "h-[3px] w-full" : "h-[3px] w-[80%]"} />
         </div>
       )}
     </div>

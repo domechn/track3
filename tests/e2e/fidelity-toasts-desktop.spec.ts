@@ -139,6 +139,8 @@ export async function refreshAllData(setProgress) {
         await expect(page.locator(".t3-fidelity-toast")).toHaveCount(1);
         await expect(page.locator(".t3-fidelity-toast").first()).toContainText("Pro refresh limit nearly used");
         await expect(page.locator(".t3-fidelity-toast").first()).toContainText("48 of 50 ERC20 refreshes used. Resets 1 Nov.");
+        await expect(page.getByRole("alertdialog", { name: "Refresh finished" })).toHaveCount(0);
+        await page.getByRole("button", { name: "Source status" }).click();
         await expect(page.getByRole("alertdialog", { name: "Refresh finished" })).toBeVisible();
         await expect(page.locator("[aria-busy='true']")).toHaveCount(0);
         await page.keyboard.press("Escape");
@@ -150,6 +152,8 @@ export async function refreshAllData(setProgress) {
         await expect(page.locator(".t3-fidelity-toast")).toHaveCount(2);
         await expect(page.locator(".t3-fidelity-toast").last()).toContainText("OKX refresh failed");
         await expect(page.locator(".t3-fidelity-toast").last()).toContainText("Source timed out");
+        await expect(page.getByRole("alertdialog", { name: "Refresh finished" })).toHaveCount(0);
+        await page.getByRole("button", { name: "Source status" }).click();
         await expect(page.getByRole("alertdialog", { name: "Refresh finished" })).toBeVisible();
         await expect(page.locator("[aria-busy='true']")).toHaveCount(0);
         await page.keyboard.press("Escape");

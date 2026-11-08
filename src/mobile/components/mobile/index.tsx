@@ -279,7 +279,7 @@ export function PullToRefresh({ children, onRefresh, disabled, className, source
       setRefreshing(true);
       void Promise.resolve(onRefresh()).finally(() => setRefreshing(false));
     }}>
-    {sourceProgress && progress?.active && <div className="fd-pull-progress" role="status">
+    {sourceProgress && (pull > 0 || refreshing) && progress?.active && <div className="fd-pull-progress" role="status">
       <span className="fd-pull-ring" aria-hidden="true" />
       <div><b>{t("fidelity.overview.refreshingSources")}</b><span>{t("fidelity.overview.refreshProgress")
         .replace("{done}", String(progress.completed.length))

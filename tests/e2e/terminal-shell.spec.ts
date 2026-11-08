@@ -55,6 +55,9 @@ test("desktop source status keeps long rows separate inside its scroll area afte
   await page.goto("/#/overview");
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   const dialog = page.getByRole("alertdialog", { name: "Refresh finished" });
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeEnabled({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Source status" }).click();
   await expect(dialog).toBeVisible();
   const rows = dialog.locator(".t3-refresh-flow-row");
   await expect(rows).toHaveCount(5);

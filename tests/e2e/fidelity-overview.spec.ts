@@ -298,6 +298,15 @@ test("Overview opens with the saved shared date range", async ({ browser }) => {
 test("Overview pull refresh shows the source progress strip", async ({ browser }) => {
   const { context, page } = await samplePage(browser);
   try {
+    await page.evaluate(() => {
+      const target = document.querySelector('[data-testid="pull-to-refresh"]');
+      if (!target) throw new Error("pull target missing");
+      const start = new Touch({ identifier: 1, target, clientX: 185, clientY: 80 });
+      const moved = new Touch({ identifier: 1, target, clientX: 185, clientY: 160 });
+      target.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [start], targetTouches: [start], changedTouches: [start] }));
+      target.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [moved], targetTouches: [moved], changedTouches: [moved] }));
+    });
+    await expect(page.locator(".mobile-pull-indicator")).toBeVisible();
     await page.evaluate(() => window.dispatchEvent(new CustomEvent("fidelity:mobile-refresh-progress", {
       detail: { active: true, total: 5, completed: ["Binance", "OKX", "Ledger"] },
     })));
