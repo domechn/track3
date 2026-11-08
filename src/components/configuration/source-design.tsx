@@ -15,6 +15,7 @@ import type { ExchangeDraft, ExchangeRow, OtherRow, StockBrokerDraft, StockBroke
 import { SourceEditorDesign } from "./source-editor-design";
 import EmptyState from "@/components/empty-state";
 import AssetLabel from "@/components/common/asset-label";
+import { Tag } from "@/components/ui/tag";
 
 type Tab = "exchanges" | "wallets" | "brokers" | "custom";
 type Holding = { wallet: string; symbol: string; amount: number; value: number; price: number };
@@ -197,9 +198,8 @@ export function SourceDesign({
           const toggle = () => kind === "exchange" ? onExchangeToggle(row.type, row.apiKey)
             : kind === "wallet" ? onWalletToggle(row.type, row.address) : onBrokerToggle(row.type, row.queryId);
           return <div className={`t3-fidelity-source-row ${stale ? "error" : ""}`} key={`${kind}:${identity}`}>
-            <div className="t3-fidelity-source-id"><AssetLabel kind={kind} type={row.type} name={name} size={24}
-              secondary={<>{metadata}{kind === "wallet" && row.type === "erc20" && <span className="t3-fidelity-source-pro">Pro</span>}</>} /></div>
-            <div><span className={`t3-fidelity-source-pill ${stale ? "error" : active ? "on" : ""}`}><i />{stale ? t("fidelity.source.error") : active ? t("fidelity.source.active") : t("fidelity.source.paused")}</span></div>
+            <div className="t3-fidelity-source-id"><AssetLabel kind={kind} type={row.type} name={name} size={24} secondary={<>{metadata}{kind === "wallet" && row.type === "erc20" && <Tag tone="accent">Pro</Tag>}</>} /></div>
+            <div><span className="t3-tag" data-tone={stale ? "negative" : active ? "positive" : "neutral"}><i />{stale ? t("fidelity.source.error") : active ? t("fidelity.source.active") : t("fidelity.source.paused")}</span></div>
             <div className={stale ? "t3-fidelity-source-warning" : active ? "" : "t3-fidelity-source-faint"}>{stale && latestGood ? `${t("fidelity.source.lastGood")} ${latestGood}` : active && latestGood ? `${t("fidelity.source.today")} ${latestGood}` : !active && sourceStatus?.lastSuccessAt
               ? new Date(sourceStatus.lastSuccessAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).replace(" at ", ", ")
               : active && value > 0 ? dateText : "—"}</div>

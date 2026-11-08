@@ -100,8 +100,8 @@ const App = ({
         const raw = readAssistantComparisonDates();
         if (raw === undefined) return;
         const dates = validateActionArgs("set_comparison_dates", raw);
-        const base = dateOptions.find((option) => option.label === dates.base);
-        const head = dateOptions.find((option) => option.label === dates.head);
+        const base = dateOptions.find((option) => parseDateToTS(option.label) === parseDateToTS(String(dates.base)));
+        const head = dateOptions.find((option) => parseDateToTS(option.label) === parseDateToTS(String(dates.head)));
         if (base && head) {
           clearAssistantComparisonDates();
           setCurrentQuickCompare(null);

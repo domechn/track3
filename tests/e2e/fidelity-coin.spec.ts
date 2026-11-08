@@ -327,7 +327,7 @@ test("transaction detail respects red-up quote colour", async ({ browser }) => {
     await page.locator(".fd-tx-row").filter({ hasText: "Sell" }).first().click();
     const realized = page.locator(".fd-detail-list").getByText("Realized (FIFO)").locator("..").locator("strong");
     await expect(realized).toHaveAttribute("data-tone", "gain");
-    await expect(realized).toHaveCSS("color", "rgb(238, 106, 130)");
+    await expect(realized).toHaveCSS("color", "rgb(239, 103, 128)"); // --negative token rounds differently from the old fixed hex.
   } finally { await context.close(); }
 });
 

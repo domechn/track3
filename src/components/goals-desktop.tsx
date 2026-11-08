@@ -7,16 +7,14 @@ import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { alertDraftFromRule, alertRuleFromDraft, needsAsset, needsWindow, type AlertDraft } from "@/middlelayers/ui-state/alert-draft";
 import { useTranslation } from "@/i18n";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
-import FidelityRail from "./fidelity-rail";
 import FidelityIcon from "./fidelity-icon";
-import { useDarkTheme } from "./common/theme";
-import { useWindowSize } from "@/utils/hook";
 import { BellIcon, TargetIcon } from "@radix-ui/react-icons";
 import EmptyState from "./empty-state";
 import { AttributionPager, useAttributionPage } from "./attribution-pager";
 import { alertTemplateDraft, alertTemplates } from "./goals-alert-templates";
 import "./rebalance-desktop.css";
 import "./goals-desktop.css";
+import { useChartHitArea } from "./chart-tooltip";
 
 const kinds: AlertKind[] = ["total_value_target", "asset_value_target", "asset_price_target", "asset_price_move", "allocation_deviation", "period_pnl", "portfolio_value_change"];
 const fixed = (value: number, digits = 1) => value.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -88,6 +86,7 @@ type Props = {
 
 export default function GoalsDesktop(props: Props) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const rules = [...props.rules].sort((a, b) => a.id - b.id);
   const history = [...props.history].sort((a, b) => b.triggeredAt.localeCompare(a.triggeredAt) || a.id - b.id);
   const rulePaging = useAttributionPage(rules, rules.map((rule) => rule.id).join(","), 20);
@@ -222,7 +221,6 @@ export default function GoalsDesktop(props: Props) {
   };
 
   return <div className="t3-fidelity-page t3-fidelity-goals">
-    <FidelityRail isProUser={props.isProUser} />
     <header className="t3-fidelity-head"><div><h1>{t("goals.fidelity.title")}</h1>
       <p>{rules.length ? <><b>{t("goals.fidelity.unread").replace("{count}", String(props.unreadCount))}</b> · {t("goals.fidelity.subtitle").replace("{count}", String(onCount)).replace("{total}", String(rules.length))}</> : t("goals.fidelity.emptySubtitle")}</p></div>
       <a className="t3-fidelity-kinds-link" href="#/goals/kinds">{t("goals.fidelity.ruleKinds")}</a>
@@ -243,9 +241,9 @@ export default function GoalsDesktop(props: Props) {
       <section className="t3-fidelity-card t3-fidelity-goal-rules">
         <div className="t3-fidelity-card-head"><h2>{t("goals.rules")}</h2><span>{rules.length ? t("goals.fidelity.rulesHint").replace("{on}", String(onCount)).replace("{off}", String(rules.length - onCount)).replace("{time}", time(latest?.at)) : t("goals.fidelity.zeroRules")}</span></div>
         {props.loading ? <div className="t3-fidelity-empty" role="status">{t("goals.loading")}</div> : rules.length ? <>
-          <div className="t3-fidelity-rule-list">
+          <div className="t3-fidelity-rule-list" data-chart-group="">
           <div className="t3-fidelity-goal-row t3-fidelity-table-head"><span /><span>{t("goals.fidelity.column.rule")}</span><span>{t("goals.fidelity.column.progress")}</span><span>{t("goals.fidelity.kind")}</span><span>{t("goals.fidelity.column.status")}</span><span /></div>
-          {rulePaging.rows.map((rule) => {
+          {rulePaging.rows.map((rule, index) => {
             const measurement = measurements[rules.indexOf(rule)];
             const raw = rule.threshold !== 0 && measurement.value !== undefined
               ? rule.kind === "portfolio_value_change" && rule.comparator === "lte" && measurement.value > rule.threshold ? 0
@@ -255,13 +253,15 @@ export default function GoalsDesktop(props: Props) {
               <label className="t3-fidelity-goal-switch"><input type="checkbox" checked={rule.enabled}
                 aria-label={t("goals.enableRule").replace("{kind}", t(`goals.kind.${rule.kind}`))}
                 onChange={(event) => props.onToggle(rule, event.target.checked)} /></label>
-              <div className="t3-fidelity-goal-name"><AssetLabel kind={rule.symbol ? rule.assetType === "stock" ? "stock" : "coin" : "custom"}
-                symbol={rule.symbol ?? ""} name={ruleTitle(rule, t)} size={20} secondary={ruleDescription(rule, t, money)} /></div>
-              <div className="t3-fidelity-goal-progress"><div><i><u className={triggered ? "warn" : ""} style={{ width: `${Math.min(100, Math.max(0, raw))}%` }} /></i>
+              <div className="t3-fidelity-goal-name"><AssetLabel kind={rule.symbol ? rule.assetType === "stock" ? "stock" : "coin" : "custom"} symbol={rule.symbol ?? ""} name={ruleTitle(rule, t)} size={20} secondary={ruleDescription(rule, t, money)} /></div>
+              <div className="t3-fidelity-goal-progress"><div><i role="button"
+                {...chart.markProps(index, `${ruleTitle(rule, t)}: ${fixed(raw, 2)}%, ${measurement.value === undefined ? t("goals.unavailable") : fixed(measurement.value, 2)}`,
+                  <><div>{ruleTitle(rule, t)}</div><div>{fixed(raw, 2)}%</div><div>{measurement.value === undefined ? t("goals.unavailable") : fixed(measurement.value, 2)}</div></>)}>
+                <u className={triggered ? "warn" : ""} style={{ width: `${Math.min(100, Math.max(0, raw))}%` }} /></i>
                 <strong>{measurement.status === "ready" ? raw >= 100 ? "100%+" : `${fixed(raw)}%` : "–"}</strong></div>
                 <small>{describeProgress(rule, measurement.value, raw)}</small></div>
               <div className="t3-fidelity-goal-kind">{kindName(rule.kind, t)}<small>{t("goals.fidelity.cooldownShort").replace("{window}", cooldownLabel(Number(alertDraftFromRule(rule).cooldownMinutes)))}</small></div>
-              <div className={`t3-fidelity-pill ${!rule.enabled ? "" : triggered ? "warning" : "info"}`}>{t(!rule.enabled ? "goals.fidelity.status.off" : triggered ? "goals.fidelity.status.triggered" : "goals.fidelity.status.watching")}</div>
+              <div className="t3-tag" data-tone={!rule.enabled ? "neutral" : triggered ? "warning" : "accent"}>{t(!rule.enabled ? "goals.fidelity.status.off" : triggered ? "goals.fidelity.status.triggered" : "goals.fidelity.status.watching")}</div>
               <div className="t3-fidelity-goal-actions"><button aria-label={t("goals.fidelity.editAction")} onClick={(event) => openEdit(rule, event.currentTarget)}><FidelityIcon name="edit" /></button>
                 <button aria-label={t("goals.fidelity.deleteAction")} onClick={() => setDeleteRule(rule)}><FidelityIcon name="trash" /></button></div>
             </div>;
@@ -345,6 +345,7 @@ export default function GoalsDesktop(props: Props) {
         </div>
       </DialogContent>
     </Dialog>
+    {chart.tooltip}
   </div>;
 }
 
@@ -357,16 +358,13 @@ const kindCards = [
   { kind: "period_pnl", asset: null, options: "two", threshold: "+$40,000", unit: "usd", window: "30d", cooldown: "7d" },
   { kind: "portfolio_value_change", asset: null, options: "two", threshold: "5%", unit: "percent", window: "24h", cooldown: "24h" },
 ] as const;
-export function GoalsKinds({ currency, isProUser }: { currency?: CurrencyRateDetail; isProUser?: boolean }) {
+export function GoalsKinds({ currency }: { currency?: CurrencyRateDetail; isProUser?: boolean }) {
   const { t } = useTranslation();
-  const darkTheme = useDarkTheme();
-  const wideDesktop = (useWindowSize().width ?? window.innerWidth) >= 1500;
   const unit = (kind: typeof kindCards[number]["unit"]) =>
     (kind === "usd" || kind === "usdPerUnit") && currency && currency.currency !== "USD"
       ? t(`goals.fidelity.kindUnit.${kind === "usd" ? "currency" : "currencyPerUnit"}`).replace("{currency}", currency.currency)
       : t(`goals.fidelity.kindUnit.${kind}`);
   return <div className="t3-fidelity-page t3-fidelity-kinds">
-    {wideDesktop && darkTheme && <FidelityRail isProUser={isProUser} />}
     <header className="t3-fidelity-head"><div><a href="#/goals">{t("goals.fidelity.title")}</a><h1>{t("goals.fidelity.ruleKinds")}</h1><p>{t("goals.fidelity.kindsSubtitle")}</p></div></header>
     <div className="t3-fidelity-info"><FidelityIcon name="info" /><div><b>{t("goals.fidelity.howRulesRun")}</b><span>{t("goals.fidelity.kindsInfo")}</span></div></div>
     <div className="t3-fidelity-grid">{kindCards.map((card) => <section key={card.kind} className={`t3-fidelity-card t3-fidelity-kind-card ${kindCards.indexOf(card) < 4 ? "top" : "bottom"}`}>

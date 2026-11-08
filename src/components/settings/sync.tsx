@@ -218,7 +218,7 @@ export default function SyncSettingsPage() {
         <CardHeader>
           <CardTitle>{t("settings.phase6.connection")}</CardTitle>
           {wide && status.mode === "ready" && status.sync.report && status.sync.phase !== "error" &&
-            <span className="t3-b-pill connected">{t("fidelity.settingsB.ai.connected")}</span>}
+            <span className="t3-tag" data-tone="positive">{t("fidelity.settingsB.ai.connected")}</span>}
           {wide && <p className="text-sm text-muted-foreground">{t("fidelity.settingsB.sync.connectionDesc")}</p>}
         </CardHeader>
         <CardContent className="space-y-5">
@@ -268,7 +268,7 @@ export default function SyncSettingsPage() {
       <div className="t3-sync-top-right">
       <Card className="t3-sync-passphrase">
         <CardHeader><CardTitle>{t(wide ? "fidelity.settingsB.sync.passphrase" : "sync.passphrase.title")}</CardTitle>
-          {wide && status.mode === "ready" && <span className="t3-b-pill connected">{t("fidelity.settingsB.sync.unlocked")}</span>}
+          {wide && status.mode === "ready" && <span className="t3-tag" data-tone="positive">{t("fidelity.settingsB.sync.unlocked")}</span>}
           {wide && <p className="text-sm text-muted-foreground">{t(status.mode === "locked" ? "fidelity.settingsB.sync.lockedDesc" : "fidelity.settingsB.sync.passphraseDesc")}</p>}</CardHeader>
         <CardContent className="space-y-4">
           {wide && status.mode === "ready" ? <div className="t3-b-sync-ready-passphrase">
@@ -358,7 +358,7 @@ export default function SyncSettingsPage() {
         <Card className="t3-sync-conflicts">
           <CardHeader>
             <CardTitle>{t(wide ? "fidelity.settingsB.sync.conflictsTitle" : "sync.configConflict.title")}
-              {wide && configConflicts.length > 0 && <span className="t3-b-sync-conflict-count">
+              {wide && configConflicts.length > 0 && <span className="t3-tag t3-b-sync-conflict-count" data-tone="warning">
                 {t("fidelity.settingsB.sync.conflictsCount").replace("{count}", String(configConflicts.length))}
               </span>}
             </CardTitle>
@@ -407,7 +407,7 @@ export default function SyncSettingsPage() {
                       onChange={(event) => setEditingDeviceName(event.target.value)}
                       onKeyDown={(event) => { if (event.key === "Enter") renameDevice(device.id, editingDeviceName); if (event.key === "Escape") setEditingDevice(undefined); }} />
                       : <b>{device.name}</b>}
-                    {device.current && <span className="t3-b-device-current">{t("sync.devices.current")}</span>}
+                    {device.current && <span className="t3-tag" data-tone="accent">{t("sync.devices.current")}</span>}
                   </div>
                   <span className="sync-device-last-upload text-xs text-muted-foreground">{uploadTime(device.lastUpload)}</span>
                   {editingDevice === device.id

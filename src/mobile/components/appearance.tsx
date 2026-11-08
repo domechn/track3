@@ -111,9 +111,6 @@ const App = ({
             <div className="text-xl font-semibold capitalize">
               {selectedTheme}
             </div>
-            <p className="text-xs text-muted-foreground">
-              {t("appearance.themeNote")}
-            </p>
           </CardContent>
         </Card>
         <Card>

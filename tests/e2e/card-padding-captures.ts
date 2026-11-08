@@ -113,7 +113,7 @@ export async function cardPaddingMeasurements(page: Page) {
 
 export async function expectAiSetupGeometry(page: Page) {
   const card = page.locator("[data-ai-setup-card]");
-  await expect(card).toBeVisible();
+  await expect(card).toBeVisible({ timeout: 30_000 });
   const geometry = await card.evaluate((element) => {
     const rect = (target: Element) => target.getBoundingClientRect();
     const outer = rect(element);

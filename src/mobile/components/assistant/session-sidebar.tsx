@@ -199,7 +199,7 @@ function PhoneSessionRow({ session, date, active, onSelect, onDelete, onPin, t }
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const touchStart = useRef<{ x: number; y: number }>();
-  return <div className="fidelity-session-row" data-testid={`session-item-${session.id}`}
+  return <div className="t3-selected-list-row fidelity-session-row" data-testid={`session-item-${session.id}`}
     data-active={active ? "true" : undefined}
     data-actions-open={String(actionsOpen)}
     onTouchStart={(event) => { touchStart.current = { x: event.touches[0].clientX, y: event.touches[0].clientY }; }}
@@ -267,10 +267,8 @@ function SessionItem({
   return (
       <div
         className={cn(
-          "group relative mx-2 rounded-md px-3 py-2 text-left transition-colors border-l-2",
+          "t3-selected-list-row group relative mx-2 rounded-md px-3 py-2 text-left transition-colors",
           "hover:bg-accent/60",
-          isActive && "bg-accent border-primary",
-          !isActive && "border-transparent",
         )}
         data-testid={`session-item-${session.id}`}
         data-active={isActive ? "true" : undefined}

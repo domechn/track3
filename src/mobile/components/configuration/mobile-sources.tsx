@@ -314,7 +314,7 @@ export function MobileSources(props: MobileSourcesProps) {
                     <button type="button" className="fidelity-source-name" onClick={() => start(kind, row)}
                       aria-label={`${name} ${identity}`}><strong>{name}</strong><small>{ending}
                       {kind === "wallet" && row.type === "erc20" && props.isPro &&
-                        <em className="fidelity-source-pro">{t("fidelity.settings.menu.pro")}</em>}</small></button>
+                        <em className="t3-tag" data-tone="accent">{t("fidelity.settings.menu.pro")}</em>}</small></button>
                   </div>
                   <Switch checked={row.active} aria-label={`${t("mobile.sources.toggle")} ${name}`} onCheckedChange={() => {
                     haptic("selection");
@@ -322,7 +322,7 @@ export function MobileSources(props: MobileSourcesProps) {
                     if (kind === "wallet") props.onToggleWallet(row as WalletRow);
                     if (kind === "broker") props.onToggleBroker(row as StockBrokerRow);
                   }} />
-                  <span className={`fidelity-source-status${failure ? " is-error" : row.active ? " is-active" : ""}`}><i />{t(failure
+                  <span className="t3-tag fidelity-source-status" data-tone={failure ? "negative" : row.active ? "positive" : "neutral"}><i />{t(failure
                     ? "fidelity.settings.sources.error" : row.active ? "fidelity.settings.sources.active" : "fidelity.settings.sources.paused")}</span>
                   <span className="fidelity-source-refresh">{failure ? lastGood
                     ? t("fidelity.settings.sources.lastGood").replace("{time}", lastGood) : "—" : row.active ? refreshLabel : "—"}</span>

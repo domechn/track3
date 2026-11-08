@@ -4,7 +4,7 @@ import { getAssetType } from "@/middlelayers/datafetch/utils/coins";
 import { cn } from "@/lib/utils";
 import { formatAssetLabel } from "@/utils/assets";
 import AssetIcon, { type AssetIconKind, type AssetIconSize } from "@/components/ui/asset-icon";
-import { Tag } from "@/components/ui/tag";
+import { Tag, type TagTone } from "@/components/ui/tag";
 
 type AssetLabelProps = {
   asset?: {
@@ -19,6 +19,7 @@ type AssetLabelProps = {
   size?: AssetIconSize;
   secondary?: ReactNode;
   tag?: string;
+  tagTone?: TagTone;
   quiet?: boolean;
   className?: string;
   labelClassName?: string;
@@ -35,6 +36,7 @@ export default function AssetLabel({
   size = 20,
   secondary,
   tag,
+  tagTone,
   quiet,
   className,
   labelClassName,
@@ -58,7 +60,7 @@ export default function AssetLabel({
       <span className="t3-asset-label-text">
         <span className="t3-asset-label-line">
           <span className={cn("t3-asset-label-name", labelClassName)} title={displayName}>{displayName}</span>
-          {displayedTag && <Tag className={cn("t3-asset-tag", badgeClassName)}>{displayedTag}</Tag>}
+          {displayedTag && <Tag tone={tagTone} className={cn("t3-asset-tag", badgeClassName)}>{displayedTag}</Tag>}
         </span>
         {secondary && <small className="t3-asset-label-secondary">{secondary}</small>}
       </span>

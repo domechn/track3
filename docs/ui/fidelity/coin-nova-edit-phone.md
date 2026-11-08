@@ -227,4 +227,11 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
+- The 8 Nov source-page and app edit-sheet viewports at 390 × 844, DPR 2,
+  differ by **9.137%** at an RGB-channel threshold of 20. The last label
+  starts at y=665 in both. The app uses a real input, functional save
+  and reset controls, a retained scroll position, and the saved coin
+  page behind the sheet; the design freezes its text and background.
+  The Changed from label uses the shared theme tag, with a border and
+  11 px text in place of the static 12 px dark pill.
 - The reference uses static text in its price control. The app keeps an editable input for typing and saving, which rasterizes some text edges differently.

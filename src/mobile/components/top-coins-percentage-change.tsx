@@ -310,7 +310,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                       {isTop && showBadges ? (
                         <span
                           data-testid="tcpc-badge"
-                          className={`max-w-full rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ${valueClass}`}
+                          className="t3-tag max-w-full" data-tone={row.valueEnd > 0 ? "positive" : row.valueEnd < 0 ? "negative" : "neutral"}
                         >
                           {t("topCoinsPercentage.topGainer")}
                         </span>
@@ -318,7 +318,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                       {isBot && showBadges ? (
                         <span
                           data-testid="tcpc-badge"
-                          className={`max-w-full rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ${valueClass}`}
+                          className="t3-tag max-w-full" data-tone={row.valueEnd > 0 ? "positive" : row.valueEnd < 0 ? "negative" : "neutral"}
                         >
                           {t("topCoinsPercentage.topLoser")}
                         </span>

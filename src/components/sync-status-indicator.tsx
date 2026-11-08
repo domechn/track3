@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { ExclamationTriangleIcon, EyeClosedIcon, EyeOpenIcon, InfoCircledIcon, LockClosedIcon, ReloadIcon, CopyIcon } from "@radix-ui/react-icons";
+import { ChevronDownIcon, ExclamationTriangleIcon, EyeClosedIcon, EyeOpenIcon, InfoCircledIcon, LockClosedIcon, ReloadIcon, CopyIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
-import { SyncDetails } from "@/components/sync-details";
+import { SyncDefinitionRow, SyncDetails } from "@/components/sync-details";
 import { useTranslation } from "@/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { SyncRecoveryExport, SyncRecoveryUnlock } from "@/components/settings/sync-recovery";
@@ -21,6 +21,7 @@ function SyncWideDiagnostics({ diagnostics, stopped, t }: {
   t: Props["t"];
 }) {
   const [expanded, setExpanded] = useState(!stopped);
+  const panelId = useId();
   const put = diagnostics.requests.PUT;
   const failures = put.count - put.outcomes.ok.count;
   const total = Object.values(diagnostics.requests).reduce((sum, request) => sum + request.count, 0);
@@ -43,10 +44,10 @@ function SyncWideDiagnostics({ diagnostics, stopped, t }: {
       {errorGroups.filter(([, count]) => count > 0).map(([label, count]) =>
         <div key={label}><span aria-hidden="true">⚠</span><span>{label}</span><b>{count}</b></div>)}
     </div>
-    <details className="t3-b-sync-pop-diagnostics" open={expanded}
-      onToggle={(event) => setExpanded(event.currentTarget.open)}>
-      <summary>{t("sync.details.title")}</summary>
-      <div>
+    <div className="t3-b-sync-pop-diagnostics">
+      <button type="button" className="t3-sync-details-toggle" aria-expanded={expanded} aria-controls={panelId}
+        onClick={() => setExpanded(!expanded)}><ChevronDownIcon aria-hidden="true" />{t("sync.details.title")}</button>
+      {expanded && <div id={panelId}>
         <h3>{t("sync.details.timings")}</h3>
         <div className="t3-b-sync-pop-measures">{phaseRows.map(([label, ms]) =>
           <div key={label}><span>{label}</span><b>{seconds(ms)}</b></div>)}</div>
@@ -63,9 +64,47 @@ function SyncWideDiagnostics({ diagnostics, stopped, t }: {
           {diagnostics.slowest.slice(0, 3).map((item, index) =>
             <div key={index}><span>{item.verb} {t(`sync.details.phase.${item.phase}`)}</span><b>{seconds(item.ms)}</b></div>)}
         </div>
-      </div>
-    </details>
+      </div>}
+    </div>
   </>;
+}
+
+function scrollRail(body: HTMLDivElement, view = body.clientHeight) {
+  const has = body.scrollHeight > body.clientHeight + 1;
+  const height = has ? Math.max(24, view * body.clientHeight / body.scrollHeight) : 0;
+  return {
+    more: body.scrollTop + body.clientHeight < body.scrollHeight - 1,
+    has, height,
+    top: has ? body.scrollTop / (body.scrollHeight - body.clientHeight) * (view - height) : 0,
+  };
+}
+
+function SyncFidelityBody({ children }: { children: React.ReactNode }) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [scroll, setScroll] = useState({ more: false, has: false, top: 0, height: 0 });
+  const measureScroll = () => {
+    if (!bodyRef.current) return;
+    const next = scrollRail(bodyRef.current);
+    setScroll((current) => current.more === next.more && current.has === next.has &&
+      current.top === next.top && current.height === next.height ? current : next);
+  };
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const observer = new ResizeObserver(measureScroll);
+    observer.observe(body);
+    if (body.firstElementChild) observer.observe(body.firstElementChild);
+    measureScroll();
+    return () => observer.disconnect();
+  }, []);
+  return <div className="t3-sync-fidelity-scroll-frame" data-more-below={scroll.more}>
+    <div ref={bodyRef} className="t3-sync-fidelity-body" onScroll={measureScroll}>
+      <div>{children}</div>
+    </div>
+    {scroll.has && <div className="t3-sync-fidelity-scroll-indicator" aria-hidden="true">
+      <span style={{ top: scroll.top, height: scroll.height }} />
+    </div>}
+  </div>;
 }
 
 
@@ -93,7 +132,36 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
   const [recoveryExportOpen, setRecoveryExportOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState("");
   const recoveryRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverScroll, setPopoverScroll] = useState({ more: false, has: false, top: 0, height: 0, view: 0 });
   const [now, setNow] = useState(Date.now());
+
+  const measurePopoverScroll = () => {
+    const body = popoverRef.current;
+    if (!body) return;
+    const style = getComputedStyle(body);
+    const view = body.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    const next = { ...scrollRail(body, view), view };
+    setPopoverScroll((current) => current.more === next.more && current.has === next.has &&
+      current.top === next.top && current.height === next.height && current.view === next.view ? current : next);
+  };
+  useEffect(() => {
+    const body = popoverRef.current;
+    if (!open || !body) return;
+    let frame = requestAnimationFrame(measurePopoverScroll);
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measurePopoverScroll);
+    });
+    const resize = new ResizeObserver(measurePopoverScroll);
+    observer.observe(body, { childList: true, subtree: true });
+    resize.observe(body);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      resize.disconnect();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (status.mode === "locked" && syncRuntime.claimLockedPrompt()) setOpen(true);
@@ -300,7 +368,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
           </button>
         </PopoverTrigger>
         {wide && open && !fidelityReady && <div className="t3-b-sync-scrim" aria-hidden="true" onClick={() => setOpen(false)} />}
-        <PopoverContent align="end" side="bottom" sideOffset={wide && !fidelityReady ? -10 : fidelityReady ? 8 : 0} collisionPadding={16}
+        <PopoverContent ref={popoverRef} aria-labelledby={locked ? "sync-locked-title" : undefined} align="end" side="bottom" sideOffset={wide && !fidelityReady ? -10 : fidelityReady ? 8 : 0} collisionPadding={16}
           // Radix Escape was intermittent with focused content in the widened card; nested confirmations handle their own Escape.
           onKeyDown={(event) => {
             if (event.key === "Escape" && !document.querySelector('[role="alertdialog"]')) setOpen(false);
@@ -308,26 +376,33 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
           onInteractOutside={(event) => {
             if (fidelityLocked || document.querySelector('[role="alertdialog"]')) event.preventDefault();
           }}
+          onClick={() => requestAnimationFrame(measurePopoverScroll)}
+          onScroll={measurePopoverScroll}
           data-locked={mobile && locked && !compactLocked}
-          className={`t3-sync-popover max-h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-[520px] overflow-y-auto space-y-3 text-sm ${mobile ? `ios-d3-sync-popover${fidelitySheet ? " is-fidelity-sheet" : ""}${compactLocked ? " is-locked" : status.sync.retryStopped && fidelitySheet ? " is-stopped" : status.sync.phase === "error" && fidelitySheet ? " is-error" : ""}` : ""} ${fidelityLocked ? "t3-sync-lock-dialog" : ""} ${wide && !fidelityReady ? "t3-b-sync-popover" : ""}`}>
+          className={`t3-sync-popover w-[calc(100vw-2rem)] max-w-[520px] overflow-y-auto space-y-3 text-sm ${fidelityReady ? "is-fidelity-ready" : ""} ${mobile ? `ios-d3-sync-popover${fidelitySheet ? " is-fidelity-sheet" : ""}${compactLocked ? " is-locked" : status.sync.retryStopped && fidelitySheet ? " is-stopped" : status.sync.phase === "error" && fidelitySheet ? " is-error" : ""}` : ""} ${fidelityLocked ? "t3-sync-lock-dialog" : ""} ${wide && !fidelityReady ? "t3-b-sync-popover" : ""}`}>
           {mobile && !locked && <p className="text-xs text-muted-foreground">{controlLabel}</p>}
+          {!fidelityReady && <div className="t3-sync-popover-scroll-rail" hidden={!popoverScroll.has} aria-hidden="true">
+            <div style={{ height: popoverScroll.view }}><span style={{ top: popoverScroll.top, height: popoverScroll.height }} /></div>
+          </div>}
           {fidelityReady ? <div className="t3-sync-fidelity">
             <header><h2>{t("overview.fidelity.backupSync")}</h2>
               <span>{t("overview.fidelity.upToDate")}</span></header>
-            <dl>
-              <div><dt>{t("overview.fidelity.lastUpload")}</dt><dd>{syncedTime} · {t("overview.fidelity.thisDevice")}</dd></div>
-              <div><dt>{t("overview.fidelity.destination")}</dt><dd>{destination}</dd></div>
-              <div><dt>{t("overview.fidelity.devices")}</dt><dd>{deviceNames.length
-                ? `${deviceNames.length} · ${deviceNames.join(", ")}` : "—"}</dd></div>
-              <div><dt>{t("overview.fidelity.waitingUpload")}</dt><dd>—</dd></div>
-              <div><dt>{t("overview.fidelity.errors")}</dt><dd>{t("sync.details.none")}</dd></div>
+            <SyncFidelityBody>
+            <dl className="t3-sync-fidelity-stats">
+              <SyncDefinitionRow label={t("overview.fidelity.lastUpload")} value={`${syncedTime} · ${t("overview.fidelity.thisDevice")}`} />
+              <SyncDefinitionRow label={t("overview.fidelity.destination")} value={destination} />
+              <SyncDefinitionRow label={t("overview.fidelity.devices")} value={deviceNames.length
+                ? `${deviceNames.length} · ${deviceNames.join(", ")}` : "—"} />
+              <SyncDefinitionRow label={t("overview.fidelity.waitingUpload")} value="—" />
+              <SyncDefinitionRow label={t("overview.fidelity.errors")} value={t("sync.details.none")} />
             </dl>
-            <p>{status.sync.diagnostics
+            <p className="t3-sync-fidelity-summary">{status.sync.diagnostics
               ? t("overview.fidelity.runTiming")
                 .replace("{seconds}", String(Math.round(status.sync.diagnostics.wallMs / 1000)))
               : t("overview.fidelity.nextCheckOnActivity")}</p>
             <div className="t3-sync-fidelity-footer">
               <SyncDetails report={report} diagnostics={status.sync.diagnostics} t={t} ConfirmDialog={ConfirmDialog} />
+              <div className="t3-sync-fidelity-footer-actions">
               <button type="button" onClick={() => { setOpen(false); setRecoveryExportOpen(true); }}>
                 {t("sync.fidelity.saveRecoveryFile")}
               </button>
@@ -338,8 +413,10 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
               }}><CopyIcon aria-hidden="true" />{t("sync.details.copy")}</button>}
               <Button size="sm" variant="outline" onClick={() => void syncRuntime.syncNow()}>
                 {t("sync.now")}</Button>
+              </div>
             </div>
             {copyStatus && <span role="status">{copyStatus}</span>}
+            </SyncFidelityBody>
           </div> : wide && status.mode === "ready" ? <>
           <div className="t3-b-sync-pop-content">
             <div className="t3-b-sync-pop-head">
@@ -348,7 +425,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
                   : status.sync.phase === "error" ? t("fidelity.settingsB.sync.pop.failedTitle")
                     : phase === "conflict" ? t("sync.status.conflictSummary").replace("{count}", String(report?.conflicts.length ?? 0))
                     : report ? t("fidelity.settingsB.sync.pop.upToDate") : t("fidelity.settingsB.sync.pop.sync")}</h2>
-              <span className={`t3-b-sync-pop-badge ${status.sync.phase === "error" ? "negative" : phase === "conflict" ? "warning" : status.sync.phase === "syncing" ? "info" : report ? "positive" : ""}`}>
+              <span className="t3-tag" data-tone={status.sync.phase === "error" ? "negative" : phase === "conflict" ? "warning" : status.sync.phase === "syncing" ? "accent" : report ? "positive" : "neutral"}>
                 {status.sync.phase === "syncing" ? t(status.sync.progress?.phase === "pull" ? "fidelity.settingsB.sync.pop.downloading" : "fidelity.settingsB.sync.pop.uploading")
                   : status.sync.retryStopped ? t("fidelity.settingsB.sync.pop.needsAttention")
                     : status.sync.phase === "error" ? t("fidelity.settingsB.sync.pop.retrying")
@@ -405,25 +482,25 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
           </div>
           </> : <>
           {fidelitySheet && (!locked || compactLocked) ? <div className="fidelity-sync-sheet-head">
-            <h2>{t(locked ? "fidelity.b.sync.sheetLocked" : status.sync.retryStopped ? "fidelity.b.sync.stopped" : phase === "error" || phase === "unreadable"
+            <h2 id={locked ? "sync-locked-title" : undefined}>{t(locked ? "sync.fidelity.lockedTitle" : status.sync.retryStopped ? "fidelity.b.sync.stopped" : phase === "error" || phase === "unreadable"
               ? "fidelity.b.sync.sheetFailed" : phase === "syncing" ? "fidelity.b.sync.syncing"
                 : never ? "settings.tab.sync" : "fidelity.b.sync.sheetUpToDate")}</h2>
-            <span className={`fidelity-sync-sheet-pill${locked ? " is-warning" : phase === "error" || phase === "unreadable"
-              ? " is-error" : report && status.sync.phase === "idle" ? " is-positive" : ""}`}>
+            <span className="t3-tag" data-tone={locked ? "warning" : phase === "error" || phase === "unreadable"
+              ? "negative" : phase === "syncing" ? "accent" : report && status.sync.phase === "idle" ? "positive" : "neutral"}>
               {t(locked ? "fidelity.b.sync.sheetPassphraseNeeded" : status.sync.retryStopped
                 ? "fidelity.b.sync.sheetNeedsAttention" : phase === "error" || phase === "unreadable"
                   ? "fidelity.b.sync.sheetRetrying"
                 : phase === "syncing" ? status.sync.progress?.phase === "pull" ? "fidelity.b.sync.sheetDownloading" : "fidelity.b.sync.sheetUploading"
                   : never ? "fidelity.b.sync.sheetNever" : "fidelity.b.sync.synced")}
             </span>
-          </div> : !(mobile && locked && !compactLocked) && <h2 className="text-base font-semibold">{t("sync.status.details")}</h2>}
+          </div> : !fidelityLocked && !(mobile && locked && !compactLocked) && <h2 id={locked ? "sync-locked-title" : undefined} className="text-base font-semibold">{t(locked ? "sync.fidelity.lockedTitle" : "sync.status.details")}</h2>}
           {status.mode === "unreadable" ? <>
             <p role="alert" className="text-destructive">{t("sync.unreadable")}</p>
             <a href="#/settings/sync" className="text-primary underline">{t("sync.reenter")}</a>
           </> : fidelityLocked ? (
             <div className="t3-sync-fidelity-locked">
               <LockClosedIcon className="t3-sync-fidelity-lock-icon" aria-hidden="true" />
-              <h2>{t("sync.fidelity.lockedTitle")}</h2>
+              <h2 id="sync-locked-title">{t("sync.fidelity.lockedTitle")}</h2>
               <p className="t3-sync-fidelity-intro">{t("sync.fidelity.lockedDescription").replace("{destination}",
                 syncRuntime.getSettings().endpoint.includes("r2.cloudflarestorage.com")
                   ? t("sync.fidelity.cloudflareDestination") : t("sync.fidelity.s3Destination"))}</p>
@@ -450,7 +527,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
           ) : locked && mobile && !compactLocked ? (
             <div className="fd-sync-locked">
               <LockClosedIcon className="fd-sync-lock-icon" aria-hidden="true" />
-              <h2>{t("fidelity.startup.syncLocked")}</h2>
+              <h2 id="sync-locked-title">{t("sync.fidelity.lockedTitle")}</h2>
               <p>{t("fidelity.startup.syncDescription")}</p>
               <Label htmlFor="sync-status-passphrase">{t("fidelity.startup.syncPassphrase")}</Label>
               <div className="fd-sync-passphrase">
@@ -468,7 +545,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
               <button type="button" className="fd-sync-forgot" onClick={() => recoveryRef.current?.scrollIntoView({ block: "start" })}>
                 {t("fidelity.startup.forgotPassphrase")}</button>
               <Button className="fd-sync-unlock" disabled={busy} onClick={() => void unlock()}>{t("fidelity.startup.unlock")}</Button>
-              <Button className="fd-sync-skip" disabled={busy} onClick={() => {
+              <Button variant="ghost" className="fd-sync-skip" disabled={busy} onClick={() => {
                 syncRuntime.skip();
                 setOpen(false);
               }}>{t("fidelity.startup.continueWithoutSync")}</Button>
@@ -591,6 +668,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
                   ? t(status.sync.error === "sync" ? "sync.status.errorsPresent" : `sync.connection.${status.sync.error}`) : undefined} />}
           </>}
           </>}
+          {!fidelityReady && <div className="t3-sync-popover-scroll-fade" hidden={!popoverScroll.more} aria-hidden="true" />}
         </PopoverContent>
       </Popover>
     </div>

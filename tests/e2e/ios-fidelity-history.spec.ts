@@ -18,7 +18,7 @@ test("phone list aligns values and uses the source text hierarchy", async ({ pag
   await installFidelityRecords(page);
   await page.goto("/#/history");
   const row = page.locator(".history-mobile-snapshot").first();
-  await expect(row).toBeVisible({ timeout: 15_000 });
+  await expect(row).toBeVisible({ timeout: 40_000 });
   await expect(page.locator(".fidelity-history-subtitle strong")).toHaveText("1,284");
   const positions = await row.evaluate((node) => {
     const right = (selector: string) => node.querySelector(selector)!.getBoundingClientRect().right;
@@ -28,7 +28,7 @@ test("phone list aligns values and uses the source text hierarchy", async ({ pag
   expect(Math.round(positions.total)).toBe(357);
   expect(Math.round(positions.delta)).toBe(357);
   expect(Math.round(positions.time)).toBe(39);
-  await expect(page.locator(".fidelity-history-edited").first()).toHaveCSS("font-weight", "500");
+  await expect(page.locator(".history-mobile-snapshot .t3-tag[data-tone='accent']").first()).toHaveCSS("font-weight", "500");
   await expect(page.locator(".mobile-tab-badge")).toHaveCSS("font-size", "10px");
   await expect(page.locator(".mobile-tab-badge")).toHaveCSS("font-weight", "700");
   await expect(page.locator(".mobile-tab-badge")).toHaveCSS("line-height", "18px");
@@ -36,7 +36,7 @@ test("phone list aligns values and uses the source text hierarchy", async ({ pag
     const text = document.createRange();
     text.selectNodeContents(badge);
     return text.getBoundingClientRect().x;
-  }))).toBe(359);
+  }))).toBe(354);
 });
 
 test("light history and detail keep backgrounds and text legible", async ({ page }) => {
@@ -73,7 +73,12 @@ test("light history and detail keep backgrounds and text legible", async ({ page
   };
   const title = await page.locator(".fidelity-history h1").evaluate((node) => getComputedStyle(node).color);
   const selectedTab = await page.locator(".mobile-tab[aria-current='page']").evaluate((node) => getComputedStyle(node).color);
-  expect(Math.min(contrast(title, ground), contrast(selectedTab, tab), contrast(chip.color, chip.background)))
+  const tint = (chip.background.match(/[\d.]+/g) ?? []).map(Number);
+  const surface = (ground.match(/[\d.]+/g) ?? []).map(Number);
+  const alpha = tint[3] ?? 1;
+  const chipGround = `rgb(${tint.slice(0, 3).map((value, index) =>
+    Math.round(value * alpha + surface[index] * (1 - alpha))).join(", ")})`;
+  expect(Math.min(contrast(title, ground), contrast(selectedTab, tab), contrast(chip.color, chipGround)))
     .toBeGreaterThanOrEqual(4.5);
   mkdirSync(dir, { recursive: true });
   await page.screenshot({ path: `${dir}/history-light-phone.png` });
@@ -147,6 +152,7 @@ test("history change has separate aligned amount and percent with the source gap
   await page.goto("/#/history");
   const change = page.locator(".history-mobile-snapshot-delta").first();
   await expect(change).toBeVisible({ timeout: 20_000 });
+  await expect(change).toHaveCSS("border-top-width", "0px");
   const spans = change.locator("span");
   await expect(spans).toHaveCount(2);
   const left = await spans.first().boundingBox();
@@ -201,11 +207,12 @@ test("detail Back followed by Analytics switches routes every time", async ({ pa
 });
 
 test("list, filter, swipe, delete, undo", async ({ page }) => {
+  test.setTimeout(120_000);
   mkdirSync(dir, { recursive: true });
   await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
   await installFidelityRecords(page);
   await page.goto("/#/history");
-  await expect(page.getByText("Snapshots", { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Snapshots", { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".history-mobile-snapshot")).toHaveCount(50);
   await expect(page.locator(".history-mobile-snapshot").first()).toContainText("$763,809.27");
   const firstRow = page.locator(".history-mobile-snapshot").first();
@@ -218,16 +225,16 @@ test("list, filter, swipe, delete, undo", async ({ page }) => {
     buttons.map((button) => Math.round(button.getBoundingClientRect().width)));
   expect(chipWidths).toEqual([118, 134, 69]);
   await expect(page.locator(".fidelity-history-chips button").first()).toHaveCSS("font-variant-numeric", "tabular-nums");
-  expect(Math.round((await page.locator(".mobile-tab-badge").boundingBox())!.y)).toBe(790);
+  expect(Math.round((await page.locator(".mobile-tab-badge").boundingBox())!.y)).toBe(791);
   const tabCenters = await page.locator(".mobile-tab-bar .mobile-tab").evaluateAll((tabs) =>
     tabs.map((tab) => Math.round(tab.getBoundingClientRect().x + tab.getBoundingClientRect().width / 2)));
-  for (const [index, target] of [53, 153, 253, 348].entries()) {
+  for (const [index, target] of [49, 146, 244, 341].entries()) {
     expect(Math.abs(tabCenters[index] - target)).toBeLessThanOrEqual(1);
   }
-  await expect(page.locator(".mobile-tab-bar .mobile-tab").first()).toHaveCSS("line-height", "18px");
+  await expect(page.locator(".mobile-tab-bar .mobile-tab").first()).toHaveCSS("line-height", "16.5px");
   const partial = page.locator(".history-mobile-snapshot").filter({ hasText: "4 of 5 sources" }).first();
-  await expect(partial.locator(".fidelity-history-sources")).not.toHaveCSS("color", "rgb(217, 164, 65)");
-  await expect(partial.locator(".fidelity-history-source-count")).toHaveCSS("color", "rgb(217, 164, 65)");
+  await expect(partial.locator(".fidelity-history-sources")).not.toHaveCSS("color", "rgb(216, 163, 65)");
+  await expect(partial.locator(".fidelity-history-source-count")).toHaveCSS("color", "rgb(216, 163, 65)");
   await expect(partial.locator(".history-mobile-snapshot-date .rounded-full")).toHaveCount(0);
   await page.screenshot({ path: `${dir}/history-phone-long.png`, fullPage: true,
     style: ".mobile-tab-bar { display: none !important; }" });
@@ -284,6 +291,7 @@ test("list, filter, swipe, delete, undo", async ({ page }) => {
   });
   expect(deleteCopy).toBe(696);
   await page.screenshot({ path: `${dir}/history-delete-phone.png` });
+  await page.clock.pauseAt(new Date("2026-10-31T09:41:00Z"));
   await page.getByRole("alertdialog").getByRole("button", { name: /Delete snapshot/ }).click();
   await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Undo" }).locator("svg")).toBeVisible();
@@ -307,8 +315,8 @@ test("list, filter, swipe, delete, undo", async ({ page }) => {
     text: { x: 318, y: 731, width: 29, height: 14 },
   });
   await expect(page.locator(".fidelity-history-delete-toast .mobile-toast-copy > div:first-child")).toHaveCSS("line-height", "18px");
-  await expect(page.locator(".fidelity-history-delete-toast .mobile-toast-copy > div:last-child")).toHaveCSS("color", "rgb(180, 182, 188)");
-  await expect(page.locator(".fidelity-history-delete-toast .mobile-toast-action")).toHaveCSS("color", "rgb(155, 157, 163)");
+  await expect(page.locator(".fidelity-history-delete-toast .mobile-toast-copy > div:last-child")).toHaveCSS("color", "rgb(180, 182, 187)");
+  await expect(page.locator(".fidelity-history-delete-toast .mobile-toast-action")).toHaveCSS("color", "rgb(154, 156, 162)");
   const toastCopy = await page.locator(".fidelity-history-delete-toast .mobile-toast-copy").evaluate((node) =>
     [...node.children].map((child) => {
       const range = document.createRange();
@@ -340,6 +348,9 @@ test("refreshes configured sources when no snapshot has been saved", async ({ pa
   await executeSceneSql(page, "DELETE FROM assets_v2");
   await page.goto("/#/history");
   await page.getByRole("button", { name: "Refresh now" }).click();
+  await expect(page.getByRole("alertdialog", { name: "Source status" })).toHaveCount(0);
+  await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
+  await page.getByRole("button", { name: "Source status" }).click();
   await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
 });
 

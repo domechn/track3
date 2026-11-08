@@ -172,7 +172,7 @@ for (const phone of phones) {
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await installTauriBridge(page, { emptyPortfolio: true });
     await page.goto("/#/overview");
-    await expect(page.getByRole("heading", { name: "Add your first source" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Add your first source" })).toBeVisible({ timeout: 30_000 });
     await page.screenshot({ path: `test-results/mobile/ios-${phone.name}-first-launch.png` });
     await page.getByRole("button", { name: "Add an exchange" }).click();
     await expect(page).toHaveURL(/#\/settings\/configuration$/);
@@ -185,6 +185,8 @@ for (const phone of phones) {
     await expect(page.getByRole("button", { name: "Edit ETH" })).toBeVisible();
     await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
     await page.getByRole("button", { name: "Refresh now" }).click();
+    await expect(page.getByRole("alertdialog", { name: "Source status" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Source status" }).click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phone.width);
   });

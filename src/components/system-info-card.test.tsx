@@ -63,7 +63,13 @@ it("uses the existing expiry translation key for the date phrase", () => {
 
 it("shows a trialing subscription with the active status tone", () => {
   render(<SystemInfoCard title="Track3 Pro" status={{ label: "Trialing", value: "trialing" }} version="0.9.9" t={(key) => key} />);
-  expect(screen.getByText("Trialing")).toHaveClass("text-green-700");
+  expect(screen.getByText("Trialing")).toHaveClass("t3-tag");
+  expect(screen.getByText("Trialing")).toHaveAttribute("data-tone", "positive");
+});
+
+it.each(["expired", "canceled"])("shows a %s subscription with the negative status tone", (status) => {
+  render(<SystemInfoCard title="Track3 Pro" status={{ label: "Expired", value: status }} version="0.9.9" t={(key) => key} />);
+  expect(screen.getByText("Expired")).toHaveAttribute("data-tone", "negative");
 });
 
 it("keeps separators with the following plan segment when the summary wraps", () => {

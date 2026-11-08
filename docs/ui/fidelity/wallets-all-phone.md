@@ -24,6 +24,21 @@ Long capture: `/tmp/fidelity/wallets/wallets-all-phone-long.png` vs `/tmp/fideli
 
 ## Remaining differences
 
+- The latest dark 390 × 844 source and app viewport captures differ by
+  **10.66%** at an RGB-channel threshold of 20. Their Allocation cards
+  have identical computed x=16, y=320, width 358px, height 397px,
+  RGB (19, 18, 23) and 13px text. The owner-required selected source
+  and tab faces differ from the static source's white chip and bare tab;
+  the working Back control has no source counterpart. Text rendering
+  differs between the source font load and the app's offline font.
+  Captures and bounds are in `.local/tag-theme/phone-wallets-*`.
+
+- Earlier 8 Nov source-page and dark app first-screen captures at 390 × 844
+  differ by **6.091%** at an RGB-channel threshold of 20. The app's
+  stored source status supplies a real failed OKX reason and retry time;
+  the static source gives a different sample. Its Failed label now uses
+  the shared negative tag, which adds a subtle border and 11 px label
+  while keeping the source status visible.
 With no sources, Wallets now uses the shared centred empty state and the existing add-source route. The supplied Wallets source pages all contain saved sources, so there is no zero-source reference screen.
 
 - Fresh 5 Nov 2026 390px viewport pixel diff: **6.06%** (any RGB channel differs by more than 20). The full-page diff is **7.15%** over the common 2673 px (source 2673 px; app 2725 px). These are direct source HTML and current app captures in `/tmp/ui3-remeasure/` and `/tmp/fidelity/wallets/`.

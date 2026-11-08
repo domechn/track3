@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
-import { expectReadablePublicIpButton } from "./public-ip-contrast";
+import { expectReadablePublicIpButton } from "./public-ip-scenes";
 
 test("desktop exchange form shows public IP states in both themes and languages", async ({ page }) => {
   test.setTimeout(180_000);

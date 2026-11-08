@@ -41,4 +41,9 @@ describe("AssetLabel", () => {
     const { container } = render(<AssetLabel kind="exchange" type="unknown-provider" name="Mystery Source" size={20} />);
     expect(container.querySelector(".t3-asset-icon-fallback")).toHaveAttribute("data-initials", "M");
   });
+
+  it("keeps an accent source tag on the shared label", () => {
+    render(<AssetLabel kind="wallet" type="erc20" name="Ethereum" tag="Pro" tagTone="accent" />);
+    expect(screen.getByText("Pro")).toHaveAttribute("data-tone", "accent");
+  });
 });

@@ -20,7 +20,6 @@ import {
 } from "@/utils/assets";
 import { useTranslation } from "@/mobile/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
-import { directionClass } from "@/utils/color";
 import { ListRow, useIsMobile } from "@/mobile/components/mobile";
 
 const PAGE_SIZE = 20;
@@ -138,20 +137,20 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
   function renderChangeBadge(change: number) {
     if (change > 0) {
       return (
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted ${directionClass(change)}`}>
+        <span className="t3-tag" data-tone="positive">
           ↑{change}
         </span>
       );
     }
     if (change < 0) {
       return (
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted ${directionClass(change)}`}>
+        <span className="t3-tag" data-tone="negative">
           ↓{Math.abs(change)}
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+      <span className="t3-tag">
         —
       </span>
     );

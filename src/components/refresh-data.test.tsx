@@ -15,6 +15,7 @@ import { deliverAlerts } from "@/middlelayers/alert-notifications";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
 import axe from "axe-core";
 import { refreshRetryScheduler } from "@/middlelayers/refresh-retry-scheduler";
+import { writeStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 
 // Hoist mock fn references so they're available inside vi.mock factories
 const mockSetButtonLoading = vi.hoisted(() => vi.fn());
@@ -92,37 +93,159 @@ beforeEach(() => {
   vi.mocked(refreshInsights).mockResolvedValue(true);
 });
 
+async function openFinishedSourceStatus() {
+  await waitFor(() => expect(mockSetButtonLoading).toHaveBeenLastCalledWith(false));
+  expect(screen.queryByRole("alertdialog")).toBeNull();
+  fireEvent.click(await screen.findByRole("button", { name: "Source status" }));
+}
+
 describe("RefreshData — currency rates refresh ordering", () => {
-  it("dismisses a finished Overview panel when navigation changes the route", async () => {
+  it("keeps the panel closed after refresh and closes a user-opened panel on navigation", async () => {
+    writeStoredStatuses([
+      { sourceId: "btc:0", label: "Wallet", status: "ok" },
+    ]);
     render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    expect(await screen.findByRole("alertdialog", { name: "Refresh finished" })).toBeVisible();
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("alertdialog", { name: "Refresh finished" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
+    expect(await screen.findByRole("alertdialog")).toBeVisible();
     act(() => window.dispatchEvent(new HashChangeEvent("hashchange")));
     await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   });
-  it("opens the source progress panel for a manual refresh at 1440 px", async () => {
+  it("opens the source progress panel only after a status click at 1440 px", async () => {
     const previousWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
     vi.mocked(refreshAllData).mockReturnValueOnce(new Promise(() => {}));
     try {
       render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
       fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+      await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+      expect(screen.queryByRole("alertdialog", { name: "Refreshing sources" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Source status" }));
       expect(await screen.findByRole("alertdialog", { name: "Refreshing sources" })).toBeVisible();
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
     }
   });
-  it("chooses the Overview progress flow from its route even before the grid mounts", async () => {
+  it("offers the Overview progress flow from its route before the grid mounts", async () => {
     const previousWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
     vi.mocked(refreshAllData).mockReturnValueOnce(new Promise(() => {}));
     try {
       render(<RefreshData loading={false} overviewFlow />);
       fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+      await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Source status" }));
       expect(await screen.findByRole("alertdialog", { name: "Refreshing sources" })).toBeVisible();
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
     }
+  });
+  it("shows only current source results, ordered by failed, pending, then done with unique names", async () => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+    writeStoredStatuses(
+      ["Main", "Main", "Slow", "Done"].map((label, index) => ({
+        sourceId: `cex:${index}`, label, status: "ok" as const,
+        ...(index < 2 ? { kind: "exchange" as const, provider: index === 0 ? "OKX" : "Binance", hint: `#${index + 1}` } : {}),
+        startedAt: "2026-10-31T09:40:00.000Z", finishedAt: "2026-10-31T09:40:05.000Z",
+      })));
+    vi.mocked(getConfiguration).mockResolvedValue({} as never);
+    vi.mocked(listPortfolioSources).mockReturnValue(
+      ["Main", "Main", "Slow", "Done"].map((label, index) => ({ sourceId: `cex:${index}`, label })));
+    let resolveRefresh!: (value: never) => void;
+    vi.mocked(refreshAllData).mockImplementationOnce(async (_progress, options) => {
+      await new Promise<never>((resolve) => { resolveRefresh = resolve; });
+      return options as never;
+    });
+    try {
+      render(<RefreshData loading={false} overviewFlow />);
+      fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+      await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
+      fireEvent.click(document.querySelector(".t3-refresh-progress-pill")!);
+      const dialog = await screen.findByRole("alertdialog", { name: "Refreshing sources" });
+      expect(within(dialog).getAllByRole("group").map((row) => row.getAttribute("aria-label")))
+        .toEqual(["Main (OKX · #1)", "Main (Binance · #2)", "Slow", "Done"]);
+      expect(within(dialog).getByRole("group", { name: "Main (OKX · #1)" })).toHaveTextContent("Refreshing");
+      expect(within(dialog).getByRole("group", { name: "Main (Binance · #2)" })).toHaveTextContent("Refreshing");
+      expect(within(dialog).getByRole("group", { name: "Slow" })).toHaveTextContent("Refreshing");
+      expect(dialog).not.toHaveTextContent("Done in 5.0 s");
+      expect(dialog).toHaveTextContent("0 of 4 finished · 0 failed");
+      expect(within(dialog).queryByRole("progressbar")).toBeNull();
+      const onSourceResult = vi.mocked(refreshAllData).mock.calls[0][1]?.onSourceResult!;
+      act(() => {
+        onSourceResult({ sourceId: "cex:3", label: "Done", status: "ok", coins: [], walletIdentities: [],
+          startedAt: "2026-10-31T09:41:00.000Z", finishedAt: "2026-10-31T09:41:02.000Z" });
+        onSourceResult({ sourceId: "cex:0", label: "Main", status: "stale", category: "network", coins: [], walletIdentities: [],
+          startedAt: "2026-10-31T09:41:00.000Z", finishedAt: "2026-10-31T09:41:03.000Z" });
+      });
+      expect(within(dialog).getAllByRole("group").map((row) => row.getAttribute("aria-label")))
+        .toEqual(["Main (OKX · #1)", "Main (Binance · #2)", "Slow", "Done"]);
+      expect(within(dialog).getByRole("group", { name: "Main (Binance · #2)" })).toHaveTextContent("Refreshing");
+      expect(within(dialog).getByRole("group", { name: "Slow" })).toHaveTextContent("Refreshing");
+      expect(dialog).toHaveTextContent("2 of 4 finished · 1 failed");
+      expect(within(dialog).getByRole("group", { name: "Done" })).toHaveTextContent("Done in 2.0 s");
+      expect(within(dialog).getByRole("group", { name: "Main (OKX · #1)" })).toHaveTextContent("Retry");
+    } finally {
+      resolveRefresh?.({ failedSources: [], requiresDataSourceAction: false, usedLastKnownData: false } as never);
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
+  it("shows a successful stored source as done when its old status has no duration", async () => {
+    writeStoredStatuses([
+      { sourceId: "cex:0", label: "Offline", status: "failed", category: "network" },
+      { sourceId: "cex:1", label: "Ready", status: "ok" },
+    ]);
+    render(<RefreshData loading={false} overviewFlow />);
+    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
+    const ready = await screen.findByRole("group", { name: "Ready" });
+    expect(ready).toHaveTextContent("Done");
+    expect(ready).not.toHaveTextContent("Other");
+  });
+  it("keeps provider details in stored Overview row names", async () => {
+    writeStoredStatuses([
+      { sourceId: "cex:0", label: "Main", status: "failed", kind: "exchange", provider: "OKX", hint: "#1" },
+      { sourceId: "cex:1", label: "Main", status: "ok", kind: "exchange", provider: "Binance", hint: "#2" },
+    ]);
+    render(<RefreshData loading={false} overviewFlow />);
+    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getAllByRole("group").map((row) => row.getAttribute("aria-label")))
+      .toEqual(["Main (OKX · #1)", "Main (Binance · #2)"]);
+  });
+  it("shows a unique provider name once in stored Overview rows", async () => {
+    writeStoredStatuses([{ sourceId: "cex:0", label: "Binance", status: "ok", kind: "exchange", provider: "Binance" }]);
+    render(<RefreshData loading={false} overviewFlow />);
+    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getAllByRole("group").map((row) => row.getAttribute("aria-label")))
+      .toEqual(["Binance"]);
+  });
+  it("queues Retry on a failed row until the current refresh finishes", async () => {
+    const failed = { sourceId: "cex:0", label: "Offline", status: "stale" as const,
+      category: "network" as const, coins: [], walletIdentities: [] };
+    let finish!: (result: Awaited<ReturnType<typeof refreshAllData>>) => void;
+    vi.mocked(refreshAllData).mockImplementationOnce((_progress, options) =>
+      new Promise((resolve) => {
+        finish = resolve;
+        options?.onSourceResult?.(failed);
+      }));
+    render(<RefreshData loading={false} overviewFlow />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByRole("button", { name: /Refreshing.*1 of 1 finished/ }));
+    const retryButton = await screen.findByRole("button", { name: "Retry" });
+    expect(retryButton).toBeEnabled();
+    fireEvent.click(retryButton);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await act(async () => {
+      finish({ failedSources: [], requiresDataSourceAction: false, usedLastKnownData: true,
+        persisted: true, sourceResults: [failed], sourceStatuses: [failed] });
+    });
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(refreshAllData).mock.calls[1][1]).toMatchObject({ retrySourceId: "cex:0" });
   });
   it("does not offer a retry for a quota-limited Overview source", async () => {
     vi.mocked(refreshAllData).mockResolvedValue({
@@ -130,6 +253,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     } as never);
     render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     expect(await screen.findByRole("alertdialog", { name: "Refresh finished" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "Retry failed" })).not.toBeInTheDocument();
   });
@@ -149,6 +273,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     } as never);
     render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Refresh finished" });
     expect(dialog).toHaveTextContent("1 of 2 refreshed · 1 needs a plan change");
     expect(await within(dialog).findByText("Pro limit reached: 50 of 50 ERC20 refreshes used, resets 1 Nov")).toBeVisible();
@@ -167,12 +292,18 @@ describe("RefreshData — currency rates refresh ordering", () => {
     } as never);
     render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     expect(await screen.findByRole("alertdialog", { name: "Refresh finished" }))
       .toHaveTextContent("1 of 4 refreshed · 3 failed");
   });
   it("offers an explicit Close action after every source refreshes", async () => {
+    vi.mocked(refreshAllData).mockResolvedValue({
+      failedSources: [], requiresDataSourceAction: false, usedLastKnownData: false,
+      sourceStatuses: [{ sourceId: "btc:0", label: "Wallet", status: "ok" }],
+    } as never);
     render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Refresh finished" });
     expect(within(dialog).getByRole("button", { name: "Close" })).toBeVisible();
   });
@@ -180,6 +311,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
     render(<div className="t3-overview-grid"><RefreshData loading={false} overviewFlow /></div>);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     fireEvent.click(await screen.findByRole("button", { name: "Retry failed" }));
     await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(2));
     expect(vi.mocked(refreshAllData).mock.calls[1][1]).toMatchObject({ retrySourceId: "btc:0" });
@@ -256,6 +388,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     } as never);
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     expect(dialog).toHaveTextContent("Monthly refresh limit reached");
     expect(screen.queryByRole("button", { name: "Retry Wallet" })).not.toBeInTheDocument();
@@ -269,7 +402,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(window.location.hash).toBe("#/settings/systemInfo");
     window.location.hash = "";
   });
-  it("offers Retry and Details on a failed source toast", async () => {
+  it("offers Retry on a failed source toast and keeps status on the toolbar", async () => {
     vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
@@ -279,7 +412,8 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const failedToast = mockToast.mock.lastCall?.[0];
     const notice = within(render(<div>{failedToast.action}</div>).container);
     expect(notice.getByRole("button", { name: "Retry" })).toBeVisible();
-    expect(notice.getByRole("button", { name: /^Details$/ })).toBeVisible();
+    expect(notice.queryByRole("button", { name: /^Details$/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Source status" })).toHaveAttribute("title", "1 failed");
     fireEvent.click(notice.getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(2));
     expect(vi.mocked(refreshAllData).mock.calls[1][1]).toMatchObject({
@@ -412,6 +546,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     expect(await screen.findByRole("button", { name: "Use last known values" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Use last known values" }));
     expect(screen.queryByRole("button", { name: "Use last known values" })).not.toBeInTheDocument();
@@ -424,6 +559,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     await waitFor(() => expect(dialog).toHaveTextContent("Next automatic try at"));
     expect(refreshRetryScheduler.status().nextBySource["btc:0"]).toBeDefined();
@@ -441,6 +577,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     await screen.findByRole("alertdialog", { name: "Source status" });
     await waitFor(() => expect(refreshRetryScheduler.status().nextBySource["btc:0"]).toBeDefined());
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
@@ -477,6 +614,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     expect(await screen.findByRole("alertdialog", { name: "Source status" })).toBeTruthy();
     expect(screen.getByText("BTC wallet 1")).toBeTruthy();
     expect(screen.getByText(/Network or timeout/)).toBeTruthy();
@@ -500,6 +638,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     expect(dialog).toHaveTextContent("Pro service error");
     expect(dialog).not.toHaveTextContent("No duneApiKey or defiApiKey or debankApiKey");
@@ -516,14 +655,14 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    await user.click(screen.getByRole("button", { name: "Source status" }));
-    expect(screen.getByText("OK")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("OK")).toBeTruthy());
     expect(refreshAllData).toHaveBeenLastCalledWith(
       expect.any(Function),
       {
         retrySourceId: "btc:0",
+        onSourceResult: expect.any(Function),
         previousSourceResults: [failedSource],
         previousSourceStatuses: partialResult.sourceStatuses,
         previousSnapshotId: "previous",
@@ -539,6 +678,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
     expect(await screen.findByRole("button", { name: "Run full refresh" })).toBeVisible();
   });
@@ -550,6 +690,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
     await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(2));
     expect(screen.getByRole("button", { name: "Retry BTC wallet 1" })).toBeTruthy();
@@ -573,6 +714,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     await user.click(await screen.findByRole("button", { name: "Retry Cold vault" }));
     await waitFor(() => expect(mockToast).toHaveBeenLastCalledWith(expect.objectContaining({
       description: "Source retry failed: Cold vault. The saved snapshot is unchanged.",
@@ -588,6 +730,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     expect(await screen.findByText(/Failed sources \(1 of 1\): BTC wallet 1/)).toBeTruthy();
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
       description: "All sources failed: BTC wallet 1. The saved snapshot is unchanged.",
@@ -626,6 +769,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     await screen.findByText(/Authentication or invalid key/);
     expect(document.body.textContent).not.toContain("secret-token");
   });
@@ -637,6 +781,8 @@ describe("RefreshData — currency rates refresh ordering", () => {
     render(<I18nProvider><RefreshData loading={false} /></I18nProvider>);
 
     await user.click(screen.getByRole("button", { name: "刷新" }));
+    await waitFor(() => expect(mockSetButtonLoading).toHaveBeenLastCalledWith(false));
+    await user.click(screen.getByRole("button", { name: "数据源状态" }));
     expect(await screen.findByText("BTC 钱包 1")).toBeTruthy();
   });
 
@@ -648,6 +794,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     expect(await screen.findByText("Cold vault")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry Cold vault" })).toBeTruthy();
     expect(localStorage.getItem("track3-refresh-source-statuses")).toContain("Cold vault");
@@ -670,6 +817,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     expect(dialog).toHaveTextContent("Failed sources (2 of 4)");
     const rows = Array.from(dialog.querySelectorAll("[data-source-status-row]"));
@@ -690,6 +838,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(2));
     expect(vi.mocked(refreshAllData).mock.calls[1][1]).toEqual({
       previousSourceStatuses: sourceStatuses,
+      onSourceResult: expect.any(Function),
     });
   });
 
@@ -710,6 +859,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     expect(dialog).toHaveTextContent("1 failed, 1 partial");
     const partialRow = screen.getByRole("group", { name: "Gate.io (Gate)" });
@@ -781,6 +931,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     expect(vi.mocked(refreshAllData).mock.calls[0][1]).toEqual({
+      onSourceResult: expect.any(Function),
       previousSourceStatuses: [{
         sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "#1",
         status: "ok", lastSuccessAt: "2026-10-17T12:30:00Z",
@@ -813,7 +964,8 @@ describe("RefreshData — currency rates refresh ordering", () => {
     await user.click(screen.getByRole("button", { name: "Source status" }));
     await user.click(screen.getByRole("button", { name: "Retry all failed" }));
     await waitFor(() => expect(refreshAllData).toHaveBeenCalledWith(
-      expect.any(Function), { previousSourceStatuses: statuses }, expect.any(Object), expect.any(Function),
+      expect.any(Function), { previousSourceStatuses: statuses, onSourceResult: expect.any(Function) },
+      expect.any(Object), expect.any(Function),
     ));
   });
 
@@ -878,7 +1030,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
       expect(persistenceAttempts).toBe(2);
       expect(refreshAllData).toHaveBeenCalledWith(
         expect.any(Function),
-        {},
+        { onSourceResult: expect.any(Function) },
         {
           operationUuid: expect.stringMatching(
             /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,

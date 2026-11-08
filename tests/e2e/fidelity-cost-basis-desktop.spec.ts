@@ -93,9 +93,21 @@ test("FIFO report and data gaps table", async ({ page }) => {
   await expect(subtotal.locator("td").first()).toHaveAttribute("colspan", "3");
   await expect(page.locator(".fidelity-total td").first()).toHaveAttribute("colspan", "3");
   await expect(subtotal.locator("td").nth(4)).toHaveClass(/pos|neg|zero/);
-  await expect(subtotal.locator(".fidelity-pill")).toHaveCSS("background-color", "rgb(33, 32, 35)");
-  await expect(subtotal.locator(".fidelity-pill")).toHaveCSS("color", "rgb(189, 189, 192)");
-  await expect(subtotal.locator(".fidelity-pill")).toHaveCSS("font-weight", "500");
+  const subtotalTag = subtotal.locator(".t3-tag");
+  await expect(subtotalTag).toHaveCSS("font-weight", "500");
+  const tagContrast = await subtotalTag.evaluate((node) => {
+    const rgb = (value: string) => [...value.matchAll(/[\d.]+/g)].slice(0, 3).map(([number]) => Number(number));
+    const linear = (value: number) => {
+      const channel = value / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = (color: string) => rgb(color).reduce((sum, value, index) =>
+      sum + [0.2126, 0.7152, 0.0722][index] * linear(value), 0);
+    const style = getComputedStyle(node);
+    const [low, high] = [luminance(style.color), luminance(style.backgroundColor)].sort((a, b) => a - b);
+    return (high + 0.05) / (low + 0.05);
+  });
+  expect(tagContrast).toBeGreaterThanOrEqual(4.5);
   await expect(page.locator(".fidelity-subtotal").filter({ hasText: "SOL subtotal" }).locator("td").last())
     .toBeEmpty();
   const acquired = (await page.locator(".fidelity-cost-table th").nth(1).boundingBox())!;
@@ -171,6 +183,7 @@ test("empty tax year retains open lots and chart empty state", async ({ page }) 
   await page.getByRole("button", { name: "Records controls" }).click();
   await page.locator(".t3-records-settings-link").click();
   await expect(page).toHaveURL(/#\/settings/, { timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.getByRole("link", { name: "Cost basis" }).click();
   await expect(page).toHaveURL(/#\/cost-basis/, { timeout: 15_000 });
   await expect(page.getByLabel("Tax year")).toHaveValue("2025", { timeout: 15_000 });

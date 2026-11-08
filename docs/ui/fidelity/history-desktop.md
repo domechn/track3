@@ -50,6 +50,18 @@ Chromium briefly sets a 1 × 1 viewport during some full page screenshots. The d
 
 UI42 uses the approved website-style neutral tile for saved asset and source marks. The older History page design renders those marks differently.
 
+The 8 Nov 2026 current 1600 × 1024 app viewport differs by **6.076%**
+from the same area of the rendered `records-history.html` source at RGB-sum
+threshold 60. Captures are `.local/tag-theme/desktop-history-edited-app.png`
+and `/tmp/ui21-source-fresh/history.png`. This isolated fixture shows the
+product's default newest selection and no completed sync, while the source
+preselects the edited 28 Oct row and prints a synced stamp. The app selects
+newest on load and shows a sync stamp only after a real completed pass. The
+app's first column measures 207.45 px at x=85, against the
+source's recorded 209.61 px at 1600 px, leaving room for date, time and
+the Edited tag. The fixed-height shell and stored edit differences below
+also remain visible.
+
 The 7 Nov 2026 populated History capture is **5.71%** different from the
 saved 1600 × 1272 source render at RGB-sum threshold 60 when the app's
 1600 × 1024 scroll viewport is padded to the source height. The fixed shell

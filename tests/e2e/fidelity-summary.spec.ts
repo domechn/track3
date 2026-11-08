@@ -378,7 +378,9 @@ test("summary full state follows the approved card order and captures at 390px",
     await page.screenshot({ path: "/tmp/fidelity/summary/summary-phone-long.png", fullPage: true });
     await page.screenshot({ path: "/tmp/fidelity/summary/summary-phone.png" });
     await page.locator(".fd-month").last().click();
-    await expect(page.locator(".fd-chart-chip")).toContainText("Oct 2026");
+    await expect(page.locator(".fd-summary-chart [data-chart-mark]").last()).toHaveAttribute("aria-label", /Oct 2026/);
+    await expect(page.locator("[data-chart-tooltip]")).toContainText("Oct 2026");
+    await expect(page.locator("[data-chart-tooltip]")).toContainText("$");
     await page.getByRole("radio", { name: "30D" }).click();
     await expect(page.locator(".fd-primary-stat")).not.toContainText("+$188,809.27");
   } finally { await context.close(); }
@@ -553,11 +555,12 @@ test("summary P&L chart exposes the value and month while scrubbing", async ({ b
     await chart.scrollIntoViewIfNeeded();
     const box = (await chart.boundingBox())!;
     await page.mouse.move(box.x + box.width * .35, box.y + box.height * .5);
-    const chip = page.locator(".fd-chart-chip");
-    await expect(chip).toContainText("$");
-    const first = await chip.textContent();
+    const tooltip = page.locator("[data-chart-tooltip]");
+    await expect(tooltip).toContainText("$");
+    await expect(tooltip).toContainText(/202[56]/);
+    const first = await tooltip.textContent();
     await page.mouse.move(box.x + box.width * .75, box.y + box.height * .5);
-    await expect.poll(() => chip.textContent()).not.toBe(first);
+    await expect.poll(() => tooltip.textContent()).not.toBe(first);
   } finally { await context.close(); }
 });
 

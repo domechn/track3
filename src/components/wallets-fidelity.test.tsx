@@ -26,6 +26,23 @@ beforeEach(() => {
 });
 
 describe("WalletsFidelity", () => {
+  it("shows the exact mover amount over its bar", async () => {
+    const { container } = render(<WalletsFidelity currency={currency} dateRange={dateRange}
+      quoteColor="green-up-red-down" selectedSource={null} onSelectSource={vi.fn()} statuses={[]} />);
+    await waitFor(() => expect(container.querySelector(".t3-wallet-mover-track")).toBeInTheDocument());
+    fireEvent.pointerEnter(container.querySelector(".t3-wallet-mover-track")!);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("+$30.00");
+  });
+
+  it("shows exact source value and share when a split segment is hovered", async () => {
+    const { container } = render(<WalletsFidelity currency={currency} dateRange={dateRange}
+      quoteColor="green-up-red-down" selectedSource={null} onSelectSource={vi.fn()} statuses={[]} />);
+    await waitFor(() => expect(container.querySelector(".t3-wallet-split i")).toBeInTheDocument());
+    expect(container.querySelector(".t3-wallet-split i")).toHaveAttribute("role", "button");
+    fireEvent.pointerEnter(container.querySelector(".t3-wallet-split i")!, { pointerType: "mouse" });
+    expect(screen.getByRole("tooltip")).toHaveTextContent("$120.00");
+    expect(screen.getByRole("tooltip")).toHaveTextContent("66.67%");
+  });
   it("uses a muted change line under total value", async () => {
     const { container } = render(<WalletsFidelity currency={currency} dateRange={dateRange}
       quoteColor="green-up-red-down" selectedSource={null} onSelectSource={vi.fn()} statuses={[]} />);

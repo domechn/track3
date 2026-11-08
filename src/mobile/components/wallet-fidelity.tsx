@@ -22,6 +22,8 @@ import { directionTone } from "@/utils/color";
 import AssetLabel from "@/components/common/asset-label";
 import { sourceIconKind } from "@/components/source-allocation-list";
 
+import { useChartHitArea } from "@/components/chart-tooltip";
+
 const WalletAssetsPercentage = lazy(() => import("@/mobile/components/wallet-assets-percentage"));
 const WalletAssetsChange = lazy(() => import("@/mobile/components/wallet-assets-change"));
 const WalletSourceChanges = lazy(() => import("@/components/wallet-source-changes"));
@@ -64,6 +66,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
   onRangeChange?: (selectedTimes: number, range: { from: Date; to: Date } | undefined) => void;
 }) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const version = useDataChangedVersion();
   const walletOrdinals = useLatestWalletOrdinals();
   const retry = useSyncExternalStore(refreshRetryScheduler.subscribe, refreshRetryScheduler.status);
@@ -220,7 +223,12 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
               <div><span>{t("fidelity.wallets.largestSource")}</span><b>{sources[0] ? percent(share(sources[0])) : "—"}</b><small>{sources[0]?.label}</small></div>
               <div><span>{t("fidelity.wallets.lastRefresh")}</span><b>{time(statuses.reduce<string | undefined>((current, status) => !current || (status.finishedAt ?? status.lastSuccessAt ?? "") > current ? status.finishedAt ?? status.lastSuccessAt : current, undefined))}</b><small>{t("fidelity.wallets.currentSources").replace("{ok}", statuses.length ? String(sources.filter((source) => source.status?.status === "ok").length) : "—").replace("{all}", String(sources.length))}</small></div>
             </>}</div>
-          <div className="fd-wallet-split">{shareItems.map((item, index) => <i key={item.label} style={{ width: `${item.fraction * 100}%`, background: colors[index % colors.length] }} />)}</div>
+          <div className="fd-wallet-split" data-chart-group="">{shareItems.map((item, index) => {
+            const detail = `${item.label}: ${money(item.value, currency)} · ${percent(item.fraction, 2)}`;
+            return <i key={item.label} role="button" {...chart.markProps(index, detail, detail)}
+              style={{ width: `${item.fraction * 100}%`, background: colors[index % colors.length] }} />;
+          })}</div>
+          {chart.tooltip}
           <div className="fd-wallet-legend">{shareItems.map((item, index) => <span key={item.label}><i style={{ background: colors[index % colors.length] }} />{item.label} <b>{percent(item.fraction)}</b></span>)}</div>
         </section>
         <section className="fd-card fd-wallet-balances"><div className="fd-card-heading"><h3>{chosen ? t("fidelity.wallets.balances") : t("fidelity.wallets.balancesBySource")}</h3><span>{chosen ? selectedFailed ? t("fidelity.wallets.asOf").replace("{time}", time(lastGood)) : t("fidelity.wallets.refreshedLower").replace("{time}", time(chosen.status?.lastSuccessAt)) : t("fidelity.wallets.changeVs").replace("{date}", date)}</span></div>
@@ -243,7 +251,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
                 <div className="fd-wallet-retry"><button type="button" onClick={() => source.status && requestRefreshSource(source.status.sourceId)}><ReloadIcon aria-hidden="true" />{t("refresh.retryButton")}</button>
                   {next && <span>{t("fidelity.wallets.nextRetry").replace("{time}", time(new Date(next).toISOString()))}</span>}</div></> :
                 <small>{source.status?.detail || (source.kind === "exchange" ? t("fidelity.wallets.exchange") : source.kind === "broker" ? t("fidelity.wallets.broker") : t("fidelity.wallets.publicAddress"))}</small>}</div>
-              <span>{sourceFailed ? t("fidelity.wallets.failed") : time(source.status?.lastSuccessAt)}</span></div>; })}
+              <span className={sourceFailed ? "t3-tag" : undefined} data-tone={sourceFailed ? "negative" : undefined}>{sourceFailed ? t("fidelity.wallets.failed") : time(source.status?.lastSuccessAt)}</span></div>; })}
         </section>}
         {chosen ? <section className="fd-card fd-wallet-changes"><div className="fd-card-heading"><h3>{t("fidelity.wallets.assetChanges")}</h3><span>{range}, {currency.currency}</span></div>
           <MoverList items={movers} currency={currency} />
@@ -273,13 +281,16 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
 }
 
 function MoverList({ items, currency }: { items: { symbol: string; value: number }[]; currency: CurrencyRateDetail }) {
+  const chart = useChartHitArea();
   const positive = Math.max(0, ...items.map((item) => item.value));
   const negative = Math.max(0, ...items.map((item) => -item.value));
   const zero = negative / (positive + negative || 1) * 92 + 4;
   const unit = (100 - zero - 4) / (positive || 1);
-  return <div className="fd-wallet-movers">{items.map((item) => <div className="fd-wallet-mover" key={item.symbol}><b><AssetLabel symbol={item.symbol} size={20} quiet /></b>
-    <span style={{ "--fd-zero": `${zero}%` } as CSSProperties}>{item.value !== 0 && <i data-tone={directionTone(item.value)} style={item.value > 0
+  return <div className="fd-wallet-movers" data-chart-group="">{items.map((item, index) => <div className="fd-wallet-mover" key={item.symbol}><b><AssetLabel symbol={item.symbol} size={20} quiet /></b>
+    <span role="button" {...chart.markProps(index, `${item.symbol}: ${money(item.value, currency, 2, true)}`,
+      <><div>{item.symbol}</div><div data-tone={directionTone(item.value)}>{money(item.value, currency, 2, true)}</div></>)}
+      style={{ "--fd-zero": `${zero}%` } as CSSProperties}>{item.value !== 0 && <i data-tone={directionTone(item.value)} style={item.value > 0
       ? { left: `${zero}%`, width: `${item.value * unit}%` }
       : { right: `${100 - zero}%`, width: `${-item.value * unit}%` }} />}</span>
-    <strong data-tone={directionTone(item.value)}>{money(item.value, currency, 0, true)}</strong></div>)}</div>;
+    <strong data-tone={directionTone(item.value)}>{money(item.value, currency, 0, true)}</strong></div>)}{chart.tooltip}</div>;
 }
