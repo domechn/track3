@@ -157,6 +157,12 @@ body:has(.fd-page), .app-layout:has(.fd-page) { background:hsl(var(--background)
 .fd-coin-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; margin-top:14px; padding-top:14px; border-top:1px solid var(--fd-border); }
 .fd-coin-stats>.fd-coin-metric { min-width:0; padding:0 10px; border-left:1px solid var(--fd-border); }
 .fd-coin-stats>.fd-coin-metric:first-child { padding-left:0; border-left:0; }
+@media (max-width:699px) {
+  .fd-coin-stats { display:flex; flex-wrap:wrap; row-gap:12px; overflow:hidden; }
+  .fd-coin-stats>.fd-coin-metric { flex:1 1 0; min-width:min-content; max-width:100%; margin-left:-10px; padding:0 0 0 9px; border-left:1px solid var(--fd-border); }
+  .fd-coin-stats>.fd-coin-metric:first-child { margin-left:0; padding-left:0; padding-right:16px; border-left:0; }
+  .fd-coin-stats>.fd-coin-metric:nth-child(2) { padding-right:16px; }
+}
 .fd-source-row,.fd-tx-row { display:block; width:100%; min-height:64px; padding:12px 0; border-top:1px solid var(--fd-rule); color:var(--fd-text); text-align:left; }
 .fd-source-row:first-child { border-top:0; }
 .fd-source-row b { font-weight:600; }
