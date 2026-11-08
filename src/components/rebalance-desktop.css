@@ -13,20 +13,20 @@
 .t3-fidelity-rail-live .t3-live-trigger { width: 36px; padding: 0; }
 .t3-fidelity-rail-live .t3-live-label { display: none; }
 .t3-fidelity-refresh-progress { position: fixed; z-index: 32; top: 0; right: 0; left: 56px; pointer-events: none; }
-.t3-fidelity-rail { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; display: flex; width: 56px; flex-direction: column; gap: 2px; overflow: hidden; padding: 12px 10px; border-right: 1px solid #222224; background: #0d0d0e; }
+.t3-fidelity-rail { position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; display: flex; width: 56px; flex-direction: column; gap: 2px; overflow: hidden; padding: 12px 10px; border-right: 1px solid var(--sidebar-border); background: var(--sidebar-background); }
 .t3-fidelity-brand { display: flex; height: 44px; flex: none; align-items: center; justify-content: center; margin: -4px -4px 8px; border-radius: 6px; }
 .t3-fidelity-brand svg { width: 28px; height: 28px; }
 .t3-fidelity-brand:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
-.t3-fidelity-rail-item { position: relative; display: flex; height: 36px; flex: none; align-items: center; justify-content: center; border-radius: 6px; color: #8c8e95; }
-.t3-fidelity-rail-item:hover { background: #18181c; color: #fff; }
-.t3-fidelity-rail-item.selected { background: #1c1c20; color: #fff; }
-.t3-fidelity-rail-item.selected::before { position: absolute; top: 8px; bottom: 8px; left: -10px; width: 2px; background: #4a8ad6; content: ""; }
+.t3-fidelity-rail-item { position: relative; display: flex; height: 36px; flex: none; align-items: center; justify-content: center; border-radius: 6px; color: var(--sidebar-muted); }
+.t3-fidelity-rail-item:hover { background: var(--sidebar-hover-bg); color: var(--sidebar-foreground); }
+.t3-fidelity-rail-item.selected { background: var(--sidebar-active-bg); color: var(--sidebar-active-fg); }
+.t3-fidelity-rail-item.selected::before { position: absolute; top: 8px; bottom: 8px; left: -10px; width: 2px; background: hsl(var(--accent-data)); content: ""; }
 .t3-fidelity-rail-item svg { width: 18px; height: 18px; }
 .t3-fidelity-rail .desktop-sync-status-indicator { display: grid; width: 36px; min-height: 36px; place-items: center; }
 .t3-fidelity-rail .t3-topbar-sync-button { width: 34px; min-height: 34px; height: 34px; justify-content: center; padding: 0; overflow: hidden; font-size: 0; }
-.t3-fidelity-rail-sep { height: 1px; flex: none; margin: 8px 6px; background: #222224; }
+.t3-fidelity-rail-sep { height: 1px; flex: none; margin: 8px 6px; background: var(--sidebar-border); }
 .t3-fidelity-rail-spacer { flex: 1; }
-.t3-fidelity-rail-badge { position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border: 2px solid #0d0d0e; border-radius: 50%; background: #ee6a82; }
+.t3-fidelity-rail-badge { position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border: 2px solid var(--sidebar-background); border-radius: 50%; background: var(--sidebar-badge); }
 .t3-fidelity-page {
   width: 100%; color: #fff; font: 400 13px/18px "Public Sans Variable", "Public Sans", sans-serif;
   font-variant-numeric: tabular-nums;
@@ -38,9 +38,9 @@
 .t3-fidelity-head > div { flex: 1; min-width: 0; }
 .t3-fidelity-head h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 600; letter-spacing: -.01em; }
 .t3-fidelity-head p { margin: 2px 0 0; overflow-wrap: anywhere; color: #b4b6bc; font-size: 13px; line-height: 18px; }
-.t3-fidelity-stamp { display: inline-flex; align-items: center; gap: 6px; color: #9b9da3; font-size: 12px; white-space: nowrap; }
-.t3-fidelity-stamp i { width: 6px; height: 6px; border-radius: 50%; background: #5fc39c; }
-.t3-fidelity-stamp.stale i { background: #9b9da3; }
+.t3-fidelity-stamp { display: inline-flex; align-items: center; gap: 6px; color: var(--shell-faint); font-size: 12px; white-space: nowrap; }
+.t3-fidelity-stamp i { width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--positive)); }
+.t3-fidelity-stamp.stale i { background: var(--shell-faint); }
 .t3-fidelity-error { padding: 12px 14px; margin-bottom: 16px; border: 1px solid #4a2530; border-radius: 6px; color: #ee6a82; background: #2c1a20; }
 .t3-fidelity-status { padding: 12px 14px; margin-bottom: 16px; border: 1px solid #1b2828; border-radius: 6px; color: #5fc39c; background: #142420; }
 .t3-fidelity-grid { display: grid; grid-template-columns: repeat(12, minmax(0,1fr)); gap: 16px; align-items: stretch; }

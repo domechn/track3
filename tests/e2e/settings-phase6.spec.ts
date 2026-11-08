@@ -92,6 +92,7 @@ test("desktop language settings show the current appearance summary", async ({ p
   await expect(page.getByRole("heading", { name: "Current Theme" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Language", exact: true }).last()).toBeVisible();
   await expect(page.getByText("Affects all visible text in the app.")).toBeVisible();
+  await expect(page.getByText("Restart is triggered after applying a new theme")).toHaveCount(0);
 });
 
 test("system preview surfaces follow theme background tokens", async ({ page }) => {

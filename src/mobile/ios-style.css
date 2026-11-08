@@ -17,6 +17,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --mobile-safe-top: env(safe-area-inset-top);
     --mobile-safe-right: env(safe-area-inset-right);
     --mobile-safe-bottom: env(safe-area-inset-bottom);
@@ -81,9 +82,21 @@
     --glass-shadow: var(--shadow-card);
     --sidebar-width: 216px;
     --sidebar-collapsed-width: 56px;
+    --sidebar-background: hsl(var(--card));
+    --mobile-tab-badge-foreground: #fff;
+    --sidebar-foreground: hsl(var(--foreground));
+    --sidebar-muted: hsl(var(--muted-foreground));
+    --sidebar-border: hsl(var(--border));
+    --sidebar-active-bg: hsl(var(--accent-data) / .12);
+    --sidebar-active-fg: hsl(var(--foreground));
+    --sidebar-hover-bg: hsl(var(--raised));
+    --mobile-topbar-background: hsl(var(--card));
+    --mobile-overview-alert-border: hsl(var(--border));
+    --sheet-handle: hsl(var(--muted-foreground));
   }
 
   .dark {
+    color-scheme: dark;
     --ios-segment-selected: hsl(var(--raised));
     --background: 240 4% 5%;
     --foreground: 0 0% 100%;
@@ -128,6 +141,18 @@
     --glass-bg: hsl(var(--card));
     --glass-border: hsl(var(--border));
     --glass-shadow: var(--shadow-card);
+    --sidebar-background: hsl(var(--background));
+    --mobile-tab-badge-foreground: #1a0509;
+    --sidebar-group-label: var(--shell-faint);
+    --sidebar-foreground: hsl(var(--foreground));
+    --sidebar-muted: hsl(var(--muted-foreground));
+    --sidebar-border: hsl(var(--border));
+    --sidebar-active-bg: #1c1c20;
+    --sidebar-active-fg: #fff;
+    --sidebar-hover-bg: hsl(var(--raised));
+    --mobile-topbar-background: #0d0d0e;
+    --mobile-overview-alert-border: #3a3a3e;
+    --sheet-handle: #44454b;
   }
   :root[data-quote="red-up"] { --gain: var(--negative); --loss: var(--positive); }
 }

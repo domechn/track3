@@ -25,6 +25,7 @@ import { Pager, usePager } from "./ui/pager";
 import { CoinLotsTable, CoinSourcesTable, useStickyCoinChart, type CoinLotRow } from "./coin-detail-sections";
 import { ArchiveIcon, BackpackIcon, ClockIcon } from "@radix-ui/react-icons";
 import EmptyState from "./empty-state";
+import { useChartHitArea } from "./chart-tooltip";
 
 type Props = {
   symbol: string;
@@ -56,6 +57,7 @@ function line(values: number[], indices: number[], total: number, lower: number,
 }
 
 export default function CoinFidelityView({ symbol, assetType, currency, dateRange, lastAsset, transactions, transactionsLoading = false, walletAliasMap, quoteColor, onEdit }: Props) {
+  const chart = useChartHitArea();
   const walletOrdinals = useLatestWalletOrdinals();
   const { t, locale } = useTranslation();
   const money = (value: number | undefined, sign = false, digits = 2) => value === undefined || !Number.isFinite(value) ? "–" : `${sign && value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${num(Math.abs(value * currency.rate), digits)}`;
@@ -288,11 +290,11 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
           <div className="coin-fidelity-controls" role="group" aria-label={t("coin.fidelity.valueHoldings")}><button type="button" aria-pressed={mode === "value"} className={mode === "value" ? "active" : ""} onClick={() => setMode("value")}>{t("coin.fidelity.value")}</button><button type="button" aria-pressed={mode === "price"} className={mode === "price" ? "active" : ""} onClick={() => setMode("price")}>{t("coin.fidelity.price")}</button></div>
           <div className="coin-fidelity-controls" role="group" aria-label={t("datePicker.predefined")}><button type="button" aria-pressed={windowDays === 7} className={windowDays === 7 ? "active" : ""} onClick={() => setWindowDays(7)}>7D</button><button type="button" aria-pressed={windowDays === 30} className={windowDays === 30 ? "active" : ""} onClick={() => setWindowDays(30)}>30D</button></div>
         </div></div>
-        {values.length < 3 ? <div className="coin-fidelity-plot coin-fidelity-short-history" role="status">{t("coin.fidelity.notEnoughHistory")}</div> : <div className="coin-fidelity-plot"><div className="coin-fidelity-ylabels">{axisLabels.map((label, index) => <span key={index}>{label}</span>)}</div><svg viewBox="0 0 720 315" preserveAspectRatio="none" role="img" aria-label={t(mode === "value" ? "coin.fidelity.valueHoldings" : "coin.fidelity.price")}><path d={line(plotValues, plotIndices, values.length, axisLow, axisHigh)} />{plotIndices.map((sourceIndex) => {
+        {values.length < 3 ? <div className="coin-fidelity-plot coin-fidelity-short-history" role="status">{t("coin.fidelity.notEnoughHistory")}</div> : <div className="coin-fidelity-plot"><div className="coin-fidelity-ylabels">{axisLabels.map((label, index) => <span key={index}>{label}</span>)}</div><svg viewBox="0 0 720 315" preserveAspectRatio="none" role="group" data-chart-group="" aria-label={t(mode === "value" ? "coin.fidelity.valueHoldings" : "coin.fidelity.price")}><path d={line(plotValues, plotIndices, values.length, axisLow, axisHigh)} />{plotIndices.map((sourceIndex, markIndex) => {
           const point = values[sourceIndex];
           const label = `${date(series?.timestamps[sourceIndex] ?? 0)}: ${money(point)}`;
-          return <circle key={sourceIndex} data-point cx={sourceIndex / Math.max(1, values.length - 1) * 720} cy={coinChartY(point, axisLow, axisHigh, 315)} r="6" fill="transparent" role="img" tabIndex={0} aria-label={label}><title>{label}</title></circle>;
-        })}</svg>{values.length > 0 && <b style={{ top: `${Math.max(0, Math.min(90, (1 - ((endValue ?? axisLow) - axisLow) / (axisHigh - axisLow)) * 100))}%` }}>{endLabel}</b>}</div>}
+          return <circle key={sourceIndex} data-point cx={sourceIndex / Math.max(1, values.length - 1) * 720} cy={coinChartY(point, axisLow, axisHigh, 315)} r="10" fill="transparent" role="button" {...chart.markProps(markIndex, label, label)} />;
+        })}</svg>{chart.tooltip}{values.length > 0 && <b style={{ top: `${Math.max(0, Math.min(90, (1 - ((endValue ?? axisLow) - axisLow) / (axisHigh - axisLow)) * 100))}%` }}>{endLabel}</b>}</div>}
         <div className="coin-fidelity-xlabels">{xDates.map(({ timestamp, index }, tick) => <span key={index} style={{ left: `${index / Math.max(1, (series?.timestamps.length ?? 1) - 1) * 100}%`, transform: tick === 0 ? "none" : tick === xDates.length - 1 ? "translateX(-100%)" : "translateX(-50%)" }}>{tickDate(timestamp)}</span>)}</div>
         <div className="coin-fidelity-chart-stats">{metric(t("coin.fidelity.high"), money(high), values.length ? tickDate(series!.timestamps[values.indexOf(high)]) : "–")}{metric(t("coin.fidelity.low"), money(low), values.length ? tickDate(series!.timestamps[values.indexOf(low)]) : "–")}{metric(t("coin.fidelity.since").replace("{date}", tickDate(series?.timestamps[0])), startValue && endValue ? money(endValue-startValue, true) : "–", startValue && endValue ? `${endValue >= startValue ? "+" : "−"}${num(Math.abs((endValue/startValue-1)*100),2)}%` : "–")}</div>
       </section>}
