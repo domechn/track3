@@ -10,6 +10,7 @@ import { BottomSheet } from "@/mobile/components/mobile";
 import { ArchiveIcon, BarChartIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
 import { directionPhysicalTone } from "@/utils/color";
+import { useChartHitArea } from "@/components/chart-tooltip";
 
 const PAGE_SIZE = 50;
 const methods: CostBasisMethod[] = ["FIFO", "LIFO", "HIFO", "AVERAGE"];
@@ -92,6 +93,7 @@ export function PhoneCostBasis({
   onExport: (format: "csv" | "json") => void;
 }) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const [exportOpen, setExportOpen] = useState(false);
   const yearRef = useRef<HTMLSelectElement>(null);
   const [holdingOpen, setHoldingOpen] = useState(false);
@@ -323,14 +325,18 @@ export function PhoneCostBasis({
             <small>{t("fidelity.cost.openCost").replace("{amount}", money(openCost))}</small></div>
         </div>
       </section>
-      <section className="fidelity-cost-card fidelity-cost-holding">
+      <section className="fidelity-cost-card fidelity-cost-holding" data-chart-group="">
         <div className="fidelity-card-heading"><h2>{t("cost.design.holdingPeriod")}</h2><span>{t("fidelity.cost.realizedOnly")}</span></div>
         {(["long", "short"] as const).map((term) => {
           const rows = report.disposals.filter((row) => row.term === term);
           const value = term === "long" ? report.totals.longTerm : report.totals.shortTerm;
           return <div className="fidelity-holding-row" key={term}>
             <div><span>{t(`cost.term.${term}`)}</span><strong>{method === "AVERAGE" ? "–" : gain(value)}</strong></div>
-            <div className="fidelity-holding-track"><span data-tone={tone(value)} style={{ width: `${method === "AVERAGE" ? 0 :
+            <div className="fidelity-holding-track" role="button"
+              {...(method === "AVERAGE" ? {} : chart.markProps(term === "long" ? 0 : 1,
+                `${t(`cost.term.${term}`)}: ${signed(value)}`,
+                <><div>{t(`cost.term.${term}`)}</div><div data-tone={tone(value)}>{signed(value)}</div></>))}>
+              <span data-tone={tone(value)} style={{ width: `${method === "AVERAGE" ? 0 :
               Math.max(rows.length ? 3 : 0, Math.abs(value) / Math.max(1, Math.abs(report.totals.longTerm) + Math.abs(report.totals.shortTerm)) * 100)}%` }} /></div>
             <small>{method === "AVERAGE" ? t("fidelity.cost.notAvailable") :
               t(term === "long" ? "fidelity.cost.heldLong" : "fidelity.cost.heldShort").replace("{count}", String(rows.length))}</small>
@@ -338,11 +344,14 @@ export function PhoneCostBasis({
         })}
         {method === "AVERAGE" && <p className="fidelity-holding-note">{t("fidelity.cost.averageHoldingNote")}</p>}
       </section>
-      <section className="fidelity-cost-card fidelity-cost-by-asset">
+      <section className="fidelity-cost-card fidelity-cost-by-asset" data-chart-group="">
         <div className="fidelity-card-heading"><h2>{t("finance.realizedByAsset")}</h2>
           <span>{t("fidelity.cost.assetRange").replace("{range}", year || t("fidelity.cost.selectedRange"))}</span></div>
-        {byAsset.length || chartUnknown.length ? byAsset.map((row) => <div className="fidelity-asset-bar" key={`${row.assetType}:${row.symbol}`}>
-          <strong>{row.symbol}</strong><span className="fidelity-bar-track" style={{ "--z": `${zero}%` } as CSSProperties}>
+        {byAsset.length || chartUnknown.length ? byAsset.map((row, index) => <div className="fidelity-asset-bar" key={`${row.assetType}:${row.symbol}`}>
+          <strong>{row.symbol}</strong><span className="fidelity-bar-track" role="button"
+            {...chart.markProps(index, `${row.symbol}: ${signed(row.gainLoss)}`,
+              <><span>{row.symbol}</span><div data-tone={tone(row.gainLoss)}>{signed(row.gainLoss)}</div></>)}
+            style={{ "--z": `${zero}%` } as CSSProperties}>
             {row.gainLoss !== 0 && <i data-tone={tone(row.gainLoss)}
               style={{ width: `${Math.abs(row.gainLoss) * barUnit}%`,
                 [row.gainLoss < 0 ? "right" : "left"]: row.gainLoss < 0 ? "calc(100% - var(--z))" : "var(--z)" }} />}
@@ -491,5 +500,6 @@ export function PhoneCostBasis({
         </button>
         <p>{t("fidelity.cost.exportNote").replace("{method}", methodText).replace("{range}", rangeText)}</p>
     </BottomSheet>
+    {chart.tooltip}
   </div>;
 }

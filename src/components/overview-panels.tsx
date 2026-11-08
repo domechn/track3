@@ -18,6 +18,8 @@ import { matchSourceStatus } from "./source-status-match";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { buildAssetDetailsPath } from "@/utils/assets";
 import { currencyWrapper } from "@/utils/currency";
+import { dailyChangeTooltip, type DailyChange } from "./daily-change-tooltip";
+import { useChartHitArea } from "./chart-tooltip";
 import { Card } from "./ui/card";
 import { deriveContributions, deriveOverviewSeries, selectBestDayContributionSnapshots, selectSevenDayContributionSnapshots, unavailableSources } from "./overview-derived";
 import { overviewRefreshRequestedEvent, sourceStatusesChangedEvent } from "./source-status-event";
@@ -25,7 +27,7 @@ import { niceStep } from "./overview-chart-scale";
 import { directionClass, directionColorVar } from "@/utils/color";
 import type { QuoteColor } from "@/middlelayers/types";
 
-type Change = { timestamp: number; value: number };
+type Change = DailyChange;
 type Contribution = { symbol: string; assetType: AssetType; value: number };
 type CoinRow = {
   symbol: string; assetType: AssetType; value: number; amount: number;
@@ -147,10 +149,20 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
   currency: CurrencyRateDetail; daily: Change[]; bestDay?: Change; desktopFidelity?: boolean; quoteColor?: QuoteColor;
 }) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const chartValue = desktopFidelity ? currencyWrapper(currency) : (value: number) => value;
   const peak = Math.max(1, ...daily.map((item) => Math.abs(chartValue(item.value))));
   const scale = niceStep(peak);
   const barScale = desktopFidelity ? scale : peak;
+  const scrub = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch") return;
+    const marks = [...event.currentTarget.querySelectorAll<HTMLElement>(".t3-daily-column")];
+    const index = marks.reduce((best, mark, candidate) =>
+      Math.abs(mark.getBoundingClientRect().left + mark.getBoundingClientRect().width / 2 - event.clientX) <
+        Math.abs(marks[best].getBoundingClientRect().left + marks[best].getBoundingClientRect().width / 2 - event.clientX)
+        ? candidate : best, 0);
+    chart.select(index, marks[index]);
+  };
   return <Card className="t3-overview-panel t3-daily-panel">
     <header className="t3-overview-panel-heading">
       <h2>{t("overview.design.dailyChange")}</h2>
@@ -159,7 +171,8 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
         : t("overview.design.lastSnapshots").replace("{count}", String(daily.length))}</span>
     </header>
     {daily.length ? <>
-      <div className="t3-daily-chart" role="img" aria-label={t("overview.design.dailyChart")}>
+      <div className="t3-daily-chart" role="group" aria-label={t("overview.design.dailyChart")} data-chart-group=""
+        onPointerDown={scrub} onPointerMove={scrub}>
         <div className="t3-daily-zero" />
         {desktopFidelity && <div className="t3-daily-y-axis" aria-hidden="true">
           {[scale, scale / 2, 0, -scale / 2, -scale].map((value) =>
@@ -168,11 +181,16 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
         {desktopFidelity && <div className="t3-daily-direction" aria-hidden="true">
           <span className={directionClass(1, quoteColor)}>▲ {t("overview.fidelity.up")}</span><span className={directionClass(-1, quoteColor)}>▼ {t("overview.fidelity.down")}</span>
         </div>}
-        {daily.map((item) => <div className="t3-daily-column" key={item.timestamp} title={`${dayLabel(item.timestamp, locale)}: ${signedMoney(item.value, currency)}`}>
+        {daily.map((item, index) => {
+          const detail = dailyChangeTooltip(item, currency, locale, quoteColor, t);
+          return <div role="button" className="t3-daily-column" key={item.timestamp}
+            {...chart.markProps(index, detail.label, detail.content)}
+            style={{ opacity: chart.active !== null && chart.active !== index ? .55 : 1 }}>
           <span className={item.value > 0 ? "t3-daily-up" : item.value < 0 ? "t3-daily-down" : "t3-daily-neutral"}
             data-direction={item.value > 0 ? "gain" : item.value < 0 ? "loss" : "neutral"}
             style={{ height: `${Math.max(2, Math.abs(chartValue(item.value)) / barScale * 48)}%`, backgroundColor: directionColorVar(item.value, quoteColor) }} />
-        </div>)}
+          </div>;
+        })}
         {desktopFidelity && <div className="t3-daily-x-axis" aria-hidden="true">
           <span />
           <span>{daily.length > 10 ? dayLabel(daily[9].timestamp, locale) : ""}</span>
@@ -181,6 +199,7 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
         </div>}
         <span className="sr-only">{daily.map((item) => `${dayLabel(item.timestamp, locale)} ${signedMoney(item.value, currency)}`).join(", ")}</span>
       </div>
+      {chart.tooltip}
       <div className="t3-panel-footnote">{bestDay && t("overview.design.bestDay")
         .replace("{day}", dayLabel(bestDay.timestamp, locale))
         .replace("{amount}", signedMoney(bestDay.value, currency))}</div>
@@ -192,6 +211,7 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
   currency: CurrencyRateDetail; rows: Contribution[]; count: number; weekBased?: boolean; desktopFidelity?: boolean; quoteColor?: QuoteColor;
 }) {
   const { t } = useTranslation();
+  const chart = useChartHitArea();
   const net = rows.reduce((total, item) => total + item.value, 0);
   const orderedRows = weekBased ? [...rows].sort((a, b) =>
     Number(b.value >= 0) - Number(a.value >= 0) || Math.abs(b.value) - Math.abs(a.value)) : rows;
@@ -206,10 +226,13 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
       {count > 0 && <span>{weekBased
         ? t("overview.fidelity.weekChange").replace("{value}", signedMoney0(net, currency))
         : t("overview.design.snapshotCount").replace("{count}", String(count))}</span>}</header>
-    {rows.length ? <ol className={`t3-moved-list${desktopFidelity ? " t3-moved-diverging" : ""}`}>
-      {orderedRows.slice(0, 8).map((row) => <li key={`${row.assetType}:${row.symbol}`}>
+    {rows.length ? <ol data-chart-group="" className={`t3-moved-list${desktopFidelity ? " t3-moved-diverging" : ""}`}>
+      {orderedRows.slice(0, 8).map((row, index) => <li key={`${row.assetType}:${row.symbol}`}>
         <Link to={buildAssetDetailsPath({ symbol: row.symbol, assetType: row.assetType })} className="t3-moved-symbol">{row.symbol}</Link>
-        <span className="t3-moved-track" style={desktopFidelity ? { "--zero": `${zero}%` } as CSSProperties : undefined}>
+        <span className="t3-moved-track" role="button"
+          {...chart.markProps(index, `${row.symbol}: ${signedMoney(row.value, currency)}`,
+            `${row.symbol}: ${signedMoney(row.value, currency)}`)}
+          style={desktopFidelity ? { "--zero": `${zero}%` } as CSSProperties : undefined}>
           <span className={row.value >= 0 ? "t3-daily-up" : "t3-daily-down"} style={{
             backgroundColor: directionColorVar(row.value, quoteColor),
             width: `${row.value === 0 ? 0 : Math.max(2, desktopFidelity
@@ -221,6 +244,7 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
         <strong className={directionClass(row.value, quoteColor)}>{weekBased ? signedMoney0(row.value, currency) : signedMoney(row.value, currency)}</strong>
       </li>)}
     </ol> : <p className="t3-panel-empty">{t("overview.design.needTwoSnapshots")}</p>}
+    {chart.tooltip}
   </Card>;
 }
 

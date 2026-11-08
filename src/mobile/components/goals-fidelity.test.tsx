@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -37,6 +37,14 @@ it("shows partial progress for a price or value goal above an at-most threshold"
   expect(within(row as HTMLElement).getByText("Watching")).toBeInTheDocument();
   expect(within(row as HTMLElement).getByRole("progressbar", { name: "Progress toward Portfolio value goal" }))
     .toHaveAttribute("aria-valuenow", "78.3");
+});
+
+it("shows the measured rule value on its progress mark", () => {
+  renderGoals({ rules: [rule] });
+  const mark = document.querySelector(".pf-goal-progress [data-chart-mark]");
+  expect(mark).not.toBeNull();
+  fireEvent.pointerEnter(mark!);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("78.3%");
 });
 
 it("opens a prefilled template from the empty phone Rules panel", async () => {
