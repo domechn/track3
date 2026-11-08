@@ -112,6 +112,25 @@ for (const width of [1280, 1100]) {
   }
 }
 
+test.describe("coarse pointer empty Goals panels", () => {
+  test.use({ isMobile: true, hasTouch: true });
+
+  test("fits without an inner scroll at 360px", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 390 });
+    await installTauriBridge(page, { emptyPortfolio: true });
+    await page.goto("/#/goals");
+    for (const selector of [".t3-goals-rules", ".t3-goals-history"]) {
+      const panel = page.locator(selector);
+      await expect(panel.locator("[data-empty-state]")).toBeVisible();
+      const overflow = await panel.locator(":scope > div:last-child").evaluate((content) => ({
+        horizontal: content.scrollWidth - content.clientWidth,
+        vertical: content.scrollHeight - content.clientHeight,
+      }));
+      expect(overflow, selector).toEqual({ horizontal: 0, vertical: 0 });
+    }
+  });
+});
+
 test("empty desktop pages have no bare or mostly blank cards", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await installTauriBridge(page, { emptyPortfolio: true });
