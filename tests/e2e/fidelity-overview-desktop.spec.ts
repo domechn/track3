@@ -155,26 +155,22 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         const chart = page.locator(".t3-hero-chart canvas");
         const box = await chart.boundingBox();
         await chart.hover({ position: { x: box!.width * 0.38, y: box!.height / 2 } });
-        await page.waitForTimeout(150);
-        const markerPixels = await chart.evaluate((canvas: HTMLCanvasElement) => {
-          const { width, height } = canvas;
-          const pixels = canvas.getContext("2d")!.getImageData(0, 0, width, height).data;
-          const brightness = (x: number, y: number) => {
-            const offset = (y * width + x) * 4;
-            return pixels[offset] + pixels[offset + 1] + pixels[offset + 2];
-          };
-          let longest = 0;
-          for (let x = Math.floor(width * 0.8); x < width * 0.97; x++) {
-            let hits = 0;
-            for (let y = Math.floor(height * 0.1); y < height * 0.8; y += 5) {
-              if (brightness(x, y) - brightness(x - 3, y) > 24 &&
-                brightness(x, y) - brightness(x + 3, y) > 24) hits++;
-            }
-            longest = Math.max(longest, hits);
+        await expect(page.locator("[data-chart-tooltip]")).toContainText(/Value: \$[\d,]+\.\d\d/);
+        const caption = page.locator(".t3-total-overview .t3-chart-best-day");
+        await caption.focus();
+        const point = await page.locator(".t3-total-overview [data-chart-active-point]").boundingBox();
+        const markerPixels = await chart.evaluate((canvas: HTMLCanvasElement, point) => {
+          const rect = canvas.getBoundingClientRect();
+          const x = Math.round((point.x + point.width / 2 - rect.x) * canvas.width / rect.width);
+          const y = Math.round((point.y + point.height / 2 - rect.y) * canvas.height / rect.height);
+          let green = 0;
+          for (let dx = -4; dx <= 4; dx++) for (let dy = -4; dy <= 4; dy++) {
+            const [r, g, b] = canvas.getContext("2d")!.getImageData(x + dx, y + dy, 1, 1).data;
+            if (g > r + 15 && g > b + 10) green++;
           }
-          return longest;
-        });
-        expect(markerPixels).toBeGreaterThan(12);
+          return green;
+        }, point!);
+        expect(markerPixels).toBeGreaterThan(4);
       }
       await page.screenshot({ path: `${output}/${state.name}-desktop.png`, fullPage: state.name !== "overview-hover" });
       if (state.name === "overview") {

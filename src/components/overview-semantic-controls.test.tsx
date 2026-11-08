@@ -86,7 +86,7 @@ beforeEach(() => {
   localStorage.removeItem(localeLocalStorageKey);
   vi.mocked(queryTotalValue).mockResolvedValue({ totalValue: 1250 });
   vi.mocked(queryAssetChange).mockResolvedValue({
-    timestamps: [1713158400, 1713244800],
+    timestamps: [Date.parse("2024-04-15T00:00:00Z"), Date.parse("2024-04-16T00:00:00Z")],
     data: [
       { usdValue: 1000, btcPrice: 50000 },
       { usdValue: 1250, btcPrice: 62500 },
