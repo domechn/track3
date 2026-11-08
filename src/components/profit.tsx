@@ -25,7 +25,6 @@ import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
-  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useDataChangedVersion } from "@/contexts/data-changed";
@@ -33,17 +32,6 @@ import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import ProfitAttribution from "./profit-attribution";
 import { profitRanks } from "./analyze-values";
 import { PartialProfitHint } from "./profit-summary-hints";
-
-function getToneBadgeClass(value: number, quoteColor: QuoteColor) {
-  const tone = positiveNegativeTone(value, quoteColor);
-  if (tone === "green") {
-    return "bg-positive/15 text-positive";
-  }
-  if (tone === "red") {
-    return "bg-negative/15 text-negative";
-  }
-  return "bg-muted text-muted-foreground";
-}
 
 const App = ({
   currency,
@@ -142,7 +130,7 @@ const App = ({
     [profit, quoteColor],
   );
   const totalToneBadgeClass = useMemo(
-    () => profit === null ? "bg-muted text-muted-foreground" : getToneBadgeClass(profit, quoteColor),
+    () => profit === null ? "neutral" : positiveNegativeTone(profit, quoteColor) === "green" ? "positive" : positiveNegativeTone(profit, quoteColor) === "red" ? "negative" : "neutral",
     [profit, quoteColor],
   );
   const positiveCount = useMemo(
@@ -228,13 +216,11 @@ const App = ({
               "{asset}",
               formatAssetLabel(d),
             )}</span>
-            <img
-              className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-              src={resolveAssetLogoSrc(d, logoMap[getAssetLogoKey(d)])}
-              alt=""
-            />
             <AssetLabel
               asset={d}
+              src={logoMap[getAssetLogoKey(d)]}
+              size={20}
+              quiet
               className="min-w-0"
               labelClassName="font-medium text-sm"
             />
@@ -300,7 +286,7 @@ const App = ({
             </div>
           </div>
           <div
-            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${totalToneBadgeClass}`}
+            className="t3-tag" data-tone={totalToneBadgeClass}
           >
             {profitPercentage === null ? "—" : profitPercentage === undefined
               ? t("common.infinity")

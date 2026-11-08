@@ -1,10 +1,12 @@
 # Rebalance desktop fidelity specification
 
+The shared rail geometry and active paint now follow [navigation.md](../navigation.md).
+
 Source: `desktop/plan/rebalance{-empty,-invalid}-desktop.jpg` and `source/ds/pages/plan-rebalance*.html/js`. All positions below are measured in headless Chromium at a 1600 px viewport; source uses Public Sans and the tokens in `source/ds/ds.css`.
 
 ## Shell and layout
 
-- Dark ground `#0d0d0e`; fixed 56 px icon rail, 1 px `#222224` divider. Main starts at x=56, with padding 20 px top, 28 px sides, 40 px bottom. Content runs x=84–1572 (1488 px). The rail has the Rebalance arrow icon selected in a `#1c1c20` square with a 2 px blue edge mark.
+- Dark ground `#0d0d0e`; fixed 56 px icon rail, 1 px `#222224` divider. Main starts at x=56, with padding 20 px top, 28 px sides, 40 px bottom. Content runs x=84–1572 (1488 px). The selected Rebalance icon uses the shared 40 px tinted tile and 3 × 20 px edge mark described in [navigation.md](../navigation.md).
 - Header y=20–72: “Rebalance” is 26/32 px, weight 600, white. Subtitle is 13/18 px `#b4b6bc`, 2 px below the title. At right, 12 px `#9b9da3` “Prices as of 09:41” with a 6 px green dot. The content grid begins y=88.
 - Twelve equal grid columns (109.33 px each), 16 px gutters. A full-width KPI card is followed by 8/12 and 4/12 cards (987 and 485 px); second card row repeats these columns. Cards use `#131217`, `#222224` 1 px stroke, 6 px radius, 20 px padding, and a subtle shadow. Row gap is 16 px.
 - KPI card x=84 y=88 is 1488×108. Its five equally wide metric cells are 289.2 px, with 20 px left insets and vertical separators. Labels 12/18 px faint, values 22/28 px weight 500, captions 12/18 px muted.
@@ -36,13 +38,17 @@ At 1600 px in dark mode, target inputs update the actual validated profile; `+ S
 
 ## Remaining differences
 
+UI42 uses the approved website-style neutral tile for asset marks. The older Rebalance page design renders those marks differently.
+
 The zero-target trade area uses the shared centred icon and explanation; the source's empty panel predates this UI18 requirement. Target inputs, reserve calculation, and CSV content are unchanged.
 
-Current 1600 px captures are in `/tmp/fidelity-desktop/rebalance/`. Against freshly rendered authoritative HTML in `/tmp/uidc_r5/design/`, with a pixel counted when any RGB channel differs by more than 40, the current ratios are: plan **2.689%**, empty **0.272%**, invalid **1.206%**. For plan, the 1358 px app capture is compared with the top of the 1405 px design and the ratio uses the full design area.
+The wide dark page places Refresh, sync and the Pro live-value control in the unified rail without taking a 50 px strip above the content. Its regular TopBar remains visible in light mode and below 1500 px; those layouts have no matching 1600 px dark source capture. The 10/30/50/100/All presets and date picker are hidden only in the wide dark plan because its calculation always uses the latest snapshot. The shared rail's tile, logo and control differences from the illustrative source are detailed in [navigation.md](../navigation.md).
+
+The 8 Nov 1600 × 1000 captures in `/tmp/fidelity-desktop/rebalance/` differ from the design HTML captures in `/tmp/fidelity-source/` by **1.049%** for the plan, **0.504%** for empty, and **1.744%** for invalid within the shared viewport. A pixel counts when any RGB channel differs by more than 40. The design pages extend to 1405, 1215 and 1289 px while Track3 scrolls inside its 1000 px desktop shell. Padding the lower design area with the shell ground yields **2.392%**, **0.937%**, and **1.851%** respectively. The source `getBoundingClientRect()` and `getComputedStyle()` check places the KPI card at `(84, 88, 1488, 108)` with `rgb(19, 18, 23)` fill; the app card begins at the same coordinates.
 
 | State | Remaining visible difference and reason |
 | --- | --- |
-| All | The stablecoin hint uses setting-accurate copy, “Off: stablecoins have their own targets; sells and buys can leave cash. On: they fund trades and the net shows a cash change,” because the actual calculator can leave a cash reserve even with stablecoins treated as assets. Secondary holding labels show asset type because a general holding has no full-name field. The design assumes names for its sample assets. Refresh and, for Pro users, live value appear in the rail to retain their actions; progress appears at the top edge during refresh. Assistant is absent for non-Pro users because the existing license gate hides that route. |
+| All | The stablecoin hint uses setting-accurate copy, “Off: stablecoins have their own targets; sells and buys can leave cash. On: they fund trades and the net shows a cash change,” because the actual calculator can leave a cash reserve even with stablecoins treated as assets. Secondary holding labels show asset type because a general holding has no full-name field. The design assumes names for its sample assets. Refresh, sync and, for Pro users, live value appear in the unified rail; progress appears at the top edge during refresh. Assistant is absent for non-Pro users because the existing license gate hides that route. |
 | Full plan | The calculator honours the ±2.0 pt tolerance and $1,000 minimum, yielding two trades: sell USDT $29,684.89 and buy BTC $23,405.20, with $6,279.69 in cash. The design shows eight trades. The trade hint now describes tolerance, and result notes use the correct singular and stablecoin setting. |
 | Empty targets | The Rules header says “Not saved” because no profile exists in the fixture. The source says “Saved on this device”, which would falsely claim persistence. |
 | Invalid targets | The Rules header shows “Unsaved changes” and a disabled Save action because the captured edit changes the stored profile to an invalid 103% draft. The source incorrectly says “Saved on this device”. |

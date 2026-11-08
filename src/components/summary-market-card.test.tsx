@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { queryAttribution } from "@/middlelayers/charts-attribution-data";
 import { calculateTotalProfit, queryLatestAssets } from "@/middlelayers/charts";
@@ -90,6 +90,8 @@ it("shows a whole-unit Summary range with its exact title and aligned amounts", 
     quoteColor="green-up-red-down"
   />);
   const table = await screen.findByRole("table", { name: "Profit attribution" });
+  const assetRow = within(table).getByRole("row", { name: /BTC/ });
+  expect(assetRow.querySelector('.t3-asset-icon[data-kind="coin"][data-size="20"]')).toBeInTheDocument();
   const total = within(table).getByRole("row", { name: /^Total/ });
   const [range, market, quantity, unexplained, totalChange] = within(total).getAllByRole("cell");
   expect(range).toHaveTextContent("$6,003,301 → $22,503,903");
@@ -124,4 +126,24 @@ it("hides the unexplained column when every converted residual rounds to zero", 
   const table = await screen.findByRole("table", { name: "Profit attribution" });
   expect(within(table).queryByRole("columnheader", { name: "Unexplained" })).not.toBeInTheDocument();
   expect(within(table).getByRole("row", { name: /^Total/ }).querySelectorAll('[role="cell"]')).toHaveLength(4);
+});
+
+it("shows exact market and quantity values on attribution marks", async () => {
+  vi.mocked(queryAttribution).mockResolvedValue({
+    attribution: {
+      entries: [{ symbol: "BTC", assetType: "crypto", wallet: "w",
+        priceEffect: 12.345, flowEffect: -2.345, residual: 0, totalChange: 10 }],
+      totals: { priceEffect: 12.345, flowEffect: -2.345, residual: 0, totalChange: 10 },
+      startValue: 100, endValue: 110,
+    }, aliases: {},
+  });
+  render(<SummaryMarketCard mode="attribution"
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }}
+    dateRange={{ start: new Date("2026-10-01T00:00:00Z"), end: new Date("2026-10-31T23:59:59Z") }}
+    quoteColor="green-up-red-down" />);
+  const row = await screen.findByRole("row", { name: /BTC/ });
+  fireEvent.pointerEnter(row.querySelector(".fidelity-attribution-track .market")!);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("+$12.35");
+  fireEvent.pointerEnter(row.querySelector(".fidelity-attribution-track .quantity")!);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("−$2.35");
 });

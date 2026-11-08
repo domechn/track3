@@ -250,6 +250,11 @@ it("finds the opening baseline before the requested start", async () => {
   );
 });
 
+it("requests the snapshot strictly before the selected start as its cost baseline", async () => {
+  await calculateTotalProfit(dateRange, "BTC", "crypto");
+  expect(ASSET_HANDLER.listLastSnapshotBefore).toHaveBeenCalledWith(dateRange.start);
+});
+
 async function warmProfitCache() {
   await calculateTotalProfit(dateRange, "BTC", "crypto");
   await calculateTotalProfit(dateRange, "BTC", "crypto");

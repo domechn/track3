@@ -274,7 +274,7 @@ test("iPad portrait attribution shows full contributor names", async ({ browser 
     await page.locator(".d2-summary .analyze-profit-card").getByRole("radio", { name: "Attribution" }).click();
     for (const width of [744, 834]) {
       await page.setViewportSize({ width, height: 1133 });
-      const names = page.locator(".d2-summary .analyze-profit-card .attribution-rank-button .truncate");
+      const names = page.locator(".d2-summary .analyze-profit-card .attribution-rank-button .t3-asset-label-name");
       await expect(names.first()).toBeVisible();
       const clipped = await names.evaluateAll((nodes) => nodes
         .filter((node) => node.scrollWidth > node.clientWidth + 1)
@@ -899,7 +899,7 @@ for (const [name, width, height] of viewports) {
             } else {
               const columns = await page.locator(".profit-metrics-mobile").evaluate((node) =>
                 getComputedStyle(node).gridTemplateColumns.split(" ").length);
-              expect(columns).toBe(3);
+              expect(columns).toBe(width >= 700 && width <= 900 ? 2 : 3);
             }
             if (size === "wide") {
               const tiles = await page.locator(".analytics-tile-grid").evaluate((node) =>

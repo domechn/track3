@@ -31,6 +31,7 @@ export async function queryAttribution(dateRange: TDateRange): Promise<{ attribu
     let previous: AttributionSnapshot | undefined = baseline.length
       ? { createdAt: baseline[0].createdAt, assets: baseline, transactions: [] }
       : undefined;
+    let firstInterval = true;
     let cursor = { createdAt: dateRange.start.toISOString(), uuid: "" };
     while (true) {
       const rows = await selectFromDatabaseWithSql<{ uuid: string; createdAt: string }>(
@@ -68,7 +69,8 @@ export async function queryAttribution(dateRange: TDateRange): Promise<{ attribu
       }));
       const interval = attributeSnapshots(previous ? [previous, ...snapshots] : snapshots, blacklist, transferContext);
       if (interval.entries.length > 0) {
-        if (entries.size === 0) startValue = interval.startValue;
+        if (firstInterval) startValue = interval.startValue;
+        firstInterval = false;
         endValue = interval.endValue;
         for (const entry of interval.entries) {
           const id = JSON.stringify([entry.assetType, entry.symbol, entry.wallet]);

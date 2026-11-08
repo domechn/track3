@@ -10,6 +10,7 @@ import { queryPreviousProfitSnapshotDate } from "@/middlelayers/charts-profit";
 const profitMock = vi.hoisted(() => vi.fn());
 vi.mock("@/middlelayers/charts", () => ({
   calculateTotalProfit: profitMock,
+  queryLatestAssets: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("@/middlelayers/charts-profit", () => ({
   queryPreviousProfitSnapshotDate: vi.fn().mockResolvedValue(undefined),
@@ -61,6 +62,15 @@ it.each([
     ([range]) => range.start.getTime() === new Date(currentYear, 0, 1).getTime()
       && range.end.getTime() === yearEnd,
   )).toBe(true));
+});
+
+it("desktop Summary month and year cards use the selected single-snapshot range", async () => {
+  const point = new Date("2026-10-09T12:00:00.000Z");
+  render(<DesktopSummary fidelity dateRange={{ start: point, end: point }}
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+    quoteColor="green-up-red-down" />);
+  await waitFor(() => expect(vi.mocked(calculateTotalProfit).mock.calls.some(([range]) =>
+    range.start.getTime() === point.getTime() && range.end.getTime() === point.getTime())).toBe(true));
 });
 
 it.each([

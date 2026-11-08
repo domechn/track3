@@ -1,4 +1,5 @@
 import React from "react";
+import { Outlet } from "react-router-dom";
 import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./index";
@@ -43,7 +44,7 @@ vi.mock("@/components/ui/use-toast", async (importOriginal) => ({
 }));
 
 vi.mock("../settings", () => ({
-  default: () => <div>settings</div>,
+  default: () => <div>settings<Outlet /></div>,
 }));
 
 vi.mock("../refresh-data", () => {
@@ -131,7 +132,8 @@ vi.mock("../summary", () => ({
 }));
 
 vi.mock("@/components/configuration", () => ({
-  default: () => <div>configuration</div>,
+  default: ({ onConfigurationSave }: { onConfigurationSave?: (aliasChanged: boolean) => void }) =>
+    <button data-testid="trigger-alias-save" onClick={() => onConfigurationSave?.(true)}>configuration</button>,
 }));
 vi.mock("@/components/data-management", () => ({
   default: () => <div>data management</div>,
@@ -255,6 +257,15 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
+  it("publishes a saved source alias to other views", async () => {
+    window.location.hash = "#/settings/configuration";
+    const view = renderApp();
+    fireEvent.click(await view.findByTestId("trigger-alias-save"));
+    window.location.hash = "#/summary";
+    await view.findByTestId("summary-range");
+    expect(lastDataChangedVersion).toBe(1);
+  });
+
   it("keeps the Pro live portfolio control on wide Goals pages", async () => {
     vi.stubGlobal("innerWidth", 1600);
     vi.mocked(getLicenseIfIsPro).mockResolvedValue("pro");
@@ -262,6 +273,7 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     try {
       const view = renderApp();
       expect(await view.findByRole("button", { name: "Live total" })).toBeInTheDocument();
+      expect(view.container.querySelector(".t3-plan-rail-tools")).toBeInTheDocument();
     } finally {
       vi.unstubAllGlobals();
     }

@@ -10,16 +10,18 @@ it("keeps the shared daily chart scaled to its own values by default", () => {
     { timestamp: Date.parse("2026-10-29"), value: 120 },
     { timestamp: Date.parse("2026-10-30"), value: -30 },
   ]} />);
-  const up = screen.getByRole("img", { name: /daily change chart/i }).querySelector(".t3-daily-up") as HTMLElement;
+  const up = screen.getByRole("group", { name: /daily change chart/i }).querySelector(".t3-daily-up") as HTMLElement;
   expect(up.style.height).toBe("48%");
   expect(screen.queryByText("overview.fidelity.up")).not.toBeInTheDocument();
 });
 
-it("keeps the shared coin row structure by default", () => {
+it("shows the shared coin row with a 20px asset tile by default", () => {
   render(<MemoryRouter><TopCoinsCard currency={usd} rows={[
     { symbol: "BTC", assetType: "crypto", value: 100, amount: 1, priceChange: 5 },
   ]} /></MemoryRouter>);
-  expect(screen.getByTestId("overview-coin-row").firstElementChild?.tagName).toBe("STRONG");
+  const row = screen.getByTestId("overview-coin-row");
+  expect(row.querySelector(".t3-asset-icon")).toHaveAttribute("data-size", "20");
+  expect(row.querySelector(".t3-asset-label-name")).toHaveTextContent("BTC");
 });
 
 it("keeps the shared coin change sign for a small nonzero change", () => {

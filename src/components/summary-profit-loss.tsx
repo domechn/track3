@@ -13,6 +13,7 @@ import { requestFullRefresh } from "./refresh-request";
 import { directionColorVar } from "@/utils/color";
 import { splitDirectionLine } from "@/components/direction-line";
 import { PartialProfitHint, hasVisibleUnrecordedChange } from "./profit-summary-hints";
+import { useChartHitArea } from "./chart-tooltip";
 
 type Point = { timestamp: number; value: number | null };
 type SummaryData = {
@@ -36,10 +37,12 @@ const number = (value: number, decimals = 2) =>
 const money = (value: number, currency: CurrencyRateDetail, decimals = 2) =>
   `${value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${number(Math.abs(currencyWrapper(currency)(value)), decimals)}`;
 
-export default function SummaryProfitLoss({ currency, dateRange, quoteColor, oneSnapshot = false }: {
+export default function SummaryProfitLoss({ currency, dateRange, quoteColor, oneSnapshot = false, baseline, rangeLabel = "All", snapshotCount }: {
   currency: CurrencyRateDetail; dateRange: TDateRange; quoteColor: QuoteColor; oneSnapshot?: boolean;
+  baseline?: Date; rangeLabel?: string; snapshotCount?: number;
 }) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const date = (value: Date) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(value);
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const dataVersion = useDataChangedVersion();
@@ -50,11 +53,12 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
 
   useEffect(() => {
     let active = true;
+    setData(undefined);
     setError(false);
     Promise.all([
       calculateTotalProfit(dateRange),
       queryPNLChartValue(dateRange),
-      queryLatestAssets(),
+      queryLatestAssets(dateRange),
       queryTotalValue(dateRange),
     ]).then(async ([profit, snapshots, assets, current]) => {
       const lastByMonth = new Map<string, number>();
@@ -62,7 +66,7 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
         const month = new Date(point.timestamp).toISOString().slice(0, 7);
         lastByMonth.set(month, point.timestamp);
       }
-      const points: Point[] = [{ timestamp: dateRange.start.getTime(), value: 0 }];
+      const points: Point[] = [{ timestamp: (baseline ?? dateRange.start).getTime(), value: 0 }];
       const chartTimestamps = [...lastByMonth.values()];
       if (snapshots.length > 1 && chartTimestamps.length === 1 && snapshots[0].timestamp !== chartTimestamps[0]) {
         chartTimestamps.unshift(snapshots[0].timestamp);
@@ -79,7 +83,7 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
         runningKnown += interval.knownTotal ?? 0;
         return { timestamp, value: interval.total === null && interval.knownTotal === null ? null : runningKnown };
       });
-      points.push(...monthly.filter((point) => point.timestamp !== dateRange.start.getTime()));
+      points.push(...monthly.filter((point) => point.timestamp !== points[0].timestamp));
       const stableCoins = new Set(await new StableCoinsQuery().listAllStableCoins());
       const movers = profit.coins.filter((coin) => !stableCoins.has(coin.symbol));
       if (!active) return;
@@ -95,7 +99,7 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
         up: movers.filter((coin) => !coin.isUnknown && coin.value !== null && coin.value > 0.005).length,
         down: movers.filter((coin) => !coin.isUnknown && coin.value !== null && coin.value < -0.005).length,
         points,
-        snapshotTimestamps: snapshots.map((point) => point.timestamp),
+        snapshotTimestamps: [...(baseline ? [baseline.getTime()] : []), ...snapshots.map((point) => point.timestamp)],
         sampled: boundedTimestamps.length < chartTimestamps.length,
       });
     }).catch(() => {
@@ -104,10 +108,10 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
       if (active) reportLoaded();
     });
     return () => { active = false; };
-  }, [rangeKey, dataVersion, retry]);
+  }, [rangeKey, baseline?.getTime(), dataVersion, retry]);
 
   const usablePoints = useMemo(() => data?.points.filter((point): point is { timestamp: number; value: number } => point.value !== null) ?? [], [data]);
-  const hasLine = hasProfitLine(data?.snapshotTimestamps ?? []) && usablePoints.length > 1;
+  const hasLine = hasProfitLine(data?.snapshotTimestamps ?? []) && usablePoints.length >= 2;
   const axis = axisForValues(usablePoints.map((point) => point.value));
   const topValue = axis.upper;
   const span = axis.upper - axis.lower;
@@ -118,51 +122,71 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
   const ticks = axis.ticks;
   const best = data?.sampled ? undefined : usablePoints.slice(1).map((point, index) => ({ point, index: index + 1, change: point.value - usablePoints[index].value }))
     .sort((a, b) => b.change - a.change)[0];
+  const noComparison = oneSnapshot || (snapshotCount !== undefined && (!baseline || snapshotCount === 0));
+  const missingReason = error ? t("summary.fidelity.loadError")
+    : oneSnapshot ? t("summary.fidelity.needsSecond")
+    : snapshotCount === 0 ? t("summary.fidelity.noSnapshotsRange").replace("{range}", rangeLabel)
+    : !baseline && snapshotCount !== undefined ? t("summary.fidelity.noBaselineRange").replace("{range}", rangeLabel)
+    : data?.total === null ? t("summary.fidelity.unknownPnlRange").replace("{range}", rangeLabel)
+    : data ? t("summary.fidelity.noPnlPointsRange").replace("{range}", rangeLabel)
+    : t("summary.fidelity.loadingSubtitle");
   const displayedTotal = data?.total ?? (data?.unknownCoins.length ? data.knownTotal : null);
-  const tone = oneSnapshot || displayedTotal == null ? "fidelity-faint" : displayedTotal >= 0
+  const unavailable = noComparison || displayedTotal == null;
+  const tone = unavailable ? "fidelity-faint" : displayedTotal! >= 0
     ? quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"
     : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive";
-  const missing = "–";
+  const missing = oneSnapshot ? "–" : t("summary.fidelity.notAvailable");
+  const percentMissing = data?.percentage === null;
+  const percentMissingReason = percentMissing && !unavailable
+    ? t("summary.fidelity.unknownPercentRange").replace("{range}", rangeLabel) : missingReason;
+  const percentage = data?.percentage;
+  const percentageText = unavailable || percentage === null ? missing : percentage === undefined
+    ? "∞" : `${percentage >= 0 ? "+" : "−"}${number(Math.abs(percentage))}%`;
   const netPnlFull = displayedTotal == null ? null : money(displayedTotal, currency);
   const netPnlLong = netPnlFull !== null && netPnlFull.length > 12;
-  const netPnlText = oneSnapshot || netPnlFull === null ? missing : netPnlLong
+  const netPnlText = unavailable || netPnlFull === null ? missing : netPnlLong
     ? `${displayedTotal! > 0 ? "+" : ""}${compactMoney(currencyWrapper(currency)(displayedTotal!), currency.symbol)}`
     : netPnlFull;
 
   return <section className="fidelity-card fidelity-summary-pnl">
     <div className="fidelity-card-head"><h2>{t("summary.fidelity.profitLoss")}</h2><span>{t("summary.fidelity.netPnlUsd").replace("{currency}", currency.currency)}</span></div>
     <div className="fidelity-kpis fidelity-summary-pnl-kpis">
-      <div><span>{t("summary.fidelity.netPnlAll")}</span><strong className={cn("big", tone, netPnlLong && "fidelity-long-money")} title={oneSnapshot ? undefined : netPnlFull ?? undefined}>{netPnlLong ? <span className="whitespace-nowrap">{netPnlText}</span> : netPnlText}</strong><small>{oneSnapshot || displayedTotal == null ? t("summary.fidelity.needsSecond") : t("summary.fidelity.since").replace("{date}", date(dateRange.start))}</small>
-        {data?.unknownCoins.length ? <PartialProfitHint names={data.unknownCoins.map((coin) => coin.symbol)} affected={data.unknownCoins}
-          period={date(dateRange.start)} t={t} /> : null}
-        {!oneSnapshot && data && hasVisibleUnrecordedChange(data.unrecordedChange, currency) && <small className="text-muted-foreground">{t("profitSummary.unrecordedChanges").replace("{amount}", money(data.unrecordedChange, currency))}</small>}
+      <div><span>{rangeLabel === "All" ? t("summary.fidelity.netPnlAll") : t("summary.fidelity.netPnlRange").replace("{range}", rangeLabel)}</span><strong className={cn("big", tone, netPnlLong && "fidelity-long-money")} title={unavailable ? missingReason : netPnlFull ?? undefined}>{netPnlLong && !unavailable ? <span className="whitespace-nowrap">{netPnlText}</span> : netPnlText}</strong><small>{unavailable ? missingReason : t("summary.fidelity.since").replace("{date}", date(baseline ?? dateRange.start))}</small>
       </div>
-      <div><span>{t("summary.fidelity.pnlPercent")}</span><strong className={tone}>{oneSnapshot || data?.total == null || data.percentage === null ? missing : data.percentage === undefined ? "∞" : `${data.percentage >= 0 ? "+" : "−"}${number(Math.abs(data.percentage))}%`}</strong><small>{oneSnapshot || data?.total == null ? t("summary.fidelity.investedCapital") : t("summary.fidelity.onInvested").replace("{amount}", money(data.investedCapital, currency, 0).replace(/^[+−]/, ""))}</small></div>
-      <div><span>{t("summary.fidelity.breakeven")}</span><strong className={oneSnapshot || data?.total == null ? "fidelity-faint" : undefined}>{oneSnapshot || data?.total == null ? missing : money(data.currentValue - data.total, currency, 0).replace(/^[+−]/, "")}</strong><small>{t("summary.fidelity.breakevenNote").replace("{symbol}", currency.symbol)}</small></div>
-      <div><span>{t("summary.fidelity.positions")}</span><strong>{data?.positions ?? missing}</strong><small>{oneSnapshot || data?.total == null ? t("summary.fidelity.oneSnapshot") : <><span className={data.up === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"}>{data.up} {t("summary.fidelity.up")}</span> · <span className={data.down === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive"}>{data.down} {t("summary.fidelity.down")}</span> · {Math.max(0, data.positions - data.up - data.down)} {t("summary.fidelity.flat")}</>}</small></div>
+      <div><span>{t("summary.fidelity.pnlPercent")}</span><strong className={tone} title={unavailable || percentMissing ? percentMissingReason : undefined}>{percentageText}</strong><small>{unavailable || percentMissing ? percentMissingReason : t("summary.fidelity.onInvested").replace("{amount}", money(data?.investedCapital ?? 0, currency, 0).replace(/^[+−]/, ""))}</small></div>
+      <div><span>{t("summary.fidelity.breakeven")}</span><strong className={unavailable || data?.total == null ? "fidelity-faint" : undefined} title={unavailable ? missingReason : undefined}>{unavailable || !data || data.total == null ? missing : money(data.currentValue - data.total, currency, 0).replace(/^[+−]/, "")}</strong><small>{unavailable ? missingReason : t("summary.fidelity.breakevenNote").replace("{symbol}", currency.symbol)}</small></div>
+      <div><span>{t("summary.fidelity.positions")}</span><strong>{data?.positions ?? missing}</strong><small className={rangeLabel === "All" ? "whitespace-nowrap" : undefined}>{data && !oneSnapshot && <><span className={data.up === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"}>{data.up} {t("summary.fidelity.up")}</span> · <span className={data.down === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive"}>{data.down} {t("summary.fidelity.down")}</span> · {Math.max(0, data.positions - data.up - data.down)} {t("summary.fidelity.flat")}</>}{snapshotCount !== undefined && <>{data && !oneSnapshot && " · "}<span>{oneSnapshot && snapshotCount === 1 ? t("summary.fidelity.oneSnapshot") : baseline && snapshotCount > 0 && baseline < dateRange.start
+        ? t("summary.fidelity.snapshotsSince").replace("{date}", date(baseline)).replace("{count}", String(snapshotCount))
+        : snapshotCount === 1 ? t("summary.fidelity.snapshotInRangeOne")
+        : t("summary.fidelity.snapshotsInRange").replace("{count}", String(snapshotCount))}</span></>}</small></div>
     </div>
+    {data?.unknownCoins.length ? <PartialProfitHint names={data.unknownCoins.map((coin) => coin.symbol)} affected={data.unknownCoins} period={date(dateRange.start)} t={t} /> : null}
+    {!oneSnapshot && data && hasVisibleUnrecordedChange(data.unrecordedChange, currency) && <small className="block text-muted-foreground">{t("profitSummary.unrecordedChanges").replace("{amount}", money(data.unrecordedChange, currency))}</small>}
     {error ? <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => setRetry((n) => n + 1)}>{t("summary.fidelity.retry")}</button></div> :
-      !hasLine ? <div className="fidelity-empty fidelity-summary-chart-empty"><div>{t("summary.fidelity.lineStarts")}</div><button type="button" onClick={requestFullRefresh}><svg aria-hidden="true" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3h-3" /></svg>{t("summary.fidelity.refreshNow")}</button></div> :
+      !hasLine ? <div className="fidelity-empty fidelity-summary-chart-empty"><div>{missingReason || t("summary.fidelity.lineStarts")}</div><button type="button" onClick={requestFullRefresh}><svg aria-hidden="true" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3h-3" /></svg>{t("summary.fidelity.refreshNow")}</button></div> :
       <>
-        <p className="fidelity-caption">{t("summary.fidelity.chartCaption").replace("{date}", date(dateRange.start))}</p>
-        <svg className="fidelity-summary-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={t("summary.fidelity.chartCaption").replace("{date}", date(dateRange.start))}>
+        <p className="fidelity-caption">{t("summary.fidelity.chartCaption").replace("{date}", date(baseline ?? dateRange.start))}</p>
+        <svg className="fidelity-summary-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="group"
+          data-chart-group="" aria-label={t("summary.fidelity.chartCaption").replace("{date}", date(baseline ?? dateRange.start))}>
           {ticks.map((tick, index) => <g key={index}><line x1={left} x2={width} y1={y(tick)} y2={y(tick)} stroke="#262629" shapeRendering="crispEdges" /><text x={left - 8} y={y(tick) + 4} textAnchor="end" fill="#9b9da3" fontSize="12">{compactMoney(currencyWrapper(currency)(tick), currency.symbol).replace(currency.symbol, "")}</text></g>)}
           {lineSegments.map(({ start, end, value }, index) => <line key={index} data-direction={value > 0 ? "gain" : value < 0 ? "loss" : "neutral"}
             x1={start.x} y1={start.y} x2={end.x} y2={end.y}
             stroke={directionColorVar(value, quoteColor)} strokeWidth="2" />)}
           {usablePoints.map((point, index) => {
             const label = `${date(new Date(point.timestamp))}: ${money(point.value, currency)}`;
-            return <circle key={point.timestamp} data-point cx={x(index)} cy={y(point.value)} r="6" fill="transparent" role="img" tabIndex={0} aria-label={label}><title>{label}</title></circle>;
+            return <circle key={point.timestamp} data-point cx={x(index)} cy={y(point.value)} r="10"
+              fill="transparent" role="button" {...chart.markProps(index, label, label)} />;
           })}
-          {best && <g><line x1={x(best.index)} x2={x(best.index)} y1="9" y2={height-bottom} stroke="#9b9da3" opacity=".45" strokeWidth="1" shapeRendering="crispEdges" /><text x={x(best.index)+4} y="17" fill="#9b9da3" fontSize="11">{t("summary.fidelity.bestMonth").replace("{month}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(best.point.timestamp)).replace("{amount}", money(best.change, currency, 0))}</text></g>}
+          {best && <g pointerEvents="none"><line x1={x(best.index)} x2={x(best.index)} y1="9" y2={height-bottom} stroke="#9b9da3" opacity=".45" strokeWidth="1" shapeRendering="crispEdges" /><text x={x(best.index)+4} y="17" fill="#9b9da3" fontSize="11">{t("summary.fidelity.bestMonth").replace("{month}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(best.point.timestamp)).replace("{amount}", money(best.change, currency, 0))}</text></g>}
           {usablePoints.filter((_, index) => index === 0 || index === usablePoints.length - 1 || index % Math.max(1, Math.floor(usablePoints.length / 4)) === 0).map((point) => {
             const index = usablePoints.indexOf(point);
-            return <text key={index} x={x(index)} y={height - 8} textAnchor={index === 0 ? "start" : index === usablePoints.length - 1 ? "end" : "middle"} fill="#9b9da3" fontSize="12">{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { ...(index === 0 ? { day: "numeric" as const } : {}), month: "short", year: "2-digit" }).format(point.timestamp)}</text>;
+            return <text key={index} x={x(index)} y={height} textAnchor={index === 0 ? "start" : index === usablePoints.length - 1 ? "end" : "middle"} fill="#9b9da3" fontSize="12">{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { ...(index === 0 ? { day: "numeric" as const } : {}), month: "short", year: "2-digit" }).format(point.timestamp)}</text>;
           })}
           <text data-direction-end="" x={x(usablePoints.length - 1) + 6} y={y(usablePoints.at(-1)!.value) + 4}
             textAnchor="start" fill={directionColorVar(usablePoints.at(-1)!.value, quoteColor)}
-            fontSize="12" fontWeight="600">{money(usablePoints.at(-1)!.value, currency, 0).replace(/^[+−]/, "")}</text>
+            fontSize="12" fontWeight="600">{money(usablePoints.at(-1)!.value, currency, 0)}</text>
         </svg>
+        {chart.tooltip}
       </>}
   </section>;
 }

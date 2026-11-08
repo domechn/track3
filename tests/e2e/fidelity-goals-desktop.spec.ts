@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { installPlanFidelityScene } from "./plan-fidelity-scenes";
 
 const output = process.env.WUI18_CAPTURE_DIR ?? "/tmp/fidelity-desktop/goals";
+const designSource = process.env.TRACK3_DESIGN_SOURCE;
 
 for (const state of ["list", "delete", "edit", "edit-error", "empty", "kinds"] as const) {
   test(`Goals ${state} matches the desktop structure`, async ({ page }) => {
@@ -13,6 +14,8 @@ for (const state of ["list", "delete", "edit", "edit-error", "empty", "kinds"] a
     await installPlanFidelityScene(page, state === "empty" || state === "kinds" ? "goals-empty" : "goals");
     await page.goto(state === "kinds" ? "/#/goals/kinds" : "/#/goals");
     await expect(page.locator('#app-main-content > div[aria-busy="false"]')).toBeVisible();
+    await expect(page.locator(".t3-plan-rail-tools .t3-date-trigger")).toBeHidden();
+    await expect(page.locator(".t3-plan-rail-tools .t3-topbar-ranges")).toBeHidden();
     if (state !== "kinds") {
       await expect(page.getByTestId("goals-summary")).toBeVisible();
       await expect(page.getByTestId("goals-summary")).toContainText("09:41");
@@ -40,12 +43,24 @@ for (const state of ["list", "delete", "edit", "edit-error", "empty", "kinds"] a
     await page.waitForTimeout(350);
     if (state === "list") {
       expect((await page.getByTestId("goals-summary").boundingBox())!.width).toBe(1488);
+      expect((await page.getByTestId("goals-summary").boundingBox())?.y).toBe(88);
       const switchRect = await page.locator(".t3-fidelity-goal-switch input").first().boundingBox();
       expect(switchRect?.y).toBeCloseTo(321.5, 1);
       expect(await page.locator(".t3-fidelity-head p b").evaluate((element) => {
         const style = getComputedStyle(element);
         return [style.fontWeight, style.color, style.fontSize, element.getBoundingClientRect().x];
       })).toEqual(["500", "rgb(255, 255, 255)", "13px", 84]);
+      if (designSource) {
+        const source = await page.context().newPage();
+        await source.setViewportSize({ width: 1600, height: 1000 });
+        await source.goto(`file://${designSource}/source/ds/pages/plan-goals.html`, { waitUntil: "domcontentloaded" });
+        await expect(source.locator("h1")).toBeVisible();
+        expect(await source.locator(".card").first().evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          return [rect.x, rect.y, rect.width, rect.height, getComputedStyle(element).backgroundColor];
+        })).toEqual([84, 88, 1488, 108, "rgb(19, 18, 23)"]);
+        await source.close();
+      }
     }
     if (state === "list" || state === "delete") {
       expect((await page.locator(".t3-fidelity-triggered h2").boundingBox())?.y).toBe(236);
@@ -61,8 +76,6 @@ for (const state of ["list", "delete", "edit", "edit-error", "empty", "kinds"] a
     if (state === "list" || state === "empty") {
       await page.screenshot({ path: `${output}/${state}-viewport.png`, animations: "disabled" });
     }
-    // Full-page captures need the rail positioned within the scrolled content.
-    await page.addStyleTag({ content: ".t3-fidelity-rail { position: absolute !important; top: -20px !important; left: -84px !important; height: 1000px !important; bottom: auto !important; }" });
     await page.screenshot({ path: `${output}/${state}.png`, fullPage: true, animations: "disabled" });
     if (state === "kinds") {
       await expect(page.getByRole("heading", { name: "Rule kinds" })).toBeVisible();

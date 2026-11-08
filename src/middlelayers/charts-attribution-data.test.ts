@@ -40,8 +40,20 @@ describe("queryAttribution", () => {
     expect(result.attribution.startValue).toBe(80);
   });
 
+  it("includes the latest snapshot before a one-snapshot selected range", async () => {
+    vi.mocked(ASSET_HANDLER.listLastSnapshotBefore).mockResolvedValue(snapshot(1, 1, 100).assets as never);
+    vi.mocked(selectFromDatabaseWithSql).mockResolvedValue([{ uuid: "u2", createdAt: date(2) }] as never);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockImplementation(async (ids) =>
+      [...snapshot(1, 1, 100).assets, ...snapshot(2, 1, 120).assets].filter((a) => ids.includes(a.uuid)) as never);
+    vi.mocked(TRANSACTION_HANDLER.listTransactionsByUUIDs).mockResolvedValue([]);
+    const result = await queryAttribution({ start: new Date(date(2)), end: new Date(date(2)) });
+    expect(result.attribution.totals).toEqual({
+      priceEffect: 20, flowEffect: 0, residual: 0, totalChange: 20,
+    });
+  });
   it("loads unsummarized snapshots with their transactions for the selected range", async () => {
-    vi.mocked(selectFromDatabaseWithSql).mockResolvedValue([{ uuid: "u1", createdAt: date(1) }, { uuid: "u2", createdAt: date(2) }] as never);
+    vi.mocked(selectFromDatabaseWithSql).mockImplementation(async (sql) => sql.includes("createdAt < ?")
+      ? [] : [{ uuid: "u1", createdAt: date(1) }, { uuid: "u2", createdAt: date(2) }] as never);
     vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([...snapshot(2, 2, 240).assets, ...snapshot(1, 1, 100).assets] as never);
     vi.mocked(TRANSACTION_HANDLER.listTransactionsByUUIDs).mockResolvedValue([{ id: 1, assetID: 2, uuid: "u2", wallet: "w", symbol: "BTC", assetType: "crypto", amount: 1, price: 120, txnType: "buy", txnCreatedAt: date(2), createdAt: date(2), updatedAt: date(2) }] as never);
     const result = await queryAttribution(range);
@@ -55,7 +67,8 @@ describe("queryAttribution", () => {
 
   it("reuses a range result until the data-change epoch advances", async () => {
     const cacheRange = { start: range.start, end: new Date("2024-04-04T23:59:59.000Z") };
-    vi.mocked(selectFromDatabaseWithSql).mockResolvedValue([{ uuid: "u1", createdAt: date(1) }, { uuid: "u2", createdAt: date(2) }] as never);
+    vi.mocked(selectFromDatabaseWithSql).mockImplementation(async (sql) => sql.includes("createdAt < ?")
+      ? [] : [{ uuid: "u1", createdAt: date(1) }, { uuid: "u2", createdAt: date(2) }] as never);
     vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([
       ...snapshot(1, 1, 100).assets, ...snapshot(2, 2, 240).assets,
     ] as never);

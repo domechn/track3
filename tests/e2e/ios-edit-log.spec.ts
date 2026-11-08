@@ -20,12 +20,7 @@ for (const width of [390, 834]) for (const theme of ["light", "dark"] as const) 
     await expect(page.getByTestId("history-content")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
     await expect(page.getByRole("button", { name: /^View snapshot.*Edited/ }).first()).toBeVisible();
     await page.screenshot({ path: `test-results/edit-log/ios-${width}-${theme}-list.png` });
-    if (width === 390) {
-      await page.locator(".fidelity-history-chips").getByRole("button", { name: "Edited" }).click();
-    } else {
-      await page.getByRole("combobox", { name: "History filter" }).click();
-      await page.getByRole("option", { name: "Edited" }).click();
-    }
+    await page.locator(".fidelity-history-chips").getByRole("button", { name: "Edited" }).click();
     const row = page.getByTestId("history-mobile-row");
     await expect(row).toHaveCount(1);
     await row.click();

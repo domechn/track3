@@ -45,6 +45,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -59,7 +60,6 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { resolveAssetLogoSrc } from "@/utils/assets";
 import { positiveNegativeColor } from "@/utils/color";
 import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { useOptimisticDelete } from "./common/use-optimistic-delete";
@@ -596,6 +596,9 @@ const App = ({
         >
           <DialogContent className="t3-history-detail min-w-[80%] touch:min-w-0 touch:w-[calc(100vw-1rem)] touch:max-w-[1200px] touch:max-h-[calc(100dvh-1rem)]">
             <DialogHeader>
+              <DialogClose asChild><button type="button" className="t3-history-detail-back" autoFocus>
+                {t("history.fidelity.backToSnapshots")}
+              </button></DialogClose>
               <DialogTitle>{t("history.detailTitle")}</DialogTitle>
               <DialogDescription className="sr-only">
                 {t("history.detailDescription")}
@@ -688,10 +691,6 @@ const App = ({
                     <TableRow aria-hidden="true"><TableCell colSpan={6} style={{ height: detailOffsets[detailStart], padding: 0 }} /></TableRow>
                   ) : null}
                   {virtualRankData.map((item, virtualIndex) => {
-                    const apiPath = resolveAssetLogoSrc(
-                      item,
-                      logoMap[item.symbol],
-                    );
                     return (
                       <TableRow
                         key={"historical-data-detail-row-" + item.assetId}
@@ -704,14 +703,7 @@ const App = ({
                           # {item.rank}
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <div className="flex items-center gap-1 text-sm">
-                            <img
-                              className="inline-block w-[18px] h-[18px] rounded-full"
-                              src={apiPath}
-                              alt={item.symbol}
-                            />
-                            <AssetLabel asset={item} />
-                          </div>
+                          <AssetLabel asset={item} src={logoMap[item.symbol]} size={20} quiet />
                         </TableCell>
                         <TableCell className="py-1.5 text-right text-sm">
                           {currency.symbol}
@@ -1007,7 +999,7 @@ const App = ({
                                 aria-label={t("history.viewSnapshot").replace("{date}", `${timeToDateStr(new Date(row.createdAt).getTime(), true)} · ${displayDate}`)}
                                 className="t3-history-date-button flex touch:min-h-11 flex-col rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                                 <span>{displayDate}</span>
-                                {row.edited ? <span className="mt-1 w-fit rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                {row.edited ? <span className="t3-tag mt-1 w-fit" data-tone="accent">
                                   {t("history.editLog.edited")}
                                 </span> : null}
                                 <HistoryPartialPill row={row} t={t} />
@@ -1040,11 +1032,9 @@ const App = ({
                             <TableCell className="py-1.5">
                               <div className="flex items-center justify-between gap-2">
                                 <ImageStack
+                                  symbols={topAssets.map((asset) => asset.symbol)}
                                   imageSrcs={topAssets.map((asset) =>
-                                    resolveAssetLogoSrc(
-                                      asset,
-                                      logoMap[asset.symbol],
-                                    ),
+                                    logoMap[asset.symbol] ?? "",
                                   )}
                                   imageWidth={18}
                                   imageHeight={18}

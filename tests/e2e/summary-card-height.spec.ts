@@ -142,7 +142,7 @@ test("twelve years show four recent cards per page", async ({ page }) => {
   await expect(cards.filter({ hasText: "2024" })).toHaveClass(/selected/);
 });
 
-test("Wallet mover cards use their content height with three sources", async ({ page }) => {
+test("Wallet mover card fills the matrix row with three sources", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installManySourceFixture(page, 3);
@@ -152,13 +152,16 @@ test("Wallet mover cards use their content height with three sources", async ({ 
   await expect(page.locator(".t3-wallet-fidelity")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
   await expect(card.locator(".t3-wallet-movers > div").first()).toBeVisible();
   const layout = await card.evaluate((node) => ({
-    blank: node.getBoundingClientRect().bottom - node.lastElementChild!.getBoundingClientRect().bottom,
     rowHeights: [...node.querySelectorAll(".t3-wallet-movers > div")]
       .map((row) => row.getBoundingClientRect().height),
+    bottomGap: node.getBoundingClientRect().bottom - node.lastElementChild!.getBoundingClientRect().bottom,
   }));
-  expect(layout.blank).toBeLessThan(40);
+  const cardBox = (await card.boundingBox())!;
+  const matrixBox = (await page.locator(".t3-wallet-matrix").boundingBox())!;
+  expect(Math.abs(cardBox.y + cardBox.height - matrixBox.y - matrixBox.height)).toBeLessThanOrEqual(1);
   expect(layout.rowHeights.length).toBeGreaterThan(0);
   expect(Math.max(...layout.rowHeights)).toBeLessThanOrEqual(80);
+  expect(layout.bottomGap).toBeLessThan(40);
 });
 
 for (const width of [1280, 1920]) {

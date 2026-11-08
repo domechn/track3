@@ -31,10 +31,30 @@ const baseProps = {
 };
 
 describe("OthersSection", () => {
+  it("renames a custom asset without changing its symbol or amount", () => {
+    const onRename = vi.fn();
+    render(<OthersSection {...baseProps} onRename={onRename} />);
+    fireEvent.click(screen.getByRole("button", { name: "Rename My BTC" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Alias" }), { target: { value: " Treasury " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(onRename).toHaveBeenCalledWith(0, "Treasury");
+  });
+  it("keeps the existing 100-character custom alias edit path", () => {
+    const alias = "x".repeat(80);
+    const onOthersChange = vi.fn();
+    render(<OthersSection {...baseProps}
+      others={[{ symbol: "GOLD", amount: 4, alias }]}
+      pagedOthers={[{ symbol: "GOLD", amount: 4, alias }]}
+      onOthersChange={onOthersChange} />);
+    const input = screen.getByRole("textbox", { name: "Alias" });
+    expect(input).toHaveValue(alias);
+    fireEvent.change(input, { target: { value: `${alias}y` } });
+    expect(onOthersChange).toHaveBeenCalledWith(0, "alias", `${alias}y`);
+  });
   it("renders others rows", () => {
     render(<OthersSection {...baseProps} />);
 
-    expect(screen.getByDisplayValue("My BTC")).toBeInTheDocument();
+    expect(screen.getAllByRole("textbox", { name: "Alias" })[0]).toHaveValue("My BTC");
     expect(screen.getByDisplayValue("BTC")).toBeInTheDocument();
     expect(screen.getByDisplayValue("ETH")).toBeInTheDocument();
   });

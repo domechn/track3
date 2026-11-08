@@ -143,7 +143,8 @@ Capture: `/tmp/fidelity/settings-b/sync-pop-error.png` (full page: `sync-pop-err
 - The fixture now creates three real configuration conflicts and the unlocked page renders resolution controls. The runtime does not expose the source mockup’s per-setting device names or change times; locked/setup captures cannot show resolvable conflicts before unlock.
 - The page title, 16px sans-serif connection inputs, input surfaces, status pill and sync sheets now follow the source geometry. The reference reveals portions of credentials and includes item-size totals or per-setting metadata that the runtime does not expose.
 - The sheet now opens phase and request diagnostics from the preceding local fake S3 pass and shows the seeded bucket failure. The reference’s repeated timeouts, 403 responses, checksum failures, retry counts, and long timings were invented for the design and did not occur in this run; its copy and rows still differ.
+- The app retains the sync control's status line above the sheet title. The static source sheet has no status line.
 
 ## Pixel difference
 
-Viewport: **10.062%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).
+Viewport: **10.488%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture, measured 8 Nov 2026).

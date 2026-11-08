@@ -7,8 +7,3 @@
   position: absolute;
   transition: left 0.5s ease-in-out;
 }
-
-.image-stack-child img {
-  border-radius: 50%;
-  transition: width 0.5s ease-in-out, height 0.5s ease-in-out;
-}

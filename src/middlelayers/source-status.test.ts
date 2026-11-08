@@ -26,6 +26,17 @@ it("loads old saved statuses with their original label", () => {
   expect(sourceIdentity({ sourceId: "btc:0", label: "Main", status: "failed" })).toBe("Main");
 });
 
+it("does not add identity hashes to the persisted status format", () => {
+  expect(normalizeSourceStatuses([
+    { sourceId: "cex:0", label: "Main", status: "failed",
+      identityHash: "0123456789abcdef0123456789abcdef" },
+    { sourceId: "cex:1", label: "Other", status: "ok", identityHash: "plain-api-key" },
+  ])).toEqual([
+    { sourceId: "cex:0", label: "Main", status: "failed" },
+    { sourceId: "cex:1", label: "Other", status: "ok" },
+  ]);
+});
+
 it("rejects unmasked hints and upstream error text at the storage boundary", () => {
   const statuses = normalizeSourceStatuses([{
     sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance",

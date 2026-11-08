@@ -8,13 +8,22 @@ test.use({ viewport: { width: 1600, height: 1024 }, colorScheme: "dark", timezon
 
 const directory = "/tmp/fidelity-desktop/history";
 const backupDirectory = "/tmp/fidelity-wdb-locked/history";
-// Keep the source column positions as the reference while reserving room for the 32px delete target.
-function reflowedDetailHeader(sourceX: number, sourceFirstWidth: number) {
-  const left = 973.58;
-  const right = 1536;
-  const firstWidth = 72;
-  return left + firstWidth + (sourceX - left - sourceFirstWidth)
-    * (right - left - firstWidth) / (right - left - sourceFirstWidth);
+async function expectDetailHeadersInsidePane(page: Page, expectedLefts: number[]) {
+  const pane = (await page.getByTestId("history-desktop-detail").boundingBox())!;
+  const headers = await page.getByTestId("history-desktop-detail").locator("table").first().locator("thead th")
+    .evaluateAll((cells) => cells.map((cell) => {
+      const box = cell.getBoundingClientRect();
+      return { left: box.left, right: box.right };
+    }));
+  expect(headers).toHaveLength(5);
+  for (const [index, left] of expectedLefts.entries()) {
+    expect(Math.abs(headers[index].left - left)).toBeLessThan(1);
+  }
+  expect(headers[0].left).toBeGreaterThanOrEqual(pane.x);
+  expect(headers.at(-1)!.right).toBeLessThanOrEqual(pane.x + pane.width);
+  for (let index = 1; index < headers.length; index++) {
+    expect(headers[index].left).toBeGreaterThanOrEqual(headers[index - 1].right - 1);
+  }
 }
 async function capture(page: Page, name: string) {
   await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
@@ -89,8 +98,8 @@ test("populated history shows the selected snapshot beside the list", async ({ p
   await expect(page.getByTestId("history-snapshot-row").first()).toContainText("$763,809.27");
   const goalsBadge = page.locator('a[href="#/goals"] > span[aria-hidden="true"]');
   await expect(goalsBadge).toBeVisible();
-  expect((await goalsBadge.boundingBox())!.x).toBeCloseTo(31, 0);
-  expect((await goalsBadge.boundingBox())!.y).toBeCloseTo(373, 0);
+  expect((await goalsBadge.boundingBox())!.x).toBeCloseTo(34, 0);
+  expect((await goalsBadge.boundingBox())!.y).toBeCloseTo(409, 0);
   await expect(goalsBadge).toHaveCSS("border", "2px solid rgb(13, 13, 14)");
   await expect(page.getByTestId("history-desktop-detail")).toContainText("$763,809.27");
   await expect(page.getByTestId("history-snapshot-row").filter({ hasText: "28 Oct 08:51" })).toBeVisible();
@@ -132,12 +141,7 @@ test("populated history shows the selected snapshot beside the list", async ({ p
   await expect(page.getByTestId("history-desktop-detail").locator("tbody tr").first().locator("td").first()
     .getByRole("button", { name: "Delete BTC from snapshot" })).toBeAttached();
   await expect(page.getByTestId("history-desktop-detail")).toContainText("5 of 5 sources");
-  const detailHeaders = page.getByTestId("history-desktop-detail").locator("table").first().locator("thead th");
-  const sourceHeaders = [973.58, 1024.19, 1167.88, 1299.19, 1442.88];
-  for (const [index, sourceLeft] of sourceHeaders.entries()) {
-    const left = index === 0 ? sourceLeft : reflowedDetailHeader(sourceLeft, sourceHeaders[1] - sourceHeaders[0]);
-    expect(Math.abs((await detailHeaders.nth(index).boundingBox())!.x - left)).toBeLessThan(1);
-  }
+  await expectDetailHeadersInsidePane(page, [973.58, 1097.58, 1216.45, 1325.09, 1443.97]);
   const editAction = page.locator(".fidelity-history-actions button").nth(1);
   expect((await editAction.boundingBox())!.width).toBeCloseTo(61, 0);
   expect((await editAction.locator("svg").boundingBox())!.width).toBeCloseTo(14, 0);
@@ -146,12 +150,19 @@ test("populated history shows the selected snapshot beside the list", async ({ p
   expect((await rangeSegment.boundingBox())!.x).toBeCloseTo(151, 0);
   await expect(rangeSegment).toHaveCSS("background-color", "rgb(26, 26, 30)");
   await expect(rangeSegment.getByRole("button", { name: "All time" }))
-    .toHaveCSS("background-color", "rgb(42, 42, 48)");
-  expect((await page.locator(".fidelity-history-filters .fidelity-date-input").first().boundingBox())!.x).toBeCloseTo(454, 0);
+    .toHaveCSS("background-color", "rgba(72, 136, 213, 0.16)");
+  const listBox = (await page.locator(".fidelity-history-list").boundingBox())!;
+  const dateBox = (await page.locator(".fidelity-history-filters .fidelity-date-input").first().boundingBox())!;
+  expect(dateBox.x).toBeCloseTo(454.39, 0);
+  expect(dateBox.x).toBeGreaterThanOrEqual(listBox.x);
+  expect(dateBox.x + dateBox.width).toBeLessThanOrEqual(listBox.x + listBox.width);
   const showGroup = page.locator(".fidelity-history-show");
-  expect((await showGroup.boundingBox())!.x).toBeCloseTo(1280.89, 0);
+  const showBox = (await showGroup.boundingBox())!;
+  expect(showBox.x).toBeCloseTo(660.47, 0);
+  expect(showBox.x).toBeGreaterThanOrEqual(listBox.x);
+  expect(showBox.x + showBox.width).toBeLessThanOrEqual(listBox.x + listBox.width);
   await expect(showGroup).toHaveCSS("gap", "8px");
-  expect((await showGroup.locator(".fidelity-segment").boundingBox())!.x).toBeCloseTo(1319.89, 0);
+  expect((await showGroup.locator(".fidelity-segment").boundingBox())!.x).toBeCloseTo(699.47, 0);
   await expect(page.locator(".fidelity-history-filters .fidelity-date-input").first())
     .toHaveCSS("color", "rgb(155, 157, 163)");
   await expect(page.getByRole("button", { name: "With issues 2" })).toBeVisible();
@@ -163,7 +174,7 @@ test("populated history shows the selected snapshot beside the list", async ({ p
   await expect(page.locator(".fidelity-history-list tbody tr:first-child td:first-child button"))
     .toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(page.locator(".fidelity-history-detail-kpis strong").first())
-    .toHaveCSS("font-variant-numeric", "normal");
+    .toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(page.locator(".t3-records-toolbar-panel")).toBeHidden();
   await expect(page.getByTestId("history-desktop-detail")).toContainText("$752,642.71");
   await expect(page.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -216,11 +227,10 @@ test("delete confirmation and undo show the designed overlays", async ({ page })
     element.getBoundingClientRect().x + Number.parseFloat(getComputedStyle(element).paddingLeft))).toBeCloseTo(1289, 0);
   expect((await toast.locator(".fidelity-undo-action").boundingBox())!.width).toBeCloseTo(67, 0);
   await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("border", "1px solid rgb(58, 58, 62)");
+  await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("border", "1px solid rgb(59, 59, 63)");
   await expect(toast.locator(".fidelity-undo-action")).toHaveCSS("color", "rgb(154, 156, 162)");
-  expect((await page.locator(".fidelity-history-list th").first().boundingBox())!.width).toBeCloseTo(147.83, 0);
-  expect((await page.locator(".fidelity-history-detail th").nth(2).boundingBox())!.x)
-    .toBeCloseTo(reflowedDetailHeader(1159.61, (1536 - 973.58) * .092), 0);
+  expect((await page.locator(".fidelity-history-list th").first().boundingBox())!.width).toBeCloseTo(145.22, 0);
+  await expectDetailHeadersInsidePane(page, [973.58, 1097.58, 1208.94, 1320.30, 1442.09]);
   await capture(page, "history-undo");
 });
 
@@ -237,6 +247,7 @@ test("a transient tiny viewport preserves the selected desktop snapshot", async 
 
 test("history detail keeps every value distinct inside its card at narrow desktop widths", async ({ page }) => {
   test.setTimeout(120_000);
+  await mkdir("/tmp/history-kpi-overflow", { recursive: true });
   await page.setViewportSize({ width: 1100, height: 1024 });
   await installSampleBridge(page, { fidelitySample: "full" });
   await page.goto("/#/history");
@@ -286,6 +297,24 @@ test("history detail keeps every value distinct inside its card at narrow deskto
       return failures;
     });
     allCollisions.push(...collisions.map((collision) => `${width}px ${collision}`));
+    const assetAlignment = await detail.evaluate((card) => {
+      const header = card.querySelector<HTMLTableCellElement>("table thead th:first-child")!;
+      const cell = card.querySelector<HTMLTableCellElement>("table tbody tr:first-child td:first-child")!;
+      const button = cell.querySelector("button")!;
+      button.focus();
+      const cardBounds = card.getBoundingClientRect();
+      const buttonBounds = button.getBoundingClientRect();
+      button.blur();
+      return {
+        headerPadding: getComputedStyle(header).paddingLeft,
+        cellPadding: getComputedStyle(cell).paddingLeft,
+        buttonLeft: buttonBounds.left,
+        cardLeft: cardBounds.left,
+      };
+    });
+    expect(assetAlignment.cellPadding).toBe(assetAlignment.headerPadding);
+    expect(assetAlignment.buttonLeft - assetAlignment.cardLeft).toBeGreaterThanOrEqual(2);
+    await detail.screenshot({ path: `/tmp/history-kpi-overflow/history-detail-table-${width}.png` });
   }
   expect(allCollisions).toEqual([]);
 });
@@ -363,12 +392,15 @@ test("loading history keeps the table and detail skeleton grid", async ({ page }
   await page.getByRole("button", { name: "7 days" }).click();
   await page.getByRole("button", { name: "All time" }).click();
   await expect(page.getByTestId("history-desktop-loading")).toBeVisible();
-  expect((await page.locator(".fidelity-history-list").boundingBox())!.height).toBeCloseTo(768, 0);
+  const loadingList = (await page.locator(".fidelity-history-list").boundingBox())!;
+  const loadingDetail = (await page.getByTestId("history-desktop-loading").boundingBox())!;
+  expect(Math.abs(loadingList.y - loadingDetail.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(loadingList.y + loadingList.height - loadingDetail.y - loadingDetail.height)).toBeLessThanOrEqual(1);
   await expect(page.locator(".fidelity-history-pager .fidelity-skeleton")).toBeVisible();
   await expect(page.locator(".fidelity-history-pager .fidelity-skeleton"))
     .toHaveCSS("background-color", "rgb(36, 36, 42)");
   expect((await page.locator(".fidelity-history-list td .fidelity-skeleton").first().boundingBox())!.y)
-    .toBeCloseTo(261.5, 0);
+    .toBeCloseTo(281, 0);
   for (const column of [2, 3, 4]) {
     const cell = (await page.locator(`.fidelity-history-list tbody tr:first-child td:nth-child(${column})`).boundingBox())!;
     const bar = (await page.locator(`.fidelity-history-list tbody tr:first-child td:nth-child(${column}) .fidelity-skeleton`).boundingBox())!;
@@ -399,6 +431,7 @@ test("large snapshot detail keeps a bounded table window with access to later as
   await page.getByTestId("history-snapshot-row").filter({ hasText: "28 Oct 08:51" }).click();
   const detail = page.getByTestId("history-desktop-detail");
   await expect(detail).toContainText("68 assets");
+  await detail.getByRole("button", { name: "Show all (68)" }).click();
   await expect(detail.locator("tbody tr")).toHaveCount(51);
   await detail.locator(".fidelity-detail-pager").getByRole("button", { name: "Next" }).click();
   await expect(detail.locator("tbody tr")).toHaveCount(19);
@@ -423,7 +456,7 @@ test("an asset can be deleted from a snapshot and restored with Undo", async ({ 
   await installTauriBridge(page, { fidelityRecords: "history" });
   await page.goto("/#/history");
   const detail = page.getByTestId("history-desktop-detail");
-  await expect(detail).toContainText("$763,809.27");
+  await expect(detail).toContainText("$763,809.27", { timeout: 30_000 });
   await detail.getByRole("button", { name: "Delete BTC from snapshot" }).click();
   await expect(page.getByRole("alertdialog").getByRole("button", { name: "Delete & Blacklist" })).toBeVisible();
   await page.getByRole("alertdialog").getByRole("button", { name: "Delete asset" }).click();

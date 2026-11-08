@@ -1,3 +1,4 @@
+import AssetLabel from "./common/asset-label";
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
@@ -11,6 +12,7 @@ import { costBasisDisplayRows } from "./cost-basis-panels";
 import { ArchiveIcon, BarChartIcon, ExclamationTriangleIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import EmptyState from "./empty-state";
 import { directionPhysicalTone } from "@/utils/color";
+import { useChartHitArea } from "./chart-tooltip";
 
 const pageSize = 50;
 
@@ -64,6 +66,8 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
   holdingValues: Map<string, number>;
   onChooseYear: () => void;
 }) {
+  const holdingChart = useChartHitArea();
+  const assetChart = useChartHitArea();
   const numberLocale = locale === "zh" ? "zh-CN" : "en-US";
   const quantity = (value: number) => value.toLocaleString(numberLocale, { minimumFractionDigits: 4, maximumFractionDigits: 8 });
   const assetQuantity = (assetType: string, value: number) => assetType === "stock"
@@ -98,6 +102,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
       (holdingValues.get(a) ?? reportHoldingValues.get(a) ?? 0) || a.localeCompare(b);
   const byAsset = costBasisDisplayRows(report).sort((a, b) =>
     a.gainLoss === null ? 1 : b.gainLoss === null ? -1 : b.gainLoss - a.gainLoss);
+  let assetMarkIndex = 0;
   const maxPositive = Math.max(0, ...byAsset.map((row) => Math.max(0, row.gainLoss ?? 0)));
   const maxNegative = Math.max(0, ...byAsset.map((row) => Math.max(0, -(row.gainLoss ?? 0))));
   const chartSpan = maxPositive + maxNegative;
@@ -116,7 +121,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
     return rows.map((row, index) => ({ row, index, groupLength: rows.length }));
   });
   const pagedRows = flatRows.slice(tablePage * pageSize, (tablePage + 1) * pageSize);
-  const term = (value: "short" | "long") => isAverage ? "–" : <span className="fidelity-pill">{t(value === "long" ? "cost.fidelity.long" : "cost.fidelity.short")}</span>;
+  const term = (value: "short" | "long") => isAverage ? "–" : <span className="t3-tag">{t(value === "long" ? "cost.fidelity.long" : "cost.fidelity.short")}</span>;
   const held = (value: string) => {
     const days = Math.max(0, Math.round((Date.now() - Date.parse(value)) / 86_400_000));
     return days >= 365 ? t("cost.fidelity.heldYears").replace("{n}", (days / 365.25).toFixed(1))
@@ -167,7 +172,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
         </div>
         </>}
       </section>
-      <section className="fidelity-card fidelity-cost-holding" data-testid="cost-desktop-holding">
+      <section className="fidelity-card fidelity-cost-holding" data-testid="cost-desktop-holding" data-chart-group="">
         <div className="fidelity-card-head"><h2>{t("cost.design.holdingPeriod")}</h2><span>{t("cost.fidelity.realizedOnly")}</span></div>
         {(["long", "short"] as const).map((side) => {
           const value = side === "long" ? report.totals.longTerm : report.totals.shortTerm;
@@ -175,7 +180,10 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
           const total = Math.abs(report.totals.longTerm) + Math.abs(report.totals.shortTerm);
           return <div className="fidelity-holding-row" key={side}>
             <div><span>{t(`cost.fidelity.${side}Term`)}</span><strong className={isAverage ? "zero" : tone(value, quoteColor)}>{isAverage ? "–" : signed(value)}</strong></div>
-            <span className="fidelity-holding-track"><i className={tone(value, quoteColor)}
+            <span className="fidelity-holding-track" role="button"
+              {...(!isAverage ? holdingChart.markProps(side === "long" ? 0 : 1, `${t(`cost.fidelity.${side}Term`)}: ${signed(value)}`,
+                <><div>{t(`cost.fidelity.${side}Term`)}</div><div className={tone(value, quoteColor)}>{signed(value)}</div></>) : {})}>
+              <i className={tone(value, quoteColor)}
               style={{ width: `${isAverage || total === 0 ? 0 : Math.max(count ? 3 : 0, Math.abs(value) / total * 100)}%` }} /></span>
             <small>{isAverage ? t("cost.fidelity.notAvailable")
               : t(`cost.fidelity.${side}Note${holdingPeriodDays === 365 ? "" : "Days"}`)
@@ -187,9 +195,11 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
       <section className="fidelity-card fidelity-cost-chart">
         <div className="fidelity-card-head"><h2>{t("finance.realizedByAsset")}</h2><span>{t("cost.fidelity.chartRange")
           .replace("{currency}", "USD").replace("{range}", year || t("cost.fidelity.selectedRange"))}</span></div>
-        {byAsset.some((row) => row.gainLoss !== null) ? <ol>{byAsset.map((row) => <li key={`${row.assetType}:${row.symbol}`}
+        {byAsset.some((row) => row.gainLoss !== null) ? <ol data-chart-group="">{byAsset.map((row) => <li key={`${row.assetType}:${row.symbol}`}
           className={row.gainLoss === null ? "unknown" : undefined}>
-          <strong>{row.symbol}</strong><span className="fidelity-cost-chart-track"
+          <strong><AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /></strong><span className="fidelity-cost-chart-track" role="button"
+            {...(row.gainLoss === null ? {} : assetChart.markProps(assetMarkIndex++, `${row.symbol}: ${signed(row.gainLoss)}`,
+              <><span>{row.symbol}</span><div className={tone(row.gainLoss, quoteColor)}>{signed(row.gainLoss)}</div></>))}
             style={{ "--zero-at": `${zeroAt}%` } as CSSProperties}><i className={tone(row.gainLoss, quoteColor)}
               style={{ left: row.gainLoss === null ? 0 : row.gainLoss >= 0 ? `${zeroAt}%`
                 : `${zeroAt - Math.abs(row.gainLoss) / chartSpan * 92}%`,
@@ -209,7 +219,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
             const boughtQty = price?.bought ?? 0;
             const assetType = key.slice(0, key.indexOf(":"));
             const symbol = key.slice(key.indexOf(":") + 1);
-            return <tr key={key}><td>{symbol}</td><td>{boughtQty ? assetQuantity(assetType, boughtQty) : <span className="zero">–</span>}</td>
+            return <tr key={key}><td><AssetLabel asset={{ symbol, assetType: assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /></td><td>{boughtQty ? assetQuantity(assetType, boughtQty) : <span className="zero">–</span>}</td>
               <td>{boughtQty ? money(price!.averageBuy) : <span className="zero">–</span>}</td>
               <td>{soldQty ? assetQuantity(assetType, soldQty) : <span className="zero">–</span>}</td>
               <td>{soldQty ? money(price!.averageSell) : <span className="zero">–</span>}</td></tr>;
@@ -231,12 +241,12 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
             tab === "open" ? "unrealized" : "gain", "term"].map((key) => <th key={key}>{t(`cost.fidelity.${key}`)}</th>)}
         </tr></thead><tbody>{pagedRows.map(({ row, index, groupLength }, i) => <Fragment key={`${"id" in row ? row.id : row.eventId}:${i}`}>
           {isWarning(row) ? <tr className="fidelity-warnrow">
-            <td>{index === 0 ? row.symbol : ""}</td><td>{isAverage ? t("cost.fidelity.pooled") :
+            <td>{index === 0 ? <AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /> : ""}</td><td>{isAverage ? t("cost.fidelity.pooled") :
               withdrawn.get(row.eventId)?.acquiredAt ? date(withdrawn.get(row.eventId)!.acquiredAt!, locale) : "–"}</td>
             <td><ExclamationTriangleIcon className="fidelity-inline-warning" aria-hidden="true" /> {t("cost.fidelity.withdrawn")} {date(row.date, locale)}</td>
             <td>{assetQuantity(row.assetType, row.amount)}</td><td>{withdrawn.has(row.eventId) ? money(withdrawn.get(row.eventId)!.costBasis) : "–"}</td><td>–</td><td>–</td><td>–</td>
           </tr> : <tr>
-            <td>{index === 0 ? row.symbol : ""}</td><td>{isAverage ? t("cost.fidelity.pooled") : date(row.acquiredAt, locale)}</td>
+            <td>{index === 0 ? <AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /> : ""}</td><td>{isAverage ? t("cost.fidelity.pooled") : date(row.acquiredAt, locale)}</td>
             <td>{tab === "open" ? held(row.acquiredAt) : date("disposedAt" in row ? row.disposedAt : "", locale)}</td>
             <td>{assetQuantity(row.assetType, row.amount)}</td><td>{money(row.costBasis)}</td>
             <td>{money("marketValue" in row ? row.marketValue : row.proceeds)}</td>
@@ -254,7 +264,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
             const terms = known.map((entry) => "term" in entry ? entry.term
               : (Date.now() - Date.parse(entry.acquiredAt)) / 86_400_000 > holdingPeriodDays ? "long" : "short");
             const groupTerm = isAverage || !terms.length ? null : terms.every((value) => value === terms[0])
-              ? term(terms[0]) : <span className="fidelity-pill">{t("cost.fidelity.mixed")}</span>;
+              ? term(terms[0]) : <span className="t3-tag">{t("cost.fidelity.mixed")}</span>;
             return <tr className="fidelity-subtotal"><td colSpan={3}>{row.symbol} {t("cost.fidelity.subtotal")}
               {rows.some(isWarning) ? <span className="fidelity-subtotal-warning"> ⚠</span> : tab === "open" &&
                 unknown.some((warning) => warning.symbol === row.symbol)
@@ -304,5 +314,6 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
         })}</tbody></table>
       {pager(gapPage, gaps.length, setGapPage, t("cost.warnings"))}
     </section>}
+    {holdingChart.tooltip}{assetChart.tooltip}
   </>;
 }

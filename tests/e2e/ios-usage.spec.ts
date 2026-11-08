@@ -16,6 +16,8 @@ test("iOS Pro screen shows usage and an exhausted wallet shows quota status", as
   await page.goto("/#/overview");
   await page.locator("#app-top-bar .t3-refresh-button").click();
   const status = page.getByRole("alertdialog", { name: "Source status" });
+  await expect(status).toHaveCount(0);
+  await page.getByRole("button", { name: "Source status" }).click();
   await expect(status).toContainText("Monthly refresh limit reached", { timeout: 15_000 });
 });
 
@@ -63,7 +65,10 @@ test("iOS asks before an exhausted Pro wallet refresh", async ({ page }) => {
   await expect(preflight).toContainText("ERC20 wallet refreshes needed: 1; remaining: 0");
   await expect(preflight.getByRole("button", { name: "Continue refresh" })).toBeVisible();
   await preflight.getByRole("button", { name: "Continue refresh" }).click();
-  await expect(page.getByRole("alertdialog", { name: "Source status" })).toContainText("Monthly refresh limit reached");
+  const status = page.getByRole("alertdialog", { name: "Source status" });
+  await expect(status).toHaveCount(0);
+  await page.getByRole("button", { name: "Source status" }).click();
+  await expect(status).toContainText("Monthly refresh limit reached");
 });
 
 test("iOS wallet quick look explains a monthly quota failure", async ({ page }) => {

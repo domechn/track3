@@ -61,10 +61,14 @@ const App = ({
   dateRange,
   currency,
   quoteColor,
+  clipToRange = false,
+  oneSnapshot = false,
 }: {
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
+  clipToRange?: boolean;
+  oneSnapshot?: boolean;
 }) => {
   const [monthlyProfits, setMonthlyProfits] = useState<
     {
@@ -207,17 +211,12 @@ const App = ({
       const profits = await bluebird.map(
         dates.filter((d) => d.firstDay.getFullYear() === selectedYear),
         async (date) => {
+          const periodStart = new Date(Math.max(date.firstDay.getTime(), dateRange.start.getTime()));
+          const monthEnd = new Date(date.lastDay.getFullYear(), date.lastDay.getMonth(),
+            date.lastDay.getDate(), 23, 59, 59, 999);
           const { total, knownTotal = null, unknownCoins = [], lastRecordDate, unrecordedChange } = await calculateTotalProfit({
-            start: new Date(Math.max(date.firstDay.getTime(), start.getTime())),
-            end: new Date(Math.min(new Date(
-              date.lastDay.getFullYear(),
-              date.lastDay.getMonth(),
-              date.lastDay.getDate(),
-              23,
-              59,
-              59,
-              999
-            ).getTime(), end.getTime())),
+            start: periodStart,
+            end: new Date(Math.min(monthEnd.getTime(), dateRange.end.getTime())),
           });
 
           const lrd = lastRecordDate
@@ -226,7 +225,7 @@ const App = ({
               : lastRecordDate
             : undefined;
           const baselineDate = lrd
-            ? await queryPreviousProfitSnapshotDate(new Date(Math.max(date.firstDay.getTime(), start.getTime())))
+            ? await queryPreviousProfitSnapshotDate(periodStart)
             : undefined;
           return { total, knownTotal, unknownCoins, monthFirstDate: date.firstDay, lastRecordDate: lrd, baselineDate, unrecordedChange };
         },
@@ -447,6 +446,7 @@ const App = ({
   }
 
   function renderMonthSummary() {
+    if (oneSnapshot) return <div className="py-6 text-center text-muted-foreground">{t("fidelity.summary.monthsNeedSecond")}</div>;
     if (clickedMonthDateRange !== null) {
       return (
         <div id="month-detail" className="space-y-2">
@@ -480,7 +480,7 @@ const App = ({
 
     return (
       <div className="profit-period-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
-        {(isMobile ? [...monthCards].reverse() : monthCards).map((item) => {
+        {(isMobile ? [...monthCards].reverse() : monthCards).filter((item) => !clipToRange || item.inRange).map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
           const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
           const cardContent = <>
@@ -507,6 +507,7 @@ const App = ({
   }
 
   function renderYearSummary() {
+    if (oneSnapshot) return <div className="py-6 text-center text-muted-foreground">{t("fidelity.summary.yearsNeedSecond")}</div>;
     return (
       <div className="space-y-3">
       <div className="profit-period-grid profit-year-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">

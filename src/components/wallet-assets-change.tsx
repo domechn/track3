@@ -1,3 +1,4 @@
+import AssetLabel from "./common/asset-label";
 import {
   CurrencyRateDetail,
   QuoteColor,
@@ -29,7 +30,6 @@ import {
 } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
-import { getWalletLogo } from "@/lib/utils";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   WALLET_AIRDROP_URLS,
@@ -293,15 +293,10 @@ const App = ({
                     <TableCell className="py-1.5">
                       <div className="flex items-center gap-1.5 text-sm">
                         {row.walletTypeText === "Unknown" ? (
-                          <span>{t("common.unknown")}</span>
+                          <AssetLabel kind="wallet" type="unknown" name={t("common.unknown")} size={20} />
                         ) : (
                           <>
-                            <img
-                              className="w-[18px] h-[18px] rounded-full"
-                              src={getWalletLogo(row.walletTypeText)}
-                              alt={row.walletTypeText}
-                            />
-                            <span>{row.walletTypeText}</span>
+                            <AssetLabel kind="wallet" type={row.walletTypeText} name={row.walletTypeText} size={20} />
                             {detailUrl && (
                               <img
                                 src={MoneyBankIcon}

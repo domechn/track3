@@ -84,3 +84,26 @@ it("does not expose an exchange API key through the wallet alias lookup", async 
   expect(JSON.stringify(aliases)).not.toContain("custom-private-key");
   expect(aliases[md5("binance-custom-private-key")]?.alias).toBe("Binance");
 });
+
+it("renames configured sources after a config reload while snapshot identities and totals stay intact", async () => {
+  const config = {
+    configs: { groupUSD: true },
+    exchanges: [{ name: "binance", alias: "Main", initParams: { apiKey: "exchange-key", secret: "secret" }, active: true }],
+    stockConfig: { brokers: [{ name: "ibkr", alias: "Broker", initParams: { queryId: "query-id", token: "token" }, active: true }] },
+    btc: { addresses: [{ address: "bc1-wallet", alias: "Cold" }] },
+    doge: { addresses: [] }, sol: { addresses: [] }, erc20: { addresses: [] },
+    trc20: { addresses: [] }, ton: { addresses: [] }, sui: { addresses: [] }, others: [],
+  };
+  vi.mocked(getConfiguration).mockImplementation(async () => config as never);
+  const identities = [md5("binance-exchange-key"), md5("bc1-wallet"), md5("ibkr:query-id")];
+  const snapshots = identities.map((wallet, index) => makeAsset(wallet, 100 + index));
+  const before = await new WalletAnalyzer(async () => [snapshots]).listWalletAliases(identities);
+  config.exchanges[0].alias = "Trading";
+  config.btc.addresses[0].alias = "Vault";
+  config.stockConfig.brokers[0].alias = "Retirement";
+  const after = await new WalletAnalyzer(async () => [snapshots]).listWalletAliases(identities);
+  expect(identities).toEqual([md5("binance-exchange-key"), md5("bc1-wallet"), md5("ibkr:query-id")]);
+  expect(identities.map((id) => before[id]?.alias)).toEqual(["Main", "Cold", "Broker"]);
+  expect(identities.map((id) => after[id]?.alias)).toEqual(["Trading", "Vault", "Retirement"]);
+  expect(snapshots.map((asset) => [asset.uuid, asset.wallet, asset.value])).toEqual(identities.map((id, index) => ["snapshot", id, 100 + index]));
+});

@@ -172,6 +172,7 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 - Reference render: `/tmp/rev-fa3/design/analyze-summary-empty-long.png`.
 - Earlier 390 × 844 first-screen pixel difference: **2.45%** (RGB difference >20/255 in any channel). The 8 Nov 2026 comparison is under Remaining differences.
 - Full-page overlap pixel difference: **0.97%** (source 2,237px; app 2,237px high).
+- Premerge master 8 Nov 2026 comparison at 390 × 844: **6.299%** of first-screen pixels differ (RGB difference >20/255 in any channel). Source: `/tmp/fidelity/summary/ui44-source-empty-phone.png`; app: `/tmp/fidelity/summary/summary-empty-phone.png`.
 
 ## Real-data limits
 
@@ -179,9 +180,10 @@ The phone reads existing SQLite snapshots, transactions, configuration, and wall
 
 ## Remaining differences
 
-- **8 Nov 2026 current 390 × 844 capture:** one snapshot **6.240%** against `ds/pages/analyze-summary-empty.html` (any RGB channel differs by more than 20). Source: `.local/ui46-final/source-390-analyze-summary-empty.html.png`; app: `/tmp/fidelity/summary/summary-empty-phone.png`; source bounds and computed styles: `/tmp/ui46-source-390-analyze-summary-empty.html.json`; app bounds and computed-style assertions: `ios-fidelity-summary-layout.spec.ts`. Both first cards are x=16, y=150, 358 × 475. The source packs disabled range labels into an overlapping strip; the app keeps all six labels readable and the Refresh action reachable. The Analytics menu chevron and unread badge belong to the working product navigation. The source and app rasterize the same Public Sans font differently.
+- **8 Nov 2026 branch 390 × 844 capture before this merge:** one snapshot **6.240%** against `ds/pages/analyze-summary-empty.html` (any RGB channel differs by more than 20). Source: `.local/ui46-final/source-390-analyze-summary-empty.html.png`; app: `/tmp/fidelity/summary/summary-empty-phone.png`; source bounds and computed styles: `/tmp/ui46-source-390-analyze-summary-empty.html.json`; app bounds and computed-style assertions: `ios-fidelity-summary-layout.spec.ts`. Both first cards are x=16, y=150, 358 × 475. The source packs disabled range labels into an overlapping strip; the app keeps all six labels readable and the Refresh action reachable. The Analytics menu chevron and unread badge belong to the working product navigation. The source and app rasterize the same Public Sans font differently.
 - An empty chart panel now uses the shared centred icon, title, and refresh hint with a 200px minimum. The source predates the shared empty state.
 
 - The source empty state labels attribution with a start date of 1 Jul 2025, although its only snapshot is 31 Oct 2026. The app reports the stored snapshot date.
 - The source HTML compresses six disabled range labels into an unreadable cluster. The app keeps each label readable within the segmented control for accessibility.
+- The current first viewport has a 6.299% raw pixel difference. The remaining text edges differ because the static source loads Public Sans through Google's stylesheet and Track3 uses its bundled offline face; the card content and order are the same. The source's unreadable range cluster also accounts for visible pixels.
 - The Analytics tab has a small upward chevron to reveal the existing tap-again destinations. The static source has no navigation hint.

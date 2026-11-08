@@ -21,6 +21,27 @@ Fresh 390 px dark full-page renders of the source HTML and app with the source's
 
 ## Remaining differences
 
+- The 8 Nov 390 × 844 app viewport in `/tmp/fidelity/comparison/comparison-phone.png` differs from the first 844 px of the source HTML render in `/tmp/fidelity/comparison/design-comparison.png` by **7.30%** at RGB-sum threshold 48. The picker viewport differs by **5.60%** against `design-comparison-picker.png`. These captures use the corrected 1 Oct and 31 Oct snapshot dates. The app has a 44 px Back control, a mask control, calculated 67% attribution, and the shared active tab treatment; the static source omits the controls and fixes attribution at 68%. Small picker spacing and text rasterization also remain visible and could be matched but are not worth another round.
+- The one permitted browser run measured the dark 390 × 844 viewport
+  at **10.64%** different from `analyze-comparison.html` with an
+  RGB-channel threshold of 20. Its first card bounds and computed
+  background, text colour and size match exactly: x=16, y=124,
+  358 × 531px, RGB (19, 18, 23), 13px. The capture exposed a
+  padded-versus-unpadded date mismatch that left the fixture at
+  30 Oct versus 31 Oct; desktop and phone now have regression tests
+  and use the assistant's 1 Oct versus 31 Oct selection. The ratio
+  predates that fix because the browser spec is limited to one run.
+  The app also keeps its Back and masking controls, computed mover
+  attribution, and the owner-required active tab style. Captures and
+  bounds are in `.local/tag-theme/phone-comparison-*`.
+
+- The earlier 8 Nov source-page and dark app first-screen captures at 390 × 844
+  differ by **7.996%** at an RGB-channel threshold of 20. The live
+  comparison keeps its 44 px Back and masking controls and computed
+  attribution, while the static source omits or fixes those values.
+  Small picker and text positions remain visible; they could be matched
+  but do not change the required data behavior.
+- At 1133 px split view, the asset comparison cards retain two columns when their amounts fit. The source's 390 px phone render cannot show this iPad layout.
 - The source ranks mover rows by signed change, uses 40–42 px rows and fixed 435/469 px cards, and puts its zero axis and value columns at different positions. The product ranks by absolute size, uses 44 px rows, one diverging scale and shared columns per card, and grows the cards for up to ten rows plus expansion. Matching the source here would break the required behavior.
 - Below 480 px the product hides the percentage card's absolute-change column to keep the plot and signed percentage readable. The source shows that column in its static render.
 - The source's fixed attribution and stablecoin note cannot describe the 11-asset fixture. The product computes both notes from stored assets.
@@ -28,3 +49,4 @@ Fresh 390 px dark full-page renders of the source HTML and app with the source's
 - The visible mask control remains in the Snapshots card so users can hide values; the static source omits it.
 - A 44px Back control remains visible at the upper right so the Analytics subpage has an explicit return route; the static reference omits it. It now starts below the device's top safe area.
 - Snapshot value type size, picker borders and day-dot placement, small spacing, and text rasterization remain visibly different. They use the app's shared components and could be matched but are not worth another round.
+- Per-asset and mover labels use the current shared AssetIcon tiles, whose marks differ from the older source page. Their ticker and stock or crypto type remain unchanged.

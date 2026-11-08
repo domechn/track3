@@ -40,6 +40,7 @@ type BridgeOptions = {
   seedEditLog?: boolean;
   seedPartialSnapshot?: boolean;
   customPriceFixture?: boolean;
+  summaryRangeFixture?: "many" | "one";
   appVersion?: string;
   licenseDevices?: "absent" | "present" | "error";
 };
@@ -76,6 +77,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     seedEditLog = false,
     seedPartialSnapshot = false,
     customPriceFixture = false,
+    summaryRangeFixture,
     appVersion = "0.8.2",
     licenseDevices = "absent",
   } = options;
@@ -102,6 +104,23 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
       (994, '!ent:e2e:ai'),
       (998, 'e2e-client');
   `);
+  if (summaryRangeFixture) {
+    db.run("DELETE FROM assets_v2");
+    const count = summaryRangeFixture === "many" ? 1038 : 1;
+    const add = db.prepare("INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES (?, ?, ?, 'crypto', ?, 1, ?, ?)");
+    for (let index = 0; index < count; index++) {
+      const at = new Date(Date.UTC(2023, 2, 26 + index + (index === count - 1 && count > 1 ? 3 : 0), 12)).toISOString();
+      const value = 40_000 + index * 10 - (index === count - 1 && count > 1 ? 200 : 0);
+      add.run([`summary-${index}`, at, "owner-fixture", "BTC", value, value]);
+      if (index === count - 1) {
+        for (let asset = 0; asset < 10; asset++) {
+          const symbol = `ASSET${asset}`;
+          add.run([`summary-${index}`, at, "owner-fixture", symbol, 100 + asset, 100 + asset]);
+        }
+      }
+    }
+    add.free();
+  }
   if (goldenHistory) {
     db.run("DELETE FROM assets_v2");
     db.run("DELETE FROM sqlite_sequence WHERE name = 'assets_v2'");

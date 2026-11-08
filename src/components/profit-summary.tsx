@@ -73,6 +73,7 @@ const App = ({
   fidelity,
   initialType = "month",
   oneSnapshot = false,
+  unavailableReason,
 }: {
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
@@ -80,6 +81,7 @@ const App = ({
   fidelity?: boolean;
   initialType?: SummaryType;
   oneSnapshot?: boolean;
+  unavailableReason?: string;
 }) => {
   const [monthlyProfits, setMonthlyProfits] = useState<
     {
@@ -174,7 +176,7 @@ const App = ({
     if (!fidelity || initialType === "year") return;
     let active = true;
     sharedYear.setMoverNames([]);
-    Promise.all([calculateTotalProfit(dateRange), new StableCoinsQuery().listAllStableCoins(), queryLatestAssets()]).then(([profit, stable, assets]) => {
+    Promise.all([calculateTotalProfit(dateRange), new StableCoinsQuery().listAllStableCoins(), queryLatestAssets(dateRange)]).then(([profit, stable, assets]) => {
       if (!active) return;
       const stableSymbols = new Set(stable);
       const holdings = new Map<string, number>();
@@ -556,7 +558,7 @@ const App = ({
     }
 
     if (fidelity) return (
-      oneSnapshot ? <div className="fidelity-empty fidelity-period-empty">{t("summary.fidelity.monthEmpty")}</div> :
+      oneSnapshot || unavailableReason ? <div className="fidelity-empty fidelity-period-empty">{unavailableReason || t("summary.fidelity.monthEmpty")}</div> :
       <div className="fidelity-month-grid">
         {monthCards.filter((item) => item.inRange).map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
@@ -615,7 +617,7 @@ const App = ({
   }
 
   function renderYearSummary() {
-    if (fidelity) return oneSnapshot ? <div className="fidelity-empty fidelity-period-empty">{t("summary.fidelity.yearEmpty")}</div> : <>
+    if (fidelity) return oneSnapshot || unavailableReason ? <div className="fidelity-empty fidelity-period-empty">{unavailableReason || t("summary.fidelity.yearEmpty")}</div> : <>
       <div className="fidelity-year-stack" data-paged={yearCards.length > 2}>{yearPaging.rows.map((item) => {
       const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
       const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;

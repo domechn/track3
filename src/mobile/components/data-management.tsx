@@ -477,7 +477,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
     <section className="fidelity-b-card fidelity-b-security-key">
       <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.security.keyTitle")}</h2>
         <p>{t("fidelity.b.security.keyHint")}</p></div>
-        <span className="fidelity-b-pill is-positive">{t("fidelity.b.security.inUse")}</span></div>
+        <span className="t3-tag" data-tone="positive">{t("fidelity.b.security.inUse")}</span></div>
       <div className="fidelity-b-security-kpis">
         <div><span>{t("fidelity.b.security.keyId")}</span><strong>—</strong></div>
         <div><span>{t("fidelity.b.security.created")}</span><strong>—</strong></div>
@@ -497,7 +497,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
     <section className="fidelity-b-card fidelity-b-security-recovery">
       <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.security.recovery")}</h2>
         <p>{t("fidelity.b.security.recoveryHint")}</p></div>
-        <span className="fidelity-b-pill">{syncStatus.mode === "ready"
+        <span className="t3-tag">{syncStatus.mode === "ready"
           ? t("fidelity.b.security.available") : t("fidelity.b.security.unavailable")}</span></div>
       <div className="fidelity-b-security-warning">
         <InfoCircledIcon aria-hidden="true" /><div><strong>{t("fidelity.b.security.keepRecovery")}</strong>
@@ -510,7 +510,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
     <section className="fidelity-b-card fidelity-b-security-lock">
       <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.security.appLock")}</h2>
         <p>{t("fidelity.b.security.appLockHint")}</p></div>
-        <span className="fidelity-b-pill">{t("fidelity.b.security.ios")}</span></div>
+        <span className="t3-tag">{t("fidelity.b.security.ios")}</span></div>
       <div className="fidelity-b-switch-row">
         <div><Label htmlFor="app-lock-switch">{t("fidelity.b.security.requireBiometric")}</Label>
           <p>{t("fidelity.b.security.requireBiometricHint")}</p></div>
@@ -829,7 +829,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
               {blacklist.map((symbol) => (
                 <div
                   key={symbol}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-background/30 px-3 py-1 text-sm"
+                  className="t3-tag" data-tone="outline"
                 >
                   <span>{symbol}</span>
                   <ConfirmDeleteDialog

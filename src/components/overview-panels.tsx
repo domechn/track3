@@ -14,18 +14,22 @@ import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store"
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
 import { sourceDisplayNames } from "./source-display-name";
+import { useCurrentSourceStatuses } from "./use-current-source-statuses";
 import { matchSourceStatus } from "./source-status-match";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { buildAssetDetailsPath } from "@/utils/assets";
 import { currencyWrapper } from "@/utils/currency";
+import { dailyChangeTooltip, type DailyChange } from "./daily-change-tooltip";
+import { useChartHitArea } from "./chart-tooltip";
 import { Card } from "./ui/card";
 import { deriveContributions, deriveOverviewSeries, selectBestDayContributionSnapshots, selectSevenDayContributionSnapshots, unavailableSources } from "./overview-derived";
 import { overviewRefreshRequestedEvent, sourceStatusesChangedEvent } from "./source-status-event";
 import { niceStep } from "./overview-chart-scale";
 import { directionClass, directionColorVar } from "@/utils/color";
+import AssetLabel from "./common/asset-label";
 import type { QuoteColor } from "@/middlelayers/types";
 
-type Change = { timestamp: number; value: number };
+type Change = DailyChange;
 type Contribution = { symbol: string; assetType: AssetType; value: number };
 type CoinRow = {
   symbol: string; assetType: AssetType; value: number; amount: number;
@@ -41,7 +45,8 @@ export function useOverviewPanelsData(dateRange: TDateRange, allTimeRange: TDate
   const [weekBased, setWeekBased] = useState(false);
   const [coins, setCoins] = useState<CoinRow[]>([]);
   const [sources, setSources] = useState<WalletAssetsPercentageData>([]);
-  const [statuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const [storedStatuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const statuses = useCurrentSourceStatuses(storedStatuses);
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   const allKey = `${allTimeRange.start.getTime()}-${allTimeRange.end.getTime()}`;
 
@@ -135,22 +140,24 @@ const signedMoney0 = (value: number, currency: CurrencyRateDetail) =>
   `${value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${Math.abs(Math.round(currencyWrapper(currency)(value))).toLocaleString()}`;
 const dayLabel = (timestamp: number, locale: string) => new Date(timestamp).toLocaleDateString(
   locale === "zh" ? "zh-CN" : "en-GB", { month: "short", day: "numeric" });
-const sourceMonogram = (label: string) => {
-  if (/^binance$/i.test(label)) return "BN";
-  if (/^ledger\b/i.test(label)) return "LD";
-  if (/^interactive brokers$/i.test(label)) return "IB";
-  if (/^0x/i.test(label)) return "0x";
-  return label.slice(0, 2).toUpperCase();
-};
-
 export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = false, quoteColor = "green-up-red-down" }: {
   currency: CurrencyRateDetail; daily: Change[]; bestDay?: Change; desktopFidelity?: boolean; quoteColor?: QuoteColor;
 }) {
   const { t, locale } = useTranslation();
+  const chart = useChartHitArea();
   const chartValue = desktopFidelity ? currencyWrapper(currency) : (value: number) => value;
   const peak = Math.max(1, ...daily.map((item) => Math.abs(chartValue(item.value))));
   const scale = niceStep(peak);
   const barScale = desktopFidelity ? scale : peak;
+  const scrub = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "touch") return;
+    const marks = [...event.currentTarget.querySelectorAll<HTMLElement>(".t3-daily-column")];
+    const index = marks.reduce((best, mark, candidate) =>
+      Math.abs(mark.getBoundingClientRect().left + mark.getBoundingClientRect().width / 2 - event.clientX) <
+        Math.abs(marks[best].getBoundingClientRect().left + marks[best].getBoundingClientRect().width / 2 - event.clientX)
+        ? candidate : best, 0);
+    chart.select(index, marks[index]);
+  };
   return <Card className="t3-overview-panel t3-daily-panel">
     <header className="t3-overview-panel-heading">
       <h2>{t("overview.design.dailyChange")}</h2>
@@ -159,7 +166,8 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
         : t("overview.design.lastSnapshots").replace("{count}", String(daily.length))}</span>
     </header>
     {daily.length ? <>
-      <div className="t3-daily-chart" role="img" aria-label={t("overview.design.dailyChart")}>
+      <div className="t3-daily-chart" role="group" aria-label={t("overview.design.dailyChart")} data-chart-group=""
+        onPointerDown={scrub} onPointerMove={scrub}>
         <div className="t3-daily-zero" />
         {desktopFidelity && <div className="t3-daily-y-axis" aria-hidden="true">
           {[scale, scale / 2, 0, -scale / 2, -scale].map((value) =>
@@ -168,11 +176,16 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
         {desktopFidelity && <div className="t3-daily-direction" aria-hidden="true">
           <span className={directionClass(1, quoteColor)}>▲ {t("overview.fidelity.up")}</span><span className={directionClass(-1, quoteColor)}>▼ {t("overview.fidelity.down")}</span>
         </div>}
-        {daily.map((item) => <div className="t3-daily-column" key={item.timestamp} title={`${dayLabel(item.timestamp, locale)}: ${signedMoney(item.value, currency)}`}>
+        {daily.map((item, index) => {
+          const detail = dailyChangeTooltip(item, currency, locale, quoteColor, t);
+          return <div role="button" className="t3-daily-column" key={item.timestamp}
+            {...chart.markProps(index, detail.label, detail.content)}
+            style={{ opacity: chart.active !== null && chart.active !== index ? .55 : 1 }}>
           <span className={item.value > 0 ? "t3-daily-up" : item.value < 0 ? "t3-daily-down" : "t3-daily-neutral"}
             data-direction={item.value > 0 ? "gain" : item.value < 0 ? "loss" : "neutral"}
             style={{ height: `${Math.max(2, Math.abs(chartValue(item.value)) / barScale * 48)}%`, backgroundColor: directionColorVar(item.value, quoteColor) }} />
-        </div>)}
+          </div>;
+        })}
         {desktopFidelity && <div className="t3-daily-x-axis" aria-hidden="true">
           <span />
           <span>{daily.length > 10 ? dayLabel(daily[9].timestamp, locale) : ""}</span>
@@ -181,6 +194,7 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
         </div>}
         <span className="sr-only">{daily.map((item) => `${dayLabel(item.timestamp, locale)} ${signedMoney(item.value, currency)}`).join(", ")}</span>
       </div>
+      {chart.tooltip}
       <div className="t3-panel-footnote">{bestDay && t("overview.design.bestDay")
         .replace("{day}", dayLabel(bestDay.timestamp, locale))
         .replace("{amount}", signedMoney(bestDay.value, currency))}</div>
@@ -192,9 +206,14 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
   currency: CurrencyRateDetail; rows: Contribution[]; count: number; weekBased?: boolean; desktopFidelity?: boolean; quoteColor?: QuoteColor;
 }) {
   const { t } = useTranslation();
+  const [page, setPage] = useState(0);
+  const chart = useChartHitArea();
   const net = rows.reduce((total, item) => total + item.value, 0);
   const orderedRows = weekBased ? [...rows].sort((a, b) =>
     Number(b.value >= 0) - Number(a.value >= 0) || Math.abs(b.value) - Math.abs(a.value)) : rows;
+  const pageCount = Math.max(1, Math.ceil(orderedRows.length / 8));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageStart = desktopFidelity ? currentPage * 8 : 0;
   const positivePeak = Math.max(0, ...orderedRows.map((item) => item.value));
   const negativePeak = Math.max(0, ...orderedRows.map((item) => -item.value));
   const zero = negativePeak / (positivePeak + negativePeak || 1) * 92 + 4;
@@ -206,10 +225,13 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
       {count > 0 && <span>{weekBased
         ? t("overview.fidelity.weekChange").replace("{value}", signedMoney0(net, currency))
         : t("overview.design.snapshotCount").replace("{count}", String(count))}</span>}</header>
-    {rows.length ? <ol className={`t3-moved-list${desktopFidelity ? " t3-moved-diverging" : ""}`}>
-      {orderedRows.slice(0, 8).map((row) => <li key={`${row.assetType}:${row.symbol}`}>
-        <Link to={buildAssetDetailsPath({ symbol: row.symbol, assetType: row.assetType })} className="t3-moved-symbol">{row.symbol}</Link>
-        <span className="t3-moved-track" style={desktopFidelity ? { "--zero": `${zero}%` } as CSSProperties : undefined}>
+    {rows.length ? <ol data-chart-group="" className={`t3-moved-list${desktopFidelity ? " t3-moved-diverging" : ""}`}>
+      {orderedRows.slice(pageStart, pageStart + 8).map((row, index) => <li key={`${row.assetType}:${row.symbol}`}>
+        <Link to={buildAssetDetailsPath({ symbol: row.symbol, assetType: row.assetType })} className="t3-moved-symbol"><AssetLabel asset={row} size={20} quiet /></Link>
+        <span className="t3-moved-track" role="button"
+          {...chart.markProps(index, `${row.symbol}: ${signedMoney(row.value, currency)}`,
+            `${row.symbol}: ${signedMoney(row.value, currency)}`)}
+          style={desktopFidelity ? { "--zero": `${zero}%` } as CSSProperties : undefined}>
           <span className={row.value >= 0 ? "t3-daily-up" : "t3-daily-down"} style={{
             backgroundColor: directionColorVar(row.value, quoteColor),
             width: `${row.value === 0 ? 0 : Math.max(2, desktopFidelity
@@ -221,6 +243,15 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
         <strong className={directionClass(row.value, quoteColor)}>{weekBased ? signedMoney0(row.value, currency) : signedMoney(row.value, currency)}</strong>
       </li>)}
     </ol> : <p className="t3-panel-empty">{t("overview.design.needTwoSnapshots")}</p>}
+    {desktopFidelity && pageCount > 1 && <nav className="t3-moved-pager" aria-label={t("overview.design.whatMoved")}>
+      <span>{t("overview.design.moversShowing")
+        .replace("{start}", String(pageStart + 1))
+        .replace("{end}", String(Math.min(pageStart + 8, orderedRows.length)))
+        .replace("{count}", String(orderedRows.length))}</span>
+      <button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>{t("common.prev")}</button>
+      <button type="button" disabled={currentPage === pageCount - 1} onClick={() => setPage(currentPage + 1)}>{t("common.next")}</button>
+    </nav>}
+    {chart.tooltip}
   </Card>;
 }
 
@@ -263,7 +294,7 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
           <small>{source.lastSuccessAt && source.status !== "ok"
             ? t("overview.design.lastGood").replace("{time}", new Date(source.lastSuccessAt).toLocaleString())
             : source.provider ?? ""}</small></span>
-        <span className={`t3-source-condition ${source.status}`}>{t(`refresh.status.${source.status}`)}</span>
+        <span className="t3-tag" data-tone={source.status === "ok" ? "positive" : source.status === "failed" ? "negative" : "warning"}>{t(`refresh.status.${source.status}`)}</span>
       </div>)}
     </div> : <p className="t3-panel-empty">{t("overview.design.sourceEmpty")}</p>}
     <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration">{t("overview.design.manageSources")}</a>
@@ -299,11 +330,10 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
         const status = matchSourceStatus({ id: source.wallet, label }, identities, statusSources, statuses);
         const kind = status?.kind ?? (source.walletType === "ibkr" ? "broker" : source.walletType === "binance" || source.walletType === "okx" ? "exchange" : "wallet");
         return <div key={source.wallet} className="t3-source-row">
-          <span className="t3-source-logo" aria-hidden="true">{sourceMonogram(label)}</span>
-          <span className="t3-source-name" title={source.wallet}><strong>{label}</strong>
-            <small>{t(`overview.fidelity.kind.${kind}`)} · <span className={`t3-source-dot ${status?.status ?? ""}`} /> {status?.status === "ok" && status.finishedAt
+          <span className="t3-source-name" title={source.wallet}><AssetLabel kind={kind === "others" ? "custom" : kind} type={source.walletType ?? status?.provider ?? label} name={label} size={24}
+            secondary={<>{t(`overview.fidelity.kind.${kind}`)} · <span className={`t3-source-dot ${status?.status ?? ""}`} /> {status?.status === "ok" && status.finishedAt
               ? `${t("overview.fidelity.updated")} ${new Date(status.finishedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })}`
-              : status?.status === "ok" ? t("refresh.status.ok") : !status ? t("overview.fidelity.snapshot") : null}</small>
+              : status?.status === "ok" ? t("refresh.status.ok") : !status ? t("overview.fidelity.snapshot") : null}</>} />
             {status && status.status !== "ok" && <small className="t3-source-last-good">{status.lastSuccessAt
               ? t(status.category === "quota" ? "overview.fidelity.quotaLastGood" : "overview.fidelity.failedLastGood")
                 .replace("{time}", new Date(status.lastSuccessAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }))
@@ -313,11 +343,11 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
               detail: { sourceId: status.sourceId },
             }))}><UpdateIcon aria-hidden="true" />{t("refresh.retryButton")}</button>}
           {currency && sources.length > 0 && <span className="t3-source-value"><strong>{money(source.value, currency)}</strong><small>{source.percentage.toFixed(1)}%</small></span>}
-          {!currency && status && <span className={`t3-source-condition ${status.status}`}>{t(`refresh.status.${status.status}`)}</span>}
+          {!currency && status && <span className="t3-tag" data-tone={status.status === "ok" ? "positive" : status.status === "failed" ? "negative" : "warning"}>{t(`refresh.status.${status.status}`)}</span>}
         </div>;
       })}
     </div> : <p className="t3-panel-empty">{t("overview.design.sourceEmpty")}</p>}
-    {!sources.length && <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration">{t("overview.design.manageSources")}</a>}
+    {listed.length < 3 && <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration">{t("overview.design.manageSources")}</a>}
   </Card>;
   return <section className="t3-overview-source-status" aria-label={t("overview.design.sources")}>
     {failed.length > 0 && <div role="alert" className="t3-source-banner">
@@ -369,9 +399,7 @@ export function TopCoinsCard({ currency, rows, compact = false, overviewFidelity
         {visible.map((row) => <Link data-testid="overview-coin-row" key={`${row.assetType}:${row.symbol}`}
           to={buildAssetDetailsPath({ symbol: row.symbol, assetType: row.assetType })}
           className={`t3-top-row${overviewFidelity ? " t3-top-fidelity-grid" : ""}`}>
-          {overviewFidelity
-            ? <span><strong>{row.symbol}</strong>{assetNames[row.symbol] && <small>{assetNames[row.symbol]}</small>}</span>
-            : <strong>{row.symbol}</strong>}
+          <AssetLabel asset={row} size={20} secondary={overviewFidelity ? assetNames[row.symbol] : undefined} quiet />
           <span>{row.rank === undefined ? "—" : `#${row.rank}`}</span>
           <span>{row.amount ? money(row.value / row.amount, currency) : "—"}</span>
           {overviewFidelity && <span className={tone(row.dayChange)}>{percent(row.dayChange)}</span>}

@@ -1,7 +1,16 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it } from "vitest";
 import { SummaryTopList } from "./summary-top-list";
 
+it("shows full mover amount and percent on the bar row", () => {
+  const { container } = render(<SummaryTopList heading="Top loss" rows={[
+    { assetType: "crypto", symbol: "SOL", value: -12_345.67, percentage: -4.82, stable: false },
+  ]} amount={(value) => `−$${Math.abs(value).toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+    tone={() => "loss"} />);
+  fireEvent.pointerEnter(container.querySelector(".summary-top-track")!, { pointerType: "mouse" });
+  expect(screen.getByRole("tooltip")).toHaveTextContent("−$12,345.67");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("−4.82%");
+});
 it("keeps ticker, bar, amount, and a bounded percentage in each row", () => {
   const { container } = render(<SummaryTopList heading="Top loss" rows={[
     { assetType: "stock", symbol: "1211.HK", value: -109_628, percentage: -1840.4, stable: false },
@@ -11,10 +20,12 @@ it("keeps ticker, bar, amount, and a bounded percentage in each row", () => {
   const rows = container.querySelectorAll(".summary-top-row");
   expect(rows).toHaveLength(2);
   expect(rows[0].children).toHaveLength(4);
+  expect(rows[0].querySelector(".summary-top-track")).toHaveAttribute("role", "cell");
   expect(rows[0].querySelector(".summary-top-track i")).toBeInTheDocument();
   expect(screen.getByText("<-999%")).toHaveAttribute("title", "−1,840.4%");
   expect(screen.getByText("<-999%")).toHaveAttribute("aria-label", "−1,840.4%");
   expect(container.querySelectorAll(".summary-top-axis")).toHaveLength(1);
+  expect(container.querySelectorAll(".summary-top-row .t3-asset-icon[data-size='20']")).toHaveLength(2);
 });
 
 it("shows no market P&L for stablecoin rows", () => {

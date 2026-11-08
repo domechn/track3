@@ -72,7 +72,7 @@ test("phone and iPad keep the Overview inset and approved card borders", async (
     await page.goto("/#/history");
     const records = page.locator(".history-records-card");
     await expect(records).toBeVisible();
-    await expect(records).toHaveCSS("border-left-width", width === 390 ? "1px" : "0px");
+    await expect(records).toHaveCSS("border-left-width", "1px");
 
     await page.goto("/#/summary");
     const metrics = page.locator(".fd-summary > .fd-card, .profit-metrics-card").first();
@@ -141,7 +141,7 @@ test("phone More badge keeps the standard icon clear and matches both plan scree
     const badge = (await tab.locator(".mobile-tab-badge").boundingBox())!;
     expect({ icon: [icon.x, Math.round(icon.y), icon.width, icon.height],
       badge: [badge.x, Math.round(badge.y), badge.width, badge.height] })
-      .toEqual({ icon: [338.125, 794, 20, 20], badge: [354.125, 790, 17, 16] });
+      .toEqual({ icon: [331.25, 796, 20, 20], badge: [347.25, 791, 17, 16] });
     await expect(page.locator(".mobile-tab-bar")).toHaveCSS("height", "60px");
   }
 });

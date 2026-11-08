@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { I18nProvider } from "@/i18n";
+import md5 from "md5";
+import type { CurrentSourceStatus } from "@/middlelayers/source-status-labels";
 import { SourceStatusCard } from "./overview-panels";
 import { overviewRefreshRequestedEvent } from "./source-status-event";
 
@@ -13,7 +15,7 @@ it("shows stored source balances and shares without adding fields to status reco
       { sourceId: "cex:0", label: "Binance", status: "ok", kind: "exchange", provider: "binance", finishedAt: "2026-10-31T09:41:00Z" },
     ]}
     sources={[
-      { wallet: "Binance", walletAlias: "Binance", walletType: "binance", amount: 2, value: 358418.17, percentage: 46.9, chartColor: "" },
+      { wallet: md5("binance-demo-key"), walletAlias: "Binance", walletType: "binance", amount: 2, value: 358418.17, percentage: 46.9, chartColor: "" },
     ]} />);
   const card = screen.getByText("Sources").closest(".t3-sources-panel") as HTMLElement;
   expect(card).toHaveTextContent("$358,418.17");
@@ -21,7 +23,8 @@ it("shows stored source balances and shares without adding fields to status reco
   expect(card).toHaveTextContent("Exchange");
   expect(card).toHaveTextContent("09:41");
   expect(card).toHaveTextContent("1 of 1 up to date");
-  expect(card.querySelector(".t3-source-logo")).toHaveTextContent("BN");
+  expect(card.querySelector(".t3-source-row .t3-asset-icon")).toHaveAttribute("data-kind", "exchange");
+  expect(card.querySelector(".t3-source-row .t3-asset-icon img")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Refresh all" }));
   expect(requested).toBe(1);
 });
@@ -42,10 +45,10 @@ it("matches an unaliased wallet status by its address hint", () => {
 it("shows the stored last good value and offers retry for a failed source", () => {
   render(<SourceStatusCard variant="card" desktopFidelity
     currency={{ currency: "USD", rate: 1, alias: "US Dollar", symbol: "$" }}
-    statuses={[{ sourceId: "ibkr:0", label: "Interactive Brokers", status: "failed",
-      kind: "broker", provider: "ibkr", lastSuccessAt: "2026-10-31T08:12:00Z",
+    statuses={[{ sourceId: "stock:0", label: "Interactive Brokers", status: "failed",
+      kind: "broker", provider: "Interactive Brokers", hint: "#1", lastSuccessAt: "2026-10-31T08:12:00Z",
       detail: "Source timed out" }]}
-    sources={[{ wallet: "Interactive Brokers", walletAlias: "Interactive Brokers", walletType: "ibkr",
+    sources={[{ wallet: md5("ibkr:query-id"), walletAlias: "Interactive Brokers", walletType: "ibkr",
       amount: 1, value: 65555.5, percentage: 8.6, chartColor: "" }]} />);
   const card = screen.getByText("Sources").closest(".t3-sources-panel") as HTMLElement;
   expect(card).toHaveTextContent("Interactive Brokers did not refresh");
@@ -54,16 +57,19 @@ it("shows the stored last good value and offers retry for a failed source", () =
   const failedRow = card.querySelector(".t3-source-row") as HTMLElement;
   expect(failedRow.querySelectorAll(".t3-source-name small")).toHaveLength(2);
   expect(failedRow.querySelector(".t3-source-name small:first-of-type")).toHaveTextContent("Broker");
-  expect(failedRow.querySelector(".t3-source-name small:last-of-type")).toHaveTextContent("Failed · last good 08:12");
+  expect(failedRow.querySelector(".t3-source-last-good")).toHaveTextContent("Failed · last good 08:12");
   expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
 });
 
 it("shows a quota source as quota limited and offers its plan action without retry", () => {
+  const walletId = md5("0x4f001234567890abcdef1234567890abcde0a91c");
+  const status: CurrentSourceStatus = { sourceId: "erc20:0", label: "0x4f…a91c", status: "failed",
+    kind: "wallet", provider: "ERC20", hint: "0x4f00…a91c", walletId,
+    category: "quota", lastSuccessAt: "2026-10-30T21:14:00Z" };
   render(<SourceStatusCard variant="card" desktopFidelity
     currency={{ currency: "USD", rate: 1, alias: "US Dollar", symbol: "$" }}
-    statuses={[{ sourceId: "erc20:0", label: "0x4f…a91c", status: "failed",
-      kind: "wallet", category: "quota", lastSuccessAt: "2026-10-30T21:14:00Z" }]}
-    sources={[{ wallet: "0x4f…a91c", walletAlias: "0x4f…a91c", walletType: "erc20",
+    statuses={[status]}
+    sources={[{ wallet: walletId, walletAlias: "0x4f…a91c", walletType: "erc20",
       amount: 1, value: 67437.9, percentage: 8.9, chartColor: "" }]} />);
   const card = screen.getByText("Sources").closest(".t3-sources-panel") as HTMLElement;
   expect(card).toHaveTextContent("Quota used · last good 21:14");

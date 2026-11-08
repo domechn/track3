@@ -16,12 +16,10 @@ import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
-  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useTranslation } from "@/mobile/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
-import { directionClass } from "@/utils/color";
 import { ListRow, useIsMobile } from "@/mobile/components/mobile";
 
 const PAGE_SIZE = 20;
@@ -139,20 +137,20 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
   function renderChangeBadge(change: number) {
     if (change > 0) {
       return (
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted ${directionClass(change)}`}>
+        <span className="t3-tag" data-tone="positive">
           ↑{change}
         </span>
       );
     }
     if (change < 0) {
       return (
-        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted ${directionClass(change)}`}>
+        <span className="t3-tag" data-tone="negative">
           ↓{Math.abs(change)}
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+      <span className="t3-tag">
         —
       </span>
     );
@@ -179,10 +177,8 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
                 </span>}>
                 <span className="flex min-w-0 items-center gap-1">
                   <span className="w-5 min-[400px]:w-8 shrink-0 font-mono text-xs text-muted-foreground">#{row.rank}</span>
-                  <img className="h-6 w-6 shrink-0 rounded-full"
-                    src={resolveAssetLogoSrc(asset, logoMap[logoKey])}
-                    alt={formatAssetLabel(asset)} />
-                  <AssetLabel asset={asset} labelClassName="truncate text-sm font-medium" badgeClassName="top-coins-rank-type" />
+                  <AssetLabel asset={asset} src={logoMap[logoKey]} size={20} quiet
+                    labelClassName="truncate text-sm font-medium" badgeClassName="top-coins-rank-type" />
                 </span>
               </ListRow>;
             })}
@@ -209,31 +205,9 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
                     #{row.rank}
                   </TableCell>
                   <TableCell className="py-1.5">
-                    <div className="flex items-center gap-2">
-                      <img
-                        className="w-[18px] h-[18px] rounded-full"
-                        src={resolveAssetLogoSrc(
-                          { symbol: row.coin, assetType: row.assetType },
-                          logoMap[
-                            getAssetLogoKey({
-                              symbol: row.coin,
-                              assetType: row.assetType,
-                            })
-                          ],
-                        )}
-                        alt={formatAssetLabel({
-                          symbol: row.coin,
-                          assetType: row.assetType,
-                        })}
-                      />
-                      <AssetLabel
-                        asset={{
-                          symbol: row.coin,
-                          assetType: row.assetType,
-                        }}
-                        labelClassName="font-medium text-sm"
-                      />
-                    </div>
+                    <AssetLabel asset={{ symbol: row.coin, assetType: row.assetType }}
+                      src={logoMap[getAssetLogoKey({ symbol: row.coin, assetType: row.assetType })]}
+                      size={20} quiet />
                   </TableCell>
                   <TableCell className="text-right py-1.5">
                     {renderChangeBadge(row.change)}

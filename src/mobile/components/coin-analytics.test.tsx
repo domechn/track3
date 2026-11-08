@@ -133,8 +133,8 @@ vi.mock("@/mobile/components/wallet-assets-percentage", () => ({
 }));
 
 vi.mock("@/components/common/asset-label", () => ({
-  default: ({ asset }: { asset: { symbol: string } }) => (
-    <span data-testid="asset-label">{asset.symbol}</span>
+  default: ({ asset, symbol, name }: { asset?: { symbol: string }; symbol?: string; name?: string }) => (
+    <span data-testid="asset-label">{name ?? asset?.symbol ?? symbol}</span>
   ),
 }));
 
@@ -750,8 +750,8 @@ async function openTransactionDialogByType(
     expect(mocks.listWalletAliases).toHaveBeenCalled();
   });
 
-  const transactionTypeCell = screen.getByText(transactionType);
-  const transactionRow = transactionTypeCell.closest("tr");
+  const transactionTypeCell = screen.getAllByText(transactionType).find((element) => element.closest("tr"));
+  const transactionRow = transactionTypeCell?.closest("tr");
   expect(transactionRow).not.toBeNull();
 
   const editButtons = within(transactionRow!).getAllByTestId(

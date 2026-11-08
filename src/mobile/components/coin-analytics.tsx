@@ -73,12 +73,12 @@ import { PartialProfitHint } from "@/components/profit-summary-hints";
 import { StaggerContainer, FadeUp } from "@/components/motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import AssetLabel from "@/components/common/asset-label";
+import AssetIcon from "@/components/ui/asset-icon";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
   parseAssetTypeSearchParam,
-  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import {
@@ -860,7 +860,7 @@ const App = ({
       <div className="d2-coin analyze-coin relative min-h-[400px]">
         {isMobile && <div className="coin-detail-hero">
           <div className="coin-detail-identity">
-            <img src={resolveAssetLogoSrc({ symbol, assetType }, logo)} alt="" />
+            <AssetIcon kind={assetType === "stock" ? "stock" : "coin"} symbol={symbol} src={logo} size={32} decorative />
             <button type="button" role="combobox" aria-label={`${t("coin.symbol")} ${formatAssetLabel({ symbol, assetType })}`}
               aria-expanded={coinSelectOpen} onClick={() => setCoinSelectOpen(true)}>
               {symbol}<CaretSortIcon aria-hidden="true" />
@@ -946,11 +946,6 @@ const App = ({
                 </CardHeader>
                 <CardContent>
                   <div className="flex">
-                    <img
-                      className="inline-block w-[32px] h-[32px] mr-2 rounded-full py-[2px]"
-                      src={resolveAssetLogoSrc({ symbol, assetType }, logo)}
-                      alt={formatAssetLabel({ symbol, assetType })}
-                    />
                     <div className="w-[100%] min-w-0 h-[32px] mobile-coin-selector">
                       <Popover
                         open={coinSelectOpen}
@@ -967,6 +962,8 @@ const App = ({
                             <div className="min-w-0">
                               <AssetLabel
                                 asset={{ symbol, assetType }}
+                                src={logo}
+                                size={32}
                                 className="max-w-full"
                                 labelClassName="truncate"
                               />

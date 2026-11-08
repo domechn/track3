@@ -21,12 +21,17 @@ Stored assets supply symbol, quantity, price and value. A local `price` edit cha
 
 ## Remaining differences
 
-The HTML source page is present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. A fresh app capture in `/tmp/fidelity/history-detail/` differs from the Chromium source render in `/tmp/fidelity/source-review/` by **1.33%** at 390 × 844, **3.22%** over the common 390 × 1251 pixels of the long pages, and **18.52%** over their full 1486 px source height. The missing source rows below the app's 1251 px height are the unsupported named Sources section described below. A pixel differs when its summed absolute RGB difference exceeds 48. Full-page captures hide the fixed tab bar so it does not cover AAPL.
+The HTML source page is present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. On 8 Nov 2026 it was re-rendered at 390 × 844 in Chromium with scrollbars hidden. `getBoundingClientRect()` places its detail at (16, 26) with width 358 px; `getComputedStyle()` reports 13/18 px text. The eight-asset branch capture before this merge in `/tmp/ui43-captures-phone/history-detail-phone.png` differs from `/tmp/ui43-source/records-history-detail-390x844.png` by **4.10%** of viewport pixels whose summed absolute RGB difference exceeds 48. The source full page is 1486 px tall; the app's fixed shell scrolls within its main area, so its `fullPage` screenshot captures only the 844 px viewport. The source's named Sources rows also cannot be represented with stored snapshot data, as explained below.
+
+The prior 8 Nov app viewport capture in `/tmp/fidelity/history-detail/history-detail-phone.png` differs from the Chromium source render in `/tmp/fidelity/source-review/records-history-detail.png` by **4.22%** at the same size and threshold. The shared selected tab treatment, absent from the static source, raised the earlier 1.85% ratio.
 
 Remaining visible differences, with product reasons:
 
+- The active History tab keeps the app-wide tinted background and indicator; the source has only an active icon.
+- Asset rows use the current shared AssetIcon marks, which differ from the older source art while preserving the stored ticker and type.
 - “5 of 5 sources” beneath Assets and the entire named Sources section are absent. Complete snapshots do not store per-source names, values, or refresh outcomes, so current configuration cannot reconstruct those historical facts.
 - “View assets” and its down chevron replace the source's “Edit” button and pencil. They accurately describe the available shortcut because the product has no snapshot editor. Existing per-asset actions remain available.
 - The source's blue asset values with “was …” and the “changes the total by …” summary require per-field asset edits that the product does not store. The app shows a transaction price edit and a symbol-free imported replacement in the general log, with “2 edits” in the heading and no invented total delta.
 - The AAPL price edit matches the source label, value and time. The second stored record is an imported snapshot replacement rather than the source's invented USDC quantity edit, so its label and values differ. Both sides of its summary use the selected currency and cents, and the text wraps within the card.
 - The phone detail retains the shared sync lock/status control so the existing unlock and sync flow remains reachable and its state visible; the reference has no sync control.
+- A real 47-asset snapshot initially shows 12 assets, section chips, and a Show all control. The supplied source detail contains eight assets and has no corresponding large-snapshot screen.

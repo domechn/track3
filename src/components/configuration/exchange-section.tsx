@@ -1,3 +1,4 @@
+import AssetLabel from "@/components/common/asset-label";
 import { memo } from "react";
 import {
   Table,
@@ -40,17 +41,20 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
-import { getWalletLogo } from "@/lib/utils";
 import { maskSensitive } from "@/utils/attach-to";
 import type { ExchangeSectionProps } from "./types";
 import { PublicIpInfo } from "./public-ip-info";
 import { BackpackIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
+import { AliasRename } from "./alias-rename";
+import { sourceAliasFallback } from "@/components/source-display-name";
 
 const CONFIG_LIST_PAGE_SIZE = 30;
 
 const ExchangeSection = memo(function ExchangeSection({
   exchanges,
+  renameNames,
+  renameOffset = 0,
   visibleExchanges,
   exchangePage,
   exchangePageCount,
@@ -66,6 +70,7 @@ const ExchangeSection = memo(function ExchangeSection({
   onToggleActive,
   onRemove,
   onQuickLook,
+  onRename,
 }: ExchangeSectionProps) {
   const { t } = useTranslation();
 
@@ -135,11 +140,7 @@ const ExchangeSection = memo(function ExchangeSection({
                         <SelectLabel>{t("config.cex")}</SelectLabel>
                         {cexOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            <img
-                              className="h-4 w-4 text-muted-foreground inline-block mr-2"
-                              src={getWalletLogo(o.value)}
-                            />
-                            {o.label}
+                            <AssetLabel kind="exchange" type={o.value} name={o.label} size={20} />
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -289,7 +290,7 @@ const ExchangeSection = memo(function ExchangeSection({
                   <TableHead className="w-[120px]">
                     {t("config.status")}
                   </TableHead>
-                  <TableHead className="w-[84px] text-right">
+                  <TableHead className="w-[140px] text-right">
                     {t("config.actions")}
                   </TableHead>
                 </TableRow>
@@ -301,20 +302,10 @@ const ExchangeSection = memo(function ExchangeSection({
                     className="h-[42px] group align-middle"
                   >
                     <TableCell className="w-[170px]">
-                      <div className="flex items-center gap-2 text-sm">
-                        <img
-                          className="w-[18px] h-[18px] rounded-full"
-                          src={getWalletLogo(ex.type)}
-                          alt={ex.type}
-                        />
-                        <span className="truncate">
-                          {cexOptions.find((c) => c.value === ex.type)?.label ??
-                            ex.type}
-                        </span>
-                      </div>
+                      <AssetLabel kind="exchange" type={ex.type} name={cexOptions.find((c) => c.value === ex.type)?.label ?? ex.type} size={24} />
                     </TableCell>
                     <TableCell className="w-[170px] text-sm">
-                      {ex.alias || `${ex.type}-${idx + 1}`}
+                      <span className="block truncate" title={ex.alias || `${ex.type}-${idx + 1}`}>{ex.alias || `${ex.type}-${idx + 1}`}</span>
                     </TableCell>
                     <TableCell className="w-[220px] text-xs text-muted-foreground">
                       <p className="truncate">{maskSensitive(ex.apiKey)}</p>
@@ -334,8 +325,12 @@ const ExchangeSection = memo(function ExchangeSection({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="w-[84px] text-right">
-                      <div className="inline-flex w-[64px] items-center justify-end gap-1">
+                    <TableCell className="w-[140px] text-right">
+                      <div className="inline-flex items-center justify-end gap-1">
+                        <AliasRename alias={ex.alias} name={ex.alias || `${ex.type}-${idx + 1}`}
+                          fallback={sourceAliasFallback("exchange", ex.type)} index={renameOffset + exchanges.indexOf(ex)}
+                          names={renameNames ?? exchanges.map((item) => item.alias || sourceAliasFallback("exchange", item.type, item.apiKey))}
+                          onRename={(alias) => onRename?.(ex.type, ex.apiKey, alias)} />
                         {isPro && (
                           <Button
                             size="icon"

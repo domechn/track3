@@ -5,6 +5,8 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
 import { currencyWrapper } from "@/utils/currency";
+import { roundedSummaryBreakdown } from "@/middlelayers/summary-breakdown";
+import { selectSummaryRange } from "@/middlelayers/summary-range";
 import SummaryProfitLoss from "./summary-profit-loss";
 import AthValue from "./ath-value";
 import ProfitSummary from "./profit-summary";
@@ -30,9 +32,6 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
 }) {
   const { t, locale } = useTranslation();
   const setSummaryLoading = useContext(SummaryLoadingContext);
-  const money = (value: number) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 0, maximumFractionDigits: 0,
-  }).format(Math.abs(currencyWrapper(currency)(value)))}`;
   const dataVersion = useDataChangedVersion();
   const [loading, setLoading] = useState(true);
   const [subtitle, setSubtitle] = useState("");
@@ -43,7 +42,12 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   const hasValidRange = dateRange.start.getTime() > new Date("1970-01-01").getTime() &&
     dateRange.end.getTime() >= dateRange.start.getTime();
-  const oneSnapshot = dateRange.start.getTime() === dateRange.end.getTime();
+  const { availableDates, label: rangePreset } = useContext(SummaryFidelityRangeContext);
+  const selectedRange = useMemo(() => selectSummaryRange(availableDates, dateRange), [availableDates, rangeKey]);
+  const oneSnapshot = selectedRange.databaseCount < 2;
+  const rangeLabel = rangePreset === "custom"
+    ? `${new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "2-digit", month: "short" }).format(dateRange.start)} - ${new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "2-digit", month: "short" }).format(dateRange.end)}`
+    : rangePreset;
 
   useEffect(() => { setSummaryLoading(loading); }, [loading, setSummaryLoading]);
   useEffect(() => () => { setSummaryLoading(false); }, [setSummaryLoading]);
@@ -61,16 +65,19 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
     if (!hasValidRange || oneSnapshot) return;
     queryAttribution(dateRange).then((data) => {
       if (!active) return;
-      const totals = data.attribution.totals;
-      setSubtitleEmphasis(money(totals.priceEffect));
-      setSubtitle(t("summary.fidelity.fullSubtitleAdditive")
-        .replace("{market}", money(totals.priceEffect))
-        .replace("{gain}", money(totals.totalChange).replace(/^\+/, ""))
-        .replace("{date}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(dateRange.start))
-        .replace("{deposits}", `${currency.symbol}${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(currencyWrapper(currency)(totals.flowEffect))}`));
+      const amounts = roundedSummaryBreakdown(data.attribution.totals, currencyWrapper(currency)(1));
+      const displayValue = (amount: number) => `${amount < 0 ? "−" : ""}${currency.symbol}${new Intl.NumberFormat("en-US").format(Math.abs(amount))}`;
+      const displaySigned = (amount: number) => `${amount > 0 ? "+" : ""}${displayValue(amount)}`;
+      setSubtitleEmphasis(displaySigned(amounts.market));
+      setSubtitle(t(amounts.other === 0 ? "summary.fidelity.fullSubtitleAdditive" : "summary.fidelity.fullSubtitleAdditiveOther")
+        .replace("{market}", displaySigned(amounts.market))
+        .replace("{gain}", displayValue(amounts.gain))
+        .replace("{date}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(selectedRange.baseline ?? dateRange.start))
+        .replace("{deposits}", displayValue(amounts.added))
+        .replace("{other}", displayValue(amounts.other)));
     }).catch(() => {});
     return () => { active = false; };
-  }, [rangeKey, dataVersion, hasValidRange, oneSnapshot, t, locale]);
+  }, [rangeKey, dataVersion, hasValidRange, oneSnapshot, t, locale, selectedRange.baseline?.getTime()]);
 
   const reportLoaded = useCallback(() => {
     loaded.current += 1;
@@ -98,12 +105,17 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
       </header>
       {!hasValidRange ? <div className="fidelity-card fidelity-empty">{t("summary.noData")}</div> : <>
         <div className="fidelity-summary-grid" style={loading ? { visibility: "hidden", position: "absolute", inset: 0, height: 0, overflow: "hidden", pointerEvents: "none" } : undefined}>
-          <SummaryProfitLoss currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
+          <SummaryProfitLoss currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot}
+            baseline={selectedRange.baseline} snapshotCount={selectedRange.snapshots.length} rangeLabel={rangeLabel} />
           <AthValue fidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor} />
-          <ProfitSummary fidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
-          <ProfitSummary fidelity initialType="year" currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
-          <SummaryMarketCard mode="attribution" currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
-          <SummaryMarketCard mode="leaders" currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot} />
+          <ProfitSummary fidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot}
+            unavailableReason={!oneSnapshot && !selectedRange.baseline ? t("summary.fidelity.noBaselineRange").replace("{range}", rangeLabel) : undefined} />
+          <ProfitSummary fidelity initialType="year" currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot}
+            unavailableReason={!oneSnapshot && !selectedRange.baseline ? t("summary.fidelity.noBaselineRange").replace("{range}", rangeLabel) : undefined} />
+          <SummaryMarketCard mode="attribution" currency={currency} dateRange={dateRange} quoteColor={quoteColor}
+            baseline={selectedRange.baseline} rangeLabel={rangeLabel} oneSnapshot={oneSnapshot} />
+          <SummaryMarketCard mode="leaders" currency={currency} dateRange={dateRange} quoteColor={quoteColor}
+            baseline={selectedRange.baseline} rangeLabel={rangeLabel} oneSnapshot={oneSnapshot} />
         </div>
         {loading && <div className="fidelity-summary-grid" role="status" aria-label={t("summary.fidelity.loadingSubtitle")}>
           <SkeletonCard kind="pnl" title={t("summary.fidelity.profitLoss")} caption={cardCaption} />
