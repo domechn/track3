@@ -164,7 +164,10 @@ export default function RebalanceDesktop(props: Props) {
           <span>{t("rebalance.fidelity.asset")}</span><span>{t("rebalance.fidelity.currentVsTarget")}</span>
           <span>{t("rebalance.fidelity.current")}</span><span>{t("rebalance.fidelity.target")}</span><span>{t("rebalance.fidelity.drift")}</span>
         </div>
-        {props.loading ? <div className="t3-fidelity-empty" role="status">{t("rebalance.fidelity.loading")}</div> : allocation.map((row, index) => {
+        {props.loading ? <div className="t3-fidelity-empty" role="status">{t("rebalance.fidelity.loading")}</div>
+          : allocation.length === 0 ? <div className="t3-fidelity-empty t3-fidelity-allocation-empty">
+            <b>{t("rebalance.fidelity.noAssets")}</b><span>{t("rebalance.fidelity.addSourceHint")}</span>
+          </div> : allocation.map((row, index) => {
           const targetIndex = targets.indexOf(row.target!);
           const detail = <div><strong>{row.symbol}</strong><div>{t("rebalance.fidelity.current")} {fixed(row.current, 2)}%</div>
             <div>{t("rebalance.fidelity.target")} {row.target ? `${fixed(row.target.percent, 2)}%` : "–"}</div>

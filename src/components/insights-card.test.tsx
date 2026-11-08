@@ -66,6 +66,32 @@ describe("InsightsCard", () => {
     expect(takePendingAssistantQuestion()?.question)
       .toContain("BTC drove the week");
   });
+  it("shows three saved Overview insights at first and reveals the full summary on request", async () => {
+    vi.mocked(loadInsightCard).mockResolvedValue({ ...card,
+      summary: ["First idea", "Second idea", "Third idea", "Fourth idea", "Fifth idea"].join("\n"),
+      summaryLocale: "en", summarySnapshotUuid: "snapshot-a" });
+    vi.mocked(loadAIConfig).mockResolvedValue({} as never);
+    render(<InsightsCard overviewFidelity />);
+    const region = await screen.findByRole("region", { name: "AI insights" });
+    expect(region.querySelectorAll(".t3-insights-summary-lines > div")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "Show all (5)" }));
+    expect(region.querySelectorAll(".t3-insights-summary-lines > div")).toHaveLength(5);
+    fireEvent.click(screen.getByRole("button", { name: "Show fewer" }));
+    expect(region.querySelectorAll(".t3-insights-summary-lines > div")).toHaveLength(3);
+  });
+  it("shows three Overview alerts at first and reveals the rest on request", async () => {
+    vi.mocked(loadInsightCard).mockResolvedValue({ ...card,
+      insights: Array.from({ length: 5 }, (_, index) => ({
+        id: `asset:${index}`, severity: "info" as const, messageKey: "insights.newAsset",
+        data: { symbol: `ASSET${index}`, value: index + 1 },
+      })) });
+    vi.mocked(loadAIConfig).mockResolvedValue({} as never);
+    render(<InsightsCard overviewFidelity />);
+    const region = await screen.findByRole("region", { name: "Insights" });
+    expect(region.querySelectorAll("[id^='insight-']")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "Show all (5)" }));
+    expect(region.querySelectorAll("[id^='insight-']")).toHaveLength(5);
+  });
   it("keeps a saved summary visible when AI settings are temporarily unavailable", async () => {
     vi.mocked(loadInsightCard).mockResolvedValue({ ...card,
       summary: "BTC drove the week", summaryLocale: "en", summarySnapshotUuid: "snapshot-a" });

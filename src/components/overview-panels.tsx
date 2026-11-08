@@ -211,10 +211,14 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
   currency: CurrencyRateDetail; rows: Contribution[]; count: number; weekBased?: boolean; desktopFidelity?: boolean; quoteColor?: QuoteColor;
 }) {
   const { t } = useTranslation();
+  const [page, setPage] = useState(0);
   const chart = useChartHitArea();
   const net = rows.reduce((total, item) => total + item.value, 0);
   const orderedRows = weekBased ? [...rows].sort((a, b) =>
     Number(b.value >= 0) - Number(a.value >= 0) || Math.abs(b.value) - Math.abs(a.value)) : rows;
+  const pageCount = Math.max(1, Math.ceil(orderedRows.length / 8));
+  const currentPage = Math.min(page, pageCount - 1);
+  const pageStart = desktopFidelity ? currentPage * 8 : 0;
   const positivePeak = Math.max(0, ...orderedRows.map((item) => item.value));
   const negativePeak = Math.max(0, ...orderedRows.map((item) => -item.value));
   const zero = negativePeak / (positivePeak + negativePeak || 1) * 92 + 4;
@@ -227,7 +231,7 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
         ? t("overview.fidelity.weekChange").replace("{value}", signedMoney0(net, currency))
         : t("overview.design.snapshotCount").replace("{count}", String(count))}</span>}</header>
     {rows.length ? <ol data-chart-group="" className={`t3-moved-list${desktopFidelity ? " t3-moved-diverging" : ""}`}>
-      {orderedRows.slice(0, 8).map((row, index) => <li key={`${row.assetType}:${row.symbol}`}>
+      {orderedRows.slice(pageStart, pageStart + 8).map((row, index) => <li key={`${row.assetType}:${row.symbol}`}>
         <Link to={buildAssetDetailsPath({ symbol: row.symbol, assetType: row.assetType })} className="t3-moved-symbol">{row.symbol}</Link>
         <span className="t3-moved-track" role="button"
           {...chart.markProps(index, `${row.symbol}: ${signedMoney(row.value, currency)}`,
@@ -244,6 +248,14 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
         <strong className={directionClass(row.value, quoteColor)}>{weekBased ? signedMoney0(row.value, currency) : signedMoney(row.value, currency)}</strong>
       </li>)}
     </ol> : <p className="t3-panel-empty">{t("overview.design.needTwoSnapshots")}</p>}
+    {desktopFidelity && pageCount > 1 && <nav className="t3-moved-pager" aria-label={t("overview.design.whatMoved")}>
+      <span>{t("overview.design.moversShowing")
+        .replace("{start}", String(pageStart + 1))
+        .replace("{end}", String(Math.min(pageStart + 8, orderedRows.length)))
+        .replace("{count}", String(orderedRows.length))}</span>
+      <button type="button" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>{t("common.prev")}</button>
+      <button type="button" disabled={currentPage === pageCount - 1} onClick={() => setPage(currentPage + 1)}>{t("common.next")}</button>
+    </nav>}
     {chart.tooltip}
   </Card>;
 }
@@ -341,7 +353,7 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
         </div>;
       })}
     </div> : <p className="t3-panel-empty">{t("overview.design.sourceEmpty")}</p>}
-    {!sources.length && <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration">{t("overview.design.manageSources")}</a>}
+    {listed.length < 3 && <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration">{t("overview.design.manageSources")}</a>}
   </Card>;
   return <section className="t3-overview-source-status" aria-label={t("overview.design.sources")}>
     {failed.length > 0 && <div role="alert" className="t3-source-banner">

@@ -57,6 +57,8 @@
 .t3-fidelity-kpis strong[data-tone="warning"] { color: #d9a441; }
 .t3-fidelity-kpis small { display: block; color: #b4b6bc; font-size: 12px; line-height: 18px; white-space: nowrap; }
 .t3-fidelity-allocation,.t3-fidelity-trades { grid-column: span 8; }
+.t3-fidelity-allocation { display: flex; flex-direction: column; }
+.t3-fidelity-allocation-empty { flex: 1; }
 .t3-fidelity-rules,.t3-fidelity-result { grid-column: span 4; }
 .t3-fidelity-card-head { display: flex; align-items: baseline; gap: 12px; min-height: 20px; margin-bottom: 12px; }
 .t3-fidelity-card-head h2,.t3-fidelity-heading-button { margin: 0; padding: 0; border: 0; background: transparent; color: #fff; font-size: 15px; line-height: 20px; font-weight: 600; }

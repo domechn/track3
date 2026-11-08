@@ -15,6 +15,26 @@ const sizes = [
   { width: 430, height: 932 },
 ];
 
+test("review: phone assistant summary switch remains beside its label", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  try {
+    const page = await context.newPage();
+    await installTauriBridge(page, { fidelitySample: "full" });
+    await page.goto("/#/settings/assistant", { waitUntil: "domcontentloaded" });
+    const label = page.locator("label[for='assistant-insight-summary']");
+    const control = page.locator("#assistant-insight-summary");
+    await expect(label).toBeVisible({ timeout: 30_000 });
+    const labelBox = (await label.boundingBox())!;
+    const controlBox = (await control.boundingBox())!;
+    expect(await control.locator("..").evaluate((element) => getComputedStyle(element).flexDirection)).toBe("row");
+    expect(controlBox.x).toBeGreaterThan(labelBox.x + labelBox.width);
+    expect(controlBox.y).toBeLessThan(labelBox.y + labelBox.height + 16);
+  } finally {
+    await context.close();
+  }
+});
+
 test("data screens expose grouped history and analytics destinations", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true });
   const page = watchPage(await context.newPage());

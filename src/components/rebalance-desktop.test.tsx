@@ -23,6 +23,13 @@ function props(overrides: Partial<ComponentProps<typeof RebalanceDesktop>> = {})
   };
 }
 
+it("fills the allocation card with guidance when a new portfolio has no assets", () => {
+  render(<RebalanceDesktop {...props({ holdings: [], targets: [] })} />);
+  expect(screen.getByText("No assets to allocate yet")).toBeInTheDocument();
+  expect(screen.getByText("Add a source and refresh to see its assets here.")).toBeInTheDocument();
+  expect(document.querySelector(".t3-fidelity-allocation-empty")).toBeInTheDocument();
+});
+
 it("shows and changes stored mode, injected cash, and custom ignore threshold", () => {
   const onMode = vi.fn();
   const onInjectedCash = vi.fn();
