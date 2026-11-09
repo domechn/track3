@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
 
+test.use({ reducedMotion: "reduce" });
+
 const sources = Array.from({ length: 16 }, (_, index) => `Source ${String(index + 1).padStart(2, "0")}`);
 const coins = Array.from({ length: 47 }, (_, index) => `COIN${String(index + 1).padStart(2, "0")}`);
 
