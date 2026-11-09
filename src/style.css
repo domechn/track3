@@ -526,7 +526,7 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
   body:not(:has(.app-layout)) .t3-daily-direction span { position: absolute; left: 0; white-space: nowrap; }
   body:not(:has(.app-layout)) .t3-daily-direction span:first-child { top: -22px; }
   body:not(:has(.app-layout)) .t3-daily-direction span:last-child { bottom: -25px; }
-  body:not(:has(.app-layout)) .t3-moved-diverging { grid-template-columns: 58px minmax(0, 1fr) minmax(84px, max-content); }
+  body:not(:has(.app-layout)) .t3-moved-diverging { grid-template-columns: 58px minmax(0, 1fr) minmax(92px, max-content); }
   body:not(:has(.app-layout)) .t3-moved-diverging li { grid-column: 1 / -1; grid-template-columns: subgrid; gap: 0; }
   body:not(:has(.app-layout)) .t3-moved-diverging li > strong { margin-left: 12px; }
   body:not(:has(.app-layout)) .t3-moved-diverging .t3-moved-track { position: relative; left: -3px; padding-left: 0; overflow: visible; }
@@ -675,12 +675,36 @@ body:not(:has(.app-layout)) .t3-grid-moved > .t3-overview-panel { height: 100%; 
 .t3-daily-column .t3-daily-up { bottom: 50%; }
 .t3-daily-column .t3-daily-down { top: 50%; }
 .t3-daily-column .t3-daily-neutral { bottom: 50%; }
-.t3-moved-list { display: grid; gap: 12px; }
-.t3-moved-list li { display: grid; grid-template-columns: 54px minmax(0, 1fr) minmax(92px, max-content); align-items: center; gap: 8px; font-size: 12px; }
-.t3-moved-symbol { color: hsl(var(--foreground)); font-weight: 600; }
+.t3-moved-list { display: grid; grid-template-columns: minmax(64px, max-content) minmax(80px, 1fr) max-content; gap: 12px 8px; }
+.t3-moved-list li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; column-gap: 8px; font-size: 12px; }
+@supports not (grid-template-columns: subgrid) {
+  .t3-moved-list li { display: contents; }
+  .t3-moved-list li > * { align-self: center; }
+}
+.t3-moved-symbol { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: hsl(var(--foreground)); font-weight: 600; }
 .t3-moved-track { height: 6px; overflow: hidden; border-radius: 4px; background: hsl(var(--secondary)); }
 .t3-moved-track span { display: block; height: 100%; }
 .t3-moved-list strong { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.t3-signed-unit,
+:is(.t3-holdings-row, .t3-top-row) > span:not(:first-child),
+.summary-top-row > :is(strong, small),
+.t3-cmp-movers li > :is(span:not(.t3-cmp-mover-track), small),
+.t3-wallet-movers > div > span:last-child,
+.fidelity-change-abs, .fidelity-change-percent,
+.fidelity-history-detail-kpis strong,
+.coin-fidelity-metric > strong,
+:is(.t3-goals-summary, .t3-rebalance-summary) strong,
+.fidelity-attribution-row > span:nth-child(n+3),
+.fidelity-summary-pnl-kpis strong,
+.fidelity-metric strong,
+.t3-fidelity-num,
+[data-chart-tooltip] strong {
+  flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: normal;
+}
+.t3-pnl-compact-card > div > div > div > div:nth-child(2),
+.t3-daily-y-axis span {
+  flex: none; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
 .t3-top-sort { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: 999px; background: hsl(var(--secondary)); }
 .t3-top-sort button { min-height: 25px; padding: 0 8px; border-radius: 999px; color: hsl(var(--muted-foreground)); font-size: 11px; }
 .t3-top-sort button[aria-pressed="true"] { color: hsl(var(--foreground)); background: var(--nav-selected-background); }
@@ -1417,8 +1441,8 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-year-item[data-partial="true"] .fidelity-year-head { padding-right: 40px; }
 .fidelity-month-head b, .fidelity-year-head b { color: #fff; font-size: 15px; font-weight: 600; }
 .fidelity-month-head > span, .fidelity-year-head > span { color: #9b9da3; font-size: 13px; }
-.fidelity-month-value { margin-top: 6px; font-size: 17px; line-height: 24px; font-weight: 500; font-variant-numeric: normal; }
-.fidelity-month-percent { color: #b4b6bc; font-size: 12px; }
+.fidelity-month-value { margin-top: 6px; font-size: 17px; line-height: 24px; font-weight: 500; font-variant-numeric: normal; white-space: nowrap; }
+.fidelity-month-percent { color: #b4b6bc; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fidelity-month-bar { position: relative; height: 4px; margin-top: 8px; }
 .fidelity-month-bar::before { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: #3a3a3e; }
 .fidelity-month-bar i { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
@@ -1436,11 +1460,11 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-year-breakdown-badge { margin-top: 48px; }
 .fidelity-year-card.selected { border-color: hsl(var(--accent-data)); background: var(--nav-selected-background); color: hsl(var(--foreground)); }
 .fidelity-year-card strong { margin-top: 6px; font-size: 22px; line-height: 28px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.fidelity-year-percent { color: #b4b6bc; font-size: 12px; }
+.fidelity-year-percent { color: #b4b6bc; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fidelity-year-deposits { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 9px 0; color: #b4b6bc; }
 .fidelity-year-card:has(.fidelity-year-unrecorded) .fidelity-year-deposits { margin-top: 1px; padding: 4px 0; }
 .fidelity-year-deposits span:last-child { color: #fff; }
-.fidelity-summary :is(.fidelity-kpis strong, .fidelity-month-value, .fidelity-year-card strong, .fidelity-year-deposits span:last-child) { white-space: nowrap; }
+.fidelity-summary :is(.fidelity-kpis strong, .fidelity-month-value, .fidelity-year-card strong, .fidelity-year-deposits span:last-child) { white-space: nowrap; overflow-wrap: normal; }
 .fidelity-year-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; padding-top: 4px; color: #9b9da3; font-size: 12px; }
 .fidelity-year-deposits span, .fidelity-year-foot span { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .fidelity-pnl-hint { align-self: flex-start; }
@@ -3664,9 +3688,13 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .t3-wallet-status-retry button { height: 28px; padding: 0 11px; font-size: 12px; }
   .t3-wallet-status-retry span { color: hsl(var(--faint)); font-size: 12px; }
   .t3-wallet-moved, .t3-wallet-grid:not(:has(.t3-wallet-matrix)) .t3-wallet-side { display: flex; flex-direction: column; }
-  .t3-wallet-movers { display: grid; grid-auto-rows: auto; }
+  .t3-wallet-movers { display: grid; grid-template-columns: minmax(64px,max-content) minmax(80px,1fr) max-content; grid-auto-rows: minmax(40px,auto); column-gap: 12px; }
   .t3-wallet-grid:has(.t3-wallet-matrix) .t3-wallet-movers { flex: 1; grid-auto-rows: minmax(40px, 1fr); }
-  .t3-wallet-movers > div { display: grid; grid-template-columns: 88px minmax(0,1fr) 84px; align-items: center; gap: 12px; min-height: 40px; }
+  .t3-wallet-movers > div { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; column-gap: 12px; min-height: 40px; }
+  @supports not (grid-template-columns: subgrid) {
+    .t3-wallet-movers > div { display: contents; }
+    .t3-wallet-movers > div > * { align-self: center; }
+  }
   .t3-wallet-movers strong { font-weight: 600; }
   .t3-wallet-movers > div > span:last-child { text-align: right; }
   .t3-wallet-mover-track { position: relative; height: 12px; }
@@ -3693,7 +3721,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   .t3-wallet-grid:has(.t3-wallet-balances tbody tr:only-child):not(:has(.t3-wallet-matrix)) :is(.t3-wallet-balances, .t3-wallet-side) { height: auto; }
   .t3-wallet-grid:has(.t3-wallet-balances tbody tr:only-child):not(:has(.t3-wallet-matrix)) .t3-wallet-table-scroll { flex: none; }
   .t3-wallet-grid:has(.t3-wallet-balances tbody tr:only-child):not(:has(.t3-wallet-matrix)) .t3-wallet-balances table { height: auto; }
-  .t3-wallet-grid:has(.t3-wallet-balances tbody tr:only-child):not(:has(.t3-wallet-matrix)) .t3-wallet-movers { flex: none; grid-auto-rows: auto; }
+  .t3-wallet-grid:has(.t3-wallet-balances tbody tr:only-child):not(:has(.t3-wallet-matrix)) .t3-wallet-movers { flex: none; grid-auto-rows: minmax(40px,auto); }
   .t3-wallet-empty { border: 1px dashed hsl(var(--control)); border-radius: 6px; padding: 28px; color: hsl(var(--muted-foreground)); text-align: center; }
 }
 @media (min-width: 1400px) {
@@ -4195,7 +4223,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-metric { display: flex; flex-direction: column; min-width: 0; padding: 0 20px; border-left: 1px solid var(--f-border); }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-metric:first-child { padding-left: 0; border-left: 0; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-metric > span { color: var(--f-faint); font-size: 12px; }
-:where(body:has(.t3-records-fidelity-shell)) .fidelity-metric strong { margin-top: 2px; font-size: 22px; line-height: 28px; font-weight: 500; font-variant-numeric: normal; overflow-wrap: anywhere; }
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-metric strong { margin-top: 2px; font-size: 22px; line-height: 28px; font-weight: 500; font-variant-numeric: normal; white-space: nowrap; overflow-wrap: normal; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-metric small { color: var(--f-muted); font-size: 12px; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-kpi-secondary .fidelity-metric strong { color: var(--shell-faint); font-size: 17px; line-height: 22px; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-holding-row { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--f-rule); }

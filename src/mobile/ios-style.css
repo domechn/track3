@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+.t3-signed-unit { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: normal; }
+.overview-pnl-metric-value, .overview-pnl-metric-amount,
+:is(.fd-overview-mover, .fd-wallet-mover, .fd-comparison-mover) > :is(strong, small),
+.fd-overview-row > small:last-child,
+.fd-month :is(strong, small),
+.fd-year :is(strong, small),
+.fd-attr-row > strong,
+.fd-coin-metric strong,
+.history-mobile-snapshot-delta,
+.profit-metric-value,
+.fd-comparison-total > :is(strong, small),
+.fd-comparison-asset > :is(strong, span:nth-of-type(2)),
+.fd-comparison-kpis strong,
+.ios-d3-goals strong,
+.pf-rebalance :is(.pf-kpi strong, .pf-drift, .pf-current, .pf-trade-row strong, .pf-trade-net strong),
+[data-chart-tooltip] strong {
+  flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: normal;
+}
+
 .ios-safe-area {
   padding: var(--mobile-safe-top) var(--mobile-safe-right) var(--mobile-safe-bottom) var(--mobile-safe-left);
 }

@@ -100,7 +100,7 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
           const index = text.indexOf(emphasis);
           return index < 0 ? text : <>{text.slice(0, index)}<strong>{emphasis}</strong>{text.slice(index + emphasis.length)}</>;
         })() : subtitle && subtitleEmphasis && subtitle.includes(subtitleEmphasis)
-          ? <>{subtitle.slice(0, subtitle.indexOf(subtitleEmphasis))}<strong>{subtitleEmphasis}</strong>{subtitle.slice(subtitle.indexOf(subtitleEmphasis) + subtitleEmphasis.length)}</>
+          ? <>{subtitle.slice(0, subtitle.indexOf(subtitleEmphasis))}<strong className="t3-signed-unit">{subtitleEmphasis}</strong>{subtitle.slice(subtitle.indexOf(subtitleEmphasis) + subtitleEmphasis.length)}</>
           : subtitle || t("summary.fidelity.defaultSubtitle")}</p>
       </header>
       {!hasValidRange ? <div className="fidelity-card fidelity-empty">{t("summary.noData")}</div> : <>

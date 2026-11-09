@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ExclamationTriangleIcon, InfoCircledIcon, Cross2Icon, ReloadIcon, GearIcon } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
+import { SignedInlineText } from "./common/signed-inline-text";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
   dismissInsight, formatInsight, INSIGHTS_CHANGED_EVENT, loadInsightCard, refreshInsights,
@@ -208,7 +209,7 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
       </CardHeader>
       <CardContent>
         {rows.map((row) => <div key={row.id} className="t3-assistant-insight-row">
-          <div><b>{row.title}</b><small>{row.description}</small></div>
+          <div><b><SignedInlineText text={row.title} /></b><small><SignedInlineText text={row.description} /></small></div>
           <Button size="sm" variant="outline" onClick={() => ask(row.prompt)}>{row.action}</Button>
         </div>)}
       </CardContent>
@@ -239,8 +240,8 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
           const separator = line.indexOf(" — ");
           return <div key={index}>
             {separator >= 0
-              ? <><h3>{line.slice(0, separator)}</h3><p>{line.slice(separator + 3)}</p></>
-              : <p>{line}</p>}
+              ? <><h3><SignedInlineText text={line.slice(0, separator)} /></h3><p><SignedInlineText text={line.slice(separator + 3)} /></p></>
+              : <p><SignedInlineText text={line} /></p>}
           </div>;
         })}
       </div>
@@ -291,7 +292,7 @@ export default function InsightsCard({ currency, assistantView = false, onPickPr
               <SeverityIcon severity={insight.severity} />
               <span className="sr-only">{t(`insights.severity.${insight.severity}`)}</span>
               <p id={`insight-${insight.id.replace(/[^a-zA-Z0-9-]/g, "-")}`}
-                className="min-w-[12rem] flex-1 break-words text-sm leading-5">{text}</p>
+                className="min-w-[12rem] flex-1 break-words text-sm leading-5"><SignedInlineText text={text} /></p>
               <div className="ml-auto flex shrink-0 items-center gap-1">
                 <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
                   <a href="#/assistant" onClick={() => {

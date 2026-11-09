@@ -84,6 +84,16 @@ it("keeps phone P&L scale close to the actual loss and gain", async () => {
   expect(barProps.current?.options.scales.y.ticks.maxTicksLimit).toBe(6);
 });
 
+it("exposes a loss with the same minus sign as visible values", async () => {
+  vi.mocked(queryPNLChartValue).mockResolvedValue([
+    { timestamp: 1713139200000, totalValue: 1000 },
+    { timestamp: 1713225600000, totalValue: 985 },
+  ]);
+  renderChart();
+  const table = await screen.findByRole("table", { name: "Profit and loss by period" });
+  expect(table).toHaveTextContent("−$15.00");
+});
+
 it("uses only the readable scrub chip on phones and keeps the desktop tooltip", () => {
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({ matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as MediaQueryList);
   renderChart();

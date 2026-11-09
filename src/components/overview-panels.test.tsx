@@ -108,6 +108,16 @@ describe("overview panels", () => {
     expect(screen.getByText("−$25.00")).toBeInTheDocument();
     expect(document.querySelectorAll(".t3-moved-list .t3-asset-icon[data-size='20']")).toHaveLength(2);
   });
+  it("keeps a seven-digit mover's sign and currency in one numeric unit", () => {
+    render(<MemoryRouter><WhatMovedCard currency={usd} count={7} rows={[
+      { symbol: "BTC", assetType: "crypto", value: -12_345_678.9 },
+    ]} desktopFidelity /></MemoryRouter>);
+    const amount = document.querySelector(".t3-moved-list li > strong")!;
+    expect(amount).toHaveTextContent("−$12,345,678.90");
+    expect(amount).toHaveClass("t3-signed-unit");
+    expect(amount.childNodes).toHaveLength(1);
+    expect(amount.firstChild?.nodeType).toBe(Node.TEXT_NODE);
+  });
   it("pages through desktop movers without stretching the chart row", () => {
     const rows = Array.from({ length: 11 }, (_, index) => ({
       symbol: `ASSET${index}`, assetType: "crypto" as const, value: 100 - index,

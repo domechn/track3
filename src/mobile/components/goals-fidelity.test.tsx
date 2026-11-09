@@ -177,8 +177,9 @@ it("shows a rising portfolio move's positive trigger and a falling move's magnit
     { ...rule, id: 2, kind: "portfolio_value_change", comparator: "gte", threshold: 5, window: "24h" },
     { ...rule, id: 3, kind: "portfolio_value_change", comparator: "lte", threshold: -5, window: "24h" },
   ] });
-  expect(screen.getByText(/Fires at \+5\.0% or higher/)).toBeInTheDocument();
-  expect(screen.getByText(/Fires at −5\.0% or lower/)).toBeInTheDocument();
+  const descriptions = [...document.querySelectorAll(".pf-goal-progress small")].map((node) => node.textContent);
+  expect(descriptions).toContainEqual(expect.stringMatching(/^.+ · Fires at \+5\.0% or higher$/));
+  expect(descriptions).toContainEqual(expect.stringMatching(/^.+ · Fires at −5\.0% or lower$/));
   expect(screen.getByText(/Falls more than 5%/)).toBeInTheDocument();
 });
 

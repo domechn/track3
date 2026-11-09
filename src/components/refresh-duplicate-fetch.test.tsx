@@ -1,5 +1,5 @@
 import React from "react";
-import { act, render, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AthValue from "@/components/ath-value";
 import ProfitMetrics from "@/components/profit-metrics";
@@ -305,5 +305,18 @@ describe("Refresh — stale fetch protection", () => {
     } finally {
       process.off("unhandledRejection", unhandledRejection);
     }
+  });
+
+  it("shows wallet losses with one consistent minus sign", async () => {
+    queryWalletAssetsChange.mockResolvedValue([
+      { wallet: "btc-wallet", walletType: "BTC", walletAlias: "Cold storage", changeValue: -15, changePercentage: -2 },
+    ]);
+    render(wrapWithProviders(
+      <WalletAssetsChange currency={usdCurrency} dateRange={baseDateRange} quoteColor="green-up-red-down" />,
+      0,
+    ));
+    const row = (await screen.findByText("Cold storage")).closest("tr");
+    expect(row).toHaveTextContent("−2.00%");
+    expect(row).toHaveTextContent("−$15.00");
   });
 });
