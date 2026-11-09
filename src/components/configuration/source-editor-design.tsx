@@ -11,6 +11,7 @@ import { PublicIpInfo } from "./public-ip-info";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useTranslation } from "@/i18n";
 import AssetLabel from "@/components/common/asset-label";
+import { externalLinks } from "@/lib/external-links";
 
 type Tab = "exchanges" | "wallets" | "brokers" | "custom";
 type Props = {
@@ -149,7 +150,7 @@ export function SourceEditorDesign({ tab, onClose, onSaveExchange, onSaveWallet,
                 secondary={key === "bitget" || key === "okex" ? t("fidelity.editor.keySecretPassphrase") : t("fidelity.editor.keySecret")} /></button>)}
           </div>
           {info}
-          <p>{t("fidelity.editor.notListed")}<br /><a href="https://track3.dev/docs/" target="_blank" rel="noreferrer">{t("fidelity.editor.apiHelp")} <OpenInNewWindowIcon aria-hidden="true" /></a></p>
+          <p>{t("fidelity.editor.notListed")}<br /><a href={externalLinks.docs} target="_blank" rel="noreferrer">{t("fidelity.editor.apiHelp")} <OpenInNewWindowIcon aria-hidden="true" /></a></p>
         </>}
         {tab === "exchanges" && step === "form" && <>
           <EditorField label={t("fidelity.editor.label")} optional hint={t("fidelity.editor.labelHint")}>
@@ -193,7 +194,7 @@ export function SourceEditorDesign({ tab, onClose, onSaveExchange, onSaveWallet,
           <EditorField label={t("fidelity.editor.flexId")} error={broker.queryId && !brokerIdValid ? t("fidelity.editor.flexIdInvalid") : undefined}><input aria-label={t("fidelity.editor.flexId")} className={broker.queryId && !brokerIdValid ? "error" : ""} value={broker.queryId} onChange={(event) => setBroker({ ...broker, queryId: event.target.value })} /></EditorField>
           <EditorField label={t("fidelity.editor.flexToken")} error={saveError}><div className={`t3-fidelity-editor-secret ${saveError ? "error" : ""}`}><input aria-label={t("fidelity.editor.flexToken")} type={showToken ? "text" : "password"} value={broker.token} onChange={(event) => setBroker({ ...broker, token: event.target.value })} autoComplete="off" /><button type="button" aria-label={t(showToken ? "fidelity.editor.hide" : "fidelity.editor.show")} onClick={() => setShowToken(!showToken)}>{showToken ? <EyeNoneIcon /> : <EyeOpenIcon />}</button></div></EditorField>
           <EditorField label={t("fidelity.editor.label")} optional><input aria-label={t("fidelity.editor.label")} placeholder="Interactive Brokers" value={broker.alias ?? ""} onChange={(event) => setBroker({ ...broker, alias: event.target.value })} /></EditorField>
-          <p>{t("fidelity.editor.brokerHelp")} <a href="https://track3.dev/docs/" target="_blank" rel="noreferrer">{t("fidelity.editor.flexHelp")}</a></p>
+          <p>{t("fidelity.editor.brokerHelp")} <a href={externalLinks.docs} target="_blank" rel="noreferrer">{t("fidelity.editor.flexHelp")}</a></p>
           <div className="t3-fidelity-editor-banner">{shield}<div><b>{t("fidelity.editor.localOnly")}</b><span>{t("fidelity.editor.localOnlyDetail")}</span></div></div>
         </>}
         {tab === "custom" && <>

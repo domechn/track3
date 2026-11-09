@@ -132,6 +132,7 @@
   "common.showLess": "收起",
   "common.refresh": "刷新",
   "common.cancel": "取消",
+  "externalLinks.openFailed": "无法打开链接",
   "common.close": "关闭",
   "common.submit": "确定",
   "common.save": "保存",

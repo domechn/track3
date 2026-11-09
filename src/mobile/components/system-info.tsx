@@ -28,6 +28,7 @@ import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialo
 import { getVersion } from "@/utils/app";
 import { trackCheckoutCompleted, trackCheckoutPhase, trackSubscribeClicked, trackCheckoutCancelled, trackOpenClicked } from "@/middlelayers/ui-state/telemetry";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternal } from "@/lib/external-links";
 import { useTranslation } from "@/mobile/i18n";
 import { TrackLogo } from "@/components/brand/track-logo";
 import { redactSecrets } from "@/middlelayers/security/redact";
@@ -259,7 +260,7 @@ const App = ({
   }
 
   async function onViewBenefits() {
-    await openUrl("https://track3.dev/#pro");
+    await openExternal("pro");
   }
 
   function subscriptionStatusLabel(status: string | null): string {
@@ -335,7 +336,7 @@ const App = ({
       </dl>
       <div className="fidelity-b-card-foot">
         <button type="button" className="fidelity-b-about-check"
-          onClick={() => void openUrl("https://github.com/domechn/track3/releases")}>
+          onClick={() => void openExternal("releases")}>
           <ExternalLinkIcon aria-hidden="true" />{t("fidelity.b.about.viewReleases")}</button>
         <p className="fidelity-b-result">{t("fidelity.b.about.updateHint")}</p>
       </div>
@@ -349,11 +350,11 @@ const App = ({
           data-testid="onboarding-replay">{t("fidelity.b.about.replay")}</button>
       </div>
       {([
-        ["fidelity.b.about.docs", "docs.track3.dev", "https://docs.track3.dev"],
-        ["fidelity.b.about.website", "track3.dev", "https://track3.dev"],
-        ["fidelity.b.about.github", "github.com/domechn/track3", "https://github.com/domechn/track3"],
-      ] as const).map(([key, label, url]) => <button type="button" key={key}
-        className="fidelity-b-about-row" onClick={() => void openUrl(url)}>
+        ["fidelity.b.about.docs", "track3.dev/docs/", "docs"],
+        ["fidelity.b.about.website", "track3.dev", "website"],
+        ["fidelity.b.about.github", "github.com/domechn/track3", "github"],
+      ] as const).map(([key, label, link]) => <button type="button" key={key}
+        className="fidelity-b-about-row" onClick={() => void openExternal(link)}>
         <span><strong>{t(key)}</strong><small>{label}</small></span>
         <ExternalLinkIcon aria-hidden="true" />
       </button>)}
@@ -362,7 +363,7 @@ const App = ({
       <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.about.licenses")}</h2>
         <p>{t("fidelity.b.about.licensesHint")}</p></div></div>
       <button type="button" className="fidelity-b-about-link"
-        onClick={() => void openUrl("https://github.com/domechn/track3/blob/master/LICENSE")}>
+        onClick={() => void openExternal("license")}>
         {t("fidelity.b.about.viewLicenses")}<ExternalLinkIcon aria-hidden="true" />
       </button>
     </section>
@@ -370,7 +371,7 @@ const App = ({
       <div className="fidelity-b-card-head"><div><h2>{t("fidelity.b.about.whatsNew").replace("{version}", version)}</h2>
         <p>{t("fidelity.b.about.notesHint")}</p></div></div>
       <button type="button" className="fidelity-b-about-link"
-        onClick={() => void openUrl("https://github.com/domechn/track3/releases")}>
+        onClick={() => void openExternal("releases")}>
         {t("fidelity.b.about.fullNotes")}<ExternalLinkIcon aria-hidden="true" />
       </button>
     </section>
