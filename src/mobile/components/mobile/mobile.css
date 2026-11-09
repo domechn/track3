@@ -1829,6 +1829,9 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
   [data-radix-popper-content-wrapper]:has(.ios-d3-sync-popover.is-fidelity-sheet) {
     bottom: 0 !important;
   }
+  [data-radix-popper-content-wrapper]:has(.ios-d3-sync-popover.t3-sync-has-details) {
+    bottom: 0 !important;
+  }
   .ios-d3-sync-popover {
     width: 100vw !important;
     max-width: none !important;
@@ -1845,6 +1848,9 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
     font-family: "Public Sans", sans-serif;
     font-size: 13px;
     line-height: 18px;
+  }
+  .t3-sync-popover.t3-sync-has-details.ios-d3-sync-popover {
+    max-height: min(85dvh, 760px);
   }
 
   .ios-d3-sync-popover.is-locked { height: 227px; }
@@ -1917,11 +1923,8 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
   .fidelity-sync-sheet-actions button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 500; }
   .fidelity-sync-sheet-actions .is-primary { border: 1px solid white; background: white; color: #0d0d0e; }
   .fidelity-sync-sheet-actions a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 14px; color: #b4b6bc; }
-  .fidelity-sync-sheet-actions details { border: 0; padding: 0; color: #b4b6bc; }
-  .fidelity-sync-sheet-actions details summary { display: flex; align-items: center; min-height: 44px; padding: 0 14px; list-style: none; }
-  .fidelity-sync-sheet-actions details summary::-webkit-details-marker { display: none; }
-  .fidelity-sync-sheet-actions:has(details) { flex-wrap: wrap; }
-  .fidelity-sync-sheet-actions details[open] { flex-basis: 100%; order: 2; max-height: 55dvh; overflow: auto; }
+  .t3-sync-popover .fidelity-sync-sheet-actions:has(.t3-sync-details) { flex-wrap: wrap; }
+  .t3-sync-popover .fidelity-sync-sheet-actions .t3-sync-details { flex-basis: 100%; order: 2; }
   .fidelity-sync-sheet-stats { display: grid; gap: 6px; margin-top: 14px; }
   .fidelity-sync-sheet-stats > div { display: flex; justify-content: space-between; gap: 8px; }
   .fidelity-sync-sheet-stats dt { color: #b4b6bc; }

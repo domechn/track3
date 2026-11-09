@@ -60,6 +60,7 @@ it("keeps the connection error and error report alongside wide diagnostics", asy
   fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
   expect(await screen.findByText("Sync timed out. Check your connection and try again.")).toBeInTheDocument();
   expect(screen.getByText("Error details")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /Error details/ }));
   expect(screen.getAllByText("Phase timings")).toHaveLength(2);
   expect(vi.mocked(syncRuntime.syncNow)).not.toHaveBeenCalled();
 });
