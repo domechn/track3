@@ -2855,6 +2855,46 @@ body:not(:has(.app-layout)):has(.t3-refresh-overview) .t3-fidelity-ranges { disp
   body:not(:has(.app-layout)) .t3-pnl-fidelity .t3-pnl-compact-card > div > div > div > div:nth-child(2) { margin-top: 2px; }
   body:not(:has(.app-layout)) .t3-pnl-fidelity .t3-pnl-compact-card p { line-height: 18px; }
   body:not(:has(.app-layout)) .t3-pnl-fidelity .t3-pnl-compact-card p span { color: hsl(var(--faint)); }
+  body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card:not(.mobile-hero-card) > .t3-hero-content {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+  body:not(:has(.app-layout)) .t3-total-overview .t3-hero-value,
+  body:not(:has(.app-layout)) .t3-total-overview .t3-hero-change { min-width: 0; }
+  body:not(:has(.app-layout)) .t3-total-overview .t3-pnl-fidelity .t3-pnl-compact-card > div > div {
+    grid-template-columns: repeat(3, max-content);
+    justify-content: space-between;
+    column-gap: 12px;
+  }
+  body:not(:has(.app-layout)) .t3-total-overview .t3-pnl-fidelity .t3-pnl-compact-card > div > div > div { min-width: max-content; }
+  body:not(:has(.app-layout)) .t3-total-overview .t3-pnl-fidelity .t3-pnl-compact-card > div > div > div > :is(div, p) {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  @container (max-width: 1100px) {
+    body:not(:has(.app-layout)) .t3-total-overview .t3-pnl-fidelity .t3-pnl-compact-card p { font-size: 12px; }
+    body:not(:has(.app-layout)) .t3-total-overview .t3-hero-value { font-size: 25px; }
+  }
+  @container (max-width: 900px) {
+    body:not(:has(.app-layout)) .t3-total-overview .t3-pnl-fidelity .t3-pnl-compact-card p span { display: none; }
+    body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card:not(.mobile-hero-card) > .t3-hero-content {
+      display: flex;
+      flex-direction: column;
+    }
+    body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card:not(.mobile-hero-card) .t3-hero-value {
+      align-self: flex-start;
+    }
+    body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card:not(.mobile-hero-card) .t3-pnl-compact {
+      width: 100%;
+      margin: 10px 0;
+    }
+    body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card:not(.mobile-hero-card) .t3-pnl-compact .t3-pnl-compact-card {
+      border: 0;
+      border-top: 1px solid hsl(var(--border));
+    }
+    body:not(:has(.app-layout)) .t3-total-overview .t3-pnl-fidelity .t3-pnl-compact-card > div > div > div:first-child {
+      padding-left: 0 !important;
+    }
+  }
   body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card:not(.mobile-hero-card) .t3-hero-chart {
     border-top: 0; margin-top: 15px; padding-top: 0;
   }

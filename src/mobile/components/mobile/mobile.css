@@ -1160,7 +1160,8 @@
 .overview-sections .t3-pnl-compact-card .overview-pnl-metric:first-child { padding-left: 0 !important; }
 .overview-sections .t3-pnl-compact-card .overview-pnl-metric:last-child { border-right: 0; }
 .overview-sections .t3-pnl-compact-card .overview-pnl-metric-value { font-size: clamp(14px, 4vw, 18px); }
-@container (max-width: 360px) {
+.overview-sections .t3-total-overview .t3-pnl-compact-card .overview-pnl-metric > :is(div, p) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+@container (max-width: 720px) {
   .overview-sections .t3-total-overview .t3-pnl-compact-card > div > div { grid-template-columns: minmax(0, 1fr); }
   .overview-sections .t3-total-overview .t3-pnl-compact-card .overview-pnl-metric { border-right: 0; border-top: 1px solid hsl(var(--border)); }
   .overview-sections .t3-total-overview .t3-pnl-compact-card .overview-pnl-metric:first-child { border-top: 0; }
