@@ -23,6 +23,10 @@ Source names, aliases, wallet addresses, broker IDs, prices, source inclusion, e
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** sources 7.176%, sources-wallets 8.315% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
+The 8 Nov dense-data 1280 × 800 dark Wallets tab differs by **8.693%** from `settings-a-sources.html#wallets` at RGB-sum threshold 60. It shows 8 of 13 configured wallets per page and real CNY identities where the source lists a few short sample aliases. Long aliases keep their distinguishing number and suffix while their full name remains available to assistive technology.
+
 The approved source is dark only. The live page honors the selected light theme, so its light colours cannot match that reference.
 
 The approved static page uses its pencil for the full source editor and has no Rename flow. The live page uses that pencil for the requested Rename dialog; the visible source name opens the full editor. Both actions remain keyboard reachable.
@@ -34,6 +38,7 @@ The visible source name opens the existing configuration editor. The iPhone avat
 The new alias screenshots use actual source data, so their text and values differ from the fixed design fixture. The capture table below is the earlier matched-fixture baseline.
 
 UI42 uses the approved website-style neutral tile for exchange, wallet, broker and custom marks. The older Sources page design renders those marks differently.
+- The 8 Nov large-data layout pages each source tab, including the standard Settings tables at narrower desktop widths, at eight rows while keeping totals across all configured sources. The source's short lists have no pager, so the earlier pixel captures below do not cover this state.
 
 The wide empty Sources card keeps the design's 188px outer height; its dashed inner state has a 146px minimum. This is shorter than the shared component's 200px default because the approved source page uses the compact card.
 

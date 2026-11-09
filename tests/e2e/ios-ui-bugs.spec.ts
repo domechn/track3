@@ -16,7 +16,15 @@ for (const sources of [3, 8, 16, 30]) {
     await page.getByRole("button", { name: "Detailed analysis" }).click();
     const scroll = page.locator(".d2-wallets .wallet-asset-change-scroll").first();
     await expect(page.locator(".fd-wallet-chips button").nth(1)).toHaveAttribute("title", /^[0-9a-f]{32}$/i);
-    await expect(scroll.locator("thead th")).toHaveCount(sources + 2);
+    const matrixPager = page.locator(".wallet-asset-change-card [data-layout-pager]");
+    const sourceIds = new Set<string>();
+    for (let start = 0; start < sources; start += 8) {
+      await expect(scroll.locator("thead th")).toHaveCount(Math.min(8, sources - start) + 2);
+      for (const id of await scroll.locator("thead th[title]").evaluateAll((cells) =>
+        cells.map((cell) => cell.getAttribute("title") ?? ""))) sourceIds.add(id);
+      if (start + 8 < sources) await matrixPager.getByRole("button", { name: "Next" }).click();
+    }
+    expect(sourceIds.size).toBe(sources);
     await expect(scroll).toHaveAttribute("tabindex", "0");
     const rendered = await page.locator(".analyze-wallets").textContent();
     expect(rendered).not.toMatch(/[0-9a-f]{12,}/i);
@@ -120,6 +128,10 @@ test("opaque wallet keeps its number from phone Wallets to coin detail", async (
   await installManySourceFixture(page, 16);
   await page.goto("/#/wallets");
   const chip = page.locator(`.fd-wallet-chips button[title="${id}"]`);
+  await expect(page.locator(".fd-wallets")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
+  if (await chip.count() === 0) {
+    await page.getByRole("navigation", { name: "Wallets" }).getByRole("button", { name: "Next" }).click();
+  }
   await expect(chip).toBeVisible();
   const name = (await chip.locator(".t3-asset-label-name").textContent())?.trim();
   expect(name).toMatch(/^Wallet \d+$/);

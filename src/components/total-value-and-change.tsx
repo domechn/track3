@@ -503,7 +503,8 @@ const App = ({
       ...(metrics ? { layout: { padding: { top: 8, right: Math.max(72,
         Math.ceil((`${currency.symbol}${Math.round(chartEnd ?? 0).toLocaleString()}`).length * 7.5) + 16), bottom: 12 } } } : {}),
       animation: metrics || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? false : { duration: 350 },
-      onResize: (_chart: unknown, size: { width: number }) => setChartWidth(size.width),
+      onResize: (_chart: unknown, size: { width: number }) =>
+        requestAnimationFrame(() => setChartWidth(size.width)),
       onHover: (_event: unknown, elements: Array<{ datasetIndex: number; index: number }>) =>
         setActiveIndex(elements.find((element) => element.datasetIndex === 0)?.index ?? null),
       hover: {

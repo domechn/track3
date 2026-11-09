@@ -83,4 +83,45 @@ describe("WalletsFidelity", () => {
       window.removeEventListener(overviewRefreshRequestedEvent, onRequest);
     }
   });
+
+  it("pages dense source chips, balances and asset matrix independently", async () => {
+    const wallets = Array.from({ length: 16 }, (_, index) => `wallet-${index + 1}`);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue(wallets.flatMap((wallet, index) => [
+      { ...asset("old", wallet, index + 1), symbol: `COIN${index + 1}` },
+      { ...asset("new", wallet, index + 2), symbol: `COIN${index + 1}` },
+    ]) as never);
+    vi.spyOn(WalletAnalyzer.prototype, "listWalletAliases").mockResolvedValue(
+      Object.fromEntries(wallets.map((wallet) => [wallet, { wallet, alias: wallet, type: "bitcoin" }])) as never);
+    const { container } = render(<WalletsFidelity currency={currency} dateRange={dateRange}
+      quoteColor="green-up-red-down" selectedSource={null} onSelectSource={vi.fn()} statuses={[]} />);
+    await waitFor(() => expect(container.querySelectorAll(".t3-wallet-balances tbody tr")).toHaveLength(8));
+    expect(container.querySelectorAll(".t3-wallet-chips button")).toHaveLength(9);
+    expect(container.querySelectorAll(".t3-wallet-matrix tbody tr")).toHaveLength(8);
+    expect(container.querySelectorAll(".t3-wallet-matrix thead th")).toHaveLength(7);
+    const firstChip = container.querySelectorAll(".t3-wallet-chips button")[1].textContent;
+    const firstBalance = container.querySelector(".t3-wallet-balances tbody tr")?.textContent;
+    fireEvent.click(container.querySelector<HTMLButtonElement>(".t3-wallet-balances [data-layout-pager] button:not(:disabled):last-child")!);
+    expect(container.querySelector(".t3-wallet-balances tbody tr")?.textContent).not.toBe(firstBalance);
+    expect(container.querySelectorAll(".t3-wallet-chips button")[1].textContent).toBe(firstChip);
+  });
+
+  it("shows a selected source on a later chip page and names both matrix pagers", async () => {
+    const wallets = Array.from({ length: 16 }, (_, index) => `wallet-${index + 1}`);
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue(wallets.flatMap((wallet, index) => [
+      { ...asset("old", wallet, index + 1), symbol: `COIN${index + 1}` },
+      { ...asset("new", wallet, index + 2), symbol: `COIN${index + 1}` },
+    ]) as never);
+    vi.spyOn(WalletAnalyzer.prototype, "listWalletAliases").mockResolvedValue(
+      Object.fromEntries(wallets.map((wallet) => [wallet, { wallet, alias: wallet, type: "bitcoin" }])) as never);
+    const { container, rerender } = render(<WalletsFidelity currency={currency} dateRange={dateRange}
+      quoteColor="green-up-red-down" selectedSource={null} onSelectSource={vi.fn()} statuses={[]} />);
+    await waitFor(() => expect(container.querySelectorAll(".t3-wallet-matrix [data-layout-pager]")).toHaveLength(2));
+    const matrixPagers = container.querySelectorAll(".t3-wallet-matrix [data-layout-pager]");
+    expect(matrixPagers[0]).toHaveTextContent("Assets");
+    expect(matrixPagers[1]).toHaveTextContent("Sources");
+    rerender(<WalletsFidelity currency={currency} dateRange={dateRange}
+      quoteColor="green-up-red-down" selectedSource="wallet-12" onSelectSource={vi.fn()} statuses={[]} />);
+    await waitFor(() => expect(container.querySelector(".t3-wallet-chips button[aria-pressed='true']"))
+      .toHaveTextContent("wallet-12"));
+  });
 });

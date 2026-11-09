@@ -8,7 +8,7 @@ const routes = [
   "history", "rebalance", "goals", "assistant", "settings", "settings/appearance",
   "settings/sources", "settings/assistant", "settings/sync",
 ];
-const delta = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThanOrEqual(.5);
+const delta = (a: number, b: number, label = "") => expect(Math.abs(a - b), label).toBeLessThanOrEqual(.5);
 
 test("desktop navigation keeps one active tile and fixed icon geometry on every route", async ({ page }) => {
   test.setTimeout(300_000);
@@ -25,6 +25,7 @@ test("desktop navigation keeps one active tile and fixed icon geometry on every 
       let reference: Awaited<ReturnType<typeof sample>> | undefined;
       for (const route of routes) {
         await page.goto(`/#/${route}`, { waitUntil: "domcontentloaded" });
+        await expect(rail).toHaveCSS("width", expanded ? "216px" : "56px");
         const active = rail.locator(".t3-nav-item[aria-current='page']");
         await expect(active).toHaveCount(1);
         const activeRoute = route.startsWith("coins/") ? "overview" : route.split("/")[0];
@@ -48,8 +49,8 @@ test("desktop navigation keeps one active tile and fixed icon geometry on every 
           delta(state.activeSize[1], reference.activeSize[1]);
           expect(state.positions.map((p) => p.key)).toEqual(reference.positions.map((p) => p.key));
           for (const [i, position] of state.positions.entries()) {
-            delta(position.x, reference.positions[i].x);
-            delta(position.y, reference.positions[i].y);
+            delta(position.x, reference.positions[i].x, `${theme} ${expanded} ${route} ${position.key} x`);
+            delta(position.y, reference.positions[i].y, `${theme} ${expanded} ${route} ${position.key} y`);
           }
         } else reference = state;
       }

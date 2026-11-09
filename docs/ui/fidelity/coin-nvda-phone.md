@@ -213,6 +213,10 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** coin-stock 9.041% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
+The 8 Nov 390 × 844 dark dense-data stock capture differs by **9.366%** from the static NVDA phone image at RGB-sum threshold 60. The fixture's stock is AAPL with real CNY price, holdings, and name; the source depicts a different USD asset.
+
 - The merged 8 Nov DPR 2 viewport capture `/tmp/history-kpi-overflow/coin-nvda-phone-final.png` differs from `/tmp/wui18-source/coin-nvda-phone-viewport.png` by **5.50%** at RGB-sum threshold 48. The shared active Overview tab and AssetIcon mark, and the product's truthful price note in place of the source's unsupported NASDAQ delay claim, remain visible.
 - The 5.438% first-screen difference includes the owner's shared active Overview tile; the value-card comparison has different chart line and grid positions from dated stored snapshots.
 - The saved alias is “NVIDIA”; no separate “NVIDIA Corporation” name is stored for the subtitle.

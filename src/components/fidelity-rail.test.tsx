@@ -6,7 +6,7 @@ import Sidebar from "./sidebar";
 vi.mock("./use-alert-badge", () => ({ useAlertBadge: () => 2 }));
 
 const rail = (isProUser = false) => <MemoryRouter>
-  <Sidebar collapsed onToggle={() => {}} isProUser={isProUser} fidelity />
+  <Sidebar collapsed onToggle={() => {}} isProUser={isProUser} />
 </MemoryRouter>;
 
 it("hides Assistant from non-Pro users and announces unread Goals alerts", () => {

@@ -29,6 +29,7 @@ import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store"
 import { LicenseCenter, type ProUsage } from "@/middlelayers/license";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
+import { Pager, usePager } from "@/components/ui/pager";
 
 function ShieldIcon() {
   return <svg aria-hidden="true" viewBox="0 0 18 18" width="18" height="18" fill="none"
@@ -259,6 +260,9 @@ export function MobileSources(props: MobileSourcesProps) {
     if (kind === "wallet") props.onRenameWallet?.(row as WalletRow, alias);
     if (kind === "broker") props.onRenameBroker?.(row as StockBrokerRow, alias);
   };
+  const exchangePage = usePager(props.exchanges, "exchange", 8);
+  const walletPage = usePager(props.wallets, "wallet", 8);
+  const brokerPage = usePager(props.brokers, "broker", 8);
   const providerOptions = sections.find((section) => section.kind === editor?.kind)?.options ?? [];
   const hasSources = props.exchanges.length + props.wallets.length + props.brokers.length > 0;
   const sourceValue = (kind: Kind, row: Draft) => {
@@ -277,7 +281,7 @@ export function MobileSources(props: MobileSourcesProps) {
     : new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(refreshed)) : "—";
   return (
     <div className={`ios-d3-sources${props.fidelityLayout ? " fidelity-sources" : ""}`}>
-      {!hasSources && props.fidelityLayout && <div className="fidelity-source-empty">
+      {!hasSources && props.fidelityLayout && <div data-card className="fidelity-source-empty">
         <EmptyState icon={BackpackIcon} className="fidelity-source-empty-inner"
           title={props.fromOnboarding ? t("fidelity.settings.sources.emptyTitle")
             : t(`fidelity.settings.sources.empty.${props.selectedKind ?? "exchange"}`)}
@@ -307,20 +311,23 @@ export function MobileSources(props: MobileSourcesProps) {
         </ol>
         <Button className="ios-d3-editor-primary mt-5 min-h-12 w-full" onClick={() => setKindPickerOpen(true)}>{t("mobile.sources.addSource")}</Button>
       </div>}
-      {hasSources && sections.filter(({ kind }) => !props.selectedKind || kind === props.selectedKind).map(({ kind, label, add, rows, options }) => (
+      {hasSources && sections.filter(({ kind }) => !props.selectedKind || kind === props.selectedKind).map(({ kind, label, add, rows, options }) => {
+        const paging = kind === "exchange" ? exchangePage : kind === "wallet" ? walletPage : brokerPage;
+        const displayedRows: Draft[] = paging.rows;
+        return (
         <section key={kind} aria-label={label}
           className={`ios-d3-source-section${props.fidelityLayout ? " fidelity-source-section" : " space-y-2"}`}>
           {!props.fidelityLayout && <div className="flex items-center justify-between gap-2">
             <h2 className="ios-d3-section-heading">{label}</h2>
             <Button className="ios-d3-text-action min-h-11" variant="ghost" onClick={() => start(kind)}>{add}</Button>
           </div>}
-          <div className={props.fidelityLayout ? "fidelity-source-group" : "ios-d3-source-group overflow-hidden rounded-2xl bg-card"}>
+          <div data-card={props.fidelityLayout ? "" : undefined} className={props.fidelityLayout ? "fidelity-source-group" : "ios-d3-source-group overflow-hidden rounded-2xl bg-card"}>
             {props.fidelityLayout && !snapshot && rows.length > 0
-              ? <>{rows.map((row, index) => <div key={`${row.type}-${index}`} className="fidelity-source-skeleton-row" aria-hidden="true">
+              ? <>{displayedRows.map((row, index) => <div key={`${row.type}-${index}`} className="fidelity-source-skeleton-row" aria-hidden="true">
                 <div><i /><span><i /><i /></span><i /></div><div><i /><i /></div>
               </div>)}<div className="fidelity-source-skeleton-foot" aria-hidden="true" /></>
               : rows.length === 0 ? <EmptyState icon={BackpackIcon} title={t("mobile.sources.empty")}
-                hint={t("fidelity.settings.sources.emptyHint")} /> : rows.map((row, index) => {
+                hint={t("fidelity.settings.sources.emptyHint")} /> : displayedRows.map((row, index) => {
               const identity = kind === "exchange" ? maskSensitive((row as ExchangeRow).apiKey)
                 : kind === "wallet" ? truncateAddress((row as WalletRow).address)
                 : maskSensitive((row as StockBrokerRow).queryId);
@@ -417,9 +424,11 @@ export function MobileSources(props: MobileSourcesProps) {
               <strong>{money(rows.reduce((total, row) => total + (sourceValue(kind, row) ?? 0), 0))}</strong>
             </div>}
           </div>
+          <Pager count={rows.length} {...paging} t={t} ariaLabel={label} />
         </section>
-      ))}
-      {props.fidelityLayout && <details className="fidelity-source-info"><summary><ShieldIcon /><span>
+        );
+      })}
+      {props.fidelityLayout && <details data-card className="fidelity-source-info"><summary><ShieldIcon /><span>
         <strong>{t("fidelity.settings.sources.readOnly")}</strong>
         <span>{props.selectedKind === "wallet" && usage
           ? t("fidelity.settings.sources.walletQuotaNote")

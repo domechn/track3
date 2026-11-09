@@ -10,6 +10,8 @@ Right card title “Gain and loss colours”, description “Pick which colour m
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** appearance 14.067% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 At 1100px the app shows its editable summary, Theme, and Quote Color cards in one column. The static source has only its Theme and Gain and loss colours cards in two columns. The summary cards contain live settings, and stacking them keeps the short Language summary within the 60px empty-space limit.
 
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.

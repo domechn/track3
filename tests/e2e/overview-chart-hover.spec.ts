@@ -60,21 +60,21 @@ test("dense seven digit history keeps tooltips and captions clear at desktop wid
       await card.locator(".t3-chart-best-day").focus();
       await expect(page.locator("[data-chart-tooltip]")).toBeVisible();
       const bestPoint = (await card.locator("[data-chart-active-point]").boundingBox())!;
-      const markerX = await chart.evaluate((element: HTMLCanvasElement) => {
-        const { width, height } = element;
-        const pixels = element.getContext("2d")!.getImageData(0, 0, width, height).data;
-        let left = width;
-        let right = -1;
-        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-          const offset = (y * width + x) * 4;
-          const r = pixels[offset], g = pixels[offset + 1], b = pixels[offset + 2];
-          if (g > r + 15 && g > b + 10) { left = Math.min(left, x); right = Math.max(right, x); }
-        }
-        return right < 0 ? null : (left + right) / 2 * element.getBoundingClientRect().width / width;
-      });
-      expect(markerX, JSON.stringify({ width, theme })).not.toBeNull();
-      expect(Math.abs(markerX! - (bestPoint.x + bestPoint.width / 2 - canvas.x)),
-        JSON.stringify({ width, theme })).toBeLessThanOrEqual(2);
+      await expect.poll(async () => {
+        const markerX = await chart.evaluate((element: HTMLCanvasElement) => {
+          const { width, height } = element;
+          const pixels = element.getContext("2d")!.getImageData(0, 0, width, height).data;
+          let left = width;
+          let right = -1;
+          for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            const offset = (y * width + x) * 4;
+            const r = pixels[offset], g = pixels[offset + 1], b = pixels[offset + 2];
+            if (g > r + 15 && g > b + 10) { left = Math.min(left, x); right = Math.max(right, x); }
+          }
+          return right < 0 ? null : (left + right) / 2 * element.getBoundingClientRect().width / width;
+        });
+        return markerX === null ? Infinity : Math.abs(markerX - (bestPoint.x + bestPoint.width / 2 - canvas.x));
+      }, { message: JSON.stringify({ width, theme }) }).toBeLessThanOrEqual(2);
       await chart.focus();
       await page.keyboard.press("ArrowRight");
       const first = (await card.locator("[data-chart-active-point]").boundingBox())!;

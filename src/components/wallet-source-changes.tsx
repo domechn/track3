@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { queryHistoricalPage } from "@/middlelayers/charts";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
@@ -12,6 +12,7 @@ import { deriveSourceChanges } from "./wallet-snapshot-matrix";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import AssetLabel from "./common/asset-label";
 import { sourceIconKind } from "./source-allocation-list";
+import { Pager, usePager } from "./ui/pager";
 
 type MatrixData = {
   baselineAt: string;
@@ -31,7 +32,21 @@ export default function WalletSourceChanges({ currency, dateRange, quoteColor, s
   const walletOrdinals = useLatestWalletOrdinals();
   const [data, setData] = useState<MatrixData | null>(null);
   const [ready, setReady] = useState(false);
+  const matrixScrollRef = useRef<HTMLDivElement>(null);
+  const [matrixPageSize, setMatrixPageSize] = useState(8);
   const endTime = dateRange.end.getTime();
+
+  useEffect(() => {
+    const scroll = matrixScrollRef.current;
+    if (!scroll || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      const count = window.innerWidth <= 900 ? 8
+        : Math.max(1, Math.min(8, Math.floor((scroll.clientWidth - 208) / 160)));
+      setMatrixPageSize(count);
+    });
+    observer.observe(scroll);
+    return () => observer.disconnect();
+  }, [ready, data]);
 
   useEffect(() => {
     let active = true;
@@ -79,6 +94,11 @@ export default function WalletSourceChanges({ currency, dateRange, quoteColor, s
   const sources = useMemo(() =>
     data?.changes.sources.filter((source) => !selectedSource || source.id === sourceId) ?? [],
   [data, selectedSource, sourceId]);
+  const sourcePage = usePager(sources, selectedSource ?? "all", 8);
+  const matrixPage = usePager(sources, selectedSource ?? "all", matrixPageSize);
+  useEffect(() => {
+    if (matrixPage.pageSize !== matrixPageSize) matrixPage.setPageSize(matrixPageSize);
+  }, [matrixPageSize, matrixPage.pageSize]);
   const assets = useMemo(() =>
     data?.changes.assets
       .filter((asset) => sources.some((source) => asset.values[source.id]))
@@ -99,13 +119,14 @@ export default function WalletSourceChanges({ currency, dateRange, quoteColor, s
       {!ready ? <p className="text-muted-foreground text-sm">{t("common.loading")}</p>
         : !data ? <p className="text-muted-foreground text-sm">{t("wallets.changeUnavailable")}</p>
         : <div className="wallet-source-change-list">
-          {sources.map((source) => <div key={source.id}>
+          {sourcePage.rows.map((source) => <div key={source.id}>
             <strong title={source.id}><AssetLabel kind={sourceIconKind(sourceType(source.id))} type={sourceType(source.id)} name={source.label} size={20} /></strong>
             <span>{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(source.value))}</span>
             <span className={tone(source.change)}>{money(source.change)}</span>
             <span className={tone(source.change)}>{source.percentage === null ? "—" : `${source.percentage > 0 ? "+" : ""}${source.percentage.toFixed(2)}%`}</span>
           </div>)}
         </div>}
+      <Pager count={sources.length} {...sourcePage} t={t} ariaLabel={t("wallets.thirtyDaySourceChanges")} />
     </Card>
     {ready && data && assets.length > 0 && <Card className="wallet-asset-change-card">
       <div className="wallet-source-change-heading"><h2>{t("wallets.assetChangesBySource")}</h2><span>{baselineLabel}</span></div>
@@ -115,12 +136,12 @@ export default function WalletSourceChanges({ currency, dateRange, quoteColor, s
           return <div key={asset.key}><strong><AssetLabel symbol={asset.symbol} size={20} quiet /></strong><span className={tone(value)}>{money(value)}</span></div>;
         })}
       </div>
-      <div className="wallet-asset-change-scroll" tabIndex={0} aria-label={t("wallets.assetChangesBySource")}>
+      <div ref={matrixScrollRef} className="wallet-asset-change-scroll" tabIndex={0} aria-label={t("wallets.assetChangesBySource")}>
         <table>
-          <thead><tr><th>{t("cost.asset")}</th>{sources.map((source) => <th key={source.id} title={source.id} aria-label={source.label}><AssetLabel kind={sourceIconKind(sourceType(source.id))} type={sourceType(source.id)} name={source.label} size={20} /></th>)}<th>{t("wallets.allSources")}</th></tr></thead>
+          <thead><tr><th>{t("cost.asset")}</th>{matrixPage.rows.map((source) => <th key={source.id} title={source.id} aria-label={source.label}><AssetLabel kind={sourceIconKind(sourceType(source.id))} type={sourceType(source.id)} name={source.label} size={20} /></th>)}<th>{t("wallets.allSources")}</th></tr></thead>
           <tbody>{assets.map((asset) => <tr key={asset.key}>
             <th><AssetLabel symbol={asset.symbol} size={20} quiet /></th>
-            {sources.map((source) => {
+            {matrixPage.rows.map((source) => {
               const value = asset.values[source.id];
               return <td key={source.id} className={value === undefined ? "" : tone(value)}>{value === undefined ? "—" : money(value)}</td>;
             })}
@@ -128,6 +149,7 @@ export default function WalletSourceChanges({ currency, dateRange, quoteColor, s
           </tr>)}</tbody>
         </table>
       </div>
+      <Pager count={sources.length} {...matrixPage} t={t} ariaLabel={t("wallets.assetChangesBySource")} />
     </Card>}
   </div>;
 }

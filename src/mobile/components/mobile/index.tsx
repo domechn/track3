@@ -297,8 +297,8 @@ export function PullToRefresh({ children, onRefresh, disabled, className, source
   </div>;
 }
 
-export function InsetGroup({ children, title, className }: React.PropsWithChildren<{ title?: string; className?: string }>) {
-  return <section className={cn("mobile-inset-section", className)}>
+export function InsetGroup({ children, title, className, dataCard }: React.PropsWithChildren<{ title?: string; className?: string; dataCard?: boolean }>) {
+  return <section data-card={dataCard ? "" : undefined} className={cn("mobile-inset-section", className)}>
     {title && <h2 className="mobile-inset-heading">{title}</h2>}
     <div className="mobile-inset-group">{children}</div>
   </section>;

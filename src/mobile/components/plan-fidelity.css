@@ -314,3 +314,7 @@
 @media (min-width: 431px) and (max-width: 760px) {
   .pf-page button { min-width: 44px; min-height: 44px; }
 }
+@media (max-width: 760px) {
+  .pf-trades .pf-empty,
+  .pf-goals .pf-rules-list > .pf-empty { padding-bottom: 12px; }
+}

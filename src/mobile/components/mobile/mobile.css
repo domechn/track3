@@ -753,6 +753,12 @@
   .ios-d3-refresh-row details > summary::-webkit-details-marker { display: none; }
   .ios-d3-refresh-row details > summary::after { content: "⌄"; display: inline-block; transform: rotate(-90deg); font-size: 17px; }
   .ios-d3-refresh-row details[open] > summary::after { transform: none; }
+  @media (max-width: 699px) {
+    .ios-d3-refresh-sheet .ios-d3-refresh-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .ios-d3-refresh-row-main { grid-column: 1 / -1; }
+    .ios-d3-refresh-row > .ios-d3-refresh-row-duration { grid-column: 1; margin-left: 28px; text-align: left; }
+    .ios-d3-refresh-row > button { grid-column: 2; justify-self: end; }
+  }
 
   .ios-d3-startup-check { display: grid; align-content: center; justify-items: center; gap: 12px; }
   .ios-d3-startup-check div { width: min(80vw, 310px); height: 16px; border-radius: 8px; background: hsl(var(--muted)); animation: mobile-shimmer 1.4s ease-in-out infinite alternate; }
@@ -1041,12 +1047,12 @@
   .d2-coin .coin-mobile-transactions .mobile-list-row { gap: 6px; }
   .d2-coin .coin-detail-price { margin-top: 12px; font-size: clamp(40px, 11vw, 52px); line-height: 1.08; font-weight: 600; letter-spacing: -.05em; white-space: nowrap; }
   .d2-coin .coin-detail-change { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: hsl(var(--muted-foreground)); font-size: 13px; }
-  .d2-coin .coin-metric-grid { gap: 10px; }
+  .d2-coin .coin-metric-grid { gap: 16px; }
   .d2-coin .coin-metric-grid > * { grid-column: span 3; min-width: 0; }
   .d2-coin .coin-metric-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .d2-coin .coin-metric-card [data-tone="gain"] { color: var(--ios-gain); }
   .d2-coin .coin-metric-card [data-tone="loss"] { color: var(--ios-loss); }
-  .d2-coin .coin-metric-card { display: flex; height: 100%; min-height: 108px; flex-direction: column; }
+  .d2-coin .coin-metric-card { display: flex; height: 100%; min-height: 108px; flex-direction: column; justify-content: space-between; }
   .d2-coin .coin-metric-card > :first-child { padding: 12px 12px 4px; }
   .d2-coin .coin-metric-card > :last-child { padding: 4px 12px 12px; }
   .d2-coin .coin-metric-card svg { display: none; }
@@ -1054,6 +1060,7 @@
   .d2-coin .coin-metric-card > :last-child > :first-child { overflow: visible; font-size: clamp(14px, 3.8vw, 17px); white-space: nowrap; }
   .d2-coin .coin-metric-card > :last-child > :last-child { overflow: visible; white-space: normal; }
   .d2-coin .coin-breakeven-subtitle { display: flex; margin-top: 6px; gap: 4px; flex-wrap: wrap; }
+  .d2-coin .analyze-wallet-allocation > :last-child { padding-bottom: 0; }
   .d2-coin .mobile-record-list { border: 0; }
   .d2-coin .mobile-record-list .mobile-list-row { min-height: 64px; }
   .d2-coin [data-single-wallet="true"] { display: none; }
@@ -2206,8 +2213,9 @@ body:has(.fidelity-cost) {
 .fidelity-cost-by-asset:has(.fidelity-chart-empty) { display: flex; flex-direction: column; }
 .fidelity-chart-empty { width: 100%; margin: auto 0; border: 1px dashed var(--f-control); border-radius: 6px;
   padding: 22px; color: var(--f-muted); text-align: center; }
-.fidelity-asset-bar { display: grid; grid-template-columns: 44px minmax(0, 1fr) 84px; gap: 12px; align-items: center; height: 46px; }
+.fidelity-asset-bar { display: grid; grid-template-columns: 96px minmax(0, 1fr) 84px; gap: 8px; align-items: center; height: 46px; }
 .fidelity-asset-bar strong { font-weight: 600; }
+.fidelity-asset-bar .t3-asset-tag { display: none; }
 .fidelity-bar-track { position: relative; height: 12px; }
 .fidelity-bar-track::before { position: absolute; left: var(--z, 4%); top: -5px; bottom: -5px;
   width: 1px; background: var(--f-control); content: ""; }
@@ -4184,7 +4192,31 @@ body:has(.fidelity-history, .fidelity-history-detail) {
 }
 @media (min-width: 700px) and (max-width: 1050px) {
   .d2-comparison .comparison-assets-grid { grid-template-columns: minmax(0, 1fr); }
+  .d2-comparison .comparison-assets-grid [data-ui-card] > div { padding-bottom: 0; }
 }
 @media (min-width: 700px) and (max-width: 900px) {
   .d2-summary .profit-metrics-mobile { grid-template-columns: repeat(2, minmax(max-content, 1fr)); }
 }
+
+@media (min-width: 390px) and (max-width: 760px) {
+  .fidelity-cost-kpis .fidelity-kpi-secondary { grid-template-columns: 100px minmax(0, 1fr); }
+  .t3-empty-state.fidelity-no-lots[data-empty-state] { min-height: 230px; padding-bottom: 24px; }
+}
+@media (max-width: 760px) {
+  .fidelity-blacklist-empty {
+    min-height: 0;
+    margin: 12px 16px 6px;
+    padding: 12px;
+  }
+}
+@media (min-width: 761px) and (max-width: 1000px) {
+  .d2-summary .profit-period-grid:not(.profit-year-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .d2-summary .profit-summary-card { min-height: 0; }
+  .d2-summary .ath-card > div:last-child { padding-bottom: 8px; }
+  .d2-summary .profit-summary-card > :last-child { padding-bottom: 6px; }
+  .d2-wallets .analyze-wallet-allocation > :last-child,
+  .d2-wallets .wallet-source-changes > .wallet-source-change-card[data-ui-card] { padding-bottom: 4px; }
+  .ios-d3-goals.t3-manage-goals > .t3-goals-history { min-height: 0; max-height: none; }
+  .ios-d3-goals.t3-manage-goals .t3-goals-history > :last-child { padding-bottom: 6px; }
+}
+.fidelity-source-section > [data-layout-pager] { margin: 8px 16px 0; }

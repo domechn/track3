@@ -290,7 +290,7 @@ export function PhoneCostBasis({
       {holdingControl}
     </BottomSheet>
     {!validRange && <p role="alert" className="fidelity-cost-error">{t("cost.invalidRange")}</p>}
-    {firstUnknown && <section className="fidelity-cost-warning">
+    {firstUnknown && <section data-card className="fidelity-cost-warning">
       <Icon kind="alert" /><div>
         <strong>{t("fidelity.cost.unknownTitle").replace("{coin}", firstUnknown.symbol)}</strong>
         <p>{t("fidelity.cost.unknownBody").replace("{amount}", firstUnknown.amount.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 8 }))

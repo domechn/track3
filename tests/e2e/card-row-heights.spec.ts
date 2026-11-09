@@ -168,6 +168,8 @@ for (const width of [1280, 1440]) test(`review: daily axis and one source stay w
   await page.goto("/#/overview", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".t3-daily-x-axis")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".t3-sources-panel .t3-source-row")).toHaveCount(1);
+  const sourceNameWidth = await page.locator(".t3-sources-panel .t3-source-name").evaluate((node) => node.clientWidth);
+  expect(sourceNameWidth).toBeGreaterThan(100);
   const geometry = await page.evaluate(() => {
     const bounds = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
     const daily = bounds(".t3-daily-panel");

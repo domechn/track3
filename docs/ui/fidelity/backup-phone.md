@@ -97,6 +97,8 @@ State: **default**. Button actions, input validity, status, overlays, and toasts
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** backup 12.911% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 Capture: `/tmp/fidelity/settings-b/backup.png` (full page: `backup-long.png`). Design and app were compared side by side at 390 × 844 CSS px. Remaining differences are listed below.
 
 - The source has seven individual export categories, counts, estimated size, and a single Export JSON action. The existing export format supports mandatory portfolio history and one optional configuration switch; adding category switches would require data-format work outside this UI task.

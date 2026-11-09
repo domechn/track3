@@ -608,7 +608,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       </div>}
 
       {showBackup && isIOS() && section === "backup" && <p className="fidelity-b-subtitle">{t("fidelity.b.backup.subtitle")}</p>}
-      {showBackup && <section role="region" aria-label={t("data.phase6.onDevice")} className="fidelity-b-backup-device rounded-lg border border-border bg-card p-4">
+      {showBackup && <section data-card role="region" aria-label={t("data.phase6.onDevice")} className="fidelity-b-backup-device rounded-lg border border-border bg-card p-4">
         <h2 className="mb-3 text-sm font-semibold">{t("data.phase6.onDevice")}</h2>
         <div className="grid grid-cols-3 gap-2">
           {(["snapshots", "assets", "transactions"] as const).map((field) => <div key={field} className="rounded-md border border-border/50 bg-background/40 p-2">
@@ -619,7 +619,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       </section>}
 
       {showBackup && isIOS() && <div className="ios-d3-backup-actions">
-        <div className="ios-d3-backup-import-section">
+        <div data-card className="ios-d3-backup-import-section">
         <InsetGroup title={section === "backup" ? t("fidelity.b.backup.import") : t("data.import")} className="fidelity-b-backup-import">
           <button type="button" className="ios-d3-data-action-row" onClick={onImportDataClick}><span>{t("data.importButton")}</span><ChevronRightIcon aria-hidden="true" /></button>
           <button type="button" className="ios-d3-data-action-row" onClick={() => void onReviewImportClick()}><span>{t("data.importPreview.open")}</span><ChevronRightIcon aria-hidden="true" /></button>
@@ -647,7 +647,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         </InsetGroup>}
 
         </div>
-        <InsetGroup title={section === "backup" ? t("fidelity.b.backup.export") : t("data.export")} className="fidelity-b-backup-export">
+        <InsetGroup dataCard title={section === "backup" ? t("fidelity.b.backup.export") : t("data.export")} className="fidelity-b-backup-export">
           <div className="ios-d3-setting-switch-row">
             <Label htmlFor="exportConfigurationCheckbox">
               <span className="block">{t("data.phase6.configuration")}</span>
@@ -801,7 +801,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         </CardContent>
       </Card>}
 
-      {showBackup && <InsetGroup title={t("data.restore.title")} className="fidelity-b-backup-restore">
+      {showBackup && <InsetGroup dataCard title={t("data.restore.title")} className="fidelity-b-backup-restore">
         <div className="p-4">
           <BackupRestoreList directory={autoBackupDirectory} prepare={isIOS() ? prepareRestoreBackupPath : undefined} t={t} locale={locale}
             onPreview={(data, rows) => { setItemResult(undefined); setItemPreview({ data, rows, backup: true }); }} />

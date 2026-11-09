@@ -221,6 +221,21 @@ it("shows known Summary P&L and unrecorded change separately", async () => {
   expect(screen.getByRole("button", { name: /Explain partial profit/ })).toBeInTheDocument();
 });
 
+it("masks break-even when only a partial P&L is known", async () => {
+  vi.mocked(queryTotalValue).mockResolvedValue({ totalValue: 240 } as never);
+  vi.mocked(calculateTotalProfit).mockResolvedValue({
+    total: null, knownTotal: 30, percentage: null, coins: [],
+    unknownCoins: [{ symbol: "BTC", assetType: "crypto", intervals: ["2024-03-15T00:00:00.000Z"], months: 1 }],
+  } as never);
+  render(<SummaryProfitLoss
+    dateRange={{ start: at(5), end: at(9) }}
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+    quoteColor="green-up-red-down"
+  />);
+  const breakEven = (await screen.findByText("Breakeven")).closest("div")!;
+  expect(breakEven.querySelector("strong")).toHaveTextContent("n/a");
+});
+
 it("shows recorded opening capital beside P&L percent when a later quantity change is unrecorded", async () => {
   vi.mocked(queryTotalValue).mockResolvedValue({ totalValue: 240 } as never);
   vi.mocked(calculateTotalProfit).mockResolvedValue({

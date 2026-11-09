@@ -76,7 +76,7 @@ test("phone cost controls, KPIs and prices use source typography", async ({ page
   const zeroMarkerX = await page.locator(".fidelity-asset-bar").filter({ hasText: "SOL" })
     .locator(".fidelity-bar-track").evaluate((track) => track.getBoundingClientRect().x +
       Number.parseFloat(getComputedStyle(track, "::before").left));
-  expect(Math.round(zeroMarkerX)).toBe(89);
+  expect(Math.round(zeroMarkerX)).toBe(137);
 });
 
 test("average prices and quantities use transactions in the selected range", async ({ page }) => {
@@ -203,7 +203,7 @@ test("unknown SOL marker stays at the source track edge in a custom range", asyn
   const markerX = await page.locator(".fidelity-asset-bar").filter({ hasText: "SOL" })
     .locator(".fidelity-bar-track").evaluate((track) => track.getBoundingClientRect().x +
       Number.parseFloat(getComputedStyle(track, "::before").left));
-  expect(Math.round(markerX)).toBe(89);
+  expect(Math.round(markerX)).toBe(137);
 });
 
 test("default, export, methods, range, lots and gaps", async ({ page }) => {

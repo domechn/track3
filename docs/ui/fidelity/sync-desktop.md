@@ -16,6 +16,12 @@ Dialogs are centred on the dimmed page: `Use the other device’s value?`, `Disa
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** sync 11.280% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
+The 8 Nov dense-data 1280 × 800 dark capture differs by **11.377%** from `settings-b-sync.html` at RGB-sum threshold 60. The source has illustrative remote device counts and USD labels; the product shows the actual local sync state and available device fields. Responsive Sync cards stack at this width to keep settings and status readable.
+
+- The 8 Nov layout audit stacks Sync cards at 901–1300 px. At 1301–1499 px the Connection and Passphrase cards share a grid row and align their bottom edges; at wider widths they use 7/5 grid spans.
+
 The owner requested a content-sized passphrase card, a separate Sync status card using real runtime values, and a full-width What to sync row. The source places Passphrase in a stretched 423px row and What to sync beside Devices. The resulting card positions differ because the source layout leaves a large empty area in the passphrase card. The new status card omits remote object size and next scheduled sync because the runtime does not expose them.
 
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.

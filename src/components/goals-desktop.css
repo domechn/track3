@@ -5,6 +5,14 @@
 .t3-fidelity-kinds-link:hover { color: #fff; }
 .t3-fidelity-goal-rules { grid-column: span 8; display: flex; min-height: 290px; max-height: 700px; flex-direction: column; overflow: hidden; }
 .t3-fidelity-triggered { grid-column: span 4; display: flex; min-height: 290px; max-height: 700px; flex-direction: column; overflow: hidden; contain: size; }
+@media (min-width: 1201px) {
+  .t3-fidelity-goals .t3-fidelity-grid:has(.t3-fidelity-history-row):not(:has(.t3-fidelity-history-row:nth-child(5)))
+    > :is(.t3-fidelity-goal-rules, .t3-fidelity-triggered) { grid-column: 1 / -1; }
+  .t3-fidelity-goals .t3-fidelity-grid:has(.t3-fidelity-history-row):not(:has(.t3-fidelity-history-row:nth-child(5)))
+    > .t3-fidelity-triggered { min-height: 0; contain: none; }
+  .t3-fidelity-goals .t3-fidelity-grid:has(.t3-fidelity-history-row):not(:has(.t3-fidelity-history-row:nth-child(5)))
+    .t3-fidelity-history-list { flex: none; overflow: visible; }
+}
 .t3-fidelity-rule-list,.t3-fidelity-history-list { flex: 1; min-height: 0; overflow-y: auto; }
 .t3-fidelity-goal-rules > nav,.t3-fidelity-triggered > nav { flex: none; padding-top: 8px; }
 .t3-fidelity-goal-row { display: grid; grid-template-columns: 44px minmax(0,1.25fr) minmax(0,1.45fr) 128px 84px 76px; gap: 14px; align-items: center; min-height: 68px; padding: 6px 0; border-top: 1px solid #1b1a1f; }

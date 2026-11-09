@@ -209,7 +209,7 @@ for (const fixture of fixtures) for (const width of viewports) for (const theme 
   });
 }
 
-for (const fixture of ["owner-btc", "stock-hkd", "dense"] as const) for (const width of [1001, 1024, 1100]) {
+for (const fixture of ["owner-btc", "stock-hkd", "dense"] as const) for (const width of [1001, 1024, 1100, 1110]) {
   test(`${fixture} tables fit at ${width}px without wrapping lot dates`, async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop");
     await page.setViewportSize({ width, height: 900 });

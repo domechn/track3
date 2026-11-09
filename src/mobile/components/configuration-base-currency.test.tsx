@@ -132,6 +132,21 @@ describe("Configuration base currency initialization", () => {
     window.location.hash = "";
   });
 
+  it("uses a singular custom asset in the iPhone source summary", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    window.location.hash = "#/settings/configuration?section=sources";
+    vi.mocked(getConfiguration).mockResolvedValue({
+      configs: { groupUSD: false, hideInactive: false },
+      exchanges: [],
+      stockConfig: { brokers: [] },
+      others: [{ symbol: "GOLD", amount: 1 }],
+    } as never);
+    render(<Configuration />);
+    expect(await screen.findByText(/1 custom asset\./)).toBeInTheDocument();
+    vi.mocked(isIOS).mockReturnValue(false);
+    window.location.hash = "";
+  });
+
   it.each([
     ["an empty portfolio", []],
     ["only custom assets", [{ symbol: "SOL", amount: 2 }]],

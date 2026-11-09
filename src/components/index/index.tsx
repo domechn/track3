@@ -375,12 +375,12 @@ function Layout({
         collapsed={sidebarCollapsed}
         onToggle={onSidebarToggle}
         isProUser={isProUser}
-        fidelity={!!fidelityPage}
         recordsToolsOpen={recordsToolsOpen}
       />
 
       <div
         style={{ marginLeft: sidebarWidth }}
+        data-sidebar={sidebarCollapsed ? "collapsed" : "expanded"}
         className={`t3-desktop-column transition-[margin-left] duration-300 ease-in-out ${recordsPage ? "t3-records-fidelity-shell" : ""}`}
       >
         <SummaryFidelityRangeContext.Provider value={{ range: summaryRange, setRange: setSummaryRange,
@@ -403,7 +403,8 @@ function Layout({
         />}
 
         {/* Main content */}
-        <main ref={mainRef} id="app-main-content" tabIndex={0} className="mx-auto w-full max-w-[1560px] px-7 py-5">
+        <main ref={mainRef} id="app-main-content" tabIndex={0} data-route={location.pathname + location.search}
+          className="mx-auto w-full max-w-[1560px] px-7 py-5">
           <div className="relative min-h-[400px]" aria-busy={initializing}>
             <div className="t3-desktop-loading-legacy">
             <React.Suspense

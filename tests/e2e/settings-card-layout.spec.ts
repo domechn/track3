@@ -104,7 +104,7 @@ for (const width of [1280, 1100]) {
 }
 
 for (const width of [1600, 1280, 1100]) {
-  test(`sync cards fit content and start together at ${width}px`, async ({ page }) => {
+  test(`sync cards fit content and follow the expected grid at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await seedSettingsB(page, "sync", "locked");
     await page.goto(settingsBRoute.sync);
@@ -113,9 +113,11 @@ for (const width of [1600, 1280, 1100]) {
     await expectSettingsCardsFitContent(page, ".sync-settings-page [data-ui-card]");
     const tops = await page.evaluate(() => ({
       connection: document.querySelector(".t3-sync-connection")!.getBoundingClientRect().top,
+      connectionBottom: document.querySelector(".t3-sync-connection")!.getBoundingClientRect().bottom,
       passphrase: document.querySelector(".t3-sync-passphrase")!.getBoundingClientRect().top,
     }));
-    expect(Math.abs(tops.connection - tops.passphrase)).toBeLessThanOrEqual(1);
+    if (width > 1300) expect(Math.abs(tops.connection - tops.passphrase)).toBeLessThanOrEqual(1);
+    else expect(Math.abs(tops.passphrase - tops.connectionBottom - 16)).toBeLessThanOrEqual(1);
   });
 }
 

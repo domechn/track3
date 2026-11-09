@@ -67,6 +67,10 @@ The source depicts the **default** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** sources 8.601% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
+With one custom asset, the source summary uses the singular label. The approved screenshot has a different sample source count.
+
 - The approved source is dark only. In light mode the live page and rename dialog use the selected light theme; their colours cannot match that dark reference.
 - The static source uses its pencil for the full credential editor and has no Rename flow. The live pencil opens Rename; the labeled source name opens the full editor, and the avatar retains its action menu.
 - Active rows use the available shared snapshot time. The paused Kraken row now uses its stored last-success date when it matches uniquely; a source without a saved status cannot reconstruct an individual refresh time from the shared snapshot.

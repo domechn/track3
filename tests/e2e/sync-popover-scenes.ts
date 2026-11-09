@@ -44,6 +44,9 @@ export async function openPop(page: Page, width: number, height: number, theme: 
   await expect(popover).toBeVisible();
   await popover.locator(".t3-sync-details-toggle").first().click();
   await popover.evaluate((node) => { node.scrollTop = 0; });
+  await popover.evaluate(async (node) => {
+    await Promise.all(node.getAnimations().map((animation) => animation.finished.catch(() => {})));
+  });
   return popover;
 }
 

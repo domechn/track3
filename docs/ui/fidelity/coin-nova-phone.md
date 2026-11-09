@@ -192,6 +192,10 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** coin-one-source 10.658% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
+The 8 Nov 390 × 844 dark dense-data capture differs by **10.659%** from the static phone image at RGB-sum threshold 60. The fixture lacks the source's invented NOVA manual prices and holdings, so the product shows its actual empty price history and sources.
+
 The source NOVA card has manual prices and a designed no-market-feed explanation. It keeps that compact explanation and dated rows; truly empty sources, lots, and transactions use the shared empty state, for which no NOVA zero-data source page exists.
 
 - The 5.783% first-screen difference also includes the owner's shared active Overview tile.

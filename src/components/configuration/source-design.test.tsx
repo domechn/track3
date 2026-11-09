@@ -69,6 +69,7 @@ it("opens the custom editor from the visible symbol", () => {
     onSaveBroker={async () => true} onSaveCustom={() => true} />);
   const edit = screen.getAllByRole("button", { name: "Edit GOLD" })[0];
   expect(edit).toContainElement(screen.getByText("GOLD"));
+  expect(screen.getByText("1 custom asset")).toBeVisible();
   fireEvent.click(edit);
   expect(document.querySelector(".t3-fidelity-source-page")).toHaveAttribute("data-editor-open", "true");
 });
@@ -196,4 +197,35 @@ it("does not assign a legacy stale status when two sources share the same masked
   expect((await screen.findByTitle("Main")).closest(".t3-fidelity-source-row")).not.toHaveClass("error");
   expect(screen.getByTitle("Other").closest(".t3-fidelity-source-row")).not.toHaveClass("error");
   expect(screen.queryByText(/Main value as of/)).not.toBeInTheDocument();
+});
+
+it("keeps a later page's status and rename attached to its original exchange", async () => {
+  statusState.statuses = [{ sourceId: "cex:8", label: "Ninth", kind: "exchange",
+    provider: "Kraken", hint: "krak…0009", status: "failed", detail: "Latest failed" }];
+  const noop = vi.fn();
+  const rename = vi.fn();
+  const exchanges = [
+    ...Array.from({ length: 8 }, (_, index) => ({
+      type: "binance", alias: `Source ${index + 1}`, apiKey: `binance-test-000${index}`,
+      secret: "", active: true,
+    })),
+    { type: "kraken", alias: "Ninth", apiKey: "krak-sample-0009", secret: "", active: true },
+  ];
+  render(<SourceDesign loading={false} tab="exchanges" setTab={noop}
+    exchanges={exchanges} wallets={[]} brokers={[]} others={[]}
+    onExchangeToggle={noop} onWalletToggle={noop} onBrokerToggle={noop}
+    onExchangeRemove={noop} onWalletRemove={noop} onBrokerRemove={noop} onOtherRemove={noop} onOtherAttach={noop}
+    onExchangeQuickLook={noop} onWalletQuickLook={noop} onBrokerQuickLook={noop}
+    onExchangeRename={rename}
+    onSaveExchange={async () => true} onSaveWallet={async () => true}
+    onSaveBroker={async () => true} onSaveCustom={() => true} />);
+  await screen.findByTitle("Source 1");
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  const row = screen.getByTitle("Ninth").closest(".t3-fidelity-source-row");
+  expect(row).toHaveClass("error");
+  expect(row).toHaveTextContent("Latest failed");
+  fireEvent.click(screen.getByRole("button", { name: "Rename Ninth" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Alias" }), { target: { value: "Vault" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(rename).toHaveBeenCalledWith("kraken", "krak-sample-0009", "Vault");
 });

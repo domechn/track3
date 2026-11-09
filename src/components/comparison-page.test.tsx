@@ -54,6 +54,22 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
+  it("pages an eleven-asset comparison without dropping the last asset", async () => {
+    const user = userEvent.setup();
+    vi.mocked(queryAllDataDates).mockResolvedValue([
+      { id: 1, date: "2024-04-16" }, { id: 2, date: "2024-04-15" },
+    ] as never);
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue(Array.from({ length: 11 }, (_, index) => ({
+      symbol: `ASSET${index}`, assetType: "crypto", amount: 1, value: 100 + index, price: 100 + index,
+    })) as never);
+    render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+    const table = await screen.findByRole("table", { name: "Per asset" }, { timeout: 10_000 });
+    await waitFor(() => expect(table.querySelectorAll("tbody tr")).toHaveLength(10), { timeout: 10_000 });
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(table.querySelectorAll("tbody tr")).toHaveLength(1);
+    expect(table).toHaveTextContent("ASSET0");
+  });
+
   it("starts from the same 30-day comparison at narrow desktop widths", async () => {
     const width = window.innerWidth;
     window.innerWidth = 1024;

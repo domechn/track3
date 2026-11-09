@@ -144,7 +144,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
   const unknownSource = storedSource && !/^[a-f0-9]{32}$/i.test(storedSource) ? storedSource : null;
 
   return <>
-    {!pending && report.warnings.some((warning) => warning.code === "unknown-disposal") && <div className="fidelity-cost-warning">
+    {!pending && report.warnings.some((warning) => warning.code === "unknown-disposal") && <div data-card className="fidelity-cost-warning">
       <ExclamationTriangleIcon aria-hidden="true" /><div><b>{t("cost.fidelity.unknownTitle").replace("{asset}", report.warnings.find((w) => w.code === "unknown-disposal")!.symbol)}</b>
         <span>{t(unknownSource ? "cost.fidelity.unknownSourceText" : "cost.fidelity.unknownText")
           .replace("{amount}", quantity(report.warnings.find((w) => w.code === "unknown-disposal")!.amount))
@@ -239,7 +239,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
         {tableRows.length ? <div className="fidelity-table-scroll" tabIndex={0}><table><thead><tr>
           {["asset", "acquired", tab === "open" ? "held" : "soldDate", "quantity", "cost", tab === "open" ? "value" : "proceeds",
             tab === "open" ? "unrealized" : "gain", "term"].map((key) => <th key={key}>{t(`cost.fidelity.${key}`)}</th>)}
-        </tr></thead><tbody>{pagedRows.map(({ row, index, groupLength }, i) => <Fragment key={`${"id" in row ? row.id : row.eventId}:${i}`}>
+        </tr></thead><tbody data-layout-page-size={pageSize} data-layout-rendered={pagedRows.length} data-layout-total={flatRows.length}>{pagedRows.map(({ row, index, groupLength }, i) => <Fragment key={`${"id" in row ? row.id : row.eventId}:${i}`}>
           {isWarning(row) ? <tr className="fidelity-warnrow">
             <td>{index === 0 ? <AssetLabel asset={{ symbol: row.symbol, assetType: row.assetType === "stock" ? "stock" : "crypto" }} size={20} quiet /> : ""}</td><td>{isAverage ? t("cost.fidelity.pooled") :
               withdrawn.get(row.eventId)?.acquiredAt ? date(withdrawn.get(row.eventId)!.acquiredAt!, locale) : "–"}</td>

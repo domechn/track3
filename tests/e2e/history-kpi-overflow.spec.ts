@@ -133,9 +133,11 @@ for (const width of [1100, 1280, 1440, 1920]) {
       await page.evaluate(() => document.fonts.ready);
       const { fit, stripWidth, scrollWidth, boxes } = await kpiGeometry(page);
       expect(scrollWidth).toBeLessThanOrEqual(stripWidth);
+      const expectedFit = width === 1280 ? "stacked" : width === 1920 ? "roomy" : "tight";
+      expect(fit).toBe(expectedFit);
       expect(new Set(boxes.map((box) => box.y)).size).toBe(width === 1280 ? 3 : 1);
-      if (width === 1280) expectStackedDividers(boxes);
-      expect(boxes[0].fontSize).toBe(width === 1280 ? 20 : 22);
+      if (fit === "stacked") expectStackedDividers(boxes);
+      expect(boxes[0].fontSize).toBe(fit === "stacked" ? 20 : 22);
       for (const box of boxes) {
         expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth);
         expect(box.textLeft).toBeGreaterThanOrEqual(box.contentLeft - 1);
@@ -232,20 +234,38 @@ for (const [currency, symbol] of [["CNY", "¥"], ["JPY", "¥"], ["KRW", "₩"]] 
           expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth);
           expect(box.textRight).toBeLessThanOrEqual(box.contentRight + 1);
         }
-        const valueGaps = await detail.locator("table").first().evaluate((table) =>
+        const cellFits = await detail.locator("table").first().evaluate((table) =>
           [...table.querySelectorAll("tbody tr")].filter((row) =>
             row.textContent?.includes("COIN10") || row.classList.contains("fidelity-history-total"))
             .map((row) => {
-              const value = row.children[3], share = row.children[4];
+              const visible = [...row.children].filter((cell) => getComputedStyle(cell).display !== "none");
               const textBox = (cell: Element) => {
                 const range = document.createRange();
                 range.selectNodeContents(cell);
                 return range.getBoundingClientRect();
               };
-              return textBox(share).left - textBox(value).right;
+              return visible.filter((cell) => cell.textContent?.trim()).every((cell) => {
+                const box = cell.getBoundingClientRect(), text = textBox(cell);
+                return text.left >= box.left - 1 && text.right <= box.right + 1;
+              });
             }));
-        expect(valueGaps).toHaveLength(2);
-        for (const gap of valueGaps) expect(gap).toBeGreaterThanOrEqual(8);
+        expect(cellFits).toEqual([true, true]);
+        if (width >= 1500) {
+          const valueShareGaps = await detail.locator("table").first().evaluate((table) =>
+            [...table.querySelectorAll("tbody tr")].filter((row) =>
+              row.textContent?.includes("COIN10") || row.classList.contains("fidelity-history-total"))
+              .map((row) => {
+                const textBox = (cell: Element) => {
+                  const range = document.createRange();
+                  range.selectNodeContents(cell);
+                  return range.getBoundingClientRect();
+                };
+                return textBox(row.children[4]).left - textBox(row.children[3]).right;
+              }));
+          expect(valueShareGaps).toHaveLength(2);
+          for (const gap of valueShareGaps) expect(gap).toBeGreaterThanOrEqual(8);
+        }
+        if (width < 1500) await expect(detail.locator(".fidelity-history-compact-share").first()).toBeVisible();
         expect(await detail.locator("table").first().evaluate((table) => {
           const card = table.closest(".fidelity-history-detail")!;
           const contentRight = card.getBoundingClientRect().right -

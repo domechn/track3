@@ -47,7 +47,7 @@ import EmptyState from "@/components/empty-state";
 import { AliasRename } from "./alias-rename";
 import { sourceAliasFallback } from "@/components/source-display-name";
 
-const CONFIG_LIST_PAGE_SIZE = 30;
+const CONFIG_LIST_PAGE_SIZE = 8;
 
 const WalletSection = memo(function WalletSection({
   wallets,
@@ -87,7 +87,7 @@ const WalletSection = memo(function WalletSection({
             </CardTitle>
             <p className="text-xs text-muted-foreground">
               {t("config.walletShownTotal")
-                .replace("{shown}", String(visibleWallets.length))
+                .replace("{shown}", String(paged.length))
                 .replace("{total}", String(wallets.length))}
             </p>
           </div>
@@ -237,7 +237,12 @@ const WalletSection = memo(function WalletSection({
                       <AssetLabel kind="wallet" type={w.type} name={w.type.toUpperCase()} size={24} />
                     </TableCell>
                     <TableCell className="w-[170px] text-sm">
-                      <span className="block truncate" title={w.alias || `${w.type}-${idx + 1}`}>{w.alias || `${w.type}-${idx + 1}`}</span>
+                      <span className="block truncate" title={w.alias || `${w.type}-${idx + 1}`}>
+                        {w.alias && w.alias.length > 25 ? <>
+                          <span aria-hidden="true">{`${w.alias.slice(0, 10)}…${w.alias.slice(-6)}`}</span>
+                          <span className="sr-only">{w.alias}</span>
+                        </> : w.alias || `${w.type}-${idx + 1}`}
+                      </span>
                     </TableCell>
                     <TableCell className="w-[320px] text-xs text-muted-foreground">
                       <p className="truncate">{w.address}</p>
@@ -288,10 +293,11 @@ const WalletSection = memo(function WalletSection({
               </TableBody>
             </Table>
             {visibleWallets.length > CONFIG_LIST_PAGE_SIZE && (
-              <div className="flex items-center justify-end gap-2">
+              <div data-layout-pager className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label={t("common.prev")}
                   onClick={() =>
                     onWalletPageChange(Math.max(walletPage - 1, 0))
                   }
@@ -305,6 +311,7 @@ const WalletSection = memo(function WalletSection({
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label={t("common.next")}
                   onClick={() =>
                     onWalletPageChange(
                       Math.min(walletPage + 1, walletPageCount - 1),

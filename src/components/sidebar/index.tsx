@@ -43,13 +43,13 @@ const recordsControlsSliders = <>
   <circle cx="12.5" cy="13" r="2" />
 </>;
 
-function NavItem({ item, collapsed, unread, fidelity }: { item: NavEntry; collapsed: boolean; unread?: number; fidelity?: boolean }) {
+function NavItem({ item, collapsed, unread }: { item: NavEntry; collapsed: boolean; unread?: number }) {
   const { t } = useTranslation();
   const label = item.to === "/goals" ? t("overview.fidelity.alerts") : t(item.labelKey);
   const resolved = useResolvedPath(item.to);
   const match = useMatch({ path: resolved.pathname, end: false });
   const { pathname } = useLocation();
-  const current = !!match || (fidelity && item.to === "/overview" && pathname.startsWith("/coins/"));
+  const current = !!match || (item.to === "/overview" && pathname.startsWith("/coins/"));
   const unreadText = unread ? t("goals.unread").replace("{count}", String(unread)) : "";
   const link = <Link to={item.to}
     aria-label={unreadText ? `${label} ${unreadText}` : collapsed ? label : undefined}
@@ -72,18 +72,18 @@ function NavItem({ item, collapsed, unread, fidelity }: { item: NavEntry; collap
     <TooltipContent side="right" sideOffset={10}>{label}</TooltipContent></Tooltip> : link;
 }
 
-function NavGroup({ label, items, collapsed, unread, fidelity }: {
-  label: string; items: NavEntry[]; collapsed: boolean; unread: number; fidelity?: boolean;
+function NavGroup({ label, items, collapsed, unread }: {
+  label: string; items: NavEntry[]; collapsed: boolean; unread: number;
 }) {
-  return <div className={cn("t3-nav-divider fidelity-records-rail-group", fidelity && "t3-fidelity-nav-group")}>
+  return <div className="t3-nav-divider fidelity-records-rail-group t3-fidelity-nav-group">
     {!collapsed && <div className="px-[9px] pb-1 text-xs text-muted-foreground">{label}</div>}
-    {items.map((item) => <NavItem key={item.to} item={item} collapsed={collapsed} fidelity={fidelity}
+    {items.map((item) => <NavItem key={item.to} item={item} collapsed={collapsed}
       unread={item.to === "/goals" ? unread : undefined} />)}
   </div>;
 }
 
-export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOpen = false, fidelity = false }: {
-  collapsed: boolean; onToggle: () => void; isProUser: boolean; recordsToolsOpen?: boolean; fidelity?: boolean;
+export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOpen = false }: {
+  collapsed: boolean; onToggle: () => void; isProUser: boolean; recordsToolsOpen?: boolean;
 }) {
   const { t } = useTranslation();
   const unread = useAlertBadge();
@@ -113,7 +113,7 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
     }}
     className={cn("t3-desktop-rail fixed inset-y-0 left-0 z-20 flex flex-col overflow-hidden border-r bg-background transition-[width] duration-300 ease-in-out",
       collapsed && "t3-rail-collapsed",
-      !fidelity && "fidelity-records-rail", !fidelity && collapsed && "fidelity-records-rail-collapsed", fidelity && "t3-fidelity-sidebar")}>
+      "t3-fidelity-sidebar")}>
     <div className="flex h-14 shrink-0 items-center gap-2 px-[6px]">
       <Link to="/overview" aria-label={collapsed ? "Track3" : undefined}
         className="flex h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -123,13 +123,13 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
       {isProUser && !collapsed && <span className="t3-tag" data-tone="accent">{t("app.proBadge")}</span>}
     </div>
     <TooltipProvider delayDuration={220}><nav aria-label={t("nav.main", "Main navigation")} className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-[10px] touch:px-[5px] pb-2">
-      <NavItem item={overview} collapsed={collapsed} fidelity={fidelity} />
-      <NavGroup label={t("nav.analyze", "Analyze")} items={analyze} collapsed={collapsed} unread={unread} fidelity={fidelity} />
-      <NavGroup label={t("nav.manage", "Manage")} items={isProUser ? manage : manage.slice(0, -1)} collapsed={collapsed} unread={unread} fidelity={fidelity} />
+      <NavItem item={overview} collapsed={collapsed} />
+      <NavGroup label={t("nav.analyze", "Analyze")} items={analyze} collapsed={collapsed} unread={unread} />
+      <NavGroup label={t("nav.manage", "Manage")} items={isProUser ? manage : manage.slice(0, -1)} collapsed={collapsed} unread={unread} />
     </nav><div className="t3-nav-divider shrink-0">
       {collapsed && records ? <Tooltip><TooltipTrigger asChild>{recordsControl}</TooltipTrigger>
         <TooltipContent side="right" sideOffset={10}>{recordsControlLabel}</TooltipContent></Tooltip> : recordsControl}
-      <NavItem item={settings} collapsed={collapsed} fidelity={fidelity} />
+      <NavItem item={settings} collapsed={collapsed} />
     </div></TooltipProvider>
     <button type="button" aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")}
       aria-expanded={!collapsed} onClick={onToggle}

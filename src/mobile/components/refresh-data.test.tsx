@@ -759,6 +759,26 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(localStorage.getItem("track3-refresh-source-statuses")).toContain("Cold vault");
   });
 
+  it("keeps long wallet identities distinct and accessible in the phone status sheet", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    const names = [1, 2].map((index) => `Cold ${index} storage account with a long descriptive source name`);
+    vi.mocked(refreshAllData).mockResolvedValue({
+      ...partialResult,
+      sourceStatuses: names.map((label, index) => ({
+        sourceId: `btc:${index}`, label, kind: "wallet", provider: "BTC", status: "stale",
+      })),
+    } as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await openFinishedSourceStatus();
+    const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
+    expect(names.map((name) => [...dialog.querySelectorAll("[data-source-status-row]")]
+      .some((row) => row.getAttribute("aria-label")?.includes(name)))).toEqual([true, true]);
+    expect(dialog).toHaveTextContent("Cold 1 sto… (BTC)");
+    expect(dialog).toHaveTextContent("Cold 2 sto… (BTC)");
+  });
+
   it("distinguishes four Main sources, sorts failures first, and retries all failed", async () => {
     const localLastSuccess = new Date(2026, 9, 17, 12, 30).toISOString();
     const sourceStatuses = [

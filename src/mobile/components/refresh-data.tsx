@@ -47,7 +47,7 @@ import { useCurrentSourceStatuses } from "@/components/use-current-source-status
 import AssetLabel from "@/components/common/asset-label";
 import { sourceIconKind } from "@/components/source-allocation-list";
 
-import { sourceDisplayNames } from "@/components/source-display-name";
+import { compactSourceName, sourceDisplayNames } from "@/components/source-display-name";
 import { runningSourceStarts } from "@/components/source-run-progress";
 import { refreshSourceName } from "@/components/refresh-source-name";
 
@@ -564,7 +564,7 @@ const App = ({
                 <div className="ios-d3-refresh-row-main">
                   {isIOS() && <StatusIcon aria-hidden="true" className={`mt-1 h-5 w-5 shrink-0 ${source.status === "ok" ? "text-green-600 dark:text-green-400" : source.status === "failed" ? "text-destructive" : "text-amber-600"}`} />}
                   <div className="ios-d3-refresh-row-content">
-                  <AssetLabel kind={source.kind === "exchange" ? "exchange" : source.kind === "broker" ? "broker" : source.kind === "wallet" ? "wallet" : "custom"} type={source.provider ?? source.sourceId.split(":")[0]} name={name} size={20} />
+                  <span title={name}><AssetLabel kind={source.kind === "exchange" ? "exchange" : source.kind === "broker" ? "broker" : source.kind === "wallet" ? "wallet" : "custom"} type={source.provider ?? source.sourceId.split(":")[0]} name={compactSourceName(name)} size={20} /></span>
                   {source.provider && <div className="ios-d3-refresh-identity text-xs text-muted-foreground">
                     {source.provider}{source.hint && ` · ${displayHint(source)}`}
                   </div>}

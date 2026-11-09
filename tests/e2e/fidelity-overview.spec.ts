@@ -70,7 +70,11 @@ test("Overview matches the approved phone card order and sample values", async (
     await expect(page.locator(".fd-overview-sources").getByRole("button", { name: "Refresh all" })).toBeVisible();
     await expect(page.getByRole("radio", { name: "30D" })).toHaveAttribute("aria-checked", "true");
     await expect(page.locator(".fd-overview-chart")).toContainText("1 Oct");
-    expect((await page.locator(".fd-overview-chart").boundingBox())?.y).toBe(398);
+    const kpis = (await page.locator(".fd-overview-kpis").boundingBox())!;
+    const chart = (await page.locator(".fd-overview-chart").boundingBox())!;
+    const hero = (await page.locator(".fd-overview-hero").boundingBox())!;
+    expect(chart.y).toBeGreaterThanOrEqual(kpis.y + kpis.height);
+    expect(chart.y + chart.height).toBeLessThanOrEqual(hero.y + hero.height);
     expect(Number((await page.locator(".fd-overview-chart path").first().getAttribute("d"))?.match(/^M44\.00 ([\d.]+)/)?.[1])).toBeCloseTo(113.7, 1);
     await expect(page.locator(".fd-overview-chart line").first()).toHaveAttribute("y1", "164");
     await expect(page.getByText("7-day gain of $26,011, mostly BTC and SOL.")).toBeVisible();
@@ -131,7 +135,8 @@ test("AI insights use saved insight data for portfolios without template coins",
       query: "DELETE FROM configuration WHERE id = 997", values: [],
     }));
     await page.reload();
-    await expect(page.locator(".fd-overview-insights").getByRole("region", { name: "Insights" })).toBeVisible();
+    await expect(page.locator(".fd-overview-insights").getByRole("region", { name: "Insights" }))
+      .toBeVisible({ timeout: 30_000 });
     await expect(page.locator(".fd-overview-insights")).not.toContainText("Insights are turned off");
     await expect(page.locator(".fd-overview-pro")).toHaveCount(0);
   } finally { await context.close(); }

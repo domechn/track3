@@ -120,7 +120,7 @@ function CoinChart({ points, mode, symbol, currency, shortDate, emptyText }: { p
     {values.map((value, index) => {
       const detail = `${axisDate(index)}: ${money(value, false, 2, currency.symbol)}`;
       return <circle key={index} role="button" {...chart.markProps(index, detail, detail)}
-        cx={x(index)} cy={y(value)} r="10" fill="transparent" />;
+        cx={x(index)} cy={y(value)} r="10" fill="transparent" pointerEvents="all" />;
     })}
     {labelIndices.map(index => {
       const hidden = visibleDates !== null && !visibleDates.includes(index);

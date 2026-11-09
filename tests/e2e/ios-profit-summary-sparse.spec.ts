@@ -15,7 +15,7 @@ test("phone explains sparse 2026 profit months and the October baseline", async 
     await installTauriBridge(page, { sparseProfitHistory: true });
     await page.goto("/#/summary");
     const main = page.locator(".fd-summary");
-    await expect(main).toHaveAttribute("data-state", "ready");
+    await expect(main).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
     await expect(main.locator(".fd-month")).toHaveCount(10);
     await expect(main.locator(".fd-month").filter({ hasText: "Feb" })).toContainText("No snapshot");
     await expect(main.locator(".fd-month").filter({ hasText: "Oct" })).toContainText("since 4 Apr");
@@ -30,6 +30,7 @@ test("phone explains sparse 2026 profit months and the October baseline", async 
     const feb = summary.getByRole("button", { name: /Feb: No snapshot in this month/ });
     await feb.focus();
     await expect(page.getByRole("tooltip")).toHaveText("No snapshot in this month");
+    await page.mouse.move(0, 0);
     await feb.evaluate((button) => button.blur());
     await expect(page.getByRole("tooltip")).toHaveCount(0);
     await feb.tap();

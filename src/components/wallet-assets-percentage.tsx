@@ -29,6 +29,7 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 import { sourceDisplayNames } from "./source-display-name";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Pager, usePager } from "./ui/pager";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
 import { ChartResizeContext } from "@/App";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
@@ -325,6 +326,7 @@ const App = ({
     () => [...walletAssetsPercentage].sort((a, b) => b.value - a.value || a.wallet.localeCompare(b.wallet)),
     [walletAssetsPercentage],
   );
+  const sourcePage = usePager(sortedWallets, symbol ?? "sources", 8);
   const walletOrdinals = useLatestWalletOrdinals();
   const sourceLabels = useMemo(() => {
     const labels = sourceDisplayNames(sortedWallets.map((item) => ({
@@ -539,10 +541,11 @@ const App = ({
     <Card data-card-boundary="true" className="analyze-wallet-allocation">
       {!symbol && onSelectSource && <nav className="analyze-source-picker" aria-label={t("wallets.h1")}>
         <button type="button" aria-pressed={selectedSource === null} onClick={() => onSelectSource(null)}>{t("wallets.allSources")}</button>
-        {sortedWallets.map((wallet) => <button type="button" key={wallet.wallet} aria-pressed={selectedSource === wallet.wallet}
+        {sourcePage.rows.map((wallet) => <button type="button" key={wallet.wallet} aria-pressed={selectedSource === wallet.wallet}
           onClick={() => onSelectSource(wallet.wallet)} title={wallet.wallet}><AssetLabel kind={sourceIconKind(wallet.walletType)}
             type={wallet.walletType} name={displayName(wallet)} size={16} /></button>)}
       </nav>}
+      {!symbol && onSelectSource && <Pager count={sortedWallets.length} {...sourcePage} t={t} ariaLabel={t("wallets.allSources")} />}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-3">
         <CardTitle className="flex flex-wrap items-center gap-1 text-sm font-medium text-muted-foreground">
           {symbol ? (

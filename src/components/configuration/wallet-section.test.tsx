@@ -40,6 +40,30 @@ describe("WalletSection", () => {
     fireEvent.keyDown(screen.getByRole("textbox", { name: "Alias" }), { key: "Enter" });
     expect(onRename).toHaveBeenCalledWith("btc", "1abc", "");
   });
+  it("pages a real-scale wallet list at eight visible rows", () => {
+    const wallets = Array.from({ length: 13 }, (_, index): WalletRow => ({
+      type: "btc", alias: `Wallet ${index + 1}`, address: `bc1q${index + 1}`, active: true,
+    }));
+    const onWalletPageChange = vi.fn();
+    const { container } = render(<WalletSection {...baseProps} wallets={wallets} visibleWallets={wallets}
+      walletPageCount={2} onWalletPageChange={onWalletPageChange} />);
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(8);
+    expect(screen.getByText("8 shown / 13 total")).toBeInTheDocument();
+    const pager = container.querySelector("[data-layout-pager]")!;
+    fireEvent.click(within(pager as HTMLElement).getByRole("button", { name: "Next" }));
+    expect(onWalletPageChange).toHaveBeenCalledWith(1);
+  });
+  it("distinguishes long wallet aliases by their suffix without losing the full name", () => {
+    const aliases = ["Cold storage account for wallet 01", "Cold storage account for wallet 02"];
+    render(<WalletSection {...baseProps} wallets={aliases.map((alias, index) => ({
+      type: "btc", alias, address: `bc1q${index}`, active: true,
+    }))} visibleWallets={aliases.map((alias, index) => ({
+      type: "btc", alias, address: `bc1q${index}`, active: true,
+    }))} />);
+    expect(screen.getByText("Cold stora…let 01")).toBeInTheDocument();
+    expect(screen.getByText("Cold stora…let 02")).toBeInTheDocument();
+    for (const alias of aliases) expect(screen.getByText(alias)).toHaveClass("sr-only");
+  });
   it("renders wallet table with data", () => {
     render(<WalletSection {...baseProps} />);
 

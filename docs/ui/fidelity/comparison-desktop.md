@@ -23,6 +23,10 @@ With fewer than two stored snapshots, the page shows an empty explanation and no
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** comparison 9.287% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
+The dense 1440 px Snapshots card follows its content height, so the space below its controls stays below the layout-audit limit. The source's fixed card height can differ by a few pixels.
+
 - UI42's approved neutral logo tiles replace the bare marks in the older design page. On the iPad mover rows, the STOCK tag sits below its ticker so the ticker, movement bar and signed value remain visible within the available columns.
 
 After merging the active-navigation change, the dark 1440 × 900 source
@@ -51,6 +55,7 @@ the shared 20 px theme tag; its 11 px label, border, and padding differ
 from the source's 12 px dark pill. In light theme its tint follows the
 accent token, and the subtitle amount and price-movement callout use
 readable light surfaces. The source supplies no light-theme page.
+- The 8 Nov large-data layout pages the Per asset table at ten rows, while the total and mover facts still use all assets. The older pixel ratios below use the source's eight-asset state.
 
 Fresh renders of the source HTML and app with the source's eight assets both measure 1600 × 1452 px. The default state differs at **5.27%** of pixels with any RGB channel above 20, or **4.21%** above 60. With picker A open the ratios are **5.36%** and **4.23%**, respectively. The captures and `getBoundingClientRect`/`getComputedStyle` measurements are in `/tmp/ui14-current/`. The required mover layout accounts for the largest region of changed pixels. The source cannot display the required 11-asset state, so these ratios measure the same eight-asset data on both sides.
 

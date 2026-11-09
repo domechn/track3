@@ -15,6 +15,8 @@ The title is `Backup & data`; subtitle: `Export, import and automatic local back
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** backup 8.772% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.
 
 Settings toasts retain a visible 44px close × target for keyboard and pointer dismissal; the reference toasts omit it.

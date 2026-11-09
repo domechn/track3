@@ -569,7 +569,7 @@ const App = ({
               <span className={cn("fidelity-month-value", value == null ? "text-muted-foreground" : getToneClass(value, quoteColor))} title={fidelityAmount(value)}>
                 {value === null ? "–" : <FittingAttributionAmount full={fidelityAmount(value)} compact={attributionCompactAmount(value, currency, locale)} />}
               </span>
-              {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <span className="text-muted-foreground text-[10px]">{t("profitSummary.unrecordedChanges").replace("{amount}", fidelityAmount(item.unrecordedChange))}</span>}
+              {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <span className="text-muted-foreground whitespace-pre text-[10px]">{t("profitSummary.unrecordedChanges").replace("{amount}", `\n${fidelityAmount(item.unrecordedChange)}`)}</span>}
               <span className="fidelity-month-percent">{fidelityPercentage(item.percentage)}</span>
               <span className="fidelity-month-bar"><i className={value == null || value === 0 ? "" : value < 0 ? "negative" : "positive"}
                 style={{ width: `${Math.min(50, Math.abs(item.percentage ?? 0) / 16 * 50)}%` }} /></span>
@@ -630,7 +630,7 @@ const App = ({
         </strong>
         <span className={cn("fidelity-year-percent", item.total == null ? "text-muted-foreground" : getToneClass(item.total, quoteColor))}>{fidelityPercentage(item.percentage)}</span>
         <span className="fidelity-year-deposits"><span>{t("profitSummary.recordedInflows")}</span><span>{item.deposits == null ? "–" : fidelityAmount(item.deposits)}</span></span>
-        {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <span className="fidelity-year-unrecorded text-muted-foreground text-[10px]">{t("profitSummary.unrecordedChanges").replace("{amount}", fidelityAmount(item.unrecordedChange))}</span>}
+        {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <span className="fidelity-year-unrecorded whitespace-pre-line text-muted-foreground text-[10px]">{t("profitSummary.unrecordedChanges").replace("{amount}", `\n${fidelityAmount(item.unrecordedChange)}`)}</span>}
         <span className="fidelity-year-foot"><span><span className={countTone(item.count?.up ?? 0, true, quoteColor)}>{t(item.count?.up === 1 ? "profitSummary.monthUp" : "profitSummary.monthsUp").replace("{n}", String(item.count?.up ?? 0))}</span> · <span className={countTone(item.count?.down ?? 0, false, quoteColor)}>{t(item.count?.down === 1 ? "profitSummary.monthDown" : "profitSummary.monthsDown").replace("{n}", String(item.count?.down ?? 0))}</span></span><span>{span.last - span.first + 1} {t(span.last === span.first ? "summary.fidelity.month" : "summary.fidelity.months")}</span></span>
       </button><HintPopover label={t("profitSummary.depositBreakdown")} className="fidelity-year-badge fidelity-year-breakdown-badge inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground" trigger={<span>ⓘ</span>}>
         <p>{t("profitSummary.trades").replace("{amount}", fidelityAmount(item.trades ?? 0))}</p>

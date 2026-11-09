@@ -113,7 +113,7 @@ test("phone What moved bars reveal exact changes without opening coin details", 
   }
 });
 
-test("phone Summary attribution bars reveal exact market and quantity amounts", async ({ browser }) => {
+test("phone Summary attribution bars reveal exact known P&L and other changes", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 },
     isMobile: true, hasTouch: true, timezoneId: "UTC" });
   try {
@@ -125,7 +125,8 @@ test("phone Summary attribution bars reveal exact market and quantity amounts", 
     await expect(mark).toBeVisible({ timeout: 30_000 });
     await mark.tap();
     await expect(page.locator("[data-chart-tooltip]")).toContainText("$");
-    await expect(page.locator("[data-chart-tooltip]")).toContainText("Market");
+    await expect(page.locator("[data-chart-tooltip]")).toContainText("Known P&L");
+    await expect(page.locator("[data-chart-tooltip]")).toContainText("Cash flow and other changes");
   } finally {
     await context.close();
   }
@@ -187,7 +188,7 @@ test("phone Wallets share segment shows its exact value on tap", async ({ browse
 });
 
 for (const route of ["overview", "summary", "coins/BTC", "wallets", "comparison", "rebalance", "goals", "cost-basis"]) {
-  test(`every phone ${route} chart mark exposes a tooltip on hover`, async ({ browser }) => {
+  test(`every phone ${route} chart mark exposes a tooltip on tap`, async ({ browser }) => {
     test.setTimeout(120_000);
     const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 390, height: 844 },
       isMobile: true, hasTouch: true, timezoneId: "UTC" });
@@ -202,10 +203,14 @@ for (const route of ["overview", "summary", "coins/BTC", "wallets", "comparison"
         ? ".fd-overview-chart [data-chart-mark]:visible, .fd-overview-moved [data-chart-mark]:visible"
         : "[data-chart-mark]:visible");
       await expect(marks.first()).toBeVisible({ timeout: 60_000 });
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      });
       const count = await marks.count();
       for (let index = 0; index < count; index++) {
         const label = await marks.nth(index).getAttribute("aria-label");
-        await marks.nth(index).hover({ timeout: 10_000 }).catch(async (error: unknown) => {
+        await marks.nth(index).tap({ timeout: 10_000 }).catch(async (error: unknown) => {
           throw new Error(`${route} mark ${index} ${label}; current count ${await marks.count()}: ${String(error)}`);
         });
         await expect(page.locator("[data-chart-tooltip]"), `${route} mark ${index} ${await marks.nth(index).getAttribute("aria-label")}`).toBeVisible();

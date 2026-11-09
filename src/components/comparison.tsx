@@ -22,7 +22,6 @@ import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import PageLoadingOverlay from "./page-loading-overlay";
 import {
-  formatAssetLabel,
   getAssetLogoKey,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
@@ -42,6 +41,7 @@ import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, isSameDay, isSameM
 import { useTranslation } from "@/i18n";
 import ComparisonMoversPanel from "./comparison-movers-panel";
 import ComparisonFidelity from "./comparison-fidelity";
+import { Pager, usePager } from "./ui/pager";
 import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
 import { getStableCoins } from "@/middlelayers/configuration";
 import { useWindowSize } from "@/utils/hook";
@@ -294,6 +294,9 @@ const App = ({
       };
     });
   }, [baseData, headData, stableSymbols]);
+  const sortedComparisons = useMemo(() => [...coinComparisons].sort((a, b) =>
+    Math.abs(b.value.head - b.value.base) - Math.abs(a.value.head - a.value.base)), [coinComparisons]);
+  const comparisonPage = usePager(sortedComparisons, `${baseId}:${headId}`, 10);
 
   const totalValue = useMemo(() => {
     const baseTotal = baseData.reduce((sum, d) => sum + d.value, 0);
@@ -756,9 +759,9 @@ const App = ({
                       <th className="py-3 text-right">{t("common.valueLabel")} B</th>
                       <th className="py-3 text-right">{t("common.changeLabel")}</th>
                     </tr></thead>
-                    <tbody>{[...coinComparisons].sort((a, b) =>
-                      Math.abs(b.value.head - b.value.base) - Math.abs(a.value.head - a.value.base),
-                    ).map((coin) => <tr key={getAssetLogoKey(coin)} className="border-b last:border-b-0">
+                    <tbody data-layout-page-size={comparisonPage.pageSize} data-layout-rendered={comparisonPage.rows.length}
+                      data-layout-total={sortedComparisons.length}>{comparisonPage.rows.map((coin) =>
+                      <tr key={getAssetLogoKey(coin)} className="border-b last:border-b-0">
                       <td className="py-3 font-semibold"><AssetLabel asset={coin} src={logoMap[getAssetLogoKey(coin)]} size={20} quiet /></td>
                       <td className="py-3 text-right">{formatVal(coin.amount.base, "amount")}</td>
                       <td className="py-3 text-right">{formatVal(coin.amount.head, "amount")}</td>
@@ -772,6 +775,10 @@ const App = ({
                       </td>
                     </tr>)}</tbody>
                   </table>
+                  <div className="mt-3">
+                    <Pager count={sortedComparisons.length} {...comparisonPage} t={t}
+                      ariaLabel={t("comparison.perAsset")} />
+                  </div>
                 </CardContent>
               </Card>
             </FadeUp>
