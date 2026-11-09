@@ -103,10 +103,10 @@ test("Wallets Binance filter shows the source value and balances", async ({ brow
           return { selector, x: r.x, y: r.y, w: r.width, h: r.height };
         })), null, 2));
     expect((await page.locator(".fd-wallet-allocation").boundingBox())?.y).toBe(320);
-    expect((await page.locator(".fd-wallet-allocation").boundingBox())?.height).toBe(350);
+    expect((await page.locator(".fd-wallet-allocation").boundingBox())?.height).toBe(374);
     expect((await page.locator(".fd-wallet-split").boundingBox())?.y).toBe(589);
     expect((await page.locator(".fd-wallet-legend").boundingBox())?.y).toBe(611);
-    expect((await page.locator(".fd-wallet-balances").boundingBox())?.y).toBe(682);
+    expect((await page.locator(".fd-wallet-balances").boundingBox())?.y).toBe(706);
     await page.screenshot({ path: "/tmp/fidelity/wallets/wallets-binance-phone.png" });
     await captureLong(page, "/tmp/fidelity/wallets/wallets-binance-phone-long.png");
   } finally { await context.close(); }
@@ -128,11 +128,11 @@ test("Wallets OKX filter shows failed status and last good values", async ({ bro
           return { selector, x: r.x, y: r.y, w: r.width, h: r.height };
         })), null, 2));
     expect((await page.locator(".fd-wallet-allocation").boundingBox())?.y).toBe(434);
-    expect((await page.locator(".fd-wallet-allocation").boundingBox())?.height).toBe(355);
+    expect((await page.locator(".fd-wallet-allocation").boundingBox())?.height).toBe(379);
     expect((await page.locator(".fd-wallet-allocation .fd-card-heading").boundingBox())?.height).toBe(50);
     await expect.poll(async () => (await page.locator(".fd-wallet-allocation.failed-source .fd-wallet-split").boundingBox())?.y).toBe(732);
     expect((await page.locator(".fd-wallet-allocation.failed-source .fd-wallet-legend").boundingBox())?.y).toBe(754);
-    expect((await page.locator(".fd-wallet-balances").boundingBox())?.y).toBe(801);
+    expect((await page.locator(".fd-wallet-balances").boundingBox())?.y).toBe(825);
     await expect(page.locator(".fd-wallet-failure")).toContainText("Next automatic try 10:11.");
     await page.screenshot({ path: "/tmp/fidelity/wallets/wallets-okx-phone.png" });
     await captureLong(page, "/tmp/fidelity/wallets/wallets-okx-phone-long.png");

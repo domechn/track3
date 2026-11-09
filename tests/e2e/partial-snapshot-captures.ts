@@ -77,7 +77,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   await expect(page.locator("[data-testid=history-content][aria-busy=true]")).toHaveCount(0);
   await expect(page.getByText("4 of 5 sources").and(page.locator(":visible")).first()).toBeVisible();
   await capture("history-list");
-  if (shell === "ios" && width < 700) {
+  if (shell === "ios" && width < 1000) {
     await page.locator(".fidelity-history-chips button").nth(1).click();
     await page.getByRole("button", { name: /Issues/ }).click();
     await page.getByRole("button", { name: /^Show / }).click();

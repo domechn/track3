@@ -31,6 +31,8 @@ for (const width of [390, 820]) {
           await expect(page.getByText("Loading page", { exact: true })).toHaveCount(0, { timeout: 30_000 });
           await expect(page.locator("#app-main-content [aria-busy='true']")).toHaveCount(0, { timeout: 30_000 });
           await page.evaluate(() => document.fonts.ready);
+          if (width === 390 && route === "summary")
+            await expect(page.locator(".fd-three strong").first()).toHaveCSS("font-variant-numeric", "tabular-nums");
           const result = await findKpiOverflows(page);
           inspected += result.inspected;
           failures.push(...result.failures.map((item) => `${route}: ${item}`));

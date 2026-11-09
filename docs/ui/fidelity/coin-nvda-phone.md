@@ -223,7 +223,6 @@ The 8 Nov 390 × 844 dark dense-data stock capture differs by **9.366%** from th
 - The 390 × 844 DPR 2 viewport capture in `/tmp/fidelity/coin-nvda/` differs by **2.80%** from the saved source render in `/tmp/wui18-source/` at RGB-sum threshold 48. It predates the shared active-tab tint. The normal chart grid remains three columns and the page is 1,964 px high.
 - The app now uses the shared tinted Overview tab and indicator. The static coin source uses an untinted active icon; this contributes to newer same-base captures.
 - A fresh DPR 1 source render inside the mobile test context differed by 6.97%; its font raster and lower card position differ from the approved DPR 2 source capture. The matching DPR 2 pair above is the fidelity comparison.
-- At 390 px, chart-stat amounts use 14 px text to keep all three values inside their columns. The source uses larger text in that row.
 - The saved stock record has no exchange or quote-delay fields, so it cannot substantiate the source’s “NASDAQ · delayed 15 min” price caption. The chart uses dated stored snapshots.
 - With HKD conversion, long chart statistics can wrap to a second aligned row; the USD NVDA source page has shorter values and no wrapped variant.
 - The product's scroll container preserves route scroll position; Chromium antialiases small text in that layer differently from the standalone source page.

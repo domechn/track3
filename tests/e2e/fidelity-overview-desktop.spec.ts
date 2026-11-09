@@ -103,17 +103,6 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         expect(Math.abs(insightsBox!.y - 605)).toBeLessThan(1);
         expect(await insights.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
       }
-      if (state.name === "overview-range") {
-        await page.getByRole("button", { name: "Choose date range" }).click();
-        const popover = await page.locator(".t3-date-popover").boundingBox();
-        expect(Math.abs(popover!.x - 715)).toBeLessThan(1);
-        expect(Math.abs(popover!.y - 51)).toBeLessThan(1);
-        await page.getByRole("textbox", { name: "From" }).fill("8 Oct 2026");
-        await page.getByRole("textbox", { name: "To" }).fill("24 Oct 2026");
-        await page.getByRole("textbox", { name: "To" }).blur();
-        await expect(page.locator(".t3-date-fidelity-footer")).toContainText("17 snapshots");
-        await page.getByRole("textbox", { name: "From" }).focus();
-      }
       await page.waitForFunction(async () => {
         const runtimeModule = "/src/middlelayers/sync/runtime.ts";
         const { syncRuntime } = await import(runtimeModule);
@@ -122,6 +111,22 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
       }, undefined, { timeout: 60_000 });
       await expect(page.locator(".desktop-sync-status-indicator button").first())
         .toContainText("Synced 09:41", { timeout: 30_000 });
+      if (state.name === "overview-range") {
+        await page.getByRole("button", { name: "Choose date range" }).click();
+        await expect.poll(() => page.evaluate(() => {
+          const popover = document.querySelector<HTMLElement>(".t3-date-popover");
+          const trigger = document.querySelector<HTMLElement>(".t3-date-trigger");
+          if (!popover || !trigger) return null;
+          const popoverBox = popover.getBoundingClientRect();
+          const triggerBox = trigger.getBoundingClientRect();
+          return [popoverBox.width, popoverBox.y, Math.round(popoverBox.right - triggerBox.right)];
+        })).toEqual([560, 51, 108]);
+        await page.getByRole("textbox", { name: "From" }).fill("8 Oct 2026");
+        await page.getByRole("textbox", { name: "To" }).fill("24 Oct 2026");
+        await page.getByRole("textbox", { name: "To" }).blur();
+        await expect(page.locator(".t3-date-fidelity-footer")).toContainText("17 snapshots");
+        await page.getByRole("textbox", { name: "From" }).focus();
+      }
       const bell = page.locator(".t3-topbar-bell");
       const badge = bell.locator("span");
       await expect(badge).toBeVisible();

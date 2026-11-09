@@ -6,9 +6,9 @@ References viewed: `phone/analyze/wallets-okx-phone.jpg`, `phone-long/analyze/wa
 
 1. Wallets title x16 y14. Two-line subtitle `What does OKX hold? Showing balances from 09:12; the 09:41 refresh failed, so today's prices are not applied.` 30D selected range y90 and three rows of chips y150; OKX selected white, still has amber warning dot.
 2. Red alert banner x16 y302 w358 h116: alert triangle, **OKX refresh failed**, `Rate limit exceeded (HTTP 429) at 09:41. The numbers below are from the last good refresh at 09:12. Next automatic try 10:11.`, outlined Retry at right.
-3. OKX card x16 y434 h355. Title OKX; red dot `Refresh failed · last good 09:12 · API key, read-only`. `OKX value (as of 09:12)` `$142,475.77`, `+$2,046.16 · +1.46% vs 1 Oct`. Three columns: Share of total **18.7%** of $763,809; Assets **3** exchange; Largest asset **USDT** 49.1% of source. Split bar and legend USDT 49.1%, USDC 28.1%, ETH 22.8%.
-4. Balances x16 y801 h257, header `as of 09:12`, three two-line rows: USDT 70,000.00 / `$70,000.00` / `$1.00 · 49.1%` / `−$7 · −0.01%`; USDC 40,000.00 / `$40,000.00` / `$1.00 · 28.1%` / `−$4 · −0.01%`; ETH 12.8508 / `$32,475.77` / `$2,527.14 · 22.8%` / `+$2,057 · +6.76%`.
-5. Asset changes x16 y1070 h336, bars ETH `+$2,057`, USDC `−$4`, USDT `−$7`; Source change `+$2,046.16`, Share of portfolio change `5.9%`, unchanged-amount price-movement note. Full source page 1494px, bottom navigation fixed.
+3. OKX card x16 y434 h379. Title OKX; red dot `Refresh failed · last good 09:12 · API key, read-only`. `OKX value (as of 09:12)` `$142,475.77`, `+$2,046.16 · +1.46% vs 1 Oct`. Three columns: Share of total **18.7%** of $763,809; Assets **3** exchange; Largest asset **USDT** 49.1% of source. The legend has two columns at 341–480px and one at 320px: USDT 49.1%, USDC 28.1%, ETH 22.8%.
+4. Balances x16 y825 h257, header `as of 09:12`, three two-line rows: USDT 70,000.00 / `$70,000.00` / `$1.00 · 49.1%` / `−$7 · −0.01%`; USDC 40,000.00 / `$40,000.00` / `$1.00 · 28.1%` / `−$4 · −0.01%`; ETH 12.8508 / `$32,475.77` / `$2,527.14 · 22.8%` / `+$2,057 · +6.76%`.
+5. Asset changes x16 y1094 h336, bars ETH `+$2,057`, USDC `−$4`, USDT `−$7`; Source change `+$2,046.16`, Share of portfolio change `5.9%`, unchanged-amount price-movement note. Full source page 1494px, bottom navigation fixed.
 
 ## Interactive and data rules
 
