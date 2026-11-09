@@ -47,8 +47,9 @@ for (const width of [820, 390]) {
             expect(state.activeContrast).toBeGreaterThanOrEqual(4.5);
             expect(state.inactiveContrast).toBeGreaterThanOrEqual(3);
             if (width === 820) {
-              expect(state.tile[1]).toBe(expanded ? 36 : 40);
-              if (!expanded) expect(state.tile[0]).toBe(40);
+              // The former 36/40px tiles conflict with the 44pt nav target requirement in ios-wide.
+              expect(state.tile[1]).toBe(44);
+              if (!expanded) expect(state.tile[0]).toBe(44);
             }
             if (resolved === "light") {
               expect(state.railBackground).not.toBe("rgb(13, 13, 14)");

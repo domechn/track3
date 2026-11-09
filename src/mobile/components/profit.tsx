@@ -235,7 +235,7 @@ const App = ({
         </span>}>
         <span className="flex min-w-0 items-center gap-2">
           <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground mobile-mover-rank">#{index + 1}</span>
-          <AssetLabel asset={row} labelClassName="truncate text-sm font-medium" />
+          <AssetLabel asset={row} className="flex-wrap" labelClassName="max-w-full shrink-0 truncate text-sm font-medium" />
         </span>
       </ListRow>;
     })}

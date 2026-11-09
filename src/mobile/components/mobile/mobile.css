@@ -1467,8 +1467,8 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
 }
 
 @media (min-width: 700px) {
-  .app-layout { --mobile-sidebar-width: calc(216px + var(--mobile-safe-left)); }
-  .app-layout[data-sidebar-collapsed="true"] { --mobile-sidebar-width: calc(56px + var(--mobile-safe-left)); }
+  .app-layout { --mobile-sidebar-width: calc(204px + var(--mobile-safe-left)); }
+  .app-layout[data-sidebar-collapsed="true"] { --mobile-sidebar-width: calc(60px + var(--mobile-safe-left)); }
   .mobile-sidebar {
     padding: calc(var(--mobile-safe-top) + 12px) 10px calc(var(--mobile-safe-bottom) + 8px) calc(var(--mobile-safe-left) + 10px);
     border-right: 1px solid var(--sidebar-border); background: var(--sidebar-background);
@@ -1495,7 +1495,7 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
 }
 
 @media (min-width: 700px) {
-  .mobile-sidebar { --nav-rail-inset: calc(var(--mobile-safe-left) + 10px); --nav-scroll-inset: calc(var(--mobile-safe-left) + 10px); --nav-rail-end-inset: 10px; }
+  .mobile-sidebar { --nav-row-height: 44px; --nav-item-size: 44px; --nav-rail-inset: calc(var(--mobile-safe-left) + 10px); --nav-scroll-inset: calc(var(--mobile-safe-left) + 10px); --nav-rail-end-inset: 10px; }
   .mobile-sidebar[data-collapsed="true"] {
     --nav-rail-inset: calc(var(--mobile-safe-left) + 8px); --nav-scroll-inset: calc(var(--mobile-safe-left) + 8px); --nav-rail-end-inset: 7px;
     padding-left: calc(var(--mobile-safe-left) + 8px); padding-right: 7px;
@@ -1528,8 +1528,11 @@ body:has(#app-top-bar .t3-topbar-sync-button) .ios-d3-toast-viewport > li[data-s
 .d2-summary .summary-hero-metrics { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .d2-summary .analyze-profit-card, .d2-summary .analyze-attribution-section { container-type: inline-size; }
 .d2-summary .attribution-rank-button .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
-@container (max-width: 560px) {
+/* Keep 820px Profit rows wide enough for the stock badge without lengthening the 834px page. */
+@container (max-width: 570px) {
   .d2-summary .profit-movers-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@container (max-width: 560px) {
   .d2-summary .attribution-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .d2-summary .analyze-page-title { margin-bottom: 14px; font-size: 28px; line-height: 1.15; font-weight: 650; }

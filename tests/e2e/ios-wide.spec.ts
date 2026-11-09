@@ -265,6 +265,34 @@ test("iPad portrait Summary shows full Profit symbols", async ({ browser }) => {
   }
 });
 
+test("iPad portrait Summary truncates an overlong Profit symbol within its value row", async ({ browser }) => {
+  const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 744, height: 1024 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await installTauriBridge(page, { richPortfolio: true });
+    await page.goto("/#/summary");
+    const row = page.locator(".d2-summary .analyze-profit-card .profit-mobile-list .mobile-list-row").first();
+    const symbol = row.locator(".mobile-list-label .truncate");
+    await expect(symbol).toBeVisible();
+    await symbol.evaluate((node) => { node.textContent = "EXTRAORDINARILYLONGTOKENSYMBOL".repeat(8); });
+    const layout = await row.evaluate((node) => {
+      const label = node.querySelector<HTMLElement>(".mobile-list-label .truncate")!;
+      const value = node.querySelector<HTMLElement>(".mobile-list-value")!;
+      return {
+        clipped: label.scrollWidth > label.clientWidth + 1,
+        ellipsis: getComputedStyle(label).textOverflow,
+        labelRight: label.getBoundingClientRect().right,
+        valueLeft: value.getBoundingClientRect().left,
+      };
+    });
+    expect(layout.clipped).toBe(true);
+    expect(layout.ellipsis).toBe("ellipsis");
+    expect(layout.labelRight).toBeLessThanOrEqual(layout.valueLeft + 1);
+  } finally {
+    await context.close();
+  }
+});
+
 test("iPad portrait attribution shows full contributor names", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 744, height: 1133 }, hasTouch: true, isMobile: true, reducedMotion: "reduce" });
   const page = await context.newPage();
