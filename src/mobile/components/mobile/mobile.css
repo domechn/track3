@@ -1546,6 +1546,10 @@ body:has(.fidelity-history, .fidelity-history-detail, .fidelity-cost) .mobile-ta
 .d2-summary .profit-period-grid, .d2-profit-sheet .profit-period-grid { align-items: start; }
 .d2-summary .profit-period-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .d2-summary .profit-period-grid:has(> .profit-month-card) { align-items: stretch; }
+.d2-summary .profit-year-scroll { max-height:60vh; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; scrollbar-width:thin; scrollbar-color:hsl(var(--muted-foreground)) transparent; }
+.d2-summary .profit-year-scroll::-webkit-scrollbar { width:6px; }
+.d2-summary .profit-year-scroll::-webkit-scrollbar-thumb { border-radius:3px; background:hsl(var(--muted-foreground)); }
+.d2-summary .profit-year-scroll:focus-visible { outline:2px solid hsl(var(--ring)); outline-offset:2px; }
 .d2-summary .profit-period-grid > .profit-month-card {
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
