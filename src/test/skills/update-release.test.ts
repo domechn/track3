@@ -35,6 +35,7 @@ type MainDependencies = {
 };
 
 type UpdateModule = {
+  compareVersions: (left: string, right: string) => number;
   downloadManifest: (
     url: string,
     fetchImplementation: typeof fetch,
@@ -117,6 +118,11 @@ vi.stubGlobal("fetch", bootstrap.fetch);
 
 // @ts-expect-error The release finalizer is a runtime-only ESM module.
 const updateModule = (await import("../../../scripts/update.mjs")) as UpdateModule;
+
+it("orders a two-digit patch after the previous release", () => {
+  expect(updateModule.compareVersions("0.9.10", "0.9.9")).toBe(1);
+  expect(updateModule.compareVersions("0.9.9", "0.9.10")).toBe(-1);
+});
 
 function asset(name: string, id?: number): ReleaseAsset {
   return {
