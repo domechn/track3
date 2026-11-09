@@ -49,7 +49,6 @@ import {
   getLicenseIfIsPro,
   getInitialQueryDateRange,
   getQuoteColor,
-  getDefaultCurrencyRate,
 } from "@/middlelayers/configuration";
 import React from "react";
 import { Progress } from "../ui/progress";
@@ -73,6 +72,7 @@ import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { toast } from "@/components/ui/use-toast";
+import { DisplayCurrencyContext, useDisplayCurrencyState } from "@/contexts/display-currency";
 
 const Setting = React.lazy(() => import("../settings"));
 const HistoricalData = React.lazy(() => import("../historical-data"));
@@ -677,9 +677,8 @@ const App = () => {
   const [lastRefreshAt, setLastRefreshAt] = useState<string | undefined>(
     undefined,
   );
-  const [currentCurrency, setCurrentCurrency] = useState<CurrencyRateDetail>(
-    getDefaultCurrencyRate(),
-  );
+  const displayCurrencyState = useDisplayCurrencyState(() => toast({ description: t("currency.quick.failed"), variant: "destructive" }));
+  const { displayCurrency: currentCurrency, updatePreferredCurrency: setCurrentCurrency } = displayCurrencyState;
 
   const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
   const [hasData, setHasData] = useState(true);
@@ -1027,6 +1026,7 @@ const App = () => {
       <DataChangedContext.Provider value={dataChangedVersion}>
         <LatestSourceNamesProvider ready={!initializing}>
         <HashRouter>
+          <DisplayCurrencyContext.Provider value={displayCurrencyState}>
           <FirstRunOnboarding variant="desktop" ready={!initializing} />
           <DesktopErrorBoundary><AppRoutes
           sidebarCollapsed={sidebarCollapsed}
@@ -1047,6 +1047,7 @@ const App = () => {
           onDataChanged={onDataChanged}
           handleConfigurationSave={handleConfigurationSave}
         /></DesktopErrorBoundary>
+          </DisplayCurrencyContext.Provider>
         </HashRouter>
         </LatestSourceNamesProvider>
       </DataChangedContext.Provider>

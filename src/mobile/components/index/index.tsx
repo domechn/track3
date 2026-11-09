@@ -40,7 +40,6 @@ import {
   getLicenseIfIsPro,
   getInitialQueryDateRange,
   getQuoteColor,
-  getDefaultCurrencyRate,
   getConfiguration,
 } from "@/middlelayers/configuration";
 import React from "react";
@@ -63,6 +62,7 @@ import { processAlerts } from "@/middlelayers/alerts";
 import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { toast } from "@/mobile/components/ui/use-toast";
+import { DisplayCurrencyContext, useDisplayCurrencyState } from "@/contexts/display-currency";
 import { ToastAction } from "@/mobile/components/ui/toast";
 import { markIOSReady } from "@/utils/ios-ready";
 import { BottomSheet, Button as MobileButton, InsetGroup, ListRow, MobilePage, PullToRefresh, SplitView, useHaptics, useIsMobile, useSizeClass } from "@/mobile/components/mobile";
@@ -884,9 +884,8 @@ const App = () => {
   const [lastRefreshAt, setLastRefreshAt] = useState<string | undefined>(
     undefined,
   );
-  const [currentCurrency, setCurrentCurrency] = useState<CurrencyRateDetail>(
-    getDefaultCurrencyRate(),
-  );
+  const displayCurrencyState = useDisplayCurrencyState(() => toast({ description: t("currency.quick.failed"), variant: "destructive" }));
+  const { displayCurrency: currentCurrency, updatePreferredCurrency: setCurrentCurrency } = displayCurrencyState;
 
   const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
   const [hasData, setHasData] = useState(true);
@@ -1241,6 +1240,7 @@ const App = () => {
       <DataChangedContext.Provider value={dataChangedVersion}>
         <LatestSourceNamesProvider ready={!initializing && !loadFailed}>
         <HashRouter>
+          <DisplayCurrencyContext.Provider value={displayCurrencyState}>
           <FirstRunOnboarding variant="ios" ready={!initializing && !loadFailed} />
           <AppRoutes
           initializing={initializing}
@@ -1264,6 +1264,7 @@ const App = () => {
           onLocalRefresh={refreshLocalView}
           handleConfigurationSave={handleConfigurationSave}
         />
+          </DisplayCurrencyContext.Provider>
         </HashRouter>
         </LatestSourceNamesProvider>
       </DataChangedContext.Provider>

@@ -19,6 +19,7 @@ import { DateRange } from "react-day-picker";
 import type { Theme } from "@/middlelayers/ui-state/appearance";
 import { runWithEncryptionWriteGate } from "./encryption-write-gate";
 import type { CostBasisMethod } from "./cost-basis";
+import { displayCurrencyOverrideKey } from "./ui-state/display-currency-override";
 
 export const PRO_API_ENDPOINT = "https://api.track3.dev";
 
@@ -599,8 +600,16 @@ export async function queryPreferCurrency(): Promise<CurrencyRateDetail> {
 }
 
 export async function savePreferCurrency(currency: string) {
+  const previousCurrency = getCachedPreferCurrency();
   cachePreferCurrency(currency);
   await saveConfigurationById(preferCurrencyId, currency, false);
+  if (previousCurrency && previousCurrency !== currency.toUpperCase()) {
+    try {
+      localStorage.removeItem(displayCurrencyOverrideKey);
+    } catch {
+      // The preference remains the source of truth.
+    }
+  }
 }
 
 export function getCachedPreferCurrency(): string | undefined {

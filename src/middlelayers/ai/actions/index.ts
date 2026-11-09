@@ -23,6 +23,7 @@ import type { PendingAction } from "./lifecycle";
 import { ASSISTANT_APP_ACTION_EVENT } from "./page-settings";
 import { getCurrentDateRange, getCurrentComparisonDates, getRebalanceOptionsRaw, readRebalanceOptions, mergeRebalanceOptions, readCostBasisSettingsForAssistant, setCostBasisSettingsFromAssistant, setAssistantDateRange, setAssistantComparisonDates } from "@/middlelayers/ui-state/page-prefs";
 import { rebalanceCsvFilename } from "@/middlelayers/ui-state/rebalance-export";
+import { queryDisplayCurrency } from "@/middlelayers/display-currency";
 export { ASSISTANT_APP_ACTION_EVENT, COST_BASIS_SETTINGS_KEY, REBALANCE_OPTIONS_KEY } from "./page-settings";
 
 export const actionNames = [
@@ -333,7 +334,7 @@ function csvCell(value: unknown): string {
 }
 async function exportPortfolio(report: "portfolio_snapshot" | "markdown_summary", format: "csv" | "json" | "md"): Promise<string> {
   const assets = redactForExport(await queryLatestAssets());
-  const rate = await queryPreferCurrency();
+  const rate = await queryDisplayCurrency();
   const total = assets.reduce((sum, asset) => sum + asset.value * rate.rate, 0);
   const content = format === "json"
     ? JSON.stringify({ currency: rate.currency, total, assets }, null, 2)
@@ -381,7 +382,7 @@ export async function executeAction(name: string, raw: unknown): Promise<string>
     case "export_rebalance": {
       const profile = await getRebalanceProfile();
       if (!profile) throw new Error("No rebalance targets to export");
-      const currency = await queryPreferCurrency();
+      const currency = await queryDisplayCurrency();
       const { holdings, stablecoinSymbols, partialSnapshot } = await loadRebalanceHoldings(currency);
       const options = readRebalanceOptions();
       const result = calculateRebalance(holdings, profile.targets, {

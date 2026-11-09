@@ -7,6 +7,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { TrackLogo } from "@/components/brand/track-logo";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { settingsCog } from "@/components/settings-cog";
+import { useContext } from "react";
+import { DisplayCurrencyContext } from "@/contexts/display-currency";
+import CurrencySwitchButton from "@/components/currency-switch-button";
 
 const overview = { to: "/overview", labelKey: "nav.overview" };
 const analyze = [
@@ -86,6 +89,7 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
   collapsed: boolean; onToggle: () => void; isProUser: boolean; recordsToolsOpen?: boolean; fidelity?: boolean;
 }) {
   const { t } = useTranslation();
+  const displayCurrency = useContext(DisplayCurrencyContext);
   const unread = useAlertBadge();
   const { pathname } = useLocation();
   const records = pathname === "/history" || pathname === "/cost-basis";
@@ -129,6 +133,9 @@ export default function Sidebar({ collapsed, onToggle, isProUser, recordsToolsOp
     </nav><div className="t3-rail-footer t3-nav-divider shrink-0">
       {collapsed && records ? <Tooltip><TooltipTrigger asChild>{recordsControl}</TooltipTrigger>
         <TooltipContent side="right" sideOffset={10}>{recordsControlLabel}</TooltipContent></Tooltip> : recordsControl}
+      {displayCurrency && <CurrencySwitchButton preferredCurrency={displayCurrency.preferredCurrency}
+        displayCurrency={displayCurrency.displayCurrency} onToggle={displayCurrency.toggleDisplayCurrency}
+        disabled={displayCurrency.switching} collapsed={collapsed} />}
       <NavItem item={settings} collapsed={collapsed} fidelity={fidelity} />
     </div></TooltipProvider>
     <button type="button" aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")}

@@ -16,6 +16,7 @@ import {
   getImportedPartHashes,
   saveImportedPartHash,
   getInitialQueryDateRange,
+  savePreferCurrency,
 } from "./configuration";
 import { ASSET_HANDLER } from "./entities/assets";
 import { GlobalConfig } from "./datafetch/types";
@@ -96,6 +97,15 @@ beforeEach(() => {
 });
 
 describe("saveConfiguration", () => {
+  it("keeps the display override out of the preferred currency write and clears it on change", async () => {
+    localStorage.setItem("track3-prefer-currency", "CNY");
+    localStorage.setItem("track3.ui.display-currency-override", "USD");
+    await savePreferCurrency("EUR");
+    expect(tracing.executeCalls).toHaveLength(1);
+    expect(tracing.executeCalls[0].values).toEqual(["7", "EUR"]);
+    expect(localStorage.getItem("track3.ui.display-currency-override")).toBeNull();
+  });
+
   it("keeps exchange and broker credentials in the encrypted configuration export", async () => {
     tracing.db.select.mockResolvedValue([
       { id: "10", data: yaml.stringify({ exchanges: makeConfig().exchanges }) },
