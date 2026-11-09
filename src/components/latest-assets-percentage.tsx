@@ -6,20 +6,16 @@ import {
 } from "@/middlelayers/types";
 import { Card, CardContent } from "./ui/card";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
-import { getImageApiPath } from "@/utils/app";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
-import { downloadCoinLogos } from "@/middlelayers/data";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
-import bluebird from "bluebird";
 import { Link } from "react-router-dom";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
 import {
@@ -39,9 +35,7 @@ import AssetLabel from "@/components/common/asset-label";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
-  getAssetLogoKey,
-  resolveAssetLogoSrc,
-  shouldDownloadCryptoLogo,
+  getAssetKey,
 } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
@@ -71,7 +65,6 @@ const App = ({
   const percentageData = useMemo(() => {
     return splitTopAndOtherData(latestAssetsPercentageData);
   }, [latestAssetsPercentageData]);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
@@ -124,32 +117,6 @@ const App = ({
     return () => { active = false; };
   }, [holdings, rangeKey, dataChangedVersion]);
 
-  useEffect(() => {
-    if (holdings) return;
-    let active = true;
-
-    // download coin logos
-    downloadCoinLogos(
-      latestAssetsPercentageData
-        .filter((d) => shouldDownloadCryptoLogo(d))
-        .map((d) => ({
-          symbol: d.coin,
-          price: d.value / (d.amount || 1),
-        })),
-    );
-
-    // set logo map
-    void getLogoMap(latestAssetsPercentageData).then((map) => {
-      if (active) {
-        setLogoMap(map);
-      }
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [latestAssetsPercentageData, holdings]);
-
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
     const mp = Math.floor(
@@ -167,20 +134,6 @@ const App = ({
     [latestAssetsPercentageData, dataPage],
   );
 
-  async function getLogoMap(d: LatestAssetsPercentageData) {
-    const acd = await getAppCacheDir();
-    const kvs = await bluebird.map(d, async (coin) => {
-      const assetRef = { symbol: coin.coin, assetType: coin.assetType };
-      if (!shouldDownloadCryptoLogo(coin)) {
-        return { [getAssetLogoKey(assetRef)]: "" };
-      }
-
-      const path = await getImageApiPath(acd, coin.coin);
-      return { [getAssetLogoKey(assetRef)]: path };
-    });
-
-    return Object.assign({}, ...kvs);
-  }
 
   const options = {
     maintainAspectRatio: false,
@@ -305,7 +258,7 @@ const App = ({
           <TableBody>
             {pagedLatestAssetsPercentageData.map((d) => (
               <TableRow
-                key={getAssetLogoKey({
+                key={getAssetKey({
                   symbol: d.coin,
                   assetType: d.assetType,
                 })}
@@ -323,19 +276,6 @@ const App = ({
                       "{asset}",
                       formatAssetLabel({ symbol: d.coin, assetType: d.assetType }),
                     )}</span>
-                    <img
-                      className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-                      src={resolveAssetLogoSrc(
-                        { symbol: d.coin, assetType: d.assetType },
-                        logoMap[
-                          getAssetLogoKey({
-                            symbol: d.coin,
-                            assetType: d.assetType,
-                          })
-                        ],
-                      )}
-                      alt=""
-                    />
                     <div
                       className="mr-1 font-medium text-sm"
                       title={"" + d.amount}
@@ -376,7 +316,7 @@ const App = ({
       </header>
       <div className="t3-holdings-head"><span>{t("overview.design.asset")}</span><span>{t("overview.design.value")}</span><span>{t("overview.fidelity.sevenDays")}</span></div>
       <div className="t3-holdings-body">
-        {latestAssetsPercentageData.map((asset) => <Link key={getAssetLogoKey({ symbol: asset.coin, assetType: asset.assetType })}
+        {latestAssetsPercentageData.map((asset) => <Link key={getAssetKey({ symbol: asset.coin, assetType: asset.assetType })}
           to={buildAssetDetailsPath({ symbol: asset.coin, assetType: asset.assetType })}
           className="t3-holdings-row">
           <span><span className="sr-only">{t("common.openAssetDetails").replace("{asset}", formatAssetLabel({ symbol: asset.coin, assetType: asset.assetType }))} </span><strong>{asset.coin}</strong><small>{asset.percentage.toFixed(1)}%</small></span>

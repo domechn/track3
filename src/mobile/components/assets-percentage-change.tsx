@@ -20,7 +20,7 @@ import {
   glassScaleOptions,
   glassTooltip,
 } from "@/mobile/chart-theme";
-import { formatAssetLabel, getAssetLogoKey } from "@/utils/assets";
+import { formatAssetLabel, getAssetKey } from "@/utils/assets";
 import { useTranslation } from "@/mobile/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { downsampleIndices } from "@/middlelayers/chart-downsample";
@@ -84,7 +84,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
         key: string;
       }[];
     }
-    const topNSet = new Set(topN.map((a) => getAssetLogoKey(a)));
+    const topNSet = new Set(topN.map((a) => getAssetKey(a)));
     const topNCurrent: {
       label: string;
       current: number;
@@ -93,9 +93,9 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     }[] = [];
     let othersCurrent = 0;
     lastEntry.percentages.forEach((item) => {
-      const key = getAssetLogoKey(item);
+      const key = getAssetKey(item);
       if (topNSet.has(key)) {
-        const idx = topN.findIndex((a) => getAssetLogoKey(a) === key);
+        const idx = topN.findIndex((a) => getAssetKey(a) === key);
         const color = chartColors[idx % chartColors.length].main;
         topNCurrent.push({
           label: formatAssetLabel(item),
@@ -201,7 +201,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   );
 
   const preparedData = useMemo(() => {
-    const topNSet = new Set(topN.map((asset) => getAssetLogoKey(asset)));
+    const topNSet = new Set(topN.map((asset) => getAssetKey(asset)));
     const labels: string[] = [];
     const othersData: number[] = [];
     const topNData = topN.map(() => [] as number[]);
@@ -213,7 +213,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       let others = 0;
 
       entry.percentages.forEach((item) => {
-        const assetKey = getAssetLogoKey(item);
+        const assetKey = getAssetKey(item);
         if (topNSet.has(assetKey)) {
           percentageByAsset.set(assetKey, item.percentage);
           return;
@@ -223,7 +223,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
       topN.forEach((asset, idx) => {
         topNData[idx].push(
-          percentageByAsset.get(getAssetLogoKey(asset)) ?? 0
+          percentageByAsset.get(getAssetKey(asset)) ?? 0
         );
       });
       othersData.push(others);

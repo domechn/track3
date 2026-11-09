@@ -27,9 +27,6 @@ import { TRC20ProUserAnalyzer } from "@/middlelayers/datafetch/coins/trc20";
 import { TonAnalyzer } from "@/middlelayers/datafetch/coins/ton";
 import { SUIAnalyzer } from "@/middlelayers/datafetch/coins/sui";
 import { invalidateUsageCache, isProVersion } from "@/middlelayers/license";
-import { getImageApiPath } from "@/utils/app";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import bluebird from "bluebird";
 import {
   maskSensitive,
   truncateAddress,
@@ -158,9 +155,6 @@ const App = ({
   const [quickLookData, setQuickLookData] = useState<
     { symbol: string; amount: number; assetType?: "crypto" | "stock" }[]
   >([]);
-  const [quickLookLogoMap, setQuickLookLogoMap] = useState<{
-    [x: string]: string;
-  }>({});
   const [quickLookTitle, setQuickLookTitle] = useState("");
 
   const [addExchangeConfig, setAddExchangeConfig] = useState<
@@ -487,22 +481,10 @@ const App = ({
     markFormChanged();
   }
 
-  async function buildLogoMap(
-    coins: { symbol: string }[],
-  ): Promise<{ [x: string]: string }> {
-    const acd = await getAppCacheDir();
-    const kvs = await bluebird.map(coins, async (coin) => {
-      const path = await getImageApiPath(acd, coin.symbol);
-      return { [coin.symbol]: path };
-    });
-    return Object.assign({}, ...kvs);
-  }
-
   // ---- QuickLook handlers ----
   async function handleQuickLookExchange(ex: ExchangeRow) {
     setQuickLookTitle(ex.alias ?? ex.type);
     setQuickLookData([]);
-    setQuickLookLogoMap({});
     setQuickLookLoading(true);
     setQuickLookOpen(true);
 
@@ -531,7 +513,6 @@ const App = ({
           assetType: c.assetType,
         }));
       setQuickLookData(filtered);
-      buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
       toast({
         description: t("config.failedFetchBalances") + safeError(e),
@@ -546,7 +527,6 @@ const App = ({
   async function handleQuickLookWallet(wallet: WalletRow) {
     setQuickLookTitle(wallet.alias ?? `${wallet.type.toUpperCase()} Wallet`);
     setQuickLookData([]);
-    setQuickLookLogoMap({});
     setQuickLookLoading(true);
     setQuickLookOpen(true);
 
@@ -589,7 +569,6 @@ const App = ({
         .sort((a, b) => b.amount - a.amount)
         .map((c) => ({ symbol: c.symbol, amount: c.amount }));
       setQuickLookData(filtered);
-      buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
       toast({
         description: classifySourceError(e) === "quota"
@@ -606,7 +585,6 @@ const App = ({
   async function handleQuickLookStockBroker(broker: StockBrokerRow) {
     setQuickLookTitle(broker.alias ?? broker.type);
     setQuickLookData([]);
-    setQuickLookLogoMap({});
     setQuickLookLoading(true);
     setQuickLookOpen(true);
 
@@ -633,7 +611,6 @@ const App = ({
         .sort((a, b) => b.amount - a.amount)
         .map((c) => ({ symbol: c.symbol, amount: c.amount }));
       setQuickLookData(filtered);
-      buildLogoMap(filtered).then(setQuickLookLogoMap);
     } catch (e: any) {
       toast({
         description: t("config.failedFetchPositions") + safeError(e),
@@ -1146,8 +1123,7 @@ const App = ({
     setQuickLookOpen(open);
     if (!open) {
       setQuickLookData([]);
-      setQuickLookLogoMap({});
-      setQuickLookTitle("");
+        setQuickLookTitle("");
     }
   }
 
@@ -1181,7 +1157,6 @@ const App = ({
         title={quickLookTitle}
         loading={quickLookLoading}
         data={quickLookData}
-        logoMap={quickLookLogoMap}
       />
 
       <AttachModal

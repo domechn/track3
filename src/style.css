@@ -1181,9 +1181,8 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .cost-dashboard-empty { padding: 32px 0; text-align: center; color: hsl(var(--muted-foreground)); }
 .analyze-coin [data-ui-card] { overflow: hidden; }
 .coin-page-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 14px; }
-.coin-page-identity { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.coin-page-identity { display: flex; align-items: center; min-width: 0; }
 .coin-page-identity > div { min-width: 0; }
-.coin-page-identity img { width: 30px; height: 30px; border-radius: 50%; }
 .coin-page-heading h1 { overflow-wrap: anywhere; font-size: 23px; line-height: 1.2; font-weight: 650; }
 .coin-page-identity span { color: hsl(var(--muted-foreground)); font-size: 12px; }
 .coin-page-heading button { flex-shrink: 0; border-radius: var(--radius-pill); }
@@ -2441,8 +2440,7 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
   .t3-fidelity-blacklist .table-head, .t3-fidelity-blacklist .table-row { display: grid; grid-template-columns: minmax(230px,1fr) minmax(115px,.55fr) 125px 176px; align-items: center; gap: 10px; padding: 0 20px; }
   .t3-fidelity-blacklist .table-head { min-height: 36px; border-bottom: 1px solid hsl(var(--border)); color: hsl(var(--faint)); font-size: 12px; }
   .t3-fidelity-blacklist .table-row { min-height: 60px; border-bottom: 1px solid hsl(var(--border)); }
-  .t3-fidelity-blacklist .identity { display: flex; align-items: center; gap: 10px; }
-  .t3-fidelity-blacklist .identity .logo { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border: 1px solid hsl(var(--input)); border-radius: 6px; background: hsl(var(--raised)); font-size: 9px; font-weight: 600; }
+  .t3-fidelity-blacklist .identity { display: flex; align-items: center; }
   .t3-fidelity-blacklist .identity b, .t3-fidelity-blacklist .identity small { display: block; }
   .t3-fidelity-blacklist .identity b { font-weight: 600; }
   .t3-fidelity-blacklist .identity small, .t3-fidelity-blacklist .muted { color: hsl(var(--faint)); font-size: 12px; }

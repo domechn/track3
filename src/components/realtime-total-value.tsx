@@ -19,9 +19,6 @@ import {
   CarouselItem,
 } from "./ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import bluebird from "bluebird";
-import { getImageApiPath } from "@/utils/app";
 import { useTranslation } from "@/i18n";
 import { useLiveTotal } from "./use-live-total";
 
@@ -36,7 +33,6 @@ const App = ({
 }) => {
   const { t } = useTranslation();
   const [activated, setActivated] = useState(false);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [realtimeAssetValues, setRealtimeAssetValues] = useState<Asset[]>([]);
   const [lastRefreshAssetValues, setLastRefreshAssetValues] = useState<Asset[]>(
     []
@@ -50,7 +46,6 @@ const App = ({
     load: async () => {
       const assets = (await queryRealTimeAssetsValue()).sort((a, b) => b.value - a.value);
       setRealtimeAssetValues(assets);
-      void getLogoMap(assets).then(setLogoMap).catch(() => {});
       return assets.reduce((sum, asset) => sum + asset.value, 0);
     },
   });
@@ -77,13 +72,6 @@ const App = ({
   async function loadLastRefreshAssetValues() {
     const lra = await queryLatestAssets();
     setLastRefreshAssetValues(lra);
-  }
-
-  async function getLogoMap(d: Asset[]) {
-    const acd = await getAppCacheDir();
-    return Object.fromEntries(
-      await bluebird.map(d, async (s) => [s.symbol, await getImageApiPath(acd, s.symbol)]),
-    );
   }
 
   function RealtimeView() {
@@ -150,11 +138,6 @@ const App = ({
               >
                 <div className="px-1 py-0.5 text-sm flex justify-between items-center gap-3">
                   <div className="flex items-center min-w-0">
-                    <img
-                      className="inline-block w-[18px] h-[18px] rounded-full mr-1.5"
-                      src={logoMap[asset.symbol]}
-                      alt={asset.symbol}
-                    />
                     <div className="truncate">{asset.symbol}</div>
                   </div>
                   <div className="tabular-nums">

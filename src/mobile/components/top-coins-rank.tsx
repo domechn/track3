@@ -4,20 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { queryLatestAssetsPercentage, queryTopCoinsRank } from "@/middlelayers/charts";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import { getImageApiPath } from "@/utils/app";
-import { downloadCoinLogos } from "@/middlelayers/data";
-import bluebird from "bluebird";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import AssetLabel from "@/components/common/asset-label";
 import {
   buildAssetDetailsPath,
-  formatAssetLabel,
-  getAssetLogoKey,
-  resolveAssetLogoSrc,
-  shouldDownloadCryptoLogo,
+  getAssetKey,
 } from "@/utils/assets";
 import { useTranslation } from "@/mobile/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
@@ -33,7 +26,6 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
     timestamps: [],
     coins: [],
   } as TopCoinsRankData);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [latest, setLatest] = useState<LatestAssetsPercentageData>([]);
   const [page, setPage] = useState(0);
   const navigate = useNavigate();
@@ -59,35 +51,6 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
     }
     setTopCoinsRankData(tcr);
     setLatest(holdings);
-  }
-
-  useEffect(() => {
-    if (topCoinsRankData.coins.length === 0) return;
-    downloadCoinLogos(
-      topCoinsRankData.coins
-        .filter((coin) => shouldDownloadCryptoLogo(coin))
-        .map((c) => ({ symbol: c.coin, price: 0 })),
-    );
-    getLogoMap(topCoinsRankData.coins).then((m) => setLogoMap(m));
-  }, [topCoinsRankData]);
-
-  async function getLogoMap(
-    coins: { coin: string; assetType: "crypto" | "stock" }[],
-  ) {
-    const acd = await getAppCacheDir();
-    const kvs = await bluebird.map(coins, async (c) => {
-      if (!shouldDownloadCryptoLogo(c)) {
-        return {
-          [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: "",
-        };
-      }
-
-      const path = await getImageApiPath(acd, c.coin);
-      return {
-        [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: path,
-      };
-    });
-    return Object.assign({}, ...kvs);
   }
 
   const rankRows = useMemo(() => {
@@ -116,7 +79,7 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
     }[];
   }, [topCoinsRankData]);
   const latestByAsset = useMemo(() => new Map(latest.map((asset) =>
-    [getAssetLogoKey({ symbol: asset.coin, assetType: asset.assetType }), asset])), [latest]);
+    [getAssetKey({ symbol: asset.coin, assetType: asset.assetType }), asset])), [latest]);
 
   const maxPage = useMemo(
     () => Math.max(Math.ceil(rankRows.length / PAGE_SIZE) - 1, 0),
@@ -170,18 +133,15 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
           {isMobile && <div className="top-coins-rank-mobile mobile-record-list">
             {pagedRows.map((row) => {
               const asset = { symbol: row.coin, assetType: row.assetType };
-              const logoKey = getAssetLogoKey(asset);
-              const holding = latestByAsset.get(logoKey);
-              return <ListRow key={logoKey} href={`#${buildAssetDetailsPath(asset)}`}
+              const assetKey = getAssetKey(asset);
+              const holding = latestByAsset.get(assetKey);
+              return <ListRow key={assetKey} href={`#${buildAssetDetailsPath(asset)}`}
                 value={<span className="top-coins-rank-value">
                   <strong>{holding ? `${currency?.symbol ?? "$"}${prettyNumberToLocaleString(currency ? currencyWrapper(currency)(holding.value) : holding.value)}` : "—"}</strong>
                   <small>{holding ? `${holding.percentage.toFixed(1)}%` : "—"} · {renderChangeBadge(row.change)}</small>
                 </span>}>
                 <span className="flex min-w-0 items-center gap-1">
                   <span className="w-5 min-[400px]:w-8 shrink-0 font-mono text-xs text-muted-foreground">#{row.rank}</span>
-                  <img className="h-6 w-6 shrink-0 rounded-full"
-                    src={resolveAssetLogoSrc(asset, logoMap[logoKey])}
-                    alt={formatAssetLabel(asset)} />
                   <AssetLabel asset={asset} labelClassName="truncate text-sm font-medium" badgeClassName="top-coins-rank-type" />
                 </span>
               </ListRow>;
@@ -191,7 +151,7 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
             <TableBody>
               {pagedRows.map((row) => (
                 <TableRow
-                  key={getAssetLogoKey({
+                  key={getAssetKey({
                     symbol: row.coin,
                     assetType: row.assetType,
                   })}
@@ -209,23 +169,7 @@ const App = ({ dateRange, currency }: { dateRange: TDateRange; currency?: Curren
                     #{row.rank}
                   </TableCell>
                   <TableCell className="py-1.5">
-                    <div className="flex items-center gap-2">
-                      <img
-                        className="w-[18px] h-[18px] rounded-full"
-                        src={resolveAssetLogoSrc(
-                          { symbol: row.coin, assetType: row.assetType },
-                          logoMap[
-                            getAssetLogoKey({
-                              symbol: row.coin,
-                              assetType: row.assetType,
-                            })
-                          ],
-                        )}
-                        alt={formatAssetLabel({
-                          symbol: row.coin,
-                          assetType: row.assetType,
-                        })}
-                      />
+                    <div className="flex items-center">
                       <AssetLabel
                         asset={{
                           symbol: row.coin,
