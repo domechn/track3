@@ -142,7 +142,7 @@ test("twelve years show four recent cards per page", async ({ page }) => {
   await expect(cards.filter({ hasText: "2024" })).toHaveClass(/selected/);
 });
 
-test("Wallet mover card fills the matrix row with three sources", async ({ page }) => {
+test("Wallet mover card stacks below the matrix without blank rows for three sources", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installManySourceFixture(page, 3);
@@ -158,7 +158,8 @@ test("Wallet mover card fills the matrix row with three sources", async ({ page 
   }));
   const cardBox = (await card.boundingBox())!;
   const matrixBox = (await page.locator(".t3-wallet-matrix").boundingBox())!;
-  expect(Math.abs(cardBox.y + cardBox.height - matrixBox.y - matrixBox.height)).toBeLessThanOrEqual(1);
+  expect(Math.abs(cardBox.x - matrixBox.x)).toBeLessThanOrEqual(1);
+  expect(cardBox.y).toBeGreaterThanOrEqual(matrixBox.y + matrixBox.height + 16);
   expect(layout.rowHeights.length).toBeGreaterThan(0);
   expect(Math.max(...layout.rowHeights)).toBeLessThanOrEqual(80);
   expect(layout.bottomGap).toBeLessThan(40);

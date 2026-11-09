@@ -45,7 +45,7 @@ test("History table separates large currency values from their shares above 1279
   for (const width of [1280, 1440, 1599, 1600, 1920]) {
     await page.setViewportSize({ width, height: 1000 });
     const table = detail.locator("table").first();
-    const { gaps, tableRight, cardRight } = await table.evaluate((element) => {
+    const { gaps, tableRight, cardRight, compactShares } = await table.evaluate((element) => {
       const card = element.closest(".fidelity-history-detail")!;
       const text = (cell: Element) => {
         const range = document.createRange();
@@ -55,12 +55,19 @@ test("History table separates large currency values from their shares above 1279
       const rows = [...element.querySelectorAll("tbody tr")].filter((row) =>
         row.textContent?.includes("COIN10") || row.classList.contains("fidelity-history-total"));
       return {
-        gaps: rows.map((row) => text(row.children[4]).left - text(row.children[3]).right),
+        gaps: rows.map((row) => {
+          const share = row.querySelector(".fidelity-history-compact-share")!;
+          return getComputedStyle(share).display === "none"
+            ? text(row.children[4]).left - text(row.children[3]).right
+            : text(row.children[3]).left - share.getBoundingClientRect().right;
+        }),
+        compactShares: rows.map((row) => getComputedStyle(row.querySelector(".fidelity-history-compact-share")!).display !== "none"),
         tableRight: element.getBoundingClientRect().right,
         cardRight: card.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(card).paddingRight),
       };
     });
     expect(gaps).toHaveLength(2);
+    expect(compactShares).toEqual(width < 1500 ? [true, true] : [false, false]);
     for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(8);
     expect(tableRight).toBeLessThanOrEqual(cardRight + 1);
     if (width === 1280) {

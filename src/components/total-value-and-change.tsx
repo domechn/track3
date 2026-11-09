@@ -399,6 +399,12 @@ const App = ({
         x + 8, chart.canvas.parentElement!.clientWidth - endLabel.offsetWidth - 2,
       ))}px`;
     }
+    const activeAnchor = chart?.canvas.parentElement?.querySelector<HTMLSpanElement>("[data-chart-active-point]");
+    const activePoint = activeIndex === null ? undefined : chart?.getDatasetMeta(0).data[activeIndex];
+    if (chart && activeAnchor && activePoint) {
+      activeAnchor.style.left = `${activePoint.x + chart.canvas.offsetLeft}px`;
+      activeAnchor.style.top = `${activePoint.y + chart.canvas.offsetTop}px`;
+    }
   });
   const plottedIndices = useMemo(
     () => downsampleIndices([lineValues], Math.max(40, Math.floor(chartWidth / 2))),
@@ -410,8 +416,12 @@ const App = ({
   );
   const bestIndex = bestDay ? plottedTimestamps.map((timestamp) =>
     new Date(timestamp).toDateString()).lastIndexOf(new Date(bestDay.timestamp).toDateString()) : -1;
-  const markerValues = useRef({ bestDay, bestIndex, chartEnd });
-  markerValues.current = { bestDay, bestIndex, chartEnd };
+  const bestDayButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (document.activeElement === bestDayButtonRef.current) setActiveIndex(bestIndex);
+  }, [bestIndex]);
+  const markerValues = useRef({ bestDay, bestIndex, chartEnd, activeIndex });
+  markerValues.current = { bestDay, bestIndex, chartEnd, activeIndex };
   const chart = chartRef.current;
   const pointElement = activeIndex === null ? undefined : chart?.getDatasetMeta(0).data[activeIndex];
   const activePoint = pointElement && chart ? { x: pointElement.x + chart.canvas.offsetLeft,
@@ -464,7 +474,13 @@ const App = ({
       ctx.restore();
     },
     afterDatasetsDraw(chart) {
-      const { bestDay, bestIndex, chartEnd } = markerValues.current;
+      const { bestDay, bestIndex, chartEnd, activeIndex } = markerValues.current;
+      const activeAnchor = chart.canvas.parentElement?.querySelector<HTMLSpanElement>("[data-chart-active-point]");
+      const activePoint = activeIndex === null ? undefined : chart.getDatasetMeta(0).data[activeIndex];
+      if (activeAnchor && activePoint) {
+        activeAnchor.style.left = `${activePoint.x + chart.canvas.offsetLeft}px`;
+        activeAnchor.style.top = `${activePoint.y + chart.canvas.offsetTop}px`;
+      }
       const endLabel = chart.canvas.parentElement?.querySelector<HTMLSpanElement>(".t3-chart-end-value");
       if (endLabel && chartEnd !== undefined) {
         endLabel.style.top = `${chart.scales.y.getPixelForValue(chartEnd) + chart.canvas.offsetTop}px`;
@@ -752,7 +768,7 @@ const App = ({
           </p>
           {metrics}
           <div className="min-h-[120px] flex-1 t3-hero-chart">
-            {bestDay && bestIndex >= 0 && <button type="button" className="t3-chart-best-day"
+            {bestDay && bestIndex >= 0 && <button ref={bestDayButtonRef} type="button" className="t3-chart-best-day"
               title={t(bestDayContribution ? "overview.fidelity.bestDayWithSignedAsset" : "overview.design.bestDay")
                 .replace("{day}", new Date(bestDay.timestamp).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", day: "numeric" }))
                 .replace("{amount}", `${bestDay.value >= 0 ? "+" : "−"}${currency.symbol}${Math.round(currencyWrapper(currency)(Math.abs(bestDay.value))).toLocaleString()}`)

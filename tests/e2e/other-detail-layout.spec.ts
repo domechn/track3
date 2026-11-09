@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./fidelity-bridge-captures";
 import { installTauriBridge as installWalletBridge } from "./fidelity-scenes";
 import { installPlanFidelityScene } from "./plan-fidelity-scenes";
+import { assertNoOverflow } from "./layout-audit";
 
 test("a short History detail card ends after its content", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
@@ -27,6 +28,19 @@ test("Cost basis side cards end after their content", async ({ page }) => {
       (element.lastElementChild?.getBoundingClientRect().bottom ?? element.getBoundingClientRect().bottom));
     expect(gap, selector).toBeLessThan(120);
   }
+});
+
+test("Cost basis KPIs use two readable columns at 1100px", async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await installTauriBridge(page, { fidelityRecords: "cost" });
+  await page.goto("/#/cost-basis");
+  const metrics = page.locator(".fidelity-cost-kpi-row").first().locator(".fidelity-metric");
+  await expect(metrics).toHaveCount(3);
+  const [first, second, third] = await Promise.all([0, 1, 2].map((index) => metrics.nth(index).boundingBox()));
+  expect(second!.y).toBeCloseTo(first!.y, 0);
+  expect(second!.x).toBeGreaterThan(first!.x);
+  expect(third!.y).toBeGreaterThan(first!.y);
+  expect((await assertNoOverflow(page)).filter((issue) => issue.rule === "R7")).toEqual([]);
 });
 
 test("Cost basis cards keep their height with one holding", async ({ page }) => {
