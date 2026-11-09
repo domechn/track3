@@ -217,9 +217,9 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 ## Captured comparison
 
-- App capture: `/tmp/ui39-app-final/coin-nova-edit-phone.png`.
-- Reference render: `/tmp/ui39-source-final/nova-edit-phone.png`.
-- 8 Nov 390 × 844 first-screen pixel difference at DPR 2: **8.028%** (any RGB channel differs by more than 20).
+- App capture: `/tmp/fidelity/coin-nova/coin-nova-edit-phone.png`.
+- Reference render: `/tmp/rev-fa3/design/records-coin-nova-edit.png`.
+- Fresh 390 × 844 first-screen pixel difference: **9.33%** (RGB difference >20/255 in any channel).
 
 ## Real-data limits
 
@@ -227,14 +227,4 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
-- The 8 Nov source-page and app edit-sheet viewports at 390 × 844, DPR 2,
-  differ by **9.137%** at an RGB-channel threshold of 20. The last label
-  starts at y=665 in both. The app uses a real input, functional save
-  and reset controls, a retained scroll position, and the saved coin
-  page behind the sheet; the design freezes its text and background.
-  The Changed from label uses the shared theme tag, with a border and
-  11 px text in place of the static 12 px dark pill.
 - The reference uses static text in its price control. The app keeps an editable input for typing and saving, which rasterizes some text edges differently.
-- The source draws editable asset type and current price controls in the transaction sheet. The app displays their saved values without offering an edit there; changing asset settings uses the separate asset editor so a pending transaction edit remains intact.
-- The selected transaction type uses the owner's shared active tint; the older source uses a solid grey selected fill.
-- The underlying Overview tab uses the owner's shared active tile; the older Coin source highlights only its text.

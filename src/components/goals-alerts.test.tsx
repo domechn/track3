@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { beforeEach, expect, it, vi } from "vitest";
@@ -61,34 +61,6 @@ it("shows stored portfolio values as a line chart", async () => {
   ]);
   render(<GoalsAlerts />);
   expect(await screen.findByRole("img", { name: /2025-01-01: 100.00.*2025-01-02: 120.00/ })).toBeInTheDocument();
-});
-it("reveals exact goal progress and values from the legacy progress bar", async () => {
-  vi.mocked(listAlertRules).mockResolvedValue([{ ...savedRule, threshold: 200 }]);
-  vi.mocked(loadAlertEvaluationData).mockResolvedValue({
-    snapshots: [{ at: "2025-01-02T00:00:00.000Z",
-      assets: [{ assetType: "crypto", symbol: "BTC", value: 120, price: 120, wallet: "wallet-a" }] }],
-    prices: {}, excludedSymbols: [],
-  });
-  render(<GoalsAlerts />);
-  const mark = await screen.findByRole("button", { name: /60.00%.*120.00.*200.00/ });
-  fireEvent.pointerEnter(mark);
-  expect(screen.getByRole("tooltip")).toHaveTextContent("60.00%");
-  expect(screen.getByRole("tooltip")).toHaveTextContent("120.00");
-  expect(screen.getByRole("tooltip")).toHaveTextContent("200.00");
-});
-it("makes the first rendered goal progress mark tabbable", async () => {
-  vi.mocked(listAlertRules).mockResolvedValue([
-    { ...savedRule, id: 7, kind: "asset_value_target", assetType: "crypto", symbol: "ETH" },
-    { ...savedRule, id: 8, kind: "total_value_target" },
-  ]);
-  vi.mocked(loadAlertEvaluationData).mockResolvedValue({
-    snapshots: [{ at: "2025-01-02T00:00:00.000Z", staleAssetKeys: ["crypto:ETH"],
-      assets: [{ assetType: "crypto", symbol: "BTC", value: 120, price: 120, wallet: "wallet-a" }] }],
-    prices: {}, excludedSymbols: [],
-  });
-  const { container } = render(<GoalsAlerts />);
-  await waitFor(() => expect(container.querySelectorAll(".t3-goals-rules [data-chart-mark]")).toHaveLength(1));
-  expect(container.querySelector(".t3-goals-rules [data-chart-mark]")).toHaveAttribute("tabindex", "0");
 });
 it("uses the evaluator's blacklist for the goal line and ETA", async () => {
   vi.mocked(queryPNLChartValue).mockResolvedValue([

@@ -1,4 +1,3 @@
-import AssetLabel from "@/components/common/asset-label";
 import { memo } from "react";
 import {
   Table,
@@ -41,13 +40,14 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
+import { getWalletLogo } from "@/lib/utils";
 import type { WalletSectionProps } from "./types";
 import { BackpackIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
 import { AliasRename } from "./alias-rename";
 import { sourceAliasFallback } from "@/components/source-display-name";
 
-const CONFIG_LIST_PAGE_SIZE = 8;
+const CONFIG_LIST_PAGE_SIZE = 30;
 
 const WalletSection = memo(function WalletSection({
   wallets,
@@ -87,7 +87,7 @@ const WalletSection = memo(function WalletSection({
             </CardTitle>
             <p className="text-xs text-muted-foreground">
               {t("config.walletShownTotal")
-                .replace("{shown}", String(paged.length))
+                .replace("{shown}", String(visibleWallets.length))
                 .replace("{total}", String(wallets.length))}
             </p>
           </div>
@@ -135,7 +135,11 @@ const WalletSection = memo(function WalletSection({
                         <SelectLabel>{t("config.walletType")}</SelectLabel>
                         {walletOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            <AssetLabel kind="wallet" type={o.value} name={o.label} size={20} />
+                            <img
+                              className="h-4 w-4 text-muted-foreground inline-block mr-2"
+                              src={getWalletLogo(o.value)}
+                            />
+                            {o.label}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -222,7 +226,7 @@ const WalletSection = memo(function WalletSection({
                   <TableHead className="w-[120px]">
                     {t("config.status")}
                   </TableHead>
-                  <TableHead className="w-[140px] text-right">
+                  <TableHead className="w-[84px] touch:w-[120px] text-right">
                     {t("config.actions")}
                   </TableHead>
                 </TableRow>
@@ -234,15 +238,17 @@ const WalletSection = memo(function WalletSection({
                     className="h-[42px] group align-middle"
                   >
                     <TableCell className="w-[140px]">
-                      <AssetLabel kind="wallet" type={w.type} name={w.type.toUpperCase()} size={24} />
+                      <div className="flex items-center gap-2 text-sm">
+                        <img
+                          src={getWalletLogo(w.type)}
+                          className="w-[18px] h-[18px] rounded-full"
+                          alt={w.type}
+                        />
+                        <span>{w.type.toUpperCase()}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="w-[170px] text-sm">
-                      <span className="block truncate" title={w.alias || `${w.type}-${idx + 1}`}>
-                        {w.alias && w.alias.length > 25 ? <>
-                          <span aria-hidden="true">{`${w.alias.slice(0, 10)}…${w.alias.slice(-6)}`}</span>
-                          <span className="sr-only">{w.alias}</span>
-                        </> : w.alias || `${w.type}-${idx + 1}`}
-                      </span>
+                      <span className="block truncate" title={w.alias || `${w.type}-${idx + 1}`}>{w.alias || `${w.type}-${idx + 1}`}</span>
                     </TableCell>
                     <TableCell className="w-[320px] text-xs text-muted-foreground">
                       <p className="truncate">{w.address}</p>
@@ -260,8 +266,8 @@ const WalletSection = memo(function WalletSection({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="w-[140px] text-right">
-                      <div className="inline-flex items-center justify-end gap-1">
+                    <TableCell className="w-[84px] touch:w-[120px] text-right">
+                      <div className="inline-flex items-center justify-end gap-0">
                         <AliasRename alias={w.alias} name={w.alias || `${w.type}-${idx + 1}`}
                           fallback={sourceAliasFallback("wallet", w.type, w.address)} index={renameOffset + wallets.indexOf(w)}
                           names={renameNames ?? wallets.map((item) => item.alias || sourceAliasFallback("wallet", item.type, item.address))}
@@ -293,11 +299,10 @@ const WalletSection = memo(function WalletSection({
               </TableBody>
             </Table>
             {visibleWallets.length > CONFIG_LIST_PAGE_SIZE && (
-              <div data-layout-pager className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  aria-label={t("common.prev")}
                   onClick={() =>
                     onWalletPageChange(Math.max(walletPage - 1, 0))
                   }
@@ -311,7 +316,6 @@ const WalletSection = memo(function WalletSection({
                 <Button
                   variant="outline"
                   size="sm"
-                  aria-label={t("common.next")}
                   onClick={() =>
                     onWalletPageChange(
                       Math.min(walletPage + 1, walletPageCount - 1),

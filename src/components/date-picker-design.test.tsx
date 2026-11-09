@@ -34,7 +34,6 @@ describe("Overview date picker", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     expect(onDateChange).toHaveBeenCalledWith(10, { from: dates[5], to: dates[14] });
   });
-
   it("allows a custom range containing one day with a snapshot", () => {
     const dates = [1, 5, 9].map((day) => new Date(2026, 0, day, 12));
     const onDateChange = vi.fn();

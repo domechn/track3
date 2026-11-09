@@ -224,7 +224,7 @@ const App = ({
         <thead><tr><th scope="col">{t("profitMetrics.date")}</th><th scope="col">{t("history.change")}</th></tr></thead>
         <tbody>{plottedPNL.map(({ change, timestamp }, index) => <tr key={`${timestamp}-${index}`}>
           <td>{timeToDateStr(timestamp)}</td>
-          <td>{`${change < 0 ? "−" : "+"}${currency.symbol}${Math.abs(change).toFixed(2)}`}</td>
+          <td>{change < 0 ? "-" : "+"}{currency.symbol}{Math.abs(change).toFixed(2)}</td>
         </tr>)}</tbody>
       </table>}
     </div>

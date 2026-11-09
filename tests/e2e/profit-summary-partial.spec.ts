@@ -43,7 +43,6 @@ test("desktop shows partial months and year with an explanation", async ({ brows
       await badge.press("Enter");
       await feb.hover();
       await expect(page.getByRole("tooltip")).toContainText("A withdrawal leaves only its snapshot interval out of known P&L");
-      await expect(page.getByRole("tooltip")).toContainText("1 affected month(s)");
       await expect(page.getByRole("tooltip")).toContainText("ETH");
       await expect(page.getByRole("tooltip")).toContainText("Pair the withdrawal in History");
       await page.screenshot({ path: `${directory}/desktop-1440-${theme}-explanation.png` });

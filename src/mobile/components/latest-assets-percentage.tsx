@@ -38,6 +38,7 @@ import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useTranslation } from "@/mobile/i18n";
@@ -302,15 +303,31 @@ const App = ({
                       "{asset}",
                       formatAssetLabel({ symbol: d.coin, assetType: d.assetType }),
                     )}</span>
+                    <img
+                      className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
+                      src={resolveAssetLogoSrc(
+                        { symbol: d.coin, assetType: d.assetType },
+                        logoMap[
+                          getAssetLogoKey({
+                            symbol: d.coin,
+                            assetType: d.assetType,
+                          })
+                        ],
+                      )}
+                      alt=""
+                    />
+                    <div
+                      className="mr-1 font-medium text-sm"
+                      title={"" + d.amount}
+                    >
+                      {d.amount >= 1
+                        ? prettyNumberKeepNDigitsAfterDecimalPoint(d.amount, 4)
+                        : prettyPriceNumberToLocaleString(d.amount)}
+                    </div>
                     <AssetLabel
                       asset={{ symbol: d.coin, assetType: d.assetType }}
-                      src={logoMap[getAssetLogoKey({ symbol: d.coin, assetType: d.assetType })]}
-                      size={20}
-                      quiet
-                      secondary={String(d.amount >= 1
-                        ? prettyNumberKeepNDigitsAfterDecimalPoint(d.amount, 4)
-                        : prettyPriceNumberToLocaleString(d.amount))}
                       className="min-w-0"
+                      labelClassName="text-muted-foreground text-xs truncate"
                     />
                     <OpenInNewWindowIcon className="ml-2 h-3 w-3 hidden group-hover:inline-block touch:inline-block text-muted-foreground" />
                   </Link>
@@ -343,10 +360,13 @@ const App = ({
             <span className="sr-only">{t("common.openAssetDetails").replace("{asset}", formatAssetLabel(reference))}</span>
             <span className="mobile-allocation-swatch" aria-hidden="true"
               style={{ backgroundColor: palette[chartIndex < 0 ? percentageData.length - 1 : chartIndex].main }} />
-            <AssetLabel asset={reference} src={logoMap[getAssetLogoKey(reference)]} size={20} quiet
-              secondary={asset.amount >= 1
+            <img src={resolveAssetLogoSrc(reference, logoMap[getAssetLogoKey(reference)])} alt="" />
+            <span className="mobile-allocation-name">
+              <strong>{asset.coin}</strong>
+              <span>{asset.amount >= 1
                 ? asset.amount.toLocaleString("en-US", { maximumFractionDigits: 4 })
-                : prettyPriceNumberToLocaleString(asset.amount)} />
+                : prettyPriceNumberToLocaleString(asset.amount)}</span>
+            </span>
             <span className="mobile-allocation-value">
               <strong className="ios-money">{currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(asset.value))}</strong>
               <span>{asset.percentage.toFixed(1)}%</span>

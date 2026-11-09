@@ -5,22 +5,6 @@ import { expectSettingsCardsFitContent, expectSettingsSameRowBottoms } from "./s
 
 test.use({ viewport: { width: 1600, height: 900 }, colorScheme: "dark", reducedMotion: "reduce" });
 
-test("settings navigation remains visible while long settings content scrolls", async ({ page }) => {
-  await page.setViewportSize({ width: 1600, height: 640 });
-  await seedSettingsB(page, "backup", "default");
-  await page.goto(settingsBRoute.backup);
-  const main = page.locator("#app-main-content");
-  await expect(page.locator(".t3-b-card").first()).toBeVisible({ timeout: 30_000 });
-  const scrollable = await main.evaluate((node) => node.scrollHeight > node.clientHeight);
-  expect(scrollable).toBe(true);
-  await main.evaluate((node) => { node.scrollTop = node.scrollHeight; });
-  expect(await main.evaluate((node) => node.scrollTop)).toBeGreaterThan(120);
-  const menu = (await page.locator(".t3-settings-menu").boundingBox())!;
-  expect(menu.y).toBeGreaterThanOrEqual(0);
-  expect(menu.y + menu.height).toBeLessThanOrEqual(640);
-  await expect(page.locator(".t3-settings-menu-link[aria-current='page']")).toBeInViewport();
-});
-
 for (const [area, route, selector] of [
   ["sources", "/#/settings/configuration?section=sources", "[data-testid='source-table']"],
   ["currency", "/#/settings/configuration?section=currency", ".t3-fidelity-currency section"],
@@ -104,7 +88,7 @@ for (const width of [1280, 1100]) {
 }
 
 for (const width of [1600, 1280, 1100]) {
-  test(`sync cards fit content and follow the expected grid at ${width}px`, async ({ page }) => {
+  test(`sync cards fit content and start together at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await seedSettingsB(page, "sync", "locked");
     await page.goto(settingsBRoute.sync);
@@ -113,11 +97,9 @@ for (const width of [1600, 1280, 1100]) {
     await expectSettingsCardsFitContent(page, ".sync-settings-page [data-ui-card]");
     const tops = await page.evaluate(() => ({
       connection: document.querySelector(".t3-sync-connection")!.getBoundingClientRect().top,
-      connectionBottom: document.querySelector(".t3-sync-connection")!.getBoundingClientRect().bottom,
       passphrase: document.querySelector(".t3-sync-passphrase")!.getBoundingClientRect().top,
     }));
-    if (width > 1300) expect(Math.abs(tops.connection - tops.passphrase)).toBeLessThanOrEqual(1);
-    else expect(Math.abs(tops.passphrase - tops.connectionBottom - 16)).toBeLessThanOrEqual(1);
+    expect(Math.abs(tops.connection - tops.passphrase)).toBeLessThanOrEqual(1);
   });
 }
 

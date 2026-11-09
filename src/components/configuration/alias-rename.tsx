@@ -35,7 +35,7 @@ export function AliasRename({ alias, name, fallback, names, index, onRename }: {
     setOpen(next);
   }}>
     <DialogTrigger asChild>
-      <Button type="button" size="icon" variant="ghost" className="t3-alias-rename-trigger h-9 w-9 touch:h-11 touch:w-11 shrink-0"
+      <Button type="button" size="icon" variant="ghost" className="t3-alias-rename-trigger h-7 w-7 touch:h-11 touch:w-11 shrink-0"
         aria-label={renameTitle} title={renameTitle}>
         <Pencil1Icon className="h-4 w-4" />
       </Button>

@@ -31,8 +31,7 @@ test("phone About and iPad rail show the two-peak brand in both themes", async (
           expect((await brand.boundingBox())!.height).toBeGreaterThanOrEqual(44);
           await brand.click();
           await expect(page).toHaveURL(/#\/overview$/);
-          await expect(page.locator("#app-main-content[data-route='/overview'] .mobile-route-heading h1"))
-            .toHaveText("Overview", { timeout: 30_000 });
+          await expect(page.locator("#app-main-content h1")).toHaveText("Overview", { timeout: 30_000 });
         }
         await expect(page.locator("[aria-busy='true']")).toHaveCount(0, { timeout: 30_000 });
         await page.screenshot({ path: `${output}/${device}-${theme}.png` });

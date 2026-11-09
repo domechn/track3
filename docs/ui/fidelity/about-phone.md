@@ -72,8 +72,6 @@ State: **default**. Button actions, input validity, status, overlays, and toasts
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** about 10.402% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
 Capture: `/tmp/fidelity/settings-b/about.png` (full page: `about-long.png`). Design and app were compared side by side at 390 × 844 CSS px. Remaining differences are listed below.
 
 - The app uses the current text-free, two-peak Track3 mark in place of the source's blue chart tile.

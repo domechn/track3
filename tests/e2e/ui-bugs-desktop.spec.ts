@@ -9,28 +9,14 @@ for (const width of [1440, 1100]) for (const sources of [3, 8, 16, 30]) {
     await installManySourceFixture(page, sources);
     await page.goto("/#/wallets");
     const scroll = page.locator(width >= 1400 ? ".t3-wallet-matrix .t3-wallet-table-scroll" : ".wallet-asset-change-scroll").first();
-    const sourceIds = new Set<string>();
-    const matrixPager = page.locator(width >= 1400
-      ? ".t3-wallet-matrix [data-layout-pager]"
-      : ".wallet-asset-change-card [data-layout-pager]").last();
-    const perPage = width >= 1400 ? 5 : 4;
-    for (let start = 0; start < sources; start += perPage) {
-      await expect(scroll.locator("thead th")).toHaveCount(Math.min(perPage, sources - start) + 2);
-      await expect(scroll.locator("thead th[title]")).toHaveCount(Math.min(perPage, sources - start));
-      for (const id of await scroll.locator("thead th[title]").evaluateAll((cells) =>
-        cells.map((cell) => cell.getAttribute("title") ?? ""))) sourceIds.add(id);
-      if (start + perPage < sources) await matrixPager.getByRole("button", { name: "Next" }).click();
-    }
-    expect(sourceIds.size).toBe(sources);
+    await expect(scroll.locator("thead th")).toHaveCount(sources + 2);
     await expect(scroll).toHaveAttribute("tabindex", "0");
     const rendered = await page.locator(".analyze-wallets").textContent();
     expect(rendered).not.toMatch(/[0-9a-f]{12,}/i);
     expect(rendered).not.toMatch(/[0-9a-f]{6,}…[0-9a-f]{4,}/i);
     const headers = scroll.locator("thead th");
     expect(await headers.allTextContents()).not.toContainEqual(expect.stringMatching(/[0-9a-f]{12,}/i));
-    if (width >= 1400) for (let page = 1; page < Math.ceil(sources / perPage); page++)
-      await matrixPager.getByRole("button", { name: "Previous" }).click();
-    const firstSourceName = await headers.nth(1).locator(".t3-asset-label-name").textContent();
+    const firstSourceName = await headers.nth(1).textContent();
     await expect(headers.nth(1)).toHaveAttribute("title", /^[0-9a-f]{32}$/i);
     await expect(headers.nth(1)).toHaveAttribute("aria-label", firstSourceName!);
     const boxes = await headers.evaluateAll((cells) => cells.map((cell) => {
@@ -45,33 +31,18 @@ for (const width of [1440, 1100]) for (const sources of [3, 8, 16, 30]) {
     expect(boxes.at(-1)?.position).toBe("sticky");
     if (sources >= 8) {
       const size = await scroll.evaluate((element) => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
-      if (width >= 1400 && sources >= 16) expect(size.scrollWidth).toBeLessThanOrEqual(size.clientWidth + 1);
-      if (size.scrollWidth > size.clientWidth + 1) {
-        await scroll.evaluate((element) => { element.scrollLeft = 500; });
-        expect(await scroll.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-        await scroll.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
-        const lastBox = (await headers.last().boundingBox())!;
-        const scrollBox = (await scroll.boundingBox())!;
-        expect(lastBox.x + lastBox.width).toBeLessThanOrEqual(scrollBox.x + scrollBox.width + 1);
-      }
+      expect(size.scrollWidth).toBeGreaterThan(size.clientWidth);
+      await scroll.evaluate((element) => { element.scrollLeft = 500; });
+      expect(await scroll.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+      await scroll.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+      const lastBox = (await headers.last().boundingBox())!;
+      const scrollBox = (await scroll.boundingBox())!;
+      expect(lastBox.x + lastBox.width).toBeLessThanOrEqual(scrollBox.x + scrollBox.width + 1);
     }
     if (sources === 16 && width === 1440) {
-      const chips = page.locator(".t3-wallet-chips button");
-      await expect(chips).toHaveCount(9);
-      await expect(chips.nth(1)).toHaveAttribute("title", /^[0-9a-f]{32}$/i);
-      const chipIds = new Set<string>();
-      for (let index = 0; index < 2; index++) {
-        for (const id of await chips.evaluateAll((buttons) => buttons.map((button) => button.getAttribute("title")).filter((id): id is string => !!id))) chipIds.add(id);
-        if (index === 0) await page.locator(".t3-wallet-picker [data-layout-pager]").getByRole("button", { name: "Next" }).click();
-      }
-      expect(chipIds.size).toBe(16);
-      const balances = page.locator(".t3-wallet-balances");
-      let brokers = 0;
-      for (let index = 0; index < 2; index++) {
-        brokers += await balances.locator("tbody th small").filter({ hasText: "broker" }).count();
-        if (index === 0) await balances.locator("[data-layout-pager]").getByRole("button", { name: "Next" }).click();
-      }
-      expect(brokers).toBe(1);
+      await expect(page.locator(".t3-wallet-chips button")).toHaveCount(17);
+      await expect(page.locator(".t3-wallet-chips button").nth(1)).toHaveAttribute("title", /^[0-9a-f]{32}$/i);
+      await expect(page.locator(".t3-wallet-balances tbody th small").filter({ hasText: "broker" })).toHaveCount(1);
       await expect(page.locator(".t3-wallet-kpis")).toContainText("— of 16 sources current");
       const allocation = (await page.locator(".t3-wallet-allocation").boundingBox())!;
       for (const chip of await page.locator(".t3-wallet-chips button").all()) {
@@ -88,10 +59,6 @@ for (const width of [1440, 1100]) for (const sources of [3, 8, 16, 30]) {
         const contentBox = (await content.boundingBox())!;
         expect(contentBox.y + contentBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
       }
-      const matrix = (await page.locator(".t3-wallet-matrix").boundingBox())!;
-      const moved = (await page.locator(".t3-wallet-moved").boundingBox())!;
-      expect(Math.abs(matrix.x - moved.x)).toBeLessThanOrEqual(1);
-      expect(moved.y).toBeGreaterThanOrEqual(matrix.y + matrix.height + 16);
     }
     if (sources === 3 || sources === 16) await scroll.screenshot({ path: `/tmp/wallet-matrix-${width}-${sources}.png` });
   });
@@ -115,8 +82,6 @@ test("History detail names sources without hash fragments", async ({ page }) => 
   await installManySourceFixture(page, 16);
   await page.goto("/#/history");
   const sources = page.locator(".fidelity-history-source-row");
-  await expect(sources).toHaveCount(12, { timeout: 30_000 });
-  await page.getByRole("button", { name: "Show all (16)" }).click();
   await expect(sources).toHaveCount(16);
   expect(await sources.allTextContents()).not.toContainEqual(expect.stringMatching(/[0-9a-f]{12,}/i));
   await expect(sources.first()).toContainText("Wallet 1");
@@ -211,11 +176,7 @@ test("an opaque wallet keeps its latest-value number on the coin page", async ({
   await page.setViewportSize({ width: 1440, height: 900 });
   await installManySourceFixture(page, 16);
   await page.goto("/#/wallets");
-  const chip = page.locator(`.t3-wallet-chips button[title="${id}"]`);
-  for (let pageIndex = 0; pageIndex < 2 && await chip.count() === 0; pageIndex++)
-    await page.locator(".t3-wallet-picker [data-layout-pager]").getByRole("button", { name: "Next" }).click();
-  await expect(chip).toBeVisible();
-  const name = await chip.textContent();
+  const name = await page.locator(`.t3-wallet-chips button[title="${id}"]`).textContent();
   expect(name).toMatch(/^Wallet \d+$/);
   await page.goto("/#/coins/COIN01");
   await expect(page.locator(".coin-fidelity")).toContainText(name!);

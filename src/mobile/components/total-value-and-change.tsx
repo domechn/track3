@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AssetChangeData,
   CurrencyRateDetail,
@@ -16,7 +16,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Line } from "react-chartjs-2";
-import type { Chart as ChartJS } from "chart.js";
 import {
   queryAssetChange,
   queryTotalValue,
@@ -25,11 +24,12 @@ import {
 } from "@/middlelayers/charts";
 import bluebird from "bluebird";
 import { ChartResizeContext } from "@/mobile/App";
-import { directionChartColor, positiveNegativeTextClass } from "@/utils/color";
+import { positiveNegativeTextClass } from "@/utils/color";
 import { chartThemeColor } from "@/utils/chart-theme";
 import {
   getChartPalette,
   glassScaleOptions,
+  glassTooltip,
   phoneChartFontFamily,
 } from "@/mobile/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
@@ -41,9 +41,6 @@ import { AnimatedAmount, DeltaPill, SegmentedControl, Switch, useHaptics, useIsM
 import { visibleHistoryIndices } from "@/mobile/components/mobile/chart-range";
 import { useTheme } from "@/mobile/components/common/theme";
 import { formatOverviewAxisTicks } from "@/components/overview-chart-scale";
-import { ChartTooltip } from "@/components/chart-tooltip";
-import { buildOverviewTooltip } from "@/components/overview-chart-tooltip";
-import { useOverviewTopMover } from "@/components/overview-top-mover";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -183,7 +180,6 @@ const App = ({
   metrics,
   ath,
   bestDay,
-  bestDayContribution,
 }: {
   currency: CurrencyRateDetail;
   dateRange: TDateRange;
@@ -191,7 +187,6 @@ const App = ({
   metrics?: ReactNode;
   ath?: { timestamp: number; value: number; distanceFromAth?: number };
   bestDay?: { timestamp: number; value: number };
-  bestDayContribution?: { symbol: string; value: number };
 }) => {
   const { resolvedTheme } = useTheme();
   const { t, locale } = useTranslation();
@@ -219,10 +214,13 @@ const App = ({
   const [chartRange, setChartRange] = useState<"1W" | "1M" | "3M" | "1Y" | "ALL">("ALL");
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const [scrubPosition, setScrubPosition] = useState<{ x: number; y: number; top: number; bottom: number } | null>(null);
-  const [scrubAnchor, setScrubAnchor] = useState<HTMLSpanElement | null>(null);
-  const chartRef = useRef<ChartJS<"line"> | null>(null);
   const lastScrub = useRef<number | null>(null);
   const [chartWidth, setChartWidth] = useState(600);
+  const chartChipRef = useRef<HTMLDivElement>(null);
+  const [chartChipWidth, setChartChipWidth] = useState(0);
+  useLayoutEffect(() => {
+    if (chartChipRef.current) setChartChipWidth(chartChipRef.current.getBoundingClientRect().width);
+  });
   const loadGenRef = useRef(0);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
@@ -388,31 +386,6 @@ const App = ({
     () => plottedIndices.map((index) => assetChangeData.timestamps[index]),
     [plottedIndices, assetChangeData.timestamps],
   );
-  const bestIndex = bestDay ? plottedTimestamps.map((timestamp) =>
-    new Date(timestamp).toDateString()).lastIndexOf(new Date(bestDay.timestamp).toDateString()) : -1;
-  const originalIndex = scrubIndex === null ? undefined : plottedIndices[scrubIndex];
-  const dayMover = useOverviewTopMover(scrubIndex === null ? undefined : plottedTimestamps[scrubIndex],
-    dateRange.start.getTime());
-  const tooltipContent = buildOverviewTooltip(
-    originalIndex === undefined ? undefined : {
-      timestamp: assetChangeData.timestamps[originalIndex],
-      value: btcAsBase || showPercentageInChart ? lineValues[originalIndex] : assetChangeData.data[originalIndex]?.usdValue,
-    },
-    originalIndex === undefined || originalIndex === 0 ? undefined : {
-      timestamp: assetChangeData.timestamps[originalIndex - 1],
-      value: btcAsBase || showPercentageInChart ? lineValues[originalIndex - 1] : assetChangeData.data[originalIndex - 1]?.usdValue,
-    },
-    currency, locale, scrubIndex === bestIndex && bestDayContribution ? bestDayContribution : dayMover,
-    showPercentageInChart ? "percent" : btcAsBase ? "btc" : "fiat",
-  );
-  const activate = (index: number) => {
-    const chart = chartRef.current;
-    const point = chart?.getDatasetMeta(0).data[index];
-    if (!chart || !point) return;
-    setScrubIndex(index);
-    setScrubPosition({ x: point.x + chart.canvas.offsetLeft, y: point.y + chart.canvas.offsetTop,
-      top: chart.chartArea.top + chart.canvas.offsetTop, bottom: chart.chartArea.bottom + chart.canvas.offsetTop });
-  };
 
   function changePercentageColorClass(
     ts: TotalValueShower,
@@ -431,8 +404,9 @@ const App = ({
       onResize: (_chart: unknown, size: { width: number }) => setChartWidth(size.width),
       onHover: (_event: unknown, elements: Array<{ index: number; element: { x: number; y: number } }>,
         chart: { chartArea: { top: number; bottom: number } }) => {
+        if (!isMobile) return;
         const next = elements[0]?.index ?? null;
-        if (isMobile && next !== null && next !== lastScrub.current) haptic("selection");
+        if (next !== null && next !== lastScrub.current) haptic("selection");
         lastScrub.current = next;
         setScrubIndex(next);
         setScrubPosition(next === null ? null : {
@@ -460,7 +434,23 @@ const App = ({
         legend: {
           display: false,
         },
-        tooltip: { enabled: false },
+        tooltip: {
+          ...glassTooltip,
+          enabled: !isMobile,
+          filter: (item: { datasetIndex: number }) => item.datasetIndex === 0,
+          callbacks: {
+            label: (context: { parsed: { y: number } }) => {
+              const v = context.parsed.y.toLocaleString();
+              if (showPercentageInChart) {
+                return `${v}%`;
+              }
+              if (btcAsBase) {
+                return `${btcSymbol}${v}`;
+              }
+              return currency.symbol + v;
+            },
+          },
+        },
       },
       scales: {
         x: {
@@ -553,9 +543,7 @@ const App = ({
           backgroundColor: "transparent",
           borderWidth: 2.5,
           tension: 0,
-          pointRadius: (context: { dataIndex: number }) => context.dataIndex === bestIndex ? 4 : 0,
-          pointBackgroundColor: directionChartColor(bestDay?.value, quoteColor, resolvedTheme),
-          pointBorderWidth: 0,
+          pointRadius: 0,
           pointStyle: "rotRect",
           segment: {
             borderDash: (segment: { p0DataIndex: number; p1DataIndex: number }) =>
@@ -575,7 +563,7 @@ const App = ({
         }]),
       ],
     };
-  }, [plottedTimestamps, plottedIndices, lineValues, lineColor, palette, ath, btcAsBase, showPercentageInChart, firstTotalValue, currency, t, assetChangeData.gaps, bestIndex, bestDay, quoteColor, resolvedTheme]);
+  }, [plottedTimestamps, plottedIndices, lineValues, lineColor, palette, ath, btcAsBase, showPercentageInChart, firstTotalValue, currency, t, assetChangeData.gaps]);
 
   return (
     <div className={metrics ? "h-full overview-total t3-total-overview" : "h-full overview-total"}>
@@ -660,7 +648,7 @@ const App = ({
               ? <AnimatedAmount value={currencyWrapper(currency)(shownTotalValue)}
                   format={(value) => currency.symbol + prettyNumberToLocaleString(value)} />
               : getTotalValueShower(btcAsBase, firstTotalValue, shownTotalValue, assetChangeData).formatTotalValue()}
-            {totalValueData.partial && <span className="t3-tag ml-2 align-middle" data-tone="warning">
+            {totalValueData.partial && <span className="ml-2 inline-flex align-middle rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 font-sans text-xs font-medium tracking-normal text-foreground">
               {t("history.partial.label")}
             </span>}
           </div>
@@ -690,63 +678,27 @@ const App = ({
             {t("totalValue.from").replace("{date}", displayedFirstDate)}
           </p>
           {metrics}
-          <div className="min-h-[120px] flex-1 mobile-hero-chart t3-hero-chart">
-            {bestDay && bestIndex >= 0 && <button type="button" className="t3-chart-best-day"
-              onMouseEnter={() => activate(bestIndex)} onFocus={() => activate(bestIndex)}
-              onMouseLeave={() => { setScrubIndex(null); setScrubPosition(null); }}
-              onBlur={() => { setScrubIndex(null); setScrubPosition(null); }}
-              title={t("overview.design.bestDay")
-                .replace("{day}", new Date(bestDay.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" }))
-                .replace("{amount}", `${bestDay.value >= 0 ? "+" : "−"}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(bestDay.value)))}`)}>
-              {t("overview.design.bestDay")
+          <div className="min-h-[120px] flex-1 mobile-hero-chart t3-hero-chart" onPointerLeave={() => { setScrubIndex(null); setScrubPosition(null); }}>
+            {bestDay && <div className="t3-chart-best-day">{t("overview.design.bestDay")
               .replace("{day}", new Date(bestDay.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" }))
-              .replace("{amount}", `${bestDay.value >= 0 ? "+" : "−"}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(bestDay.value)))}`)}</button>}
-            <div className="t3-chart-plot" onPointerLeave={(event) => {
-              if (event.pointerType === "mouse") { setScrubIndex(null); setScrubPosition(null); }
-            }}>
-            {scrubIndex !== null && scrubPosition && plottedTimestamps[scrubIndex] !== undefined && <>
+              .replace("{amount}", `${bestDay.value >= 0 ? "+" : "−"}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(bestDay.value)))}`)}</div>}
+            {isMobile && scrubIndex !== null && scrubPosition && plottedTimestamps[scrubIndex] !== undefined && <>
               <div className="mobile-chart-crosshair" aria-hidden="true"
                 style={{ left: scrubPosition.x, top: scrubPosition.top, height: scrubPosition.bottom - scrubPosition.top }} />
               <div className="mobile-chart-point" aria-hidden="true"
                 style={{ left: scrubPosition.x, top: scrubPosition.y }} />
-              <span ref={setScrubAnchor} className="t3-chart-active-point"
-                data-chart-active-point="" style={{ left: scrubPosition.x, top: scrubPosition.y }} />
-            </>}
-            <Line ref={chartRef} role="img" tabIndex={0}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") { setScrubIndex(null); setScrubPosition(null); }
-                if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-                  event.preventDefault();
-                  activate(Math.max(0, Math.min(plottedIndices.length - 1,
-                    (scrubIndex ?? (event.key === "ArrowRight" ? -1 : plottedIndices.length)) + (event.key === "ArrowRight" ? 1 : -1))));
-                }
-              }}
-              onPointerDown={(event) => {
-                const chart = chartRef.current;
-                if (!chart || !plottedIndices.length) return;
-                const x = event.nativeEvent.offsetX;
-                const points = chart.getDatasetMeta(0).data;
-                let nearest = 0;
-                for (let index = 1; index < points.length; index++) {
-                  if (Math.abs(points[index].x - x) < Math.abs(points[nearest].x - x)) nearest = index;
-                }
-                activate(nearest);
-              }}
-              aria-label={t("totalValue.chartSummary")
+              <div ref={chartChipRef} className="mobile-chart-chip" aria-hidden="true"
+                style={{ left: Math.max(chartChipWidth / 2 + 4, Math.min(chartWidth - chartChipWidth / 2 - 4, scrubPosition.x)) }}>
+                {new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" })
+                  .format(new Date(plottedTimestamps[scrubIndex]))} · {showPercentageInChart
+                  ? `${lineValues[plottedIndices[scrubIndex]]?.toFixed(2)}%`
+                  : `${btcAsBase ? btcSymbol : currency.symbol}${prettyNumberToLocaleString(lineValues[plottedIndices[scrubIndex]] ?? 0)}`}
+              </div></>}
+            <Line role="img" aria-label={t("totalValue.chartSummary")
               .replace("{value}", totalValueShower.formatTotalValue())
               .replace("{change}", changedValueOrPercentage)
               .replace("{date}", displayedFirstDate)}
               options={options as any} data={lineDataMemo} />
-            <ChartTooltip anchor={tooltipContent && scrubPosition ? scrubAnchor : null}>
-              {tooltipContent && <><div>{tooltipContent.date}</div>
-                <div>{t("common.valueLabel")}: <strong>{tooltipContent.value}</strong></div>
-                {tooltipContent.change && <div data-tone={tooltipContent.direction > 0 ? "gain" : tooltipContent.direction < 0 ? "loss" : "neutral"}>
-                  {t("common.changeLabel")}: {tooltipContent.change}</div>}
-                {tooltipContent.mover && <div>{t("overview.chart.topMover")}: {tooltipContent.mover}</div>}</>}
-            </ChartTooltip>
-            <span className="sr-only" aria-live="polite">{tooltipContent &&
-              `${tooltipContent.date}, ${tooltipContent.value}, ${tooltipContent.change ?? ""}, ${tooltipContent.mover ?? ""}`}</span>
-            </div>
           </div>
           {isMobile && plottedTimestamps.length > 0 && <div className="mobile-hero-dates" aria-hidden="true">
             <span>{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" })

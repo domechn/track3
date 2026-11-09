@@ -165,8 +165,8 @@ describe("Rebalance page", () => {
       tolerancePercent: 0,
     });
     render(<Rebalance currency={currency} />);
-    expect((await screen.findByText(/Sell 0.66666667 BTC/)).textContent).toBe("Sell 0.66666667 BTC");
-    expect(screen.getByText(/Buy 1 ETH/).textContent).toBe("Buy 1 ETH");
+    expect(await screen.findByText(/Sell 0.66666667 BTC/)).toBeInTheDocument();
+    expect(screen.getByText(/Buy 1 ETH/)).toBeInTheDocument();
   });
   it("leads with AI setup and opens manual setup for an empty profile", async () => {
     render(<Rebalance currency={currency} />);

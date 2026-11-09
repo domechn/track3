@@ -25,6 +25,14 @@ it("shows an error toast when a published link cannot be opened", async () => {
   }));
 });
 
+it("lets a caller show its own link error without a second toast", async () => {
+  vi.mocked(openUrl).mockRejectedValueOnce(new Error("opener unavailable"));
+  const onError = vi.fn();
+  await openExternal("latestRelease", onError);
+  expect(onError).toHaveBeenCalledOnce();
+  expect(toast).not.toHaveBeenCalled();
+});
+
 it("allows only central navigation URLs and known data provider URLs in source literals", () => {
   const providerHosts = new Set([
     "api.openai.com", "api.track3.dev", "currency-rate-api.track3.dev",

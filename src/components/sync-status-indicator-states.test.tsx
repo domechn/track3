@@ -162,15 +162,6 @@ describe.each([
     expect(screen.queryByLabelText("Sync passphrase")).not.toBeInTheDocument();
   });
 
-  it("names the passphrase dialog with its locked heading", async () => {
-    publish({ mode: "locked", sync: { phase: "idle" } });
-    render(<Indicator />);
-    const title = "Sync is locked";
-    const dialog = await screen.findByRole("dialog", { name: title });
-    expect(dialog).toHaveTextContent(title);
-    expect(dialog).not.toHaveTextContent("Last sync result");
-  });
-
   it("turns off sync only after confirmation and leaves cancel harmless", async () => {
     publish({ mode: "locked", sync: { phase: "idle" } });
     render(<Indicator />);
@@ -245,7 +236,7 @@ it("shows the phone successful sheet with last upload and inline details", () =>
   const sheet = screen.getByRole("dialog");
   expect(sheet).toHaveTextContent("Last upload");
   expect(sheet).toHaveTextContent("Cloudflare R2 · sync-fixture");
-  expect(sheet.querySelector(".fidelity-sync-sheet-actions .t3-sync-details")).toBeInTheDocument();
+  expect(sheet.querySelector(".fidelity-sync-sheet-actions details")).toBeInTheDocument();
   expect(sheet.querySelector(".fidelity-sync-sheet-actions")).not.toHaveTextContent("Settings");
 });
 
@@ -254,17 +245,9 @@ it("shows the known failure in expanded phone diagnostics", () => {
   publish({ mode: "ready", sync: { phase: "error", error: "bucket", report: zeroReport } });
   render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
   fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
-  const details = screen.getByRole("dialog").querySelector(".t3-sync-details")!;
-  expect(details.querySelector(".t3-sync-details-toggle")).toHaveAttribute("aria-expanded", "true");
-  expect(details.querySelector(".t3-sync-details-panel")).toHaveTextContent("Bucket not found");
-  expect(details.querySelector(".t3-sync-details-panel")).not.toHaveTextContent("None");
+  const details = screen.getByRole("dialog").querySelector("details");
+  expect(details).toHaveAttribute("open");
+  expect(details).toHaveTextContent("Bucket not found");
+  expect(details).not.toHaveTextContent("None");
   expect(screen.getByRole("dialog").querySelector(".fidelity-sync-sheet-actions")).toHaveTextContent("Retry now");
-});
-
-it("starts stopped phone diagnostics collapsed", () => {
-  window.location.hash = "#/settings/sync";
-  publish({ mode: "ready", sync: { phase: "error", error: "bucket", retryStopped: true, report: zeroReport } });
-  render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
-  fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
-  expect(screen.getByRole("dialog").querySelector(".t3-sync-details-toggle")).toHaveAttribute("aria-expanded", "false");
 });

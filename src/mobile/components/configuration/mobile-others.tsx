@@ -1,5 +1,3 @@
-import AssetLabel from "@/components/common/asset-label";
-import AssetIcon from "@/components/ui/asset-icon";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +7,8 @@ import { ConfirmSheet, ModalPage } from "@/mobile/components/mobile/overlays";
 import { ActionSheet } from "@/mobile/components/mobile";
 import { BackpackIcon, Cross2Icon, DotsHorizontalIcon, Link2Icon, LockClosedIcon, TrashIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
+import { getWalletLogo } from "@/lib/utils";
+import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import type { OtherRow } from "@/components/configuration/types";
 import { CustomPriceFields, parsePriceDraft, priceDraft } from "@/components/configuration/custom-price-fields";
 import type { PriceDraft } from "@/components/configuration/custom-price-fields";
@@ -113,7 +113,7 @@ export function MobileOthers(props: {
         <div className="fidelity-custom-identity"><button type="button" className="fidelity-custom-avatar"
           aria-labelledby={`fidelity-custom-more-${index}`} onClick={() => setMenu(index)}>
           <span className="sr-only" id={`fidelity-custom-more-${index}`}>{t("mobile.sources.moreActions").replace("{source}", other.symbol)}</span>
-          <AssetIcon kind="custom" symbol={other.symbol} size={24} decorative /></button>
+          {other.symbol === "GOLD" ? "AU" : other.symbol.slice(0, 2).toUpperCase()}</button>
           <div><button type="button" className="fidelity-custom-name" aria-label={`${t("goals.edit")} ${other.symbol}`}
             aria-describedby={`fidelity-custom-detail-${index}`} onClick={() => open(index)}><strong id={`fidelity-custom-symbol-${index}`}>{other.symbol}</strong></button><small id={`fidelity-custom-detail-${index}`} title={other.alias || other.symbol}>{other.alias || other.symbol} · {other.amount.toLocaleString("en-US")}</small></div></div>
         <div className="fidelity-custom-details">
@@ -126,7 +126,7 @@ export function MobileOthers(props: {
           <strong>{unitPrice(other) ? money(assetValue(other)) : "—"}</strong>
         </div>
         <div className="fidelity-custom-actions">
-          <button type="button" aria-label={`${t("fidelity.settings.custom.attach")} ${other.symbol}`}
+          <button type="button" aria-labelledby={`fidelity-custom-attach-${index} fidelity-custom-symbol-${index}`}
             onClick={() => props.onAttach(index)}><Link2Icon aria-hidden="true" />
             <span id={`fidelity-custom-attach-${index}`}>{t("fidelity.settings.custom.attach")}</span></button>
           <AliasRename alias={other.alias} name={other.alias || other.symbol} fallback={sourceAliasFallback("custom", other.symbol)}
@@ -232,12 +232,15 @@ export function MobileOthers(props: {
       {props.others.length === 0 && !props.hideEmpty && <EmptyState icon={BackpackIcon}
         title={t("mobile.others.empty")} hint={t("fidelity.settings.sources.emptyHint")} />}
       {props.others.map((other, index) => <div key={`${other.symbol}-${index}`} className="ios-d3-others-row flex min-w-0 items-center gap-2 px-4 py-2">
+        <span className="ios-d3-source-avatar" aria-hidden="true">
+          {getWalletLogo(other.symbol) === UnknownLogo ? other.symbol.slice(0, 2).toUpperCase() : <img src={getWalletLogo(other.symbol)} alt="" />}
+        </span>
         <button className="min-h-11 min-w-0 flex-1 text-left" aria-label={`${t("goals.edit")} ${other.symbol}`} onClick={() => open(index)}>
-          <AssetLabel kind="custom" symbol={other.symbol} name={other.alias || other.symbol} size={24}
-            secondary={<>{other.amount.toLocaleString()} {other.symbol}
+          <span className="block truncate font-medium">{other.alias || other.symbol}</span>
+          <span className="block truncate text-xs text-muted-foreground">{other.amount.toLocaleString()} {other.symbol}
             {!other.attachTo && other.price ? ` · ${t(validateCustomPrice(other.price, customSymbols, other.symbol)
               ? `config.customPrice.${other.price.kind}` : "config.customPrice.invalidRule")}` : ""}
-          </>} />
+          </span>
         </button>
         <AliasRename alias={other.alias} name={other.alias || other.symbol} fallback={sourceAliasFallback("custom", other.symbol)}
           names={props.renameNames ?? props.others.map((item) => item.alias || item.symbol)}

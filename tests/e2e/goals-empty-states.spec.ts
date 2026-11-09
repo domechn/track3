@@ -55,7 +55,7 @@ async function assertNoBareEmptyCards(page: Page) {
 
 for (const width of [1280, 1100]) {
   for (const theme of ["dark", "light"]) {
-    test(`empty Goals panels stack at ${width}px in ${theme} mode`, async ({ page }) => {
+    test(`empty Goals panels are aligned at ${width}px in ${theme} mode`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
       await installTauriBridge(page, { emptyPortfolio: true });
@@ -65,8 +65,11 @@ for (const width of [1280, 1100]) {
       await assertEmptyCard(page, ".t3-goals-history");
       await assertEmptyCard(page, ".t3-goals-chart");
       const panels = await page.locator(".t3-goals-rules, .t3-goals-history").evaluateAll((nodes) =>
-        nodes.map((node) => node.getBoundingClientRect().toJSON()));
-      expect(panels[1].top).toBeGreaterThanOrEqual(panels[0].bottom);
+        nodes.map((node) => node.getBoundingClientRect().height));
+      expect(Math.abs(panels[0] - panels[1])).toBeLessThanOrEqual(1);
+      const emptyBottoms = await page.locator(".t3-goals-rules [data-empty-state], .t3-goals-history [data-empty-state]")
+        .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().bottom));
+      expect(Math.abs(emptyBottoms[0] - emptyBottoms[1])).toBeLessThanOrEqual(1);
       await expect(page.getByRole("button", { name: "Acknowledge all" })).toBeDisabled();
       await expect(page.getByRole("button", { name: "Clear history" })).toBeDisabled();
       const notificationY = (await page.locator(".t3-goals-notifications").boundingBox())!.y;
@@ -86,10 +89,10 @@ for (const width of [1280, 1100]) {
       await expect(page.locator(".t3-goals-summary")).toContainText(`${rules} / ${rules}`, { timeout: 20_000 });
       await expect(page.locator(".t3-goals-rules .t3-goals-rule-row")).toHaveCount(Math.min(rules, 20));
       const panels = await page.locator(".t3-goals-rules, .t3-goals-history").evaluateAll((nodes) =>
-        nodes.map((node) => node.getBoundingClientRect().toJSON()));
-      expect(panels[1].top).toBeGreaterThanOrEqual(panels[0].bottom);
-      expect(panels[0].height).toBeLessThanOrEqual(700);
-      if (rules === 1 && alerts === 40) expect(panels[0].height).toBeLessThanOrEqual(400);
+        nodes.map((node) => node.getBoundingClientRect().height));
+      expect(Math.abs(panels[0] - panels[1])).toBeLessThanOrEqual(1);
+      expect(panels[0]).toBeLessThanOrEqual(700);
+      if (rules === 1 && alerts === 40) expect(panels[0]).toBeLessThanOrEqual(400);
       if (rules > 20) {
         await expect(page.getByRole("navigation", { name: "Rules" })).toBeVisible();
         await expect(page.getByRole("navigation", { name: "Alert history" })).toBeVisible();
@@ -108,22 +111,6 @@ for (const width of [1280, 1100]) {
     });
   }
 }
-
-test("1920px Goals stacks a short alert history below its rules", async ({ page }) => {
-  await page.setViewportSize({ width: 1920, height: 900 });
-  await installTauriBridge(page);
-  await seedGoals(page, 5, 2);
-  await page.goto("/#/goals");
-  await expect(page.locator(".t3-fidelity-goal-rules .t3-fidelity-goal-row:not(.t3-fidelity-table-head)")).toHaveCount(5);
-  await expect(page.locator(".t3-fidelity-triggered .t3-fidelity-history-row")).toHaveCount(2);
-  const rules = (await page.locator(".t3-fidelity-goal-rules").boundingBox())!;
-  const history = (await page.locator(".t3-fidelity-triggered").boundingBox())!;
-  const lastAlert = (await page.locator(".t3-fidelity-history-row").last().boundingBox())!;
-  const footnote = (await page.locator(".t3-fidelity-triggered .t3-fidelity-foot").boundingBox())!;
-  expect(history.y).toBeGreaterThanOrEqual(rules.y + rules.height);
-  expect(footnote.y - lastAlert.y - lastAlert.height).toBeLessThan(40);
-  expect(history.y + history.height - footnote.y - footnote.height).toBeLessThan(24);
-});
 
 test.describe("coarse pointer empty Goals panels", () => {
   test.use({ isMobile: true, hasTouch: true });
@@ -227,13 +214,13 @@ test("a coin with no transactions has substantial lots and transaction states", 
   await assertEmptyCard(page, ".coin-fidelity-transactions");
 });
 
-test("cost basis empty panels stack at 1100px", async ({ page }) => {
+test("cost basis empty panels align at 1100px", async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 900 });
   await installTauriBridge(page, { emptyPortfolio: true });
   await page.goto("/#/cost-basis");
   await expect(page.getByTestId("cost-desktop-table")).toBeVisible();
   await expect(page.locator(".fidelity-cost-averages [data-empty-state]")).toBeVisible();
-  const panels = await page.locator(".fidelity-cost-chart, .fidelity-cost-averages")
-    .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
-  expect(panels[1].top).toBeGreaterThanOrEqual(panels[0].bottom);
+  const bottoms = await page.locator(".fidelity-cost-chart [data-empty-state], .fidelity-cost-averages [data-empty-state]")
+    .evaluateAll((states) => states.map((state) => state.getBoundingClientRect().bottom));
+  expect(Math.abs(bottoms[0] - bottoms[1])).toBeLessThanOrEqual(1);
 });

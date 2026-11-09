@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ExclamationTriangleIcon, InfoCircledIcon, Cross2Icon, ReloadIcon } from "@radix-ui/react-icons";
 import { useTranslation } from "@/mobile/i18n";
-import { SignedInlineText } from "@/components/common/signed-inline-text";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
 import {
@@ -105,7 +104,7 @@ function GenericInsightsCard({ currency, overview, fidelity }: { currency?: Curr
         {!loading && !error && visible.length === 0 && <p className="text-sm text-muted-foreground">{t("insights.empty")}</p>}
         {card?.summary && card.summaryLocale === locale && card.summarySnapshotUuid === card.snapshotUuid &&
           visible.length > 0 && !summaryRepeatsInsight && (
-          <p className="whitespace-pre-line border-b pb-3 text-sm text-muted-foreground"><SignedInlineText text={card.summary} /></p>
+          <p className="whitespace-pre-line border-b pb-3 text-sm text-muted-foreground">{card.summary}</p>
         )}
         {card && visible.length > 0 && (card.summaryNeedsRefresh || (card.summary && card.summaryLocale !== locale)) &&
           <p className="text-xs text-muted-foreground">{t("insights.summaryNeedsRefresh")}</p>}
@@ -116,7 +115,7 @@ function GenericInsightsCard({ currency, overview, fidelity }: { currency?: Curr
               <SeverityIcon severity={insight.severity} />
               <span className="sr-only">{t(`insights.severity.${insight.severity}`)}</span>
               <p id={`insight-${insight.id.replace(/[^a-zA-Z0-9-]/g, "-")}`}
-                className="min-w-[12rem] flex-1 break-words text-sm leading-5"><SignedInlineText text={text} /></p>
+                className="min-w-[12rem] flex-1 break-words text-sm leading-5">{text}</p>
               <div className="ml-auto flex shrink-0 items-center gap-1">
                 <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs">
                   <a href="#/assistant" onClick={() => {

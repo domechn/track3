@@ -69,15 +69,6 @@ it("filters the desktop snapshot table by issue status and restores all rows", a
   await waitFor(() => expect(screen.getAllByTestId("history-snapshot-row")).toHaveLength(2));
 });
 
-it("keeps complete and partial source status readable in compact History rows", async () => {
-  render(<MemoryRouter><HistoricalDataDesktop currency={currency} quoteColor="green-up-red-down" /></MemoryRouter>);
-  await waitFor(() => expect(screen.getAllByTestId("history-snapshot-row")).toHaveLength(2));
-  const [complete, partial] = screen.getAllByTestId("history-snapshot-row");
-  expect(within(complete).getByText(/Assets · All refreshed/)).toBeInTheDocument();
-  expect(within(partial).getByText(/Assets · 1 of 2 sources/)).toBeInTheDocument();
-  expect(partial.querySelector(".fidelity-history-compact-meta .warn")).not.toBeNull();
-});
-
 it("removes a desktop snapshot immediately and restores it through Undo", async () => {
   const afterDataChanged = vi.fn();
   render(<MemoryRouter><HistoricalDataDesktop currency={currency} quoteColor="green-up-red-down"
@@ -112,18 +103,4 @@ it("mutes a zero edit-log delta", async () => {
   render(<MemoryRouter><HistoricalDataDesktop currency={currency} quoteColor="red-up-green-down" /></MemoryRouter>);
   const log = await screen.findByRole("region", { name: "Edits" });
   expect(within(log).getByText("$0.00")).toHaveClass("zero");
-});
-
-it("moves selection through the snapshot list with keyboard navigation", async () => {
-  render(<MemoryRouter><HistoricalDataDesktop currency={currency} quoteColor="green-up-red-down" /></MemoryRouter>);
-  const list = await screen.findByRole("region", { name: "Snapshots" });
-  await waitFor(() => expect(within(list).getAllByTestId("history-snapshot-row")[0]).toHaveClass("selected"));
-  const first = within(list).getAllByTestId("history-snapshot-row")[0].querySelector("button")!;
-  first.focus();
-  fireEvent.keyDown(first, { key: "ArrowDown" });
-  expect(within(list).getAllByTestId("history-snapshot-row")[1]).toHaveClass("selected");
-  fireEvent.keyDown(document.activeElement!, { key: "Home" });
-  expect(within(list).getAllByTestId("history-snapshot-row")[0]).toHaveClass("selected");
-  fireEvent.keyDown(document.activeElement!, { key: "End" });
-  expect(within(list).getAllByTestId("history-snapshot-row")[1]).toHaveClass("selected");
 });

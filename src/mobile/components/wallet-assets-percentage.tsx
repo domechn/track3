@@ -29,7 +29,6 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 import { sourceDisplayNames } from "@/components/source-display-name";
 import { useLatestWalletOrdinals } from "@/components/source-name-order";
 import { Card, CardContent, CardHeader, CardTitle } from "@/mobile/components/ui/card";
-import { Pager, usePager } from "@/components/ui/pager";
 import { WALLET_ANALYZER } from "@/middlelayers/charts-refresh";
 import { ChartResizeContext } from "@/mobile/App";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
@@ -37,7 +36,7 @@ import AssetLabel from "@/components/common/asset-label";
 import { useWindowSize } from "@/utils/hook";
 import { WALLET_DETAIL_URLS } from "@/middlelayers/constants";
 import { useTranslation } from "@/mobile/i18n";
-import { SourceAllocationList, sourceIconKind } from "@/components/source-allocation-list";
+import { SourceAllocationList } from "@/components/source-allocation-list";
 import { MobileRecordList } from "@/mobile/components/mobile";
 import {
   classifyWalletType,
@@ -234,6 +233,7 @@ const App = ({
   // Click-driven popover: track which tile is selected + where to position.
   const [selectedTileKey, setSelectedTileKey] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<LayoutItem | null>(null);
+  const [mobileListLimit, setMobileListLimit] = useState(50);
   const [popoverPos, setPopoverPos] = useState<{
     left: number;
     top: number;
@@ -327,8 +327,6 @@ const App = ({
     () => [...walletAssetsPercentage].sort((a, b) => b.value - a.value || a.wallet.localeCompare(b.wallet)),
     [walletAssetsPercentage],
   );
-  const sourcePage = usePager(sortedWallets, symbol ?? "sources", 8);
-  const mobileListPage = usePager(sortedWallets, symbol ?? "mobile-list", 10);
   const walletOrdinals = useLatestWalletOrdinals();
   const sourceLabels = useMemo(() => {
     const labels = sourceDisplayNames(sortedWallets.map((item) => ({
@@ -544,11 +542,9 @@ const App = ({
     <Card data-card-boundary="true" className="analyze-wallet-allocation">
       {!symbol && onSelectSource && <nav className="analyze-source-picker" aria-label={t("wallets.h1")}>
         <button type="button" aria-pressed={selectedSource === null} onClick={() => onSelectSource(null)}>{t("wallets.allSources")}</button>
-        {sourcePage.rows.map((wallet) => <button type="button" key={wallet.wallet} aria-pressed={selectedSource === wallet.wallet}
-          onClick={() => onSelectSource(wallet.wallet)} title={wallet.wallet}><AssetLabel kind={sourceIconKind(wallet.walletType)}
-            type={wallet.walletType} name={displayName(wallet)} size={16} /></button>)}
+        {sortedWallets.map((wallet) => <button type="button" key={wallet.wallet} aria-pressed={selectedSource === wallet.wallet}
+          onClick={() => onSelectSource(wallet.wallet)} title={wallet.wallet}>{displayName(wallet)}</button>)}
       </nav>}
-      {!symbol && onSelectSource && <Pager count={sortedWallets.length} {...sourcePage} t={t} ariaLabel={t("wallets.h1")} />}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-3">
         <CardTitle className="flex flex-wrap items-center gap-1 text-sm font-medium text-muted-foreground">
           {symbol ? (
@@ -791,7 +787,7 @@ const App = ({
         </div>
 
         {isMobile && sortedWallets.length > 0 && <div className="space-y-2">
-          <MobileRecordList className="wallet-allocation-mobile-list" records={mobileListPage.rows.map((wallet) => {
+          <MobileRecordList className="wallet-allocation-mobile-list" records={sortedWallets.slice(0, mobileListLimit).map((wallet) => {
             const detailUrl = wallet.walletType ? WALLET_DETAIL_URLS[wallet.walletType]?.(wallet.wallet) : undefined;
             return {
               id: `${wallet.wallet}-${wallet.walletType ?? "none"}`,
@@ -806,7 +802,10 @@ const App = ({
               actions: detailUrl ? [{ label: t("walletValueChanges.openDetails"), onClick: () => { void openUrl(detailUrl); } }] : [],
             };
           })} />
-          <Pager count={sortedWallets.length} {...mobileListPage} t={t} ariaLabel={t("wallets.h1")} />
+          {sortedWallets.length > mobileListLimit && <button type="button" className="min-h-11 w-full text-sm"
+            onClick={() => setMobileListLimit((limit) => limit + 50)}>
+            {t("history.showMoreCount").replace("{n}", String(Math.min(50, sortedWallets.length - mobileListLimit)))}
+          </button>}
         </div>}
 
         {chartHasData && (
@@ -823,8 +822,7 @@ const App = ({
                 <span
                   key={s.category}
                   data-testid={`type-pill-${s.category}`}
-                  className="t3-tag"
-                  data-tone="neutral"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/40 px-2 py-0.5"
                 >
                   <span
                     className="inline-block h-2.5 w-2.5 rounded-sm"
@@ -832,7 +830,7 @@ const App = ({
                       background: tileBackground(s.category, 0, 1),
                     }}
                   />
-                  <span>
+                  <span className="text-foreground">
                     {t(WALLET_CATEGORY_BASE_COLORS[s.category].labelKey)}
                   </span>
                   <span className="text-muted-foreground mono">

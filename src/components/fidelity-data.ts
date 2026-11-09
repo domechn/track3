@@ -70,8 +70,8 @@ export function yearSpan(year: number, start: Date, end: Date): { first: number;
   return { first: year === start.getFullYear() ? start.getMonth() + 1 : 1, last: year === end.getFullYear() ? end.getMonth() + 1 : 12 };
 }
 
-export function compactMoney(value: number, symbol: string, significantDigits = 3): string {
+export function compactMoney(value: number, symbol: string): string {
   return `${value < 0 ? "−" : ""}${symbol}${new Intl.NumberFormat("en-US", {
-    notation: "compact", maximumSignificantDigits: significantDigits,
+    notation: "compact", maximumSignificantDigits: 3,
   }).format(Math.abs(value))}`;
 }

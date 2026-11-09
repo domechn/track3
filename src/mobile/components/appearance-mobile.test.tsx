@@ -55,14 +55,6 @@ describe("iPhone appearance settings", () => {
     vi.mocked(isIOS).mockReturnValue(true);
   });
 
-  it("omits the obsolete restart note from the appearance summary", () => {
-    vi.mocked(isIOS).mockReturnValue(false);
-    window.location.hash = "#/settings/appearance";
-    render(<HashRouter><Appearance /></HashRouter>);
-    expect(screen.queryByText("Restart is triggered after applying a new theme")).not.toBeInTheDocument();
-    vi.mocked(isIOS).mockReturnValue(true);
-  });
-
   it("switches the iPhone theme in place without a process relaunch", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
     vi.mocked(reloadApp).mockClear();

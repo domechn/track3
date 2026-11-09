@@ -66,15 +66,15 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
     queryAttribution(dateRange).then((data) => {
       if (!active) return;
       const amounts = roundedSummaryBreakdown(data.attribution.totals, currencyWrapper(currency)(1));
-      const displayValue = (amount: number) => `${amount < 0 ? "−" : ""}${currency.symbol}${new Intl.NumberFormat("en-US").format(Math.abs(amount))}`;
-      const displaySigned = (amount: number) => `${amount > 0 ? "+" : ""}${displayValue(amount)}`;
-      setSubtitleEmphasis(displaySigned(amounts.market));
-      setSubtitle(t(amounts.other === 0 ? "summary.fidelity.fullSubtitleAdditive" : "summary.fidelity.fullSubtitleAdditiveOther")
-        .replace("{market}", displaySigned(amounts.market))
-        .replace("{gain}", displayValue(amounts.gain))
+      const value = (amount: number) => `${amount < 0 ? "−" : ""}${currency.symbol}${new Intl.NumberFormat("en-US").format(Math.abs(amount))}`;
+      const signedValue = (amount: number) => `${amount > 0 ? "+" : ""}${value(amount)}`;
+      setSubtitleEmphasis(signedValue(amounts.market));
+      setSubtitle(t("summary.fidelity.fullSubtitleAdditive")
+        .replace("{market}", signedValue(amounts.market))
+        .replace("{gain}", value(amounts.gain))
         .replace("{date}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(selectedRange.baseline ?? dateRange.start))
-        .replace("{deposits}", displayValue(amounts.added))
-        .replace("{other}", displayValue(amounts.other)));
+        .replace("{deposits}", value(amounts.added))
+        .replace("{other}", value(amounts.other)));
     }).catch(() => {});
     return () => { active = false; };
   }, [rangeKey, dataVersion, hasValidRange, oneSnapshot, t, locale, selectedRange.baseline?.getTime()]);
@@ -100,7 +100,7 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
           const index = text.indexOf(emphasis);
           return index < 0 ? text : <>{text.slice(0, index)}<strong>{emphasis}</strong>{text.slice(index + emphasis.length)}</>;
         })() : subtitle && subtitleEmphasis && subtitle.includes(subtitleEmphasis)
-          ? <>{subtitle.slice(0, subtitle.indexOf(subtitleEmphasis))}<strong className="t3-signed-unit">{subtitleEmphasis}</strong>{subtitle.slice(subtitle.indexOf(subtitleEmphasis) + subtitleEmphasis.length)}</>
+          ? <>{subtitle.slice(0, subtitle.indexOf(subtitleEmphasis))}<strong>{subtitleEmphasis}</strong>{subtitle.slice(subtitle.indexOf(subtitleEmphasis) + subtitleEmphasis.length)}</>
           : subtitle || t("summary.fidelity.defaultSubtitle")}</p>
       </header>
       {!hasValidRange ? <div className="fidelity-card fidelity-empty">{t("summary.noData")}</div> : <>

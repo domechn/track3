@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import md5 from "md5";
 import { installTauriBridge } from "./tauri-bridge";
-import { contrast } from "./overlay-theme-scenes";
 
 test.use({
   isMobile: true,
@@ -94,49 +93,6 @@ test("iPhone can add a custom asset from an empty sources page", async ({ page }
   await page.getByRole("tab", { name: "Custom assets" }).click();
   await page.getByRole("button", { name: "Add symbol" }).click();
   await expect(page.getByRole("dialog", { name: "Add custom asset" })).toBeVisible();
-});
-
-test("light custom asset editor keeps its controls and hints readable", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "light"));
-  await installTauriBridge(page, { emptyPortfolio: true });
-  await page.goto("/#/settings/configuration?section=sources");
-  await page.getByRole("tab", { name: "Custom assets" }).click();
-  await page.getByRole("button", { name: "Add symbol" }).click();
-  const editor = page.getByRole("dialog", { name: "Add custom asset" });
-  const colors = await editor.evaluate((node) => {
-    const style = (selector: string) => getComputedStyle(node.querySelector(selector)!);
-    return {
-      sheet: style(".fidelity-custom-editor").backgroundColor,
-      select: [style("select").backgroundColor, style("select").color],
-      segment: [style(".fidelity-custom-segment").backgroundColor,
-        style(".fidelity-custom-segment [aria-checked='true']").backgroundColor,
-        style(".fidelity-custom-segment [aria-checked='true']").color],
-      hint: style(".fidelity-editor-field > small").color,
-    };
-  });
-  expect(Number(colors.select[0].match(/\d+/)![0])).toBeGreaterThan(230);
-  expect(Number(colors.segment[0].match(/\d+/)![0])).toBeGreaterThan(230);
-  expect(contrast(colors.select[0], colors.select[1])).toBeGreaterThanOrEqual(4.5);
-  const [red, green, blue, alpha = 1] = colors.segment[1].match(/[\d.]+/g)!.map(Number);
-  const background = colors.segment[0].match(/[\d.]+/g)!.slice(0, 3).map(Number);
-  const selected = `rgb(${[red, green, blue].map((channel, index) =>
-    Math.round(channel * alpha + background[index] * (1 - alpha))).join(", ")})`;
-  expect(contrast(selected, colors.segment[2])).toBeGreaterThanOrEqual(4.5);
-  expect(contrast(colors.sheet, colors.hint)).toBeGreaterThanOrEqual(4.5);
-  await page.screenshot({ path: "/tmp/wui30-light-custom-asset.png", animations: "disabled" });
-});
-
-test("dark custom asset price segment keeps its original contrast", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "dark"));
-  await installTauriBridge(page, { emptyPortfolio: true });
-  await page.goto("/#/settings/configuration?section=sources");
-  await page.getByRole("tab", { name: "Custom assets" }).click();
-  await page.getByRole("button", { name: "Add symbol" }).click();
-  const segment = page.getByRole("dialog", { name: "Add custom asset" }).locator(".fidelity-custom-segment");
-  await expect(segment).toHaveCSS("background-color", "rgb(28, 28, 32)");
-  await expect(segment.locator("[aria-checked='true']")).toHaveCSS("background-color", "rgba(72, 136, 213, 0.16)");
 });
 
 test("iPhone custom asset editor stays closed after switching source tabs", async ({ page }) => {
@@ -356,8 +312,6 @@ for (const width of [375, 390, 430]) {
     await installTauriBridge(page);
     await page.goto("/#/overview");
     await page.locator(".fd-overview-refresh, .fd-partial-refresh").click();
-    await expect(page.getByRole("alertdialog", { name: "Source status" })).toHaveCount(0);
-    await page.getByRole("button", { name: "Source status" }).click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   });
@@ -385,7 +339,7 @@ test("rebalance suggestions use readable trade rows at 375px when a profile has 
   await expect(page.getByRole("table", { name: "Suggested trades" })).toHaveCount(0);
   const first = cards.locator(".pf-trade").first();
   await expect(first).toContainText(/BTC|ETH/);
-  await expect(first.locator(".t3-tag")).toHaveText(/Sell|Buy/);
+  await expect(first.locator(".pf-pill")).toHaveText(/Sell|Buy/);
   await expect(first.locator("strong")).toHaveText(/^\$[0-9]/);
   await expect(first.locator("small")).toContainText(/(BTC|ETH) at \$[0-9]/);
   await expect(first).toContainText("→");

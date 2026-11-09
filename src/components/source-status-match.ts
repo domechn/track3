@@ -14,6 +14,9 @@ export function matchSourceStatus(
   const direct = statuses.find((status) => (status.sourceId === source.id || status.walletId === source.id) &&
     (!provider || providerName(status.provider) === provider));
   if (direct) return direct;
+  const legacy = statuses.filter((status) => !status.walletId && !status.hint &&
+    status.label === source.label && (!status.provider || !provider || providerName(status.provider) === provider));
+  if (legacy.length === 1 && sources.filter((item) => item.label === source.label).length === 1) return legacy[0];
   if (!provider) return undefined;
   const candidates = statuses.filter((status) => !status.walletId && providerName(status.provider) === provider);
   const wallet = identities[source.id]?.wallet;

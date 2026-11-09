@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
 
 test("desktop Settings menu opens focused source and currency sections without changing the legacy page", async ({ page }) => {
-  await installTauriBridge(page, { appVersion: "0.9.10" });
+  await installTauriBridge(page, { appVersion: "0.9.9" });
   await page.goto("/#/settings/configuration");
-  await expect(page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "About 0.9.10" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "About 0.9.9" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Exchanges", exact: true }).last()).toBeVisible();
   await expect(page.getByRole("heading", { name: "General", exact: true })).toBeVisible();
 
@@ -47,7 +47,7 @@ test("desktop Settings keeps backup, blacklist, security, appearance, and About 
   expect(Math.abs((await versionCard.boundingBox())!.y - (await guideCard.boundingBox())!.y)).toBeLessThan(4);
 });
 
-test("desktop Sync aligns its columns and AI stacks its short cards", async ({ page }) => {
+test("desktop Sync and AI use the approved two column card layout", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await installTauriBridge(page);
   await page.goto("/#/settings/sync");
@@ -57,21 +57,15 @@ test("desktop Sync aligns its columns and AI stacks its short cards", async ({ p
   const passphrase = page.locator(".t3-sync-passphrase");
   await expect(connection).toBeVisible();
   await expect(passphrase).toBeVisible();
-  await expect.poll(async () => {
-    const left = (await connection.boundingBox())!;
-    const right = (await passphrase.boundingBox())!;
-    const gap = right.y - left.y - left.height;
-    return Math.abs(left.x - right.x) < 4 && gap >= 15 && gap <= 17;
-  }).toBe(true);
+  await expect.poll(async () =>
+    Math.abs((await connection.boundingBox())!.y - (await passphrase.boundingBox())!.y)).toBeLessThan(4);
 
   await page.goto("/#/settings/assistant");
   const endpoint = page.locator("[data-ui-card]").filter({ has: page.locator("#assistant-endpoint") });
   const key = page.locator("[data-ui-card]").filter({ has: page.locator("#assistant-api-key") });
   await expect(endpoint).toBeVisible();
-  const endpointBox = (await endpoint.boundingBox())!;
-  const keyBox = (await key.boundingBox())!;
-  expect(Math.abs(endpointBox.x - keyBox.x)).toBeLessThan(4);
-  expect(keyBox.y).toBeGreaterThanOrEqual(endpointBox.y + endpointBox.height - 1);
+  await expect.poll(async () =>
+    Math.abs((await endpoint.boundingBox())!.y - (await key.boundingBox())!.y)).toBeLessThan(4);
 });
 
 test("desktop Sync uses the available width when no toast is open", async ({ page }) => {
@@ -98,7 +92,6 @@ test("desktop language settings show the current appearance summary", async ({ p
   await expect(page.getByRole("heading", { name: "Current Theme" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Language", exact: true }).last()).toBeVisible();
   await expect(page.getByText("Affects all visible text in the app.")).toBeVisible();
-  await expect(page.getByText("Restart is triggered after applying a new theme")).toHaveCount(0);
 });
 
 test("system preview surfaces follow theme background tokens", async ({ page }) => {

@@ -8,8 +8,6 @@ Default table order is ETHG / “ERC20 · contract 0x9e1c…3b02” / 0x4f…a91
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** blacklist 5.790% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.
 
 Settings toasts retain a visible 44px close × target for keyboard and pointer dismissal; the reference toasts omit it.

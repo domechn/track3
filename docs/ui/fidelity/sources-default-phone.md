@@ -67,17 +67,11 @@ The source depicts the **default** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** sources 8.601% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-With one custom asset, the source summary uses the singular label. The approved screenshot has a different sample source count.
-
-- The approved source is dark only. In light mode the live page and rename dialog use the selected light theme; their colours cannot match that dark reference.
-- The static source uses its pencil for the full credential editor and has no Rename flow. The live pencil opens Rename; the labeled source name opens the full editor, and the avatar retains its action menu.
-- Active rows use the available shared snapshot time. The paused Kraken row now uses its stored last-success date when it matches uniquely; a source without a saved status cannot reconstruct an individual refresh time from the shared snapshot.
-- Source logo artwork, a few icon strokes, value alignment, and toggle switch geometry differ slightly from the approved render; they could be matched but are not worth another round. The delete control uses the reference SVG path. The phone Sources page uses "Public Sans" to match the design CSS in both themes.
-- The live iPhone back control and bottom tab bar retain the app's route targets, hit areas, and unread state. Their icon shapes and text rendering differ from the static page. The row text has small glyph and vertical alignment differences despite matching the first row's 356×181 bounds.
+- The design uses separate refresh times per source. The existing snapshot stores one shared refresh time, so the app shows the available snapshot time and a dash for paused Kraken.
+- The source row spacing now closely follows the reference. The paused Kraken timestamp is unavailable from the shared snapshot, leaving an empty line.
+- Source logo artwork and toggle switch geometry still differ from the approved render. The edit and delete controls now use the reference SVG paths.
 
 ## Pixel difference
 
-- Last captured matched-fixture difference: **6.810% dark** and **99.299% light** at 390 × 844 CSS px, threshold 16 in any RGB channel. The light ratio compares the selected light product theme with the dark-only source. The remaining dark overage includes the product's live navigation and source controls described above. A subsequent scoped font and value-position correction awaits recapture under the one-run limit.
-- Current geometry and pixel counts: `/tmp/track3-source-rename/phone-dark-measure.json` and `phone-light-measure.json`; rendered viewports: `/tmp/track3-source-rename/phone-{dark,light}-{design,sample}-default.png`. Both dark rows begin at y=233.
+- Difference ratio: **5.678%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel.
+- Design viewport: `/tmp/fidelity/settings-a/design-sources-default.png` (top 780×1688); app viewport: `/tmp/fidelity/settings-a/sources-default.png` (780×1688).

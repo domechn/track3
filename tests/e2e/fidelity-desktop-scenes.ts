@@ -36,7 +36,7 @@ export function seedDesktopFidelity(db: SeedDatabase, state: "full" | "empty" | 
   db.run("DELETE FROM alert_history");
   for (let index = 0; index < 2; index++) {
     db.run("INSERT INTO alert_history (kind, title, message, value, triggered_at) VALUES (?, ?, ?, ?, ?)",
-      ["asset_price_target", "Fixture alert", "Fixture alert", index, "2026-10-31T09:41:00.000Z"]);
+      ["target", "Fixture alert", "Fixture alert", index, "2026-10-31T09:41:00.000Z"]);
   }
   db.run("UPDATE configuration SET data = ? WHERE id = 11", [
     "btc:\n  addresses:\n    - address: bc1q-fidelity-ledger\n      alias: Ledger cold wallet\nerc20:\n  addresses:\n    - address: '0x4fa91c'\n      alias: 0x4f…a91c\nsol: {addresses: []}\ndoge: {addresses: []}\ntrc20: {addresses: []}\nton: {addresses: []}\nsui: {addresses: []}\n",

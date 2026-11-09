@@ -55,7 +55,7 @@ export function BackupDesign(p: Props) {
     <section className="t3-b-card t3-b-backup-folder">
       <div className="t3-b-card-head"><div><h3>{t("fidelity.settingsB.backup.folderTitle")}</h3><p>{t("fidelity.settingsB.backup.folderDesc")}</p></div></div>
       <div className="t3-b-backup-folder-status"><div><b>{t("fidelity.settingsB.backup.backupEnabled")}</b><small>{p.directory ? t("fidelity.settingsB.backup.folderConfigured") : t("fidelity.settingsB.backup.folderMissing")}</small></div>
-        <span className="t3-tag" data-tone={p.directory ? "positive" : "neutral"}>{t(p.directory ? "fidelity.settingsB.backup.configured" : "fidelity.settingsB.backup.notSet")}</span></div>
+        <span className={`t3-b-pill ${p.directory ? "connected" : ""}`}>{t(p.directory ? "fidelity.settingsB.backup.configured" : "fidelity.settingsB.backup.notSet")}</span></div>
       <div className="t3-b-field"><label>{t("fidelity.settingsB.backup.folder")}</label><div className="t3-b-backup-path"><span className="t3-b-input mono">{p.directory || t("fidelity.settingsB.backup.notSet")}</span>
         <button className="t3-b-button small" onClick={p.onChooseFolder}>{t(p.directory ? "fidelity.settingsB.backup.change" : "fidelity.settingsB.backup.choose")}</button>
         {p.directory && <button className="t3-b-button small" onClick={p.onClearFolder}>{t("fidelity.settingsB.backup.clear")}</button>}</div></div>

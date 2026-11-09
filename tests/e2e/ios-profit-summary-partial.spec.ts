@@ -48,16 +48,6 @@ test("phone shows partial months and year with a tap explanation", async ({ brow
       await expect(mainYear.locator("strong")).toHaveText("+$45,600");
       const mainYearBadge = mainYear.getByRole("button", { name: "Explain partial profit for 2026" });
       await expect(mainYearBadge).toContainText("?");
-      const pnlCard = (await main.locator(".fd-profit-loss").boundingBox())!;
-      const pnlBadge = (await main.locator(".fd-profit-loss .fd-partial-badge").boundingBox())!;
-      expect(pnlBadge.x).toBeGreaterThanOrEqual(pnlCard.x);
-      expect(pnlBadge.y).toBeGreaterThanOrEqual(pnlCard.y);
-      expect(pnlBadge.x + pnlBadge.width).toBeLessThanOrEqual(pnlCard.x + pnlCard.width);
-      expect(pnlBadge.y + pnlBadge.height).toBeLessThanOrEqual(pnlCard.y + pnlCard.height);
-      await main.getByRole("radio", { name: "30D" }).click();
-      await expect(main.locator(".fd-profit-loss .fd-partial-badge")).toHaveCount(0);
-      await main.getByRole("radio", { name: "All" }).click();
-      await expect(main.locator(".fd-profit-loss .fd-partial-badge")).toHaveCount(1);
       await main.locator(".fd-years").screenshot({ path: `${directory}/mobile-390-${theme}-main-years.png` });
       await expect(main.locator(".fd-summary-chart")).toContainText("31 Dec 25");
       await page.locator(".mobile-tab-bar").getByRole("link", { name: "Analytics" }).click();

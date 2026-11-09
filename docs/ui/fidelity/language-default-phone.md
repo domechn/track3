@@ -53,13 +53,9 @@ The source depicts the **default** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** language 4.435% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-- The page structure, option order, and unread badge match. Navigation icon strokes and locally bundled Public Sans glyph rasterization differ from the reference browser's web font.
-- Both theme modes now render language cards and option text from foreground, card, muted, and accent tokens.
-- The language icon chips use the shared `--raised` surface, which is slightly darker than the source's fixed `#26262c` in dark mode.
+- Minor navigation icon strokes and text rasterization remain below the 3% threshold.
 
 ## Pixel difference
 
-- Fresh difference ratio: **3.779%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel. The earlier 2.867% used a different source render.
-- Fresh design viewport: `/tmp/wui30-design/language.png` (780×1688); app viewport: `/tmp/fidelity/settings-a/language-default.png` (780×1688).
+- Difference ratio: **2.867%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel.
+- Design viewport: `/tmp/fidelity/settings-a/design-language-default.png` (top 780×1688); app viewport: `/tmp/fidelity/settings-a/language-default.png` (780×1688).

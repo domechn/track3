@@ -6,15 +6,6 @@ import { WALLET_DETAIL_URLS } from "@/middlelayers/constants";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { BackpackIcon } from "@radix-ui/react-icons";
 import EmptyState from "./empty-state";
-import AssetLabel from "./common/asset-label";
-import { classifyWalletType } from "@/utils/wallet-treemap";
-import type { AssetIconKind } from "./ui/asset-icon";
-
-export function sourceIconKind(type?: string): AssetIconKind {
-  const category = classifyWalletType(type);
-  return category === "cex" ? "exchange" : category === "broker" ? "broker"
-    : category === "onchain" ? "wallet" : "custom";
-}
 
 export function SourceAllocationList({ wallets, selectedSource, currency, name, title, showQuantity = false, emptyLabel }: {
   wallets: WalletAssetsPercentageData;
@@ -49,10 +40,8 @@ export function SourceAllocationList({ wallets, selectedSource, currency, name, 
     {visible.map((wallet) => <li key={`${wallet.wallet}-${wallet.walletType ?? ""}`}>
       {showQuantity && wallet.walletType && WALLET_DETAIL_URLS[wallet.walletType]
         ? <button type="button" className="analyze-source-list-name text-left hover:underline"
-          onClick={() => void openUrl(WALLET_DETAIL_URLS[wallet.walletType!](wallet.wallet))}>
-            <AssetLabel kind={sourceIconKind(wallet.walletType)} type={wallet.walletType} name={name(wallet)} size={20} /></button>
-        : <span className="analyze-source-list-name"><AssetLabel kind={sourceIconKind(wallet.walletType)}
-          type={wallet.walletType} name={name(wallet)} size={20} /></span>}
+          onClick={() => void openUrl(WALLET_DETAIL_URLS[wallet.walletType!](wallet.wallet))}>{name(wallet)}</button>
+        : <span className="analyze-source-list-name">{name(wallet)}</span>}
       <span className="analyze-source-list-bar" aria-hidden="true">
         <span style={{ width: `${Math.max(0, Math.min(100, wallet.percentage))}%` }} />
       </span>
@@ -72,8 +61,7 @@ export function SourceAllocationList({ wallets, selectedSource, currency, name, 
     {empty.length > 0 && <li className="analyze-source-list-empty"><button type="button" aria-expanded={emptyExpanded}
       onClick={() => setEmptyExpanded(!emptyExpanded)}>{emptyLabel?.(empty.length)} <span aria-hidden="true">{emptyExpanded ? "⌃" : "⌄"}</span></button></li>}
     {emptyExpanded && empty.map((wallet) => <li key={`${wallet.wallet}-${wallet.walletType ?? ""}`}>
-      <span className="analyze-source-list-name"><AssetLabel kind={sourceIconKind(wallet.walletType)}
-        type={wallet.walletType} name={name(wallet)} size={20} /></span>
+      <span className="analyze-source-list-name">{name(wallet)}</span>
       <span className="analyze-source-list-bar" aria-hidden="true" />
       {showQuantity && <span className="analyze-source-list-amount"><span className="analyze-source-list-amount-label">{t("common.amountLabel")}: </span>{prettyNumberKeepNDigitsAfterDecimalPoint(wallet.amount, 4)}</span>}
       <strong>{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(wallet.value))}</strong>

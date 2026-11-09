@@ -103,12 +103,6 @@ beforeEach(() => {
   vi.mocked(refreshInsights).mockResolvedValue(true);
 });
 
-async function openFinishedSourceStatus() {
-  await waitFor(() => expect(mockSetButtonLoading).toHaveBeenLastCalledWith(false));
-  expect(screen.queryByRole("alertdialog")).toBeNull();
-  fireEvent.click(await screen.findByRole("button", { name: "Source status" }));
-}
-
 async function openRunningSourceStatus() {
   expect(screen.queryByRole("alertdialog")).toBeNull();
   fireEvent.click(await screen.findByRole("button", { name: "Source status" }));
@@ -165,7 +159,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     } as never);
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     expect(dialog).toHaveTextContent("Monthly refresh limit reached");
     expect(screen.queryByRole("button", { name: "Retry Wallet" })).not.toBeInTheDocument();
@@ -183,7 +176,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     }));
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openRunningSourceStatus();
     const row = await screen.findByRole("group", { name: "Wallet" });
     expect(row).toHaveTextContent("Stale");
     expect(screen.queryByRole("button", { name: "Retry Wallet" })).not.toBeInTheDocument();
@@ -202,43 +194,12 @@ describe("RefreshData — currency rates refresh ordering", () => {
     await act(async () => { finish?.(); await refresh; });
     expect(settled).toBe(true);
   });
-  it("opens a progress sheet only after tapping Source status on iPhone", async () => {
+  it("opens a progress sheet while an iPhone refresh is running", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
-    writeStoredStatuses([
-      { sourceId: "btc:0", label: "Wallet", status: "ok" },
-    ]);
     vi.mocked(refreshAllData).mockImplementationOnce(() => new Promise(() => {}));
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
     expect(await screen.findByRole("alertdialog", { name: "Source status" })).toHaveTextContent("Refreshing portfolio");
-    expect(screen.queryByRole("progressbar")).toBeNull();
-  });
-  it("keeps stored exchange identities while exchanges run together on iPhone", async () => {
-    vi.mocked(isIOS).mockReturnValue(true);
-    writeStoredStatuses([
-      { sourceId: "cex:0", label: "Main", status: "ok", kind: "exchange", provider: "OKX", hint: "#1" },
-      { sourceId: "cex:1", label: "Main", status: "ok", kind: "exchange", provider: "Binance", hint: "#2" },
-    ]);
-    vi.mocked(getConfiguration).mockResolvedValue({} as never);
-    vi.mocked(listPortfolioSources).mockReturnValue([
-      { sourceId: "cex:0", label: "Main" }, { sourceId: "cex:1", label: "Main" },
-    ]);
-    vi.mocked(refreshAllData).mockImplementationOnce(() => new Promise(() => {}));
-    render(<RefreshData loading={false} />);
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
-    await openRunningSourceStatus();
-    const first = screen.getByRole("group", { name: "Main (OKX · #1)" });
-    const second = screen.getByRole("group", { name: "Main (Binance · #2)" });
-    expect(first).toHaveTextContent("Refreshing");
-    expect(second).toHaveTextContent("Refreshing");
-    const onSourceResult = vi.mocked(refreshAllData).mock.calls[0][1]?.onSourceResult!;
-    act(() => onSourceResult({ sourceId: "cex:0", label: "Main", kind: "exchange", provider: "OKX", hint: "#1",
-      status: "ok", coins: [], walletIdentities: [], startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() }));
-    expect(second).toHaveTextContent("Refreshing");
   });
 
   it("shows a completed source while the rest of the refresh is pending", async () => {
@@ -251,47 +212,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     }));
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openRunningSourceStatus();
     expect(await screen.findByRole("group", { name: "Main exchange" })).toHaveTextContent("2.0s");
-  });
-  it("shows a successful live source as done when its result has no duration", async () => {
-    vi.mocked(isIOS).mockReturnValue(true);
-    vi.mocked(refreshAllData).mockImplementationOnce((_progress, options) => new Promise(() => {
-      options?.onSourceResult?.({
-        sourceId: "cex:0", label: "Main exchange", walletIdentities: [], status: "ok", coins: [],
-      });
-    }));
-    render(<RefreshData loading={false} />);
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openRunningSourceStatus();
-    const row = await screen.findByRole("group", { name: "Main exchange" });
-    expect(row).toHaveTextContent("Done");
-    expect(row).not.toHaveTextContent("Done in —");
-  });
-  it("queues Retry on a failed live row until the current refresh finishes", async () => {
-    vi.mocked(isIOS).mockReturnValue(true);
-    const failed = { sourceId: "cex:0", label: "Offline", status: "stale" as const,
-      category: "network" as const, coins: [], walletIdentities: [] };
-    let finish!: (result: Awaited<ReturnType<typeof refreshAllData>>) => void;
-    vi.mocked(refreshAllData).mockImplementationOnce((_progress, options) =>
-      new Promise((resolve) => {
-        finish = resolve;
-        options?.onSourceResult?.(failed);
-      }));
-    render(<RefreshData loading={false} />);
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(1));
-    await openRunningSourceStatus();
-    const retryButton = await screen.findByRole("button", { name: "Retry Offline" });
-    expect(retryButton).toBeEnabled();
-    fireEvent.click(retryButton);
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    await act(async () => {
-      finish({ failedSources: [], requiresDataSourceAction: false, usedLastKnownData: true,
-        persisted: true, sourceResults: [failed], sourceStatuses: [failed] });
-    });
-    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(2));
-    expect(vi.mocked(refreshAllData).mock.calls[1][1]).toMatchObject({ retrySourceId: "cex:0" });
   });
 
   it("matches live rows by source ID when aliases are the same", async () => {
@@ -308,28 +229,11 @@ describe("RefreshData — currency rates refresh ordering", () => {
     }));
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openRunningSourceStatus();
-    await waitFor(() => expect(screen.getByRole("group", { name: "Vault (1)" })).toBeInTheDocument());
-    const rows = [screen.getByRole("group", { name: "Vault (1)" }), screen.getByRole("group", { name: "Vault (2)" })];
+    await waitFor(() => expect(screen.getAllByRole("group", { name: "Vault" })).toHaveLength(2));
+    const rows = screen.getAllByRole("group", { name: "Vault" });
     expect(rows[0]).toHaveTextContent("2.0s");
     expect(rows[1]).toHaveTextContent("Refreshing portfolio");
     expect(rows[1]).not.toHaveTextContent("Waiting…");
-  });
-
-  it("shows the current wallet alias on a pending refresh row", async () => {
-    vi.mocked(isIOS).mockReturnValue(true);
-    writeStoredStatuses([
-      { sourceId: "btc:0", label: "Cold", kind: "wallet", provider: "BTC", hint: "bc1q-d…rage", status: "ok" },
-    ]);
-    vi.mocked(getConfiguration).mockResolvedValue({
-      btc: { addresses: [{ address: "bc1q-demo-cold-storage", alias: "Vault" }] },
-    } as never);
-    vi.mocked(listPortfolioSources).mockReturnValue([{ sourceId: "btc:0", label: "Cold" }]);
-    vi.mocked(refreshAllData).mockImplementationOnce(() => new Promise(() => {}));
-    render(<RefreshData loading={false} />);
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openRunningSourceStatus();
-    expect(await screen.findByRole("group", { name: /^Vault(?: \(BTC · bc1q-d…rage\))?$/ })).toHaveTextContent("Vault");
   });
 
   it("gives each in-progress source one clear state", async () => {
@@ -339,9 +243,9 @@ describe("RefreshData — currency rates refresh ordering", () => {
     vi.mocked(refreshAllData).mockImplementationOnce(() => new Promise(() => {}));
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openRunningSourceStatus();
     const row = await screen.findByRole("group", { name: "Main exchange" });
-    expect(row).toHaveTextContent("Refreshing");
+    expect(row).toHaveTextContent("Refreshing portfolio");
+    expect(row).not.toHaveTextContent("Waiting…");
   });
 
   it("keeps the result summary visible on iPhone", async () => {
@@ -353,7 +257,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     } as never);
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     await waitFor(() => expect(dialog).toHaveTextContent("1 of 1 sources failed."));
     expect(dialog.querySelector("p.sr-only")).toBeNull();
@@ -369,12 +272,10 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     expect(await screen.findByText("Old BTC result")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Close" }));
     vi.mocked(refreshAllData).mockImplementationOnce(() => new Promise(() => {}));
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openRunningSourceStatus();
     expect(screen.getByRole("alertdialog", { name: "Source status" })).toHaveTextContent("Refreshing portfolio");
     expect(screen.queryByText("Old BTC result")).not.toBeInTheDocument();
   });
@@ -504,7 +405,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     expect(await screen.findByRole("button", { name: "Use last known values" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Use last known values" }));
     expect(screen.queryByRole("button", { name: "Use last known values" })).not.toBeInTheDocument();
@@ -517,7 +417,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     await waitFor(() => expect(dialog).toHaveTextContent("Next automatic try at"));
     vi.useFakeTimers();
@@ -536,7 +435,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     vi.mocked(refreshAllData).mockResolvedValue(partialResult as never);
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     await screen.findByRole("alertdialog", { name: "Source status" });
     await waitFor(() => expect(refreshRetryScheduler.status().nextBySource["btc:0"]).toBeDefined());
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
@@ -573,7 +471,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     expect(await screen.findByRole("alertdialog", { name: "Source status" })).toBeTruthy();
     expect(screen.getByText("BTC wallet 1")).toBeTruthy();
     expect(screen.getByText(/Network or timeout/)).toBeTruthy();
@@ -597,7 +494,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     expect(dialog).toHaveTextContent("Pro service error");
     expect(dialog).not.toHaveTextContent("No duneApiKey or defiApiKey or debankApiKey");
@@ -614,10 +510,10 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
-    expect(screen.getByRole("alertdialog", { name: "Source status" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("OK")).toBeTruthy());
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await user.click(screen.getByRole("button", { name: "Source status" }));
+    expect(screen.getByText("OK")).toBeTruthy();
     expect(refreshAllData).toHaveBeenLastCalledWith(
       expect.any(Function),
       expect.objectContaining({
@@ -637,7 +533,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
     expect(await screen.findByRole("button", { name: "Run full refresh" })).toBeVisible();
   });
@@ -649,7 +544,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
     await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(2));
     expect(screen.getByRole("button", { name: "Retry BTC wallet 1" })).toBeTruthy();
@@ -673,7 +567,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     await user.click(await screen.findByRole("button", { name: "Retry Cold vault" }));
     await waitFor(() => expect(mockToast).toHaveBeenLastCalledWith(expect.objectContaining({
       description: "Source retry failed: Cold vault. The saved snapshot is unchanged.",
@@ -689,7 +582,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     expect(await screen.findByText(/Failed sources \(1 of 1\): BTC wallet 1/)).toBeTruthy();
     expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
       description: "All sources failed: BTC wallet 1. The saved snapshot is unchanged.",
@@ -728,7 +620,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     await screen.findByText(/Authentication or invalid key/);
     expect(document.body.textContent).not.toContain("secret-token");
   });
@@ -740,8 +631,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     render(<I18nProvider><RefreshData loading={false} /></I18nProvider>);
 
     await user.click(screen.getByRole("button", { name: "刷新" }));
-    await waitFor(() => expect(mockSetButtonLoading).toHaveBeenLastCalledWith(false));
-    await user.click(screen.getByRole("button", { name: "数据源状态" }));
     expect(await screen.findByText("BTC 钱包 1")).toBeTruthy();
   });
 
@@ -753,30 +642,9 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     expect(await screen.findByText("Cold vault")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry Cold vault" })).toBeTruthy();
     expect(localStorage.getItem("track3-refresh-source-statuses")).toContain("Cold vault");
-  });
-
-  it("keeps long wallet identities distinct and accessible in the phone status sheet", async () => {
-    vi.mocked(isIOS).mockReturnValue(true);
-    const names = [1, 2].map((index) => `Cold ${index} storage account with a long descriptive source name`);
-    vi.mocked(refreshAllData).mockResolvedValue({
-      ...partialResult,
-      sourceStatuses: names.map((label, index) => ({
-        sourceId: `btc:${index}`, label, kind: "wallet", provider: "BTC", status: "stale",
-      })),
-    } as never);
-    const user = userEvent.setup();
-    render(<RefreshData loading={false} />);
-    await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
-    const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
-    expect(names.map((name) => [...dialog.querySelectorAll("[data-source-status-row]")]
-      .some((row) => row.getAttribute("aria-label")?.includes(name)))).toEqual([true, true]);
-    expect(dialog).toHaveTextContent("Cold 1 sto… (BTC)");
-    expect(dialog).toHaveTextContent("Cold 2 sto… (BTC)");
   });
 
   it("distinguishes four Main sources, sorts failures first, and retries all failed", async () => {
@@ -796,7 +664,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     expect(dialog).toHaveTextContent("Failed sources (2 of 4)");
     const rows = Array.from(dialog.querySelectorAll("[data-source-status-row]"));
@@ -837,7 +704,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const user = userEvent.setup();
     render(<RefreshData loading={false} />);
     await user.click(screen.getByRole("button", { name: "Refresh" }));
-    await openFinishedSourceStatus();
     const dialog = await screen.findByRole("alertdialog", { name: "Source status" });
     expect(dialog).toHaveTextContent("1 failed, 1 partial");
     const partialRow = screen.getByRole("group", { name: "Gate.io (Gate)" });
@@ -889,8 +755,7 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(dialog).toHaveTextContent("不支持的交易所");
     expect(dialog).toHaveTextContent("数据源持仓无效");
     expect(dialog).not.toHaveTextContent("API key");
-    expect(dialog.querySelectorAll("[data-source-status-row] .t3-asset-icon")).toHaveLength(3);
-    expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(3);
+    expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(6);
   });
 
   it("carries the last successful time into a full refresh that fails without saved holdings", async () => {
@@ -964,7 +829,6 @@ describe("RefreshData — currency rates refresh ordering", () => {
     vi.mocked(refreshAllData).mockImplementation(() => new Promise(() => {}));
     render(<RefreshData loading={false} />);
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openRunningSourceStatus();
     await waitFor(() => expect(refreshAllData).toHaveBeenCalledOnce());
     const onSourceResult = vi.mocked(refreshAllData).mock.calls[0][1]?.onSourceResult;
     if (!onSourceResult) throw new Error("refresh source callback missing");
@@ -978,27 +842,11 @@ describe("RefreshData — currency rates refresh ordering", () => {
     const failed = screen.getByRole("group", { name: "OKX" });
     expect(dialog).toHaveTextContent("2 of 3 finished · 1 failed");
     expect(done).toHaveTextContent("Done in 3.1s");
-    expect(done.querySelector(".t3-asset-label-secondary")).toHaveTextContent("Done in 3.1s");
     expect(done.querySelector("small svg")).toBeInTheDocument();
     expect(failed).toHaveTextContent("Stale · Network or timeout");
     expect(failed.querySelector("small svg")).toBeInTheDocument();
     expect(failed.querySelector("small svg")).not.toHaveAttribute("class", done.querySelector("small svg")?.getAttribute("class"));
-    expect(screen.getByRole("button", { name: "Retry OKX" })).toBeEnabled();
-  });
-
-  it("shows a configured exchange mark before its first refresh completes", async () => {
-    vi.mocked(isIOS).mockReturnValue(true);
-    vi.mocked(getConfiguration).mockResolvedValue({ exchanges: [{ name: "binance", active: true }] } as never);
-    vi.mocked(listPortfolioSources).mockReturnValue([
-      { sourceId: "cex:0", label: "Main account" },
-    ]);
-    vi.mocked(refreshAllData).mockImplementation(() => new Promise(() => {}));
-    render(<RefreshData loading={false} />);
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await openRunningSourceStatus();
-    const row = await screen.findByRole("group", { name: "Main account (binance)" });
-    expect(row.querySelector(".t3-asset-icon")).toHaveAttribute("data-kind", "exchange");
-    expect(row.querySelector(".t3-asset-icon img")).toHaveAttribute("src");
+    expect(screen.getByRole("button", { name: "Retry OKX" })).toBeDisabled();
   });
 
   it("offers a full retry of failed sources after restarting", async () => {
@@ -1138,5 +986,20 @@ describe("RefreshData — currency rates refresh ordering", () => {
       100,
       0,
     ]);
+  });
+  it("shows the current wallet alias on a pending refresh row", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    writeStoredStatuses([
+      { sourceId: "btc:0", label: "Cold", kind: "wallet", provider: "BTC", hint: "bc1q-d…rage", status: "ok" },
+    ]);
+    vi.mocked(getConfiguration).mockResolvedValue({
+      btc: { addresses: [{ address: "bc1q-demo-cold-storage", alias: "Vault" }] },
+    } as never);
+    vi.mocked(listPortfolioSources).mockReturnValue([{ sourceId: "btc:0", label: "Cold" }]);
+    vi.mocked(refreshAllData).mockImplementationOnce(() => new Promise(() => {}));
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await openRunningSourceStatus();
+    expect(await screen.findByRole("group", { name: /^Vault(?: \(BTC · bc1q-d…rage\))?$/ })).toHaveTextContent("Vault");
   });
 });

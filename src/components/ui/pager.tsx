@@ -35,17 +35,17 @@ export function usePager<T>(rows: readonly T[], resetKey: string, initialPageSiz
   };
 }
 
-export function Pager({ count, page, pages, pageSize = 10, previous, next, first, last, setPageSize, pageSizes, t, labelPrefix = "profit.attribution", ariaLabel, visibleLabel }: {
+export function Pager({ count, page, pages, pageSize = 10, previous, next, first, last, setPageSize, pageSizes, t, labelPrefix = "profit.attribution", ariaLabel }: {
   count: number; page: number; pages: number; pageSize?: number;
   previous: () => void; next: () => void; first?: () => void; last?: () => void;
   setPageSize?: (size: number) => void; pageSizes?: number[];
-  t: (key: string) => string; labelPrefix?: string; ariaLabel?: string; visibleLabel?: string;
+  t: (key: string) => string; labelPrefix?: string; ariaLabel?: string;
 }) {
   if (count <= pageSize) return null;
   const buttonClass = "min-h-11 min-w-11 rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
-  return <nav data-layout-pager className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"
+  return <nav className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"
     aria-label={ariaLabel ?? t(`${labelPrefix}.table`)}>
-    <span aria-live="polite" aria-atomic="true">{visibleLabel && <strong>{visibleLabel}: </strong>}{t(`${labelPrefix}.showing`)
+    <span aria-live="polite" aria-atomic="true">{t(`${labelPrefix}.showing`)
       .replace("{from}", String((page - 1) * pageSize + 1))
       .replace("{to}", String(Math.min(count, page * pageSize)))
       .replace("{total}", String(count))}</span>

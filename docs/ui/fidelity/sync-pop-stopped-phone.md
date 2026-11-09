@@ -144,8 +144,7 @@ Capture: `/tmp/fidelity/settings-b/sync-pop-stopped.png` (full page: `sync-pop-s
 - The fixture now creates three real configuration conflicts and the unlocked page renders resolution controls. The runtime does not expose the source mockup’s per-setting device names or change times; locked/setup captures cannot show resolvable conflicts before unlock.
 - The page title, 16px sans-serif connection inputs, input surfaces, status pill and sync sheets now follow the source geometry. The reference reveals portions of credentials and includes item-size totals or per-setting metadata that the runtime does not expose.
 - The status and sheet now show Sync stopped, Needs attention, a warning box, Retry now, and collapsed diagnostics. The runtime has no per-error attempt counts or last-failed-at timestamp to reproduce the source’s invented history.
-- The app retains the sync control's status line above the sheet title. The static source sheet has no status line.
 
 ## Pixel difference
 
-Viewport: **14.821%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture, measured 8 Nov 2026).
+Viewport: **11.476%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).

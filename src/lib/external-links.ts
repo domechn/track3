@@ -28,7 +28,10 @@ export async function openExternal(key: ExternalLinkKey, onError?: () => void): 
   try {
     await openUrl(externalLinks[key]);
   } catch {
-    onError?.();
+    if (onError) {
+      onError();
+      return;
+    }
     let locale = typeof navigator !== "undefined" && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
     try {
       if (localStorage.getItem(localeLocalStorageKey) === "zh") locale = "zh";

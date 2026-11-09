@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -37,14 +37,6 @@ it("shows partial progress for a price or value goal above an at-most threshold"
   expect(within(row as HTMLElement).getByText("Watching")).toBeInTheDocument();
   expect(within(row as HTMLElement).getByRole("progressbar", { name: "Progress toward Portfolio value goal" }))
     .toHaveAttribute("aria-valuenow", "78.3");
-});
-
-it("shows the measured rule value on its progress mark", () => {
-  renderGoals({ rules: [rule] });
-  const mark = document.querySelector(".pf-goal-progress [data-chart-mark]");
-  expect(mark).not.toBeNull();
-  fireEvent.pointerEnter(mark!);
-  expect(screen.getByRole("tooltip")).toHaveTextContent("78.3%");
 });
 
 it("opens a prefilled template from the empty phone Rules panel", async () => {
@@ -177,9 +169,8 @@ it("shows a rising portfolio move's positive trigger and a falling move's magnit
     { ...rule, id: 2, kind: "portfolio_value_change", comparator: "gte", threshold: 5, window: "24h" },
     { ...rule, id: 3, kind: "portfolio_value_change", comparator: "lte", threshold: -5, window: "24h" },
   ] });
-  const descriptions = [...document.querySelectorAll(".pf-goal-progress small")].map((node) => node.textContent);
-  expect(descriptions).toContainEqual(expect.stringMatching(/^.+ · Fires at \+5\.0% or higher$/));
-  expect(descriptions).toContainEqual(expect.stringMatching(/^.+ · Fires at −5\.0% or lower$/));
+  expect(screen.getByText(/Fires at \+5\.0% or higher/)).toBeInTheDocument();
+  expect(screen.getByText(/Fires at −5\.0% or lower/)).toBeInTheDocument();
   expect(screen.getByText(/Falls more than 5%/)).toBeInTheDocument();
 });
 

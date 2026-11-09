@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Line } from "react-chartjs-2";
-import { type Chart as ChartJS, type Plugin } from "chart.js";
+import { Tooltip as ChartTooltip, type Chart as ChartJS, type Plugin } from "chart.js";
 import {
   queryAssetChange,
   queryTotalValue,
@@ -30,6 +30,7 @@ import {
   chartColors,
   chartThemeColor,
   glassScaleOptions,
+  glassTooltip,
 } from "@/utils/chart-theme";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/i18n";
@@ -38,9 +39,6 @@ import { downsampleIndices } from "@/middlelayers/chart-downsample";
 import { hasPartialGap } from "@/middlelayers/chart-gap";
 import { chartBounds, formatOverviewAxisTicks, shouldShowOverviewDateTick } from "./overview-chart-scale";
 import { overviewUseLastKnownEvent } from "./source-status-event";
-import { ChartTooltip } from "./chart-tooltip";
-import { buildOverviewTooltip } from "./overview-chart-tooltip";
-import { useOverviewTopMover } from "./overview-top-mover";
 
 interface TotalValueShower {
   currencyName(): string;
@@ -54,16 +52,17 @@ interface TotalValueShower {
 
 const chartName = "Trend of Asset";
 const btcSymbol = "₿";
+Object.assign(ChartTooltip.positioners, {
+  overviewTop(this: { chart: { chartArea: { top: number } } }, elements: { element: { x: number } }[]) {
+    return elements.length ? { x: elements[0].element.x, y: this.chart.chartArea.top } : false;
+  },
+});
 const overviewCrosshair: Plugin<"line"> = {
   id: "overview-crosshair",
   afterDatasetsDraw(chart) {
     const point = chart.getActiveElements().find((item) => item.datasetIndex === 0);
-    if (!point) {
-      delete chart.canvas.dataset.crosshairX;
-      return;
-    }
+    if (!point) return;
     const { ctx, chartArea } = chart;
-    chart.canvas.dataset.crosshairX = String(point.element.x);
     ctx.save();
     ctx.strokeStyle = chartThemeColor("control");
     ctx.setLineDash([]);
@@ -387,23 +386,11 @@ const App = ({
   const valueBounds = useMemo(() => chartBounds(lineValues.map((totalValue) => ({ totalValue }))), [lineValues]);
   const chartEnd = lineValues.at(-1);
   const chartRef = useRef<ChartJS<"line"> | null>(null);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [activePointAnchor, setActivePointAnchor] = useState<HTMLSpanElement | null>(null);
   useEffect(() => {
     const chart = chartRef.current;
     const endLabel = chart?.canvas.parentElement?.querySelector<HTMLSpanElement>(".t3-chart-end-value");
     if (chart?.scales.y && endLabel && chartEnd !== undefined) {
       endLabel.style.top = `${chart.scales.y.getPixelForValue(chartEnd) + chart.canvas.offsetTop}px`;
-      const x = chart.getDatasetMeta(0).data.at(-1)?.x ?? chart.chartArea.right;
-      endLabel.style.left = `${Math.max(chart.chartArea.left, Math.min(
-        x + 8, chart.canvas.parentElement!.clientWidth - endLabel.offsetWidth - 2,
-      ))}px`;
-    }
-    const activeAnchor = chart?.canvas.parentElement?.querySelector<HTMLSpanElement>("[data-chart-active-point]");
-    const activePoint = activeIndex === null ? undefined : chart?.getDatasetMeta(0).data[activeIndex];
-    if (chart && activeAnchor && activePoint) {
-      activeAnchor.style.left = `${activePoint.x + chart.canvas.offsetLeft}px`;
-      activeAnchor.style.top = `${activePoint.y + chart.canvas.offsetTop}px`;
     }
   });
   const plottedIndices = useMemo(
@@ -414,53 +401,10 @@ const App = ({
     () => plottedIndices.map((index) => assetChangeData.timestamps[index]),
     [plottedIndices, assetChangeData.timestamps],
   );
-  const bestIndex = bestDay ? plottedTimestamps.map((timestamp) =>
-    new Date(timestamp).toDateString()).lastIndexOf(new Date(bestDay.timestamp).toDateString()) : -1;
-  const bestDayButtonRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (document.activeElement === bestDayButtonRef.current) setActiveIndex(bestIndex);
-  }, [bestIndex]);
-  const markerValues = useRef({ bestDay, bestIndex, chartEnd, activeIndex });
-  markerValues.current = { bestDay, bestIndex, chartEnd, activeIndex };
-  const chart = chartRef.current;
-  const pointElement = activeIndex === null ? undefined : chart?.getDatasetMeta(0).data[activeIndex];
-  const activePoint = pointElement && chart ? { x: pointElement.x + chart.canvas.offsetLeft,
-    y: pointElement.y + chart.canvas.offsetTop } : null;
-  useEffect(() => {
-    const chart = chartRef.current;
-    const point = activeIndex === null ? undefined : chart?.getDatasetMeta(0).data[activeIndex];
-    if (!chart || !point || !chart.scales.y) {
-      if (chart) {
-        chart.setActiveElements([]);
-        chart.update("none");
-      }
-      return;
-    }
-    chart.setActiveElements([{ datasetIndex: 0, index: activeIndex! }]);
-    chart.update("none");
-  }, [activeIndex, plottedTimestamps]);
-  const activeOriginalIndex = activeIndex === null ? undefined : plottedIndices[activeIndex];
-  const dayMover = useOverviewTopMover(activeIndex === null ? undefined : plottedTimestamps[activeIndex],
-    dateRange.start.getTime());
-  const tooltipContent = buildOverviewTooltip(
-    activeOriginalIndex === undefined ? undefined : {
-      timestamp: assetChangeData.timestamps[activeOriginalIndex],
-      value: btcAsBase || showPercentageInChart ? lineValues[activeOriginalIndex] : assetChangeData.data[activeOriginalIndex]?.usdValue,
-    },
-    activeOriginalIndex === undefined || activeOriginalIndex === 0 ? undefined : {
-      timestamp: assetChangeData.timestamps[activeOriginalIndex - 1],
-      value: btcAsBase || showPercentageInChart ? lineValues[activeOriginalIndex - 1] : assetChangeData.data[activeOriginalIndex - 1]?.usdValue,
-    },
-    currency, locale,
-    activeIndex === bestIndex && bestDayContribution ? bestDayContribution : dayMover,
-    showPercentageInChart ? "percent" : btcAsBase ? "btc" : "fiat",
-  );
   const overviewBestDayMarker = useMemo<Plugin<"line">>(() => ({
     id: "overview-best-day-marker",
     afterDraw(chart) {
       const { ctx, chartArea, scales } = chart;
-      chart.canvas.dataset.chartAreaTop = String(chartArea.top);
-      chart.canvas.dataset.chartAreaBottom = String(chartArea.bottom);
       ctx.save();
       ctx.strokeStyle = chartThemeColor("border");
       ctx.lineWidth = 1;
@@ -474,34 +418,27 @@ const App = ({
       ctx.restore();
     },
     afterDatasetsDraw(chart) {
-      const { bestDay, bestIndex, chartEnd, activeIndex } = markerValues.current;
-      const activeAnchor = chart.canvas.parentElement?.querySelector<HTMLSpanElement>("[data-chart-active-point]");
-      const activePoint = activeIndex === null ? undefined : chart.getDatasetMeta(0).data[activeIndex];
-      if (activeAnchor && activePoint) {
-        activeAnchor.style.left = `${activePoint.x + chart.canvas.offsetLeft}px`;
-        activeAnchor.style.top = `${activePoint.y + chart.canvas.offsetTop}px`;
-      }
       const endLabel = chart.canvas.parentElement?.querySelector<HTMLSpanElement>(".t3-chart-end-value");
       if (endLabel && chartEnd !== undefined) {
         endLabel.style.top = `${chart.scales.y.getPixelForValue(chartEnd) + chart.canvas.offsetTop}px`;
-        const x = chart.getDatasetMeta(0).data.at(-1)?.x ?? chart.chartArea.right;
-        endLabel.style.left = `${Math.max(chart.chartArea.left, Math.min(
-          x + 8, chart.canvas.parentElement!.clientWidth - endLabel.offsetWidth - 2,
-        ))}px`;
+        endLabel.style.left = `${chart.scales.x.getPixelForValue(plottedTimestamps.length - 1) + chart.canvas.offsetLeft + 6}px`;
       }
-      if (!bestDay || bestIndex < 0) return;
-      const point = chart.getDatasetMeta(0).data[bestIndex];
-      if (!point) return;
-      const { ctx } = chart;
+      if (!bestDay) return;
+      const index = plottedTimestamps.findIndex((timestamp) =>
+        new Date(timestamp).toDateString() === new Date(bestDay.timestamp).toDateString());
+      if (index < 0) return;
+      const { ctx, chartArea } = chart;
+      const x = chart.scales.x.getPixelForValue(index);
       ctx.save();
-      const tone = getComputedStyle(chart.canvas).getPropertyValue(bestDay.value >= 0 ? "--gain" : "--loss").trim();
-      ctx.fillStyle = tone ? `hsl(${tone})` : chartThemeColor(bestDay.value >= 0 ? "positive" : "negative");
+      ctx.strokeStyle = chartThemeColor("control");
+      ctx.setLineDash([]);
       ctx.beginPath();
-      ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(x, chartArea.top);
+      ctx.lineTo(x, chartArea.bottom);
+      ctx.stroke();
       ctx.restore();
     },
-  }), []);
+  }), [bestDay, chartEnd, plottedTimestamps]);
 
   function changePercentageColorClass(
     ts: TotalValueShower,
@@ -516,13 +453,9 @@ const App = ({
     () => ({
       maintainAspectRatio: false,
       responsive: true,
-      ...(metrics ? { layout: { padding: { top: 8, right: Math.max(72,
-        Math.ceil((`${currency.symbol}${Math.round(chartEnd ?? 0).toLocaleString()}`).length * 7.5) + 16), bottom: 12 } } } : {}),
-      animation: metrics || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? false : { duration: 350 },
-      onResize: (_chart: unknown, size: { width: number }) =>
-        requestAnimationFrame(() => setChartWidth(size.width)),
-      onHover: (_event: unknown, elements: Array<{ datasetIndex: number; index: number }>) =>
-        setActiveIndex(elements.find((element) => element.datasetIndex === 0)?.index ?? null),
+      ...(metrics ? { layout: { padding: { top: 13, right: 68, bottom: 12 } } } : {}),
+      animation: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? false : { duration: 350 },
+      onResize: (_chart: unknown, size: { width: number }) => setChartWidth(size.width),
       hover: {
         mode: "index",
         intersect: false,
@@ -543,7 +476,25 @@ const App = ({
         legend: {
           display: false,
         },
-        tooltip: { enabled: false },
+        tooltip: {
+          ...glassTooltip,
+          ...(metrics ? { position: "overviewTop", yAlign: "top", titleFont: { size: 12, weight: "normal" },
+            bodyFont: { size: 12, weight: "bold" } } : {}),
+          displayColors: false,
+          filter: (item: { datasetIndex: number }) => item.datasetIndex === 0,
+          callbacks: {
+            label: (context: { parsed: { y: number } }) => {
+              const v = metrics ? Math.round(context.parsed.y).toLocaleString() : context.parsed.y.toLocaleString();
+              if (showPercentageInChart) {
+                return `${v}%`;
+              }
+              if (btcAsBase) {
+                return `${btcSymbol}${v}`;
+              }
+              return currency.symbol + v;
+            },
+          },
+        },
       },
       scales: {
         x: {
@@ -563,7 +514,7 @@ const App = ({
               const start = 0;
               const end = size - 1;
 
-              if (metrics && shouldShowOverviewDateTick(index, size, Math.max(3, Math.floor(chartWidth / 100)))) {
+              if (metrics && shouldShowOverviewDateTick(index, size)) {
                 return new Date(data[index]).toLocaleDateString(dateLocale, { day: "numeric", month: "short" });
               }
               // only show start and end date
@@ -616,8 +567,6 @@ const App = ({
       valueBounds,
       dateLocale,
       metrics,
-      chartEnd,
-      chartWidth,
     ],
   );
 
@@ -735,7 +684,7 @@ const App = ({
         <CardContent className="flex flex-1 flex-col t3-hero-content">
           <div className="text-2xl font-semibold font-mono tabular-nums tracking-tight t3-hero-value">
             {getTotalValueShower(btcAsBase, firstTotalValue, shownTotalValue, assetChangeData).formatTotalValue()}
-            {totalValueData.partial && <span className="t3-tag ml-2 align-middle" data-tone="warning">
+            {totalValueData.partial && <span className="ml-2 inline-flex align-middle rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 font-sans text-xs font-medium tracking-normal text-foreground">
               {t("history.partial.label")}
             </span>}
           </div>
@@ -768,69 +717,23 @@ const App = ({
           </p>
           {metrics}
           <div className="min-h-[120px] flex-1 t3-hero-chart">
-            {bestDay && bestIndex >= 0 && <button ref={bestDayButtonRef} type="button" className="t3-chart-best-day"
-              title={t(bestDayContribution ? "overview.fidelity.bestDayWithSignedAsset" : "overview.design.bestDay")
-                .replace("{day}", new Date(bestDay.timestamp).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", day: "numeric" }))
-                .replace("{amount}", `${bestDay.value >= 0 ? "+" : "−"}${currency.symbol}${Math.round(currencyWrapper(currency)(Math.abs(bestDay.value))).toLocaleString()}`)
-                .replace("{asset}", bestDayContribution?.symbol ?? "")
-                .replace("{contribution}", bestDayContribution
-                  ? `${contributionValue > 0 ? "+" : contributionValue < 0 ? "−" : ""}${currency.symbol}${Math.abs(contributionValue).toLocaleString()}`
-                  : "")}
-              onMouseEnter={() => setActiveIndex(bestIndex)}
-              onFocus={() => setActiveIndex(bestIndex)}
-              onMouseLeave={() => setActiveIndex(null)}
-              onBlur={() => setActiveIndex(null)}>{t(bestDayContribution
+            {bestDay && <div className="t3-chart-best-day">{t(bestDayContribution
               ? "overview.fidelity.bestDayWithSignedAsset" : "overview.design.bestDay")
               .replace("{day}", new Date(bestDay.timestamp).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", day: "numeric" }))
               .replace("{amount}", `${bestDay.value >= 0 ? "+" : "−"}${currency.symbol}${Math.round(currencyWrapper(currency)(Math.abs(bestDay.value))).toLocaleString()}`)
               .replace("{asset}", bestDayContribution?.symbol ?? "")
               .replace("{contribution}", bestDayContribution
                 ? `${contributionValue > 0 ? "+" : contributionValue < 0 ? "−" : ""}${currency.symbol}${Math.abs(contributionValue).toLocaleString()}`
-                : "")}</button>}
-            <div className="t3-chart-plot" onPointerLeave={(event) => {
-              if (event.pointerType === "mouse") setActiveIndex(null);
-            }}>
-            {metrics && !btcAsBase && !showPercentageInChart && chartEnd !== undefined && activeIndex === null &&
+                : "")}</div>}
+            {metrics && !btcAsBase && !showPercentageInChart && chartEnd !== undefined &&
               <span className="t3-chart-end-value">
                 {currency.symbol}{Math.round(chartEnd).toLocaleString()}
               </span>}
-            <Line ref={chartRef} key={bestDay?.timestamp ?? "no-best-day"} role="img" tabIndex={0}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setActiveIndex(null);
-                if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-                  event.preventDefault();
-                  setActiveIndex((index) => Math.max(0, Math.min(plottedIndices.length - 1,
-                    (index ?? (event.key === "ArrowRight" ? -1 : plottedIndices.length)) + (event.key === "ArrowRight" ? 1 : -1))));
-                }
-              }}
-              onPointerDown={(event) => {
-                const chart = chartRef.current;
-                if (!chart || !plottedIndices.length) return;
-                const x = event.nativeEvent.offsetX;
-                const points = chart.getDatasetMeta(0).data;
-                let nearest = 0;
-                for (let index = 1; index < points.length; index++) {
-                  if (Math.abs(points[index].x - x) < Math.abs(points[nearest].x - x)) nearest = index;
-                }
-                setActiveIndex(nearest);
-              }}
-              aria-label={t("totalValue.chartSummary")
+            <Line ref={chartRef} key={bestDay?.timestamp ?? "no-best-day"} role="img" aria-label={t("totalValue.chartSummary")
               .replace("{value}", totalValueShower.formatTotalValue())
               .replace("{change}", changedValueOrPercentage)
               .replace("{date}", firstDate)}
               options={options as any} data={lineDataMemo} plugins={metrics ? [overviewBestDayMarker, overviewCrosshair] : []} />
-            {activePoint && tooltipContent && <span ref={setActivePointAnchor} className="t3-chart-active-point"
-              data-chart-active-point="" style={{ left: activePoint.x, top: activePoint.y }} />}
-            <ChartTooltip anchor={activePoint && tooltipContent ? activePointAnchor : null}>
-              {tooltipContent && <><div>{tooltipContent.date}</div>
-                <div><span>{t("common.valueLabel")}: </span><strong>{tooltipContent.value}</strong></div>
-                {tooltipContent.change && <div data-tone={tooltipContent.direction > 0 ? "gain" : tooltipContent.direction < 0 ? "loss" : "neutral"}>
-                  {t("common.changeLabel")}: {tooltipContent.change}</div>}
-                {tooltipContent.mover && <div>{t("overview.chart.topMover")}: {tooltipContent.mover}</div>}</>}
-            </ChartTooltip>
-            <span className="sr-only" aria-live="polite">{tooltipContent &&
-              `${tooltipContent.date}, ${tooltipContent.value}, ${tooltipContent.change ?? ""}, ${tooltipContent.mover ?? ""}`}</span>
-            </div>
           </div>
           {!!assetChangeData.gaps?.length && <p className="mt-1 border-t border-dotted border-muted-foreground/50 pt-1 text-xs text-muted-foreground">
             {t("totalValue.partialGap")}

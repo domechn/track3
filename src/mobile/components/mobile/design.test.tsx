@@ -15,10 +15,9 @@ describe("phone design components", () => {
     expect(screen.getByText("+2%")).toHaveAttribute("data-tone", "loss");
   });
 
-  it("offers a shared neutral tag for non-delta labels", () => {
+  it("offers a neutral pill for non-delta labels", () => {
     render(<Pill>Core holding</Pill>);
-    expect(screen.getByText("Core holding")).toHaveClass("t3-tag");
-    expect(screen.getByText("Core holding")).toHaveAttribute("data-tone", "neutral");
+    expect(screen.getByText("Core holding")).toHaveClass("mobile-pill");
   });
 
   it("offers an actionable first launch state", () => {

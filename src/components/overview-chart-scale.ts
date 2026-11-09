@@ -5,10 +5,9 @@ export function niceStep(value: number) {
   return (unit <= 1 ? 1 : unit <= 2 ? 2 : unit <= 5 ? 5 : 10) * power;
 }
 
-export function shouldShowOverviewDateTick(index: number, count: number, maxLabels?: number) {
+export function shouldShowOverviewDateTick(index: number, count: number) {
   const end = count - 1;
-  const step = maxLabels ? Math.max(5, Math.ceil(end / Math.max(1, maxLabels - 1))) : 5;
-  return index === end || index % step === 0 && (end - index >= (maxLabels ? Math.ceil(step / 2) : 4) || index === 0);
+  return index === end || index % 5 === 0 && (end - index >= 4 || index === 0);
 }
 
 export function formatOverviewAxisTicks(ticks: number[]) {

@@ -1,4 +1,3 @@
-import AssetLabel from "./common/asset-label";
 import {
   CurrencyRateDetail,
   QuoteColor,
@@ -30,6 +29,7 @@ import {
 } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
+import { getWalletLogo } from "@/lib/utils";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   WALLET_AIRDROP_URLS,
@@ -62,7 +62,7 @@ function formatSignedNumber(value: number, suffix = "") {
     return `+${prettyNumberToLocaleString(value)}${suffix}`;
   }
   if (value < 0) {
-    return `−${prettyNumberToLocaleString(Math.abs(value))}${suffix}`;
+    return `-${prettyNumberToLocaleString(Math.abs(value))}${suffix}`;
   }
   return `0${suffix}`;
 }
@@ -274,7 +274,7 @@ const App = ({
                 </TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody data-layout-page-size={parsedPageSize} data-layout-rendered={pageRows.length} data-layout-total={sortedRows.length}>
+            <TableBody>
               {pageRows.map((row) => {
                 const detailUrl = getWalletDetailUrl(
                   row.wallet,
@@ -293,10 +293,15 @@ const App = ({
                     <TableCell className="py-1.5">
                       <div className="flex items-center gap-1.5 text-sm">
                         {row.walletTypeText === "Unknown" ? (
-                          <AssetLabel kind="wallet" type="unknown" name={t("common.unknown")} size={20} />
+                          <span>{t("common.unknown")}</span>
                         ) : (
                           <>
-                            <AssetLabel kind="wallet" type={row.walletTypeText} name={row.walletTypeText} size={20} />
+                            <img
+                              className="w-[18px] h-[18px] rounded-full"
+                              src={getWalletLogo(row.walletTypeText)}
+                              alt={row.walletTypeText}
+                            />
+                            <span>{row.walletTypeText}</span>
                             {detailUrl && (
                               <img
                                 src={MoneyBankIcon}
@@ -321,20 +326,22 @@ const App = ({
                       {row.walletAliasText}
                     </TableCell>
                     <TableCell
-                      className={`t3-signed-unit py-1.5 text-right text-sm ${getToneClass(row.changePercentage, quoteColor)}`}
+                      className={`py-1.5 text-right text-sm ${getToneClass(row.changePercentage, quoteColor)}`}
                     >
                       {formatSignedNumber(row.changePercentage, "%")}
                     </TableCell>
                     <TableCell
-                      className={`t3-signed-unit py-1.5 text-right text-sm ${getToneClass(row.changeValue, quoteColor)}`}
+                      className={`py-1.5 text-right text-sm ${getToneClass(row.changeValue, quoteColor)}`}
                     >
-                      {`${row.changeValue < 0
-                        ? "−"
+                      {row.changeValue < 0
+                        ? "-"
                         : row.changeValue > 0
                           ? "+"
-                          : ""}${currency.symbol}${prettyNumberToLocaleString(
+                          : ""}
+                      {currency.symbol}
+                      {prettyNumberToLocaleString(
                         currencyWrapper(currency)(Math.abs(row.changeValue)),
-                      )}`}
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -350,7 +357,7 @@ const App = ({
         )}
 
         {sortedRows.length > 0 && (
-          <div data-layout-pager className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
             <div>
               {t("walletValueChanges.showing")
                 .replace("{start}", String(loadedRangeStart))

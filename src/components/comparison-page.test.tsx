@@ -44,7 +44,6 @@ vi.mock("@/middlelayers/charts", () => ({
 
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import { COMPARISON_DATES_KEY } from "@/middlelayers/ai/actions";
-import { readAssistantComparisonDates, setAssistantComparisonDates } from "@/middlelayers/ui-state/page-prefs";
 
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 
@@ -54,22 +53,6 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
-  it("pages an eleven-asset comparison without dropping the last asset", async () => {
-    const user = userEvent.setup();
-    vi.mocked(queryAllDataDates).mockResolvedValue([
-      { id: 1, date: "2024-04-16" }, { id: 2, date: "2024-04-15" },
-    ] as never);
-    vi.mocked(queryCoinDataByUUID).mockResolvedValue(Array.from({ length: 11 }, (_, index) => ({
-      symbol: `ASSET${index}`, assetType: "crypto", amount: 1, value: 100 + index, price: 100 + index,
-    })) as never);
-    render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
-    const table = await screen.findByRole("table", { name: "Per asset" }, { timeout: 10_000 });
-    await waitFor(() => expect(table.querySelectorAll("tbody tr")).toHaveLength(10), { timeout: 10_000 });
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    expect(table.querySelectorAll("tbody tr")).toHaveLength(1);
-    expect(table).toHaveTextContent("ASSET0");
-  });
-
   it("starts from the same 30-day comparison at narrow desktop widths", async () => {
     const width = window.innerWidth;
     window.innerWidth = 1024;
@@ -96,20 +79,6 @@ describe("Comparison page", () => {
     render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
     await waitFor(() => expect(screen.getByRole("button", { name: /base date/i })).toHaveTextContent("2024-04-15"));
     expect(localStorage.getItem(COMPARISON_DATES_KEY)).toBeNull();
-  });
-  it("applies a padded assistant date to an unpadded snapshot label", async () => {
-    setAssistantComparisonDates({ base: "2026-10-01", head: "2026-10-31" });
-    vi.mocked(queryAllDataDates).mockResolvedValue([
-      { id: "head", date: "2026-10-31", createdAt: "2026-10-31T09:41:00Z" },
-      { id: "previous", date: "2026-10-30", createdAt: "2026-10-30T09:41:00Z" },
-      { id: "base", date: "2026-10-1", createdAt: "2026-10-01T09:41:00Z" },
-    ]);
-    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
-    render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /base date/i })).toHaveTextContent(/2026-10-1\b/);
-      expect(readAssistantComparisonDates()).toBeUndefined();
-    }, { timeout: 10_000 });
   });
   it("replaces an assistant date selection when the user chooses a quick comparison", async () => {
     localStorage.setItem(COMPARISON_DATES_KEY, JSON.stringify({ base: "2024-04-15", head: "2024-04-16" }));

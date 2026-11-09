@@ -1,8 +1,8 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { expect, it, vi } from "vitest";
-import type { Asset, Transaction } from "@/middlelayers/types";
+import type { Transaction } from "@/middlelayers/types";
 import CoinFidelityView from "./coin-fidelity-view";
 
 vi.mock("@/middlelayers/charts", () => ({
@@ -24,46 +24,12 @@ const transactions = Array.from({ length: 51 }, (_, index): Transaction => ({
   txnCreatedAt: new Date(Date.UTC(2026, 9, 31) - index * 86400000).toISOString(),
 }));
 
-function view(rows: Transaction[], transactionsLoading = false, lastAsset?: Asset) {
+function view(rows: Transaction[], transactionsLoading = false) {
   return <MemoryRouter><CoinFidelityView symbol="BTC" assetType="crypto"
     currency={{ currency: "USD", alias: "USD", symbol: "$", rate: 1 }} dateRange={{
       start: new Date("2020-01-01T00:00:00Z"), end: new Date("2026-10-31T12:00:00Z"),
-    }} lastAsset={lastAsset} transactions={rows} transactionsLoading={transactionsLoading} walletAliasMap={{}} quoteColor="green-up-red-down" onEdit={async () => true} /></MemoryRouter>;
+    }} transactions={rows} transactionsLoading={transactionsLoading} walletAliasMap={{}} quoteColor="green-up-red-down" onEdit={async () => true} /></MemoryRouter>;
 }
-
-it("uses the rendered coin column width when deciding whether holdings fit", () => {
-  let holdingsRoom = 180;
-  let notifyResize = () => {};
-  const clientWidth = vi.spyOn(Element.prototype, "clientWidth", "get").mockImplementation(function (this: Element) {
-    return this.matches(".coin-fidelity-hero") ? 1280 :
-      this.matches(".coin-fidelity-metrics.top .coin-fidelity-metric:nth-child(5) strong") ? holdingsRoom : 120;
-  });
-  const scrollWidth = vi.spyOn(Element.prototype, "scrollWidth", "get").mockImplementation(function (this: Element) {
-    return this.matches(".coin-fidelity-metrics.top .coin-fidelity-metric:nth-child(5) strong") ? 160 : 100;
-  });
-  vi.stubGlobal("ResizeObserver", class {
-    constructor(private callback: () => void) {}
-    observe(element: Element) {
-      if (element.matches(".coin-fidelity")) notifyResize = this.callback;
-    }
-    disconnect() {}
-  });
-  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { callback(0); return 1; });
-  vi.stubGlobal("cancelAnimationFrame", () => {});
-  try {
-    render(view([], false, { symbol: "BTC", assetType: "crypto", amount: 1,
-      value: 1_234_567.89, price: 1 }));
-    const hero = document.querySelector(".coin-fidelity-hero")!;
-    expect(hero).not.toHaveClass("long-amount");
-    holdingsRoom = 140;
-    act(() => notifyResize());
-    expect(hero).toHaveClass("long-amount");
-  } finally {
-    clientWidth.mockRestore();
-    scrollWidth.mockRestore();
-    vi.unstubAllGlobals();
-  }
-});
 
 it("shows empty sections after transactions finish loading", () => {
   const mounted = render(view([], true));

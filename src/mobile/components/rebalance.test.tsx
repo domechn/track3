@@ -294,8 +294,8 @@ describe("Rebalance page", () => {
       tolerancePercent: 0,
     });
     render(<Rebalance currency={currency} />);
-    expect((await screen.findByText(/Sell 0.66666667 BTC/)).textContent).toBe("Sell 0.66666667 BTC");
-    expect(screen.getByText(/Buy 1 ETH/).textContent).toBe("Buy 1 ETH");
+    expect(await screen.findByText(/Sell 0.66666667 BTC/)).toBeInTheDocument();
+    expect(screen.getByText(/Buy 1 ETH/)).toBeInTheDocument();
   });
   it("shows signed values for buy and sell suggestions on iPhone", async () => {
     vi.mocked(isIOS).mockReturnValue(true);

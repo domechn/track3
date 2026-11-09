@@ -28,7 +28,7 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { useTranslation } from "@/mobile/i18n";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
-import { PartialProfitHint, hasVisibleUnrecordedChange } from "@/components/profit-summary-hints";
+import { PartialProfitHint } from "@/components/profit-summary-hints";
 import { HintPopover } from "@/components/ui/hint-popover";
 import { Pager, usePager } from "@/components/ui/pager";
 import { usePhoneWidth } from "@/mobile/components/mobile/size-class";
@@ -485,11 +485,10 @@ const App = ({
           const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
           const cardContent = <>
             <div className="text-xs text-muted-foreground">{item.label}</div>
-            <div className={cn("t3-signed-unit mt-1 text-sm font-semibold tracking-tight",
+            <div className={cn("mt-1 text-sm font-semibold tracking-tight",
               value === null ? "text-muted-foreground" : getToneClass(value, quoteColor))}>
               {item.hasData ? renderAmount(value) : "—"}
             </div>
-            {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <div className="mt-1 text-xs text-muted-foreground">{t("profitSummary.unrecordedChanges").replace("{amount}", renderAmount(item.unrecordedChange))}</div>}
             {item.gapDate && <div className="mt-1 text-xs text-muted-foreground">{gapHint(item.gapDate, selectedYear)}</div>}
           </>;
           return <div key={item.key} data-partial={partial} className={cn("profit-month-card relative rounded-lg border p-2",
@@ -532,7 +531,6 @@ const App = ({
             >
               {item.hasData ? renderAmount(value) : "—"}
             </div>
-            {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <div className="mt-1 text-xs text-muted-foreground">{t("profitSummary.unrecordedChanges").replace("{amount}", renderAmount(item.unrecordedChange))}</div>}
             {partial && renderPartialInfo(item.unknownCoins, String(item.year))}
           </div>
           );

@@ -8,8 +8,6 @@ Left card begins with “App language / Menus, labels and messages. Your data is
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** language 4.495% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
 At 1100px the app shows its editable summary and language controls in one column. The static source shows App language and Preview side by side; stacking the live summary cards keeps the Language card within the 60px empty-space limit.
 
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.

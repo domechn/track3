@@ -9,8 +9,7 @@ import { currencyWrapper } from "@/utils/currency";
 import { useTranslation } from "@/mobile/i18n";
 import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription } from "@/mobile/components/ui/alert-dialog";
 import { chartTicks } from "@/mobile/components/partial-chart-scale";
-import AssetLabel from "@/components/common/asset-label";
-import { sourceIconKind } from "@/components/source-allocation-list";
+import SourceMark from "@/mobile/components/source-mark";
 import "@/mobile/components/mobile/fidelity.css";
 
 const amount = (value: number, currency: CurrencyRateDetail) => `${currency.symbol}${currencyWrapper(currency)(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -83,7 +82,7 @@ export default function PartialOverviewFidelity({ view, statuses, currency, quot
     <main className="fd-partial-grid">
       <section className="fd-card fd-partial-hero"><div className="fd-card-heading"><h3>{t("fidelity.firstRun.portfolioValue")}</h3><span>{currency.currency} · {t("fidelity.refresh.completeSnapshots")}</span></div>
         <span className="fd-label">{t(withLastKnown ? "fidelity.refresh.withLastKnown" : "fidelity.refresh.totalExcluding").replace("{source}", provider)}</span>
-        <strong className="fd-partial-total">{amount(total, currency)}</strong><span className="t3-tag" data-tone="warning">{t("history.partial.label")}</span>
+        <strong className="fd-partial-total">{amount(total, currency)}</strong><span className="fd-partial-pill">{t("history.partial.label")}</span>
         <span className="fd-sub">{provider} {t("fidelity.refresh.lastKnown")} {amount(excludedValue, currency)}</span>
         <div className="fd-partial-kpis">{["fidelity.firstRun.today", "fidelity.overview.sevenDays", "fidelity.overview.thirtyDays"].map((key) =>
           <div key={key}><span>{t(key)}</span><b>—</b><small>{t("fidelity.refresh.incomplete")}</small></div>)}</div>
@@ -99,14 +98,10 @@ export default function PartialOverviewFidelity({ view, statuses, currency, quot
           const label = view.sourceLabels[wallet] ?? t("common.unknown");
           const isMissing = missingWallets.has(wallet);
           const status = statuses.find((item) => item.label === label || item.provider === label);
-          const sourceType = status?.provider ?? view.sourceTypes?.[wallet] ??
-            view.sources.find((source) => source.label === label)?.provider;
-          return <div className="fd-partial-source" key={wallet}>
-            <AssetLabel kind={status?.kind === "exchange" || status?.kind === "broker" ? status.kind : sourceIconKind(sourceType)}
-              type={sourceType}
-              name={label} size={20} secondary={<>{isMissing ? <ExclamationTriangleIcon className="fd-partial-source-status-icon" aria-hidden="true" /> : <CheckIcon className="fd-partial-source-status-icon" aria-hidden="true" />}{isMissing
+          return <div className="fd-partial-source" key={wallet}><SourceMark initialsOnly source={{ ...(view.sources.find((source) => source.label === label) ?? { sourceId: "", label }), kind: status?.kind, provider: status?.provider }} />
+            <div><b>{label}</b><small data-tone={isMissing ? isQuota ? "warning" : "loss" : "neutral"}>{isMissing ? <ExclamationTriangleIcon className="fd-partial-source-status-icon" aria-hidden="true" /> : <CheckIcon className="fd-partial-source-status-icon" aria-hidden="true" />}{isMissing
               ? t(isQuota ? "fidelity.refresh.quotaUsed" : "fidelity.refresh.failedLastGood").replace("{date}", date(failed?.lastSuccessAt)).replace("{time}", clock(failed?.lastSuccessAt))
-              : t("fidelity.wallets.refreshed").replace("{time}", clock(status?.lastSuccessAt))}</>} />
+              : t("fidelity.wallets.refreshed").replace("{time}", clock(status?.lastSuccessAt))}</small></div>
             <div><strong>{amount(value, currency)}</strong><small>{isMissing ? t("fidelity.refresh.lastKnown") : total ? `${(value / total * 100).toFixed(1)}%` : "—"}</small></div>
           </div>;
         })}</div><div className="fd-partial-source-footer"><i />{t("fidelity.refresh.countRefreshed").replace("{ok}", String(orderedSources.length - missing.length)).replace("{all}", String(orderedSources.length)).replace("{time}", clock(failedStatus?.finishedAt ?? view.latest?.createdAt))}</div>
@@ -138,15 +133,12 @@ export default function PartialOverviewFidelity({ view, statuses, currency, quot
           const label = view.sourceLabels[wallet] ?? t("common.unknown");
           const isMissing = missingWallets.has(wallet);
           const status = statuses.find((item) => item.label === label || item.provider === label);
-          const sourceType = status?.provider ?? view.sourceTypes?.[wallet] ??
-            view.sources.find((source) => source.label === label)?.provider;
           const duration = status?.startedAt && status.finishedAt
             ? `${((Date.parse(status.finishedAt) - Date.parse(status.startedAt)) / 1000).toFixed(1)} s` : null;
           return <div className="fd-partial-status-row" data-failed={isMissing} key={wallet}>
-            <AssetLabel kind={status?.kind === "exchange" || status?.kind === "broker" ? status.kind : sourceIconKind(sourceType)}
-              type={sourceType}
-              name={label} size={20} secondary={<>{isMissing ? <ExclamationTriangleIcon aria-hidden="true" /> : <CheckIcon aria-hidden="true" />}
-              {isMissing ? reason : t("fidelity.refresh.doneIn").replace("{duration}", duration ?? "—")}</>} />
+            <SourceMark className="fd-partial-status-logo" initialsOnly source={{ ...(view.sources.find((source) => source.label === label) ?? { sourceId: "", label }), kind: status?.kind, provider: status?.provider }} />
+            <div><b>{label}</b><small data-tone={isMissing ? isQuota ? "warning" : "loss" : "gain"}>{isMissing ? <ExclamationTriangleIcon aria-hidden="true" /> : <CheckIcon aria-hidden="true" />}
+              {isMissing ? reason : t("fidelity.refresh.doneIn").replace("{duration}", duration ?? "—")}</small></div>
             {isMissing && (isQuota ? <Link to="/settings/systemInfo">{t("fidelity.refresh.seeUsage")}</Link> : <button type="button" onClick={onRetry}>{t("refresh.retryButton")}</button>)}
           </div>;
         })}</div>

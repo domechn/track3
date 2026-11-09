@@ -52,8 +52,7 @@ export default function AutoBackupIndicator({
               role="status"
               aria-live="polite"
               aria-label={t("autoBackup.indicator.title")}
-              className="t3-tag"
-              data-tone="neutral"
+              className="flex items-center gap-2 rounded-full border border-border/40 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground shadow-sm backdrop-blur-md"
             >
               <span
                 aria-hidden="true"

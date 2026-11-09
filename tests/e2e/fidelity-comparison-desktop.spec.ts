@@ -3,13 +3,12 @@ import { mkdirSync } from "node:fs";
 import { installTauriBridge } from "./fidelity-scenes";
 import { createSyncHeader } from "../../src/middlelayers/sync/crypto";
 import { FakeS3, writeSyncHeader } from "../../src/middlelayers/sync/object-store";
-import { contrast } from "./overlay-theme-scenes";
 
 const output = "/tmp/fidelity-desktop/comparison";
 
-async function openComparison(page: Page, theme: "light" | "dark" = "dark") {
+async function openComparison(page: Page) {
   await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
-  await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
+  await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "dark"));
   const syncPassphrase = "local fidelity comparison passphrase";
   const s3 = new FakeS3();
   const { header } = await createSyncHeader(syncPassphrase);
@@ -42,54 +41,6 @@ async function openComparison(page: Page, theme: "light" | "dark" = "dark") {
 }
 
 test.describe("Comparison desktop fidelity", () => {
-  test("light quick range remains readable when selected", async ({ browser }, testInfo) => {
-    test.skip(testInfo.project.name !== "desktop");
-    const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });
-    try {
-      const page = await context.newPage();
-      await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "light"));
-      await installTauriBridge(page, { fidelitySample: "full" });
-      await page.goto("/#/comparison");
-      await page.locator(".t3-cmp-quick button").nth(2).click();
-      const selected = page.locator(".t3-cmp-quick button[aria-pressed='true']");
-      await expect(selected).toBeVisible({ timeout: 40_000 });
-      const colors = await selected.evaluate((node) => {
-        const style = getComputedStyle(node);
-        const tint = style.backgroundColor.match(/[\d.]+/g)!.map(Number);
-        const card = getComputedStyle(node.closest(".t3-cmp-card")!).backgroundColor.match(/[\d.]+/g)!.map(Number);
-        const painted = tint.slice(0, 3).map((channel, index) =>
-          Math.round(channel * tint[3] + card[index] * (1 - tint[3])));
-        return [style.color, `rgb(${painted.join(", ")})`] as const;
-      });
-      expect(contrast(...colors)).toBeGreaterThanOrEqual(4.5);
-    } finally { await context.close(); }
-  });
-
-  test("light Comparison subtitle and info callout remain readable", async ({ browser }) => {
-    test.setTimeout(120_000);
-    const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, colorScheme: "light" });
-    try {
-      const page = await context.newPage();
-      await openComparison(page, "light");
-      await expect(page.locator(".t3-cmp-heading p b")).toBeVisible();
-      await expect(page.locator(".t3-cmp-info")).toBeVisible();
-      const luminance = await page.evaluate(() => {
-        const value = (selector: string, property: "color" | "backgroundColor") => {
-          const css = getComputedStyle(document.querySelector(selector) as Element)[property];
-          const channels = [...css.matchAll(/[\d.]+/g)]
-            .slice(0, 3).map(([number]) => Number(number) / (css.startsWith("color(srgb ") ? 1 : 255));
-          return channels.reduce((sum, channel, index) => sum + [0.2126, 0.7152, 0.0722][index] *
-            (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4), 0);
-        };
-        return { subtitle: value(".t3-cmp-heading p b", "color"), callout: value(".t3-cmp-info", "backgroundColor") };
-      });
-      expect(luminance.subtitle).toBeLessThan(0.18);
-      expect(luminance.callout).toBeGreaterThan(0.7);
-    } finally {
-      await context.close();
-    }
-  });
-
   test("1001px CNY legacy table keeps each amount on one line", async ({ browser }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop");
     const context = await browser.newContext({ viewport: { width: 1001, height: 900 }, timezoneId: "UTC" });

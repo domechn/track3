@@ -48,7 +48,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
     await page.keyboard.press("Escape");
     await expect(initialStatus).toHaveCount(0);
   } else if (phoneLayout) {
-    await expect(page.locator(".fd-partial-total + .t3-tag")).toHaveText("Partial", { timeout: 30_000 });
+    await expect(page.locator(".fd-partial-pill")).toHaveText("Partial", { timeout: 30_000 });
     await expect(page.locator(".fd-partial-chart")).toBeVisible();
     await capture("overview");
     await expect(page.locator(".fd-partial-total")).toHaveText("$49,898.45");
@@ -75,9 +75,9 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
 
   await page.goto("/#/history");
   await expect(page.locator("[data-testid=history-content][aria-busy=true]")).toHaveCount(0);
-  await expect(page.getByText("4 of 5 sources").and(page.locator(":visible")).first()).toBeVisible();
+  await expect(page.getByText("4 of 5 sources").first()).toBeVisible();
   await capture("history-list");
-  if (shell === "ios" && width < 1000) {
+  if (shell === "ios" && width < 700) {
     await page.locator(".fidelity-history-chips button").nth(1).click();
     await page.getByRole("button", { name: /Issues/ }).click();
     await page.getByRole("button", { name: /^Show / }).click();
@@ -102,15 +102,10 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   await page.goto("/#/overview");
   await (phoneLayout ? page.locator(".fd-partial-refresh") : page.getByRole("button", { name: "Refresh", exact: true })).click();
   const status = page.getByRole("alertdialog", { name: shell === "desktop" ? "Refresh finished" : "Source status" });
-  await expect(status).toHaveCount(0);
-  if (!phoneLayout) await page.getByRole("button", { name: "Source status" }).click();
-  const useLastKnown = phoneLayout
-    ? page.locator(".fd-partial-banner").getByRole("button", { name: "Use last known values" })
-    : status.getByRole("button", { name: "Use last known values" });
-  await expect(useLastKnown).toBeVisible();
+  await expect(status.getByRole("button", { name: "Use last known values" })).toBeVisible();
   if (phoneLayout) {
-    await expect(page.locator(".fd-partial-total")).toHaveText("$84,000.00");
-    await expect(page.locator(".fd-partial-total + .t3-tag")).toHaveText("Partial");
+    await expect(page.locator(".fd-partial-total")).not.toHaveText("$75,048.19");
+    await expect(page.locator(".fd-partial-pill")).toHaveText("Partial");
   } else {
     await expect(page.locator(".overview-loading")).toBeHidden();
     await expect(page.locator(".t3-hero-value")).not.toContainText("$75,048.19");
@@ -118,7 +113,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
   }
   if (shell === "desktop") await expect(page.locator(".desktop-toast-viewport > li[data-state='open']")).toHaveCount(0, { timeout: 15_000 });
   await capture("refresh-offer");
-  await useLastKnown.click();
+  await status.getByRole("button", { name: "Use last known values" }).click();
   if (shell === "desktop") await expect(status).toHaveCount(0);
   else if (phoneLayout) {
     await expect(page.locator(".fd-partial-total")).toHaveText("$142,648.20");

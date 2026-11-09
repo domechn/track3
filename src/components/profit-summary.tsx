@@ -30,7 +30,7 @@ import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
 import { SummaryFidelityYearContext } from "./summary-fidelity-range-context";
 import { orderMoverNames, yearSpan } from "./fidelity-data";
-import { PartialProfitHint, PnlPercentHint, hasVisibleUnrecordedChange } from "./profit-summary-hints";
+import { PartialProfitHint, PnlPercentHint } from "./profit-summary-hints";
 import { HintPopover } from "./ui/hint-popover";
 import { attributionCompactAmount } from "./attribution-amount";
 import { FittingAttributionAmount } from "./fitting-attribution-amount";
@@ -262,17 +262,11 @@ const App = ({
       const profits = await bluebird.map(
         dates.filter((d) => d.firstDay.getFullYear() === selectedYear),
         async (date) => {
+          const periodStart = fidelity ? new Date(Math.max(date.firstDay.getTime(), dateRange.start.getTime())) : date.firstDay;
+          const monthEnd = new Date(date.lastDay.getFullYear(), date.lastDay.getMonth(), date.lastDay.getDate(), 23, 59, 59, 999);
           const { total, knownTotal = null, unknownCoins = [], lastRecordDate, percentage, coins, unrecordedChange, deposits } = await calculateTotalProfit({
-            start: new Date(Math.max(date.firstDay.getTime(), start.getTime())),
-            end: new Date(Math.min(new Date(
-              date.lastDay.getFullYear(),
-              date.lastDay.getMonth(),
-              date.lastDay.getDate(),
-              23,
-              59,
-              59,
-              999
-            ).getTime(), end.getTime())),
+            start: periodStart,
+            end: fidelity ? new Date(Math.min(monthEnd.getTime(), dateRange.end.getTime())) : monthEnd,
           });
 
           const lrd = lastRecordDate
@@ -281,7 +275,7 @@ const App = ({
               : lastRecordDate
             : undefined;
           const baselineDate = lrd
-            ? await queryPreviousProfitSnapshotDate(new Date(Math.max(date.firstDay.getTime(), start.getTime())))
+            ? await queryPreviousProfitSnapshotDate(periodStart)
             : undefined;
           return { total, knownTotal, unknownCoins, monthFirstDate: date.firstDay, lastRecordDate: lrd, baselineDate,
             percentage, unrecordedChange, deposits, count: { up: coins.filter((coin) => !stableCoins.has(coin.symbol) && !coin.isUnknown && coin.value !== null && coin.value > 0.005).length,
@@ -320,8 +314,8 @@ const App = ({
         years,
         async (year) => {
           const yearRange = {
-            start: new Date(fidelity ? Math.max(new Date(year, 0, 1).getTime(), dateRange.start.getTime()) : new Date(year, 0, 1).getTime()),
-            end: new Date(fidelity ? Math.min(new Date(year, 11, 31, 23, 59, 59, 999).getTime(), dateRange.end.getTime()) : new Date(year, 11, 31, 23, 59, 59, 999).getTime()),
+            start: fidelity ? new Date(Math.max(new Date(year, 0, 1).getTime(), dateRange.start.getTime())) : new Date(year, 0, 1),
+            end: fidelity ? new Date(Math.min(new Date(year, 11, 31, 23, 59, 59, 999).getTime(), dateRange.end.getTime())) : new Date(year, 11, 31, 23, 59, 59, 999),
           };
           const monthRanges = Array.from({ length: 12 }, (_, month) => month)
             .filter((month) => new Date(year, month, 1) <= dateRange.end &&
@@ -340,7 +334,6 @@ const App = ({
               down: months.filter((profit) => profit.lastRecordDate && amount(profit) < -0.005).length },
             coinCount: { up: coins.filter((coin) => !stableCoins.has(coin.symbol) && !coin.isUnknown && coin.value !== null && coin.value > 0.005).length,
               down: coins.filter((coin) => !stableCoins.has(coin.symbol) && !coin.isUnknown && coin.value !== null && coin.value < -0.005).length } };
-
         },
         { concurrency: 3 }
       );
@@ -569,7 +562,6 @@ const App = ({
               <span className={cn("fidelity-month-value", value == null ? "text-muted-foreground" : getToneClass(value, quoteColor))} title={fidelityAmount(value)}>
                 {value === null ? "–" : <FittingAttributionAmount full={fidelityAmount(value)} compact={attributionCompactAmount(value, currency, locale)} />}
               </span>
-              {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <span className="text-muted-foreground whitespace-pre text-[10px]">{t("profitSummary.unrecordedChanges").replace("{amount}", `\n${fidelityAmount(item.unrecordedChange)}`)}</span>}
               <span className="fidelity-month-percent">{fidelityPercentage(item.percentage)}</span>
               <span className="fidelity-month-bar"><i className={value == null || value === 0 ? "" : value < 0 ? "negative" : "positive"}
                 style={{ width: `${Math.min(50, Math.abs(item.percentage ?? 0) / 16 * 50)}%` }} /></span>
@@ -599,7 +591,6 @@ const App = ({
               value === null ? "text-muted-foreground" : getToneClass(value, quoteColor))}>
               {item.hasData ? renderAmount(value) : "—"}
             </div>
-            {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <div className="mt-1 text-xs text-muted-foreground">{t("profitSummary.unrecordedChanges").replace("{amount}", fidelityAmount(item.unrecordedChange))}</div>}
             {item.gapDate && <div className="mt-1 text-xs text-muted-foreground">{gapHint(item.gapDate, selectedYear)}</div>}
           </>;
           return <div key={item.key} data-partial={partial} className={cn("relative rounded-lg border p-2",
@@ -630,14 +621,8 @@ const App = ({
         </strong>
         <span className={cn("fidelity-year-percent", item.total == null ? "text-muted-foreground" : getToneClass(item.total, quoteColor))}>{fidelityPercentage(item.percentage)}</span>
         <span className="fidelity-year-deposits"><span>{t("profitSummary.recordedInflows")}</span><span>{item.deposits == null ? "–" : fidelityAmount(item.deposits)}</span></span>
-        {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <span className="fidelity-year-unrecorded whitespace-pre-line text-muted-foreground text-[10px]">{t("profitSummary.unrecordedChanges").replace("{amount}", `\n${fidelityAmount(item.unrecordedChange)}`)}</span>}
         <span className="fidelity-year-foot"><span><span className={countTone(item.count?.up ?? 0, true, quoteColor)}>{t(item.count?.up === 1 ? "profitSummary.monthUp" : "profitSummary.monthsUp").replace("{n}", String(item.count?.up ?? 0))}</span> · <span className={countTone(item.count?.down ?? 0, false, quoteColor)}>{t(item.count?.down === 1 ? "profitSummary.monthDown" : "profitSummary.monthsDown").replace("{n}", String(item.count?.down ?? 0))}</span></span><span>{span.last - span.first + 1} {t(span.last === span.first ? "summary.fidelity.month" : "summary.fidelity.months")}</span></span>
-      </button><HintPopover label={t("profitSummary.depositBreakdown")} className="fidelity-year-badge fidelity-year-breakdown-badge inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground" trigger={<span>ⓘ</span>}>
-        <p>{t("profitSummary.trades").replace("{amount}", fidelityAmount(item.trades ?? 0))}</p>
-        <p>{t("profitSummary.transfersInLine").replace("{amount}", fidelityAmount(item.transfersIn ?? 0))}</p>
-        <p>{t("profitSummary.rewardsUnavailable")}</p>
-        <p>{t("profitSummary.coinCounts").replace("{up}", String(item.coinCount?.up ?? 0)).replace("{down}", String(item.coinCount?.down ?? 0))}</p>
-      </HintPopover>{partial && renderPartialInfo(item.unknownCoins, String(item.year), true)}</div>;
+      </button>{partial && renderPartialInfo(item.unknownCoins, String(item.year), true)}</div>;
     })}</div>
       {yearCards.length > 2 && <div className="fidelity-year-pager"><Pager count={yearCards.length} {...yearPaging} t={t}
         ariaLabel={t("summary.fidelity.byYear")} /></div>}
@@ -667,7 +652,6 @@ const App = ({
             >
               {item.hasData ? renderAmount(value) : "—"}
             </div>
-            {hasVisibleUnrecordedChange(item.unrecordedChange, currency) && <div className="mt-1 text-xs text-muted-foreground">{t("profitSummary.unrecordedChanges").replace("{amount}", fidelityAmount(item.unrecordedChange))}</div>}
             {partial && renderPartialInfo(item.unknownCoins, String(item.year))}
           </div>
           );

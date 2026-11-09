@@ -1,7 +1,5 @@
 # Assistant desktop fidelity
 
-The shared rail geometry and active paint now follow [navigation.md](../navigation.md).
-
 ## Reference and measurements
 
 Viewed all six supplied JPGs in `desktop/plan/`. They are 1440 × 900 except `assistant-thread-desktop.jpg` (1440 × 1500). The task's capture viewport is 1600 × 900; pixel comparisons must render the authoritative HTML at 1600 × 900, then compare same-sized app captures. Source pages: `ds/pages/plan-assistant.html`, `plan-assistant-new.html`, `plan-assistant-long.html`, `plan-assistant-approved.html`, `plan-assistant-error.html`, and `plan-assistant-nokey.html`. `ds.css`, `ds.js`, `plan-assistant.js`, `lib.js`, `ds/BRIEF.md`, and `core-navigation-map.html` determine the structure and values.
@@ -64,14 +62,6 @@ The captures seed the existing AI configuration, `rebalance_profiles`, `alert_ru
 The session list keeps its empty message, loading skeleton, pin action, and delete confirmation dialog. Configuration loading keeps the existing loading card and configuration-error card; missing API key uses the specified full-width no-key state. A saved `[error]` reply uses the inline red banner with Retry and settings actions; retry resends the saved user question through the existing chat action. Insights loading, empty, and refresh errors continue to use the existing card state. Approval and errors remain in the saved chat; session and action dialogs are provided by the existing controls. No new toast is introduced by these six reference states.
 
 ## Remaining differences
-
-**9 Nov 2026 layout audit:** assistant 9.715% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-At 1100–1399 px the composer context hint uses 11 px text so its full holdings, snapshots and targets description fits beside the keyboard hint. The source uses 12 px in a wider thread pane.
-
-The last recorded 8 Nov dense-data 1280 × 800 dark capture differs by **9.314%** from the rendered `plan-assistant-new.html` at RGB-sum threshold 60. The real-scale fixture has seven loadable encrypted conversations, matching the source's Chats density. A subsequent fixture update adds portfolio-derived insights and has not been recaptured under the one-run limit. The product retains its current CNY portfolio, test model, actual usage count and context choices. The source hard-codes an eight-asset USD portfolio, seven alerts, eight targets, model usage and sample insight text. These visible data differences remain because the fixture checks the product's stored values and encrypted session flow.
-
-At 880–1119 px, the context pane opens as a drawer so the thread keeps its reading width. At 1120 px and above, it opens inline as the design shows.
 
 The Goals unread dot follows actual alert state; its size and placement differ slightly from the source rail.
 

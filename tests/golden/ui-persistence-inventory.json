@@ -41,6 +41,9 @@
     "{ role: \"user\", content: JSON.stringify(history) },",
     "budgetTruncated: text !== sanitizedText || (data !== undefined && body !== JSON.stringify(data)),"
   ],
+  "src/components/auto-updater-state.ts": [
+    "export function updateReducer(state: UpdateState, action: UpdateAction): UpdateState {"
+  ],
   "src/components/coin-analytics.tsx": [
     "await updateTransactionPrice(act.id, usdPrice);",
     "await updateTransactionTxnType(act.id, txnType);"

@@ -18,10 +18,16 @@ Source viewport: 390 × 844 dark; document height 1955px. Palette: ground #0d0d0
 - button.btn.sm x318 y524 56×44; Retry. 12px/16px/500; radius 999px.
 - button.btn x16 y772 358×44; Cancel refresh. 13px/18px/500; radius 999px.
 
+## Original capture and pixel difference
+
+App: `/tmp/fidelity/flows/refresh-progress-phone.png`. Source: `/tmp/fidelity/flows/design-refresh-progress.png`. 390px dark, full page. Pixel difference: **14.81%** of pixels differ by more than 20 in at least one RGB channel; mean maximum-channel difference 20.04/255. Source/app heights 844/844px. Compared with `/tmp/fidelity/calc-ratios.mjs` using the authoritative Chromium HTML render. This numerical threshold does not waive any visible difference.
+
+Long capture: `/tmp/fidelity/flows/refresh-progress-phone-long.png` vs `/tmp/fidelity/flows/design-refresh-progress-long.png`; **11.88%** pixel difference by the same threshold, heights 1955/3194px.
+
 ## Remaining differences
 
-- Current 390 × 844 dark eight-source running capture: **11.28%** of pixels differ by more than 20 in a channel (**10.24%** by an RGB sum greater than 60). [App capture](/tmp/ui36-final-phone-dark-running.png); [rendered design](/tmp/ui36-design-progress-390.png). The source DOM measurement puts its sheet at (0, 384), 390 × 460px with background `rgb(19, 18, 23)`; see `/tmp/ui36-source-measure.json`.
-- The source HTML's sheet repeats the progress bar and offers `Cancel`. The owner's later rule keeps the single 3px header bar and a dismissive `Hide` action; runtime cancellation of network work is unavailable. The phone sheet also respects the 420px cap and 44px touch rows, so its top edge and row spacing differ from the 460px source sheet.
-- The eight-source live fixture shows its actual 2-of-8 state with distinct wallet names and parallel exchange rows. The source is a fixed five-source 3-of-5 example with a timeout. Showing the source's durations or error text without those outcomes would be false; real errors use safe categories rather than untrusted upstream messages.
-- The static source shows its alternate Overview behind the sheet. The app preserves the real Overview and its scroll position, which puts Top coins and the compact live-total header behind this capture. Its content, order, icons, and text rasterization remain visible differences.
-- The dialog title, subtitle, avatar, progress track, fill, and footer use semantic colours in Light and Dark; the light text and avatar contrast pass 4.5:1.
+- Current 390px viewport pixel diff: **10.48%** (any RGB channel differs by more than 20).
+- Current 390px full-page pixel diff: **10.20%** with the same threshold (source/app heights 1955/3239px).
+- The flows HTML shows the top of its alternate Overview behind the sheet. The app preserves the approved core Overview, which is scrolled to Top coins with its compact live-total header in this capture; the background content, order, and header therefore differ.
+- The capture holds the local fake HTTP transport pending and asserts one fixed live state: "0 of 5 finished · 0 failed", with all five rows reading balances. The design instead shows "3 of 5 finished · 1 failed": green check marks and durations for Binance and Interactive Brokers, a warning icon, "Request timed out after 20 s", and Retry for OKX, plus a longer blue progress fill. The real phone rows now render status icons and a disabled 44px Retry while a failure is pending; a focused component test covers those states. The capture cannot claim those source results without manufacturing outcomes, and the product reports safe error categories ("Stale · Network or timeout" or "Stale · Could not load") rather than untrusted upstream error text.
+- Runtime refresh cancellation is unavailable; Close dismisses status without claiming to cancel work. Text and icon rasterization still differ in the sheet.

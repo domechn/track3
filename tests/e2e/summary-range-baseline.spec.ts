@@ -30,7 +30,8 @@ test("desktop Summary compares each range with its preceding snapshot", async ({
     for (const index of [0, 1, 2]) {
       await expect(metrics.nth(index).locator("strong")).not.toHaveText(/^(–|n\/a)$/);
     }
-    await expect(metrics.nth(3)).toContainText(preset === "All" ? "1038 snapshots" : `${count} in range`, { timeout: 30_000 });
+    await expect(metrics.nth(3).locator("small")).toHaveAttribute("title",
+      preset === "All" ? /1038 snapshots$/ : new RegExp(`${count} in range$`), { timeout: 30_000 });
     if (preset === "1D") {
       await expect(card.locator("[data-direction-end]")).toHaveText("−$190");
       await expect(summary.locator(".fidelity-period-card .fidelity-month-value").first()).toHaveText("−$190");
@@ -39,8 +40,10 @@ test("desktop Summary compares each range with its preceding snapshot", async ({
     }
     const header = (await summary.locator(".fidelity-page-head p").innerText()).replace(/\s+/g, " ");
     const amounts = [...header.matchAll(/[+−-]?\$[\d,]+/g)].map(([text]) => amount(text));
-    expect(amounts).toHaveLength(4);
-    expect(amounts[1] + amounts[2] + amounts[3]).toBe(amounts[0]);
+    expect(amounts).toHaveLength(3);
+    const details = await card.locator(".fidelity-kpis > div").first().locator("strong").getAttribute("title") ?? "";
+    const unrecorded = details.match(/Unrecorded changes: ([+−-]?\$[\d,]+)/);
+    expect(amounts[1] + amounts[2] + (unrecorded ? amount(unrecorded[1]) : 0)).toBe(amounts[0]);
   }
 });
 
@@ -55,5 +58,5 @@ test("desktop Summary explains missing metrics with one database snapshot", asyn
     await expect(metrics.nth(index).locator("strong")).toHaveText("–");
     await expect(metrics.nth(index)).toContainText("Needs a second snapshot");
   }
-  await expect(metrics.nth(3)).toContainText("in 1 snapshot");
+  await expect(metrics.nth(3).locator("small")).toHaveAttribute("title", "in 1 snapshot");
 });

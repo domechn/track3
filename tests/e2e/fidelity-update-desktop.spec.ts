@@ -45,13 +45,15 @@ test("Update desktop captures real updater controls using a local plugin fixture
           if (cmd === "plugin:updater|check") {
             return Promise.resolve({ rid: 84, currentVersion: "2.3.1", version: "2.4.0", date: "2026-10-29", body });
           }
-          if (cmd === "plugin:updater|download_and_install") {
+          if (cmd === "plugin:updater|download") {
             args.onEvent.onmessage({ event: "Started", data: { contentLength: 84_200_000 } });
             args.onEvent.onmessage({ event: "Progress", data: { chunkLength: 38_000_000 } });
             if (state === "downloading") return new Promise(() => {});
             if (state === "failed") return Promise.reject(new Error("local fixture connection reset"));
-            return Promise.resolve(null);
+            args.onEvent.onmessage({ event: "Finished" });
+            return Promise.resolve(85);
           }
+          if (cmd === "plugin:updater|install") return Promise.resolve(null);
           return original(cmd, args, options);
         };
       }, { state, body });

@@ -132,17 +132,6 @@ beforeEach(() => {
 });
 
 describe("System Info subscription management", () => {
-  it("opens the published documentation from iPhone About", async () => {
-    vi.mocked(isIOS).mockReturnValue(true);
-    window.location.hash = "#/settings/systemInfo?section=about";
-    try {
-      render(<SystemInfo onProStatusChange={vi.fn()} />);
-      fireEvent.click(await screen.findByRole("button", { name: /Documentation/ }));
-      expect(mocks.openUrl).toHaveBeenCalledWith("https://track3.dev/docs/");
-    } finally {
-      window.location.hash = "";
-    }
-  });
   it("shows the license devices on iOS only for a supported response", async () => {
     vi.mocked(isIOS).mockReturnValue(true);
     window.location.hash = "#/settings/systemInfo?section=pro";
@@ -604,5 +593,16 @@ describe("System Info subscription management", () => {
         "https://billing.stripe.test/portal",
       );
     });
+  });
+  it("opens the published documentation from iPhone About", async () => {
+    vi.mocked(isIOS).mockReturnValue(true);
+    window.location.hash = "#/settings/systemInfo?section=about";
+    try {
+      render(<SystemInfo onProStatusChange={vi.fn()} />);
+      fireEvent.click(await screen.findByRole("button", { name: /Documentation/ }));
+      expect(mocks.openUrl).toHaveBeenCalledWith("https://track3.dev/docs/");
+    } finally {
+      window.location.hash = "";
+    }
   });
 });

@@ -257,15 +257,6 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
-  it("publishes a saved source alias to other views", async () => {
-    window.location.hash = "#/settings/configuration";
-    const view = renderApp();
-    fireEvent.click(await view.findByTestId("trigger-alias-save"));
-    window.location.hash = "#/summary";
-    await view.findByTestId("summary-range");
-    expect(lastDataChangedVersion).toBe(1);
-  });
-
   it("keeps the Pro live portfolio control on wide Goals pages", async () => {
     vi.stubGlobal("innerWidth", 1600);
     vi.mocked(getLicenseIfIsPro).mockResolvedValue("pro");
@@ -273,7 +264,6 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     try {
       const view = renderApp();
       expect(await view.findByRole("button", { name: "Live total" })).toBeInTheDocument();
-      expect(view.container.querySelector(".t3-plan-rail-tools")).toBeInTheDocument();
     } finally {
       vi.unstubAllGlobals();
     }
@@ -520,5 +510,14 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
       process.off("unhandledRejection", unhandledRejection);
       consoleWarn.mockRestore();
     }
+  });
+
+  it("publishes a saved source alias to other views", async () => {
+    window.location.hash = "#/settings/configuration";
+    const view = renderApp();
+    fireEvent.click(await view.findByTestId("trigger-alias-save"));
+    window.location.hash = "#/summary";
+    await view.findByTestId("summary-range");
+    expect(lastDataChangedVersion).toBe(1);
   });
 });

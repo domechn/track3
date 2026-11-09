@@ -35,7 +35,7 @@ test("locked sync opens as a full-width bottom sheet over the iPhone tab bar", a
   await installTauriBridge(page, { seedLockedSync: true });
   await page.goto("/#/overview");
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible({ timeout: 30_000 });
+  await expect(dialog).toBeVisible();
   await expect.poll(async () => {
     const box = (await dialog.boundingBox())!;
     const tabs = (await page.locator(".mobile-tab-bar").boundingBox())!;

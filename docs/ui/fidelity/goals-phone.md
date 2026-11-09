@@ -26,23 +26,6 @@ Loading/query errors continue to use existing alert semantics. The design's illu
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** goals 12.704% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-The latest dark 390 × 844 source and app viewport captures differ by
-**8.52%** at an RGB-channel threshold of 20. Their Summary cards have
-identical computed x=16, y=140, width 358px, height 204px,
-RGB (19, 18, 23) and 13px text. The shared Watching tags add a
-theme border and smaller label, the owner-required More tab has a
-selected tile, and font rasterization remains visible. Captures and
-bounds are in `.local/tag-theme/phone-goals-*`.
-
-On 8 Nov, the source `plan-goals.html` and current 390 × 844 app capture
-measured **2.773%** different at DPR 2 with an RGB-channel threshold of 20.
-The More count badge matches the source's x=354, y=790, 17 × 16 px,
-`#ee6a82` fill, and `#1a0509` text. Watching status tags use the shared
-theme face; their tint, border, and text size differ slightly from the
-source's static dark pill.
-
 The UI18 zero-rule requirement adds an icon, “Create your first rule,” and four working templates to the source's simpler empty card. The source HTML predates that required state. Larger rule and alert lists scroll inside their cards with a pager; the source only depicts seven rules and five alerts.
 
 On 6 Nov, the design pages were rendered again from `source/ds/pages/plan-goals*.html` into `/tmp/wui18-source/`; current app captures are in `/tmp/wui18-final-screens/` and `/tmp/wui18-evidence/`. Both use a 390 × 844 viewport and DPR 2. A pixel differs when any RGB channel differs by more than 20. The populated first screen is **2.502%** and the required new empty first screen is **5.678%**. The latter compares UI18's new icon, templates, and matched panels against source HTML that predates them. The older table below used a different >10 comparison and records the prior baseline for other states.

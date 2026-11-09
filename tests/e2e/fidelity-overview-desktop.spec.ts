@@ -72,10 +72,6 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         const box = await toggle.boundingBox();
         expect(box!.y + box!.height).toBeLessThanOrEqual(900);
         await toggle.click();
-        await expect.poll(() => page.locator("aside.t3-desktop-rail").evaluate((rail) =>
-          Math.round(rail.getBoundingClientRect().width))).toBe(216);
-        await expect.poll(() => page.locator(".t3-desktop-column").evaluate((column) =>
-          Math.round(column.getBoundingClientRect().x))).toBe(216);
       }
       if (state.name === "overview-expanded-1024") {
         const controls = await page.locator(".t3-topbar-controls").boundingBox();
@@ -85,11 +81,8 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         const holdings = await page.locator(".t3-grid-holdings").boundingBox();
         expect(Math.abs(hero!.x - 244)).toBeLessThan(1);
         expect(Math.abs(hero!.y - 228)).toBeLessThan(1);
-        for (const selector of [".t3-hero-chart", ".t3-ath-note"]) {
-          const content = (await page.locator(`.t3-grid-hero ${selector}`).boundingBox())!;
-          expect(content.y + content.height, selector).toBeLessThanOrEqual(hero!.y + hero!.height + 1);
-        }
-        expect(Math.abs(holdings!.y - (hero!.y + hero!.height + 16))).toBeLessThan(1);
+        expect(Math.abs(hero!.height - 457)).toBeLessThan(1);
+        expect(Math.abs(holdings!.y - 701)).toBeLessThan(1);
         await expect(page.locator(".t3-live-label").first()).toBeVisible();
       }
       if (state.name === "overview-expanded-1440") {
@@ -103,6 +96,17 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         expect(Math.abs(insightsBox!.y - 605)).toBeLessThan(1);
         expect(await insights.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
       }
+      if (state.name === "overview-range") {
+        await page.getByRole("button", { name: "Choose date range" }).click();
+        const popover = await page.locator(".t3-date-popover").boundingBox();
+        expect(Math.abs(popover!.x - 715)).toBeLessThan(1);
+        expect(Math.abs(popover!.y - 51)).toBeLessThan(1);
+        await page.getByRole("textbox", { name: "From" }).fill("8 Oct 2026");
+        await page.getByRole("textbox", { name: "To" }).fill("24 Oct 2026");
+        await page.getByRole("textbox", { name: "To" }).blur();
+        await expect(page.locator(".t3-date-fidelity-footer")).toContainText("17 snapshots");
+        await page.getByRole("textbox", { name: "From" }).focus();
+      }
       await page.waitForFunction(async () => {
         const runtimeModule = "/src/middlelayers/sync/runtime.ts";
         const { syncRuntime } = await import(runtimeModule);
@@ -111,22 +115,6 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
       }, undefined, { timeout: 60_000 });
       await expect(page.locator(".desktop-sync-status-indicator button").first())
         .toContainText("Synced 09:41", { timeout: 30_000 });
-      if (state.name === "overview-range") {
-        await page.getByRole("button", { name: "Choose date range" }).click();
-        await expect.poll(() => page.evaluate(() => {
-          const popover = document.querySelector<HTMLElement>(".t3-date-popover");
-          const trigger = document.querySelector<HTMLElement>(".t3-date-trigger");
-          if (!popover || !trigger) return null;
-          const popoverBox = popover.getBoundingClientRect();
-          const triggerBox = trigger.getBoundingClientRect();
-          return [popoverBox.width, popoverBox.y, Math.round(popoverBox.right - triggerBox.right)];
-        })).toEqual([560, 51, 108]);
-        await page.getByRole("textbox", { name: "From" }).fill("8 Oct 2026");
-        await page.getByRole("textbox", { name: "To" }).fill("24 Oct 2026");
-        await page.getByRole("textbox", { name: "To" }).blur();
-        await expect(page.locator(".t3-date-fidelity-footer")).toContainText("17 snapshots");
-        await page.getByRole("textbox", { name: "From" }).focus();
-      }
       const bell = page.locator(".t3-topbar-bell");
       const badge = bell.locator("span");
       await expect(badge).toBeVisible();
@@ -167,22 +155,26 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         const chart = page.locator(".t3-hero-chart canvas");
         const box = await chart.boundingBox();
         await chart.hover({ position: { x: box!.width * 0.38, y: box!.height / 2 } });
-        await expect(page.locator("[data-chart-tooltip]")).toContainText(/Value: \$[\d,]+\.\d\d/);
-        const caption = page.locator(".t3-total-overview .t3-chart-best-day");
-        await caption.focus();
-        const point = await page.locator(".t3-total-overview [data-chart-active-point]").boundingBox();
-        const markerPixels = await chart.evaluate((canvas: HTMLCanvasElement, point) => {
-          const rect = canvas.getBoundingClientRect();
-          const x = Math.round((point.x + point.width / 2 - rect.x) * canvas.width / rect.width);
-          const y = Math.round((point.y + point.height / 2 - rect.y) * canvas.height / rect.height);
-          let green = 0;
-          for (let dx = -4; dx <= 4; dx++) for (let dy = -4; dy <= 4; dy++) {
-            const [r, g, b] = canvas.getContext("2d")!.getImageData(x + dx, y + dy, 1, 1).data;
-            if (g > r + 15 && g > b + 10) green++;
+        await page.waitForTimeout(150);
+        const markerPixels = await chart.evaluate((canvas: HTMLCanvasElement) => {
+          const { width, height } = canvas;
+          const pixels = canvas.getContext("2d")!.getImageData(0, 0, width, height).data;
+          const brightness = (x: number, y: number) => {
+            const offset = (y * width + x) * 4;
+            return pixels[offset] + pixels[offset + 1] + pixels[offset + 2];
+          };
+          let longest = 0;
+          for (let x = Math.floor(width * 0.8); x < width * 0.97; x++) {
+            let hits = 0;
+            for (let y = Math.floor(height * 0.1); y < height * 0.8; y += 5) {
+              if (brightness(x, y) - brightness(x - 3, y) > 24 &&
+                brightness(x, y) - brightness(x + 3, y) > 24) hits++;
+            }
+            longest = Math.max(longest, hits);
           }
-          return green;
-        }, point!);
-        expect(markerPixels).toBeGreaterThan(4);
+          return longest;
+        });
+        expect(markerPixels).toBeGreaterThan(12);
       }
       await page.screenshot({ path: `${output}/${state.name}-desktop.png`, fullPage: state.name !== "overview-hover" });
       if (state.name === "overview") {

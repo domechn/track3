@@ -1,5 +1,3 @@
-import AssetLabel from "@/components/common/asset-label";
-import AssetIcon from "@/components/ui/asset-icon";
 import { useEffect, useState } from "react";
 import md5 from "md5";
 import { Button } from "@/components/ui/button";
@@ -14,6 +12,8 @@ import { FidelityIcon } from "@/mobile/components/fidelity-icon";
 import { ActionSheet, useHaptics } from "@/mobile/components/mobile";
 import { ConfirmSheet, ModalPage } from "@/mobile/components/mobile/overlays";
 import { Switch } from "@/mobile/components/ui/switch";
+import { getWalletLogo } from "@/lib/utils";
+import UnknownLogo from "@/assets/icons/unknown-logo.svg";
 import type { ExchangeRow, StockBrokerRow, WalletRow, SelectOption } from "@/components/configuration/types";
 import { PublicIpInfo } from "@/components/configuration/public-ip-info";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
@@ -29,7 +29,6 @@ import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store"
 import { LicenseCenter, type ProUsage } from "@/middlelayers/license";
 import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
-import { Pager, usePager } from "@/components/ui/pager";
 
 function ShieldIcon() {
   return <svg aria-hidden="true" viewBox="0 0 18 18" width="18" height="18" fill="none"
@@ -260,9 +259,6 @@ export function MobileSources(props: MobileSourcesProps) {
     if (kind === "wallet") props.onRenameWallet?.(row as WalletRow, alias);
     if (kind === "broker") props.onRenameBroker?.(row as StockBrokerRow, alias);
   };
-  const exchangePage = usePager(props.exchanges, "exchange", 8);
-  const walletPage = usePager(props.wallets, "wallet", 8);
-  const brokerPage = usePager(props.brokers, "broker", 8);
   const providerOptions = sections.find((section) => section.kind === editor?.kind)?.options ?? [];
   const hasSources = props.exchanges.length + props.wallets.length + props.brokers.length > 0;
   const sourceValue = (kind: Kind, row: Draft) => {
@@ -281,7 +277,7 @@ export function MobileSources(props: MobileSourcesProps) {
     : new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(refreshed)) : "—";
   return (
     <div className={`ios-d3-sources${props.fidelityLayout ? " fidelity-sources" : ""}`}>
-      {!hasSources && props.fidelityLayout && <div data-card className="fidelity-source-empty">
+      {!hasSources && props.fidelityLayout && <div className="fidelity-source-empty">
         <EmptyState icon={BackpackIcon} className="fidelity-source-empty-inner"
           title={props.fromOnboarding ? t("fidelity.settings.sources.emptyTitle")
             : t(`fidelity.settings.sources.empty.${props.selectedKind ?? "exchange"}`)}
@@ -311,23 +307,20 @@ export function MobileSources(props: MobileSourcesProps) {
         </ol>
         <Button className="ios-d3-editor-primary mt-5 min-h-12 w-full" onClick={() => setKindPickerOpen(true)}>{t("mobile.sources.addSource")}</Button>
       </div>}
-      {hasSources && sections.filter(({ kind }) => !props.selectedKind || kind === props.selectedKind).map(({ kind, label, add, rows, options }) => {
-        const paging = kind === "exchange" ? exchangePage : kind === "wallet" ? walletPage : brokerPage;
-        const displayedRows: Draft[] = paging.rows;
-        return (
+      {hasSources && sections.filter(({ kind }) => !props.selectedKind || kind === props.selectedKind).map(({ kind, label, add, rows, options }) => (
         <section key={kind} aria-label={label}
           className={`ios-d3-source-section${props.fidelityLayout ? " fidelity-source-section" : " space-y-2"}`}>
           {!props.fidelityLayout && <div className="flex items-center justify-between gap-2">
             <h2 className="ios-d3-section-heading">{label}</h2>
             <Button className="ios-d3-text-action min-h-11" variant="ghost" onClick={() => start(kind)}>{add}</Button>
           </div>}
-          <div data-card={props.fidelityLayout ? "" : undefined} className={props.fidelityLayout ? "fidelity-source-group" : "ios-d3-source-group overflow-hidden rounded-2xl bg-card"}>
+          <div className={props.fidelityLayout ? "fidelity-source-group" : "ios-d3-source-group overflow-hidden rounded-2xl bg-card"}>
             {props.fidelityLayout && !snapshot && rows.length > 0
-              ? <>{displayedRows.map((row, index) => <div key={`${row.type}-${index}`} className="fidelity-source-skeleton-row" aria-hidden="true">
+              ? <>{rows.map((row, index) => <div key={`${row.type}-${index}`} className="fidelity-source-skeleton-row" aria-hidden="true">
                 <div><i /><span><i /><i /></span><i /></div><div><i /><i /></div>
               </div>)}<div className="fidelity-source-skeleton-foot" aria-hidden="true" /></>
               : rows.length === 0 ? <EmptyState icon={BackpackIcon} title={t("mobile.sources.empty")}
-                hint={t("fidelity.settings.sources.emptyHint")} /> : displayedRows.map((row, index) => {
+                hint={t("fidelity.settings.sources.emptyHint")} /> : rows.map((row, index) => {
               const identity = kind === "exchange" ? maskSensitive((row as ExchangeRow).apiKey)
                 : kind === "wallet" ? truncateAddress((row as WalletRow).address)
                 : maskSensitive((row as StockBrokerRow).queryId);
@@ -361,12 +354,15 @@ export function MobileSources(props: MobileSourcesProps) {
                   <div className="fidelity-source-identity"><button type="button" className="fidelity-source-avatar-action"
                     aria-label={t("mobile.sources.moreActions").replace("{source}", name)}
                     onClick={() => { haptic("selection"); setMenu({ kind, value: row, name }); }}>
-                    <AssetIcon kind={kind} type={row.type} name={name} size={24} decorative />
+                    <SourceAvatar type={row.type} label={kind === "exchange"
+                    ? ({ binance: "BN", okex: "OK", kraken: "KR", gate: "GT", coinbase: "CB", bitget: "BG",
+                      bybit: "BY", htx: "HT", mexc: "MX", backpack: "BP" } as Record<string, string>)[row.type] ?? row.type.slice(0, 2).toUpperCase()
+                    : kind === "broker" ? "IB" : row.type === "btc" ? "BTC" : "ETH"} />
                     </button>
                     <button type="button" className="fidelity-source-name" onClick={() => start(kind, row)}
                       aria-label={`${t("goals.edit")} ${name}`} aria-describedby={`fidelity-source-detail-${kind}-${index}`}><strong title={name}>{name}</strong><small id={`fidelity-source-detail-${kind}-${index}`}>{ending}
                       {kind === "wallet" && row.type === "erc20" && props.isPro &&
-                        <em className="t3-tag" data-tone="accent">{t("fidelity.settings.menu.pro")}</em>}</small></button>
+                        <em className="fidelity-source-pro">{t("fidelity.settings.menu.pro")}</em>}</small></button>
                   </div>
                   <Switch checked={row.active} aria-label={`${t("mobile.sources.toggle")} ${name}`} onCheckedChange={() => {
                     haptic("selection");
@@ -374,7 +370,7 @@ export function MobileSources(props: MobileSourcesProps) {
                     if (kind === "wallet") props.onToggleWallet(row as WalletRow);
                     if (kind === "broker") props.onToggleBroker(row as StockBrokerRow);
                   }} />
-                  <span className="t3-tag fidelity-source-status" data-tone={failure ? "negative" : row.active ? "positive" : "neutral"}><i />{t(failure
+                  <span className={`fidelity-source-status${failure ? " is-error" : row.active ? " is-active" : ""}`}><i />{t(failure
                     ? "fidelity.settings.sources.error" : row.active ? "fidelity.settings.sources.active" : "fidelity.settings.sources.paused")}</span>
                   <span className="fidelity-source-refresh">{failure ? lastGood
                     ? t("fidelity.settings.sources.lastGood").replace("{time}", lastGood) : "—" : row.active ? refreshLabel : pausedAt ?? "—"}</span>
@@ -401,8 +397,10 @@ export function MobileSources(props: MobileSourcesProps) {
                 </div>;
               }
               return <div key={`${row.type}-${index}`} className="ios-d3-source-row flex min-w-0 items-center gap-2 px-4 py-2">
+                <SourceAvatar type={row.type} />
                 <button className="min-h-11 min-w-0 flex-1 text-left" onClick={() => start(kind, row)}>
-                  <AssetLabel kind={kind} type={row.type} name={name} size={24} secondary={identity} />
+                  <span className="block truncate font-medium">{name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{identity}</span>
                 </button>
                 <Switch checked={row.active} aria-label={`${t("mobile.sources.toggle")} ${name}`} onCheckedChange={() => {
                   haptic("selection");
@@ -424,11 +422,9 @@ export function MobileSources(props: MobileSourcesProps) {
               <strong>{money(rows.reduce((total, row) => total + (sourceValue(kind, row) ?? 0), 0))}</strong>
             </div>}
           </div>
-          <Pager count={rows.length} {...paging} t={t} ariaLabel={label} />
         </section>
-        );
-      })}
-      {props.fidelityLayout && <details data-card className="fidelity-source-info"><summary><ShieldIcon /><span>
+      ))}
+      {props.fidelityLayout && <details className="fidelity-source-info"><summary><ShieldIcon /><span>
         <strong>{t("fidelity.settings.sources.readOnly")}</strong>
         <span>{props.selectedKind === "wallet" && usage
           ? t("fidelity.settings.sources.walletQuotaNote")
@@ -481,9 +477,10 @@ export function MobileSources(props: MobileSourcesProps) {
             <Button variant="ghost" className="min-h-11" onClick={close}>{t("common.cancel")}</Button>
           </div>
           <div className="ios-d3-editor-intro">
-            <div><h2 className="text-3xl font-bold">{editor.step === 2 ? <AssetLabel kind={editor.kind}
-              type={editor.draft.type} name={providerOptions.find((option) => option.value === editor.draft.type)?.label ?? editor.draft.type}
-              size={32} /> : editor.original ? t("mobile.sources.edit") : sections.find((section) => section.kind === editor.kind)?.add}</h2>
+            {editor.step === 2 && <span className="ios-d3-source-avatar ios-d3-source-avatar-large" aria-hidden="true">
+              {getWalletLogo(editor.draft.type) !== UnknownLogo && <img src={getWalletLogo(editor.draft.type)} alt="" />}{getWalletLogo(editor.draft.type) === UnknownLogo && editor.draft.type.slice(0, 2).toUpperCase()}
+            </span>}
+            <div><h2 className="text-3xl font-bold">{editor.step === 2 ? providerOptions.find((option) => option.value === editor.draft.type)?.label ?? editor.draft.type : editor.original ? t("mobile.sources.edit") : sections.find((section) => section.kind === editor.kind)?.add}</h2>
             {editor.step === 2 && <p className="text-sm text-muted-foreground">{editor.original ? t("mobile.sources.edit") : sections.find((section) => section.kind === editor.kind)?.add}</p>}</div>
           </div>
           {editor.step === 1 ? <>
@@ -496,7 +493,7 @@ export function MobileSources(props: MobileSourcesProps) {
                 const { password: _password, passphrase: _passphrase, ...rest } = editor.draft as ExchangeRow;
                 setEditor({ ...editor, step: 2, draft: { ...rest, type } });
               } else setEditor({ ...editor, step: 2, draft: { ...editor.draft, type } });
-            }}><AssetLabel kind={editor.kind} type={option.value} name={option.label} size={24} /><ChevronRightIcon aria-hidden="true" /></button>)}
+            }}><SourceAvatar type={option.value} /><span>{option.label}</span><ChevronRightIcon aria-hidden="true" /></button>)}
             </div>
           </> : <>
             <div className="ios-d3-credential-group">
@@ -543,6 +540,10 @@ export function MobileSources(props: MobileSourcesProps) {
   );
 }
 
+function SourceAvatar({ type, label }: { type: string; label?: string }) {
+  const logo = getWalletLogo(type);
+  return <span className="ios-d3-source-avatar" aria-hidden="true">{label ?? (logo === UnknownLogo ? type.slice(0, 2).toUpperCase() : <img src={logo} alt="" />)}</span>;
+}
 
 function Field({ id, label, value, onChange, secret = false, onPaste, readOnly = false, invalid = false, error }: {
   id: string; label: string; value: string; onChange: (value: string) => void; secret?: boolean; onPaste?: () => void; readOnly?: boolean; invalid?: boolean; error?: string;

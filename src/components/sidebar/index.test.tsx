@@ -31,7 +31,7 @@ it.each([false, true])("gives History filters a distinct footer icon when collap
   expect(filters).toHaveAttribute("aria-controls", "t3-records-toolbar-panel");
   expect(filters).toHaveAttribute("aria-expanded", "false");
   expect(filters).toHaveAttribute("aria-pressed", "false");
-  expect(filters).toHaveClass("t3-nav-item");
+  expect(filters).toHaveClass("focus-visible:ring-2");
   if (!collapsed) expect(filters).toHaveTextContent("History filters");
 });
 

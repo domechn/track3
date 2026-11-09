@@ -1140,8 +1140,7 @@ const App = ({
   const mobileSection = searchParams.get("section");
   const [sourceTab, setSourceTab] = useState<"exchanges" | "wallets" | "brokers" | "custom">("exchanges");
   const [sourceAddRequest, setSourceAddRequest] = useState(0);
-  const sourceSummary = t(others.length === 1
-    ? "fidelity.settings.sources.summaryRichOne" : "fidelity.settings.sources.summaryRich")
+  const sourceSummary = t("fidelity.settings.sources.summaryRich")
     .replace("{exchanges}", String(exchanges.length))
     .replace("{wallets}", String(wallets.length))
     .replace("{brokers}", String(stockBrokers.length))

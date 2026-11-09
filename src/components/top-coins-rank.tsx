@@ -15,10 +15,12 @@ import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
+import { directionClass } from "@/utils/color";
 
 const PAGE_SIZE = 20;
 
@@ -128,20 +130,20 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
   function renderChangeBadge(change: number) {
     if (change > 0) {
       return (
-        <span className="t3-tag" data-tone="positive">
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted ${directionClass(change)}`}>
           ↑{change}
         </span>
       );
     }
     if (change < 0) {
       return (
-        <span className="t3-tag" data-tone="negative">
+        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted ${directionClass(change)}`}>
           ↓{Math.abs(change)}
         </span>
       );
     }
     return (
-      <span className="t3-tag">
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
         —
       </span>
     );
@@ -178,9 +180,31 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                     #{row.rank}
                   </TableCell>
                   <TableCell className="py-1.5">
-                    <AssetLabel asset={{ symbol: row.coin, assetType: row.assetType }}
-                      src={logoMap[getAssetLogoKey({ symbol: row.coin, assetType: row.assetType })]}
-                      size={20} quiet />
+                    <div className="flex items-center gap-2">
+                      <img
+                        className="w-[18px] h-[18px] rounded-full"
+                        src={resolveAssetLogoSrc(
+                          { symbol: row.coin, assetType: row.assetType },
+                          logoMap[
+                            getAssetLogoKey({
+                              symbol: row.coin,
+                              assetType: row.assetType,
+                            })
+                          ],
+                        )}
+                        alt={formatAssetLabel({
+                          symbol: row.coin,
+                          assetType: row.assetType,
+                        })}
+                      />
+                      <AssetLabel
+                        asset={{
+                          symbol: row.coin,
+                          assetType: row.assetType,
+                        }}
+                        labelClassName="font-medium text-sm"
+                      />
+                    </div>
                   </TableCell>
                   <TableCell className="text-right py-1.5">
                     {renderChangeBadge(row.change)}

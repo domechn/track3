@@ -25,16 +25,6 @@ The product's real profile validator rejects a saved 103% profile. The invalid s
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** rebalance 12.410% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-Fresh 8 Nov source and app first-screen captures at 390 × 844, DPR 2,
-measure **2.677%** for the populated plan and **2.448%** for the invalid
-draft, counting pixels whose RGB channels differ by more than 20. The
-source's total chip begins at x=132 in the populated state and x=148 in
-the invalid state; the app aligns its shared status tag to that column.
-Its theme tint, border, and 11 px label differ slightly from the static
-dark pill.
-
 The zero-target trade panel adds the shared centred icon and 200px minimum required by UI18. The source's earlier dashed panel is shorter; the target and export actions still use the same handlers.
 
 The design pages were rendered again from `source/ds/pages/plan-rebalance*.html` into `/tmp/fidelity/design-fresh/`; app captures are in `/tmp/fidelity/rebalance/`. Both use a 390 × 844 viewport and DPR 2. The diff ratio counts a pixel when any RGB channel differs by more than 10, divided by the larger canvas with the design ground colour filling extra height. The second ratio uses the review's source render for a direct before/after comparison; an independent render of the same source changes a few antialiased text edges.

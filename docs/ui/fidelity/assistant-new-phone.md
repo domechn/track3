@@ -15,10 +15,6 @@ The sample holdings, targets, 7 day change and generated insight time come from 
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** assistant 13.157% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-The earlier 8 Nov 390 × 844 dark real-data capture differed by **12.880%** from the static phone image at RGB-sum threshold 60. The real-scale fixture now has seven loadable encrypted chats behind the phone's Chats button and a saved insight card. The source still uses illustrative USD holdings, context settings, usage totals and generated responses; the product shows the fixture's actual CNY portfolio and stored choices. The new chat screen keeps the Chats pane closed until requested at phone and iPad widths.
-
 Capture: `/tmp/fidelity/assistant/new.png`; design and capture were viewed side by side.
 
 - The existing iOS navigation tests require an **Assistant** top bar and a tab bar below the composer. The source shows **New chat** aligned left and no tab bar.

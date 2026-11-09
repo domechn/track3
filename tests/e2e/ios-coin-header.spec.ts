@@ -18,7 +18,7 @@ test("phone ellipsizes a long source name and keeps the full tooltip", async ({ 
     });
   });
   await page.goto("/#/coins/BTC");
-  await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+  await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready");
   const name = page.locator('.fd-coin-head .coin-source-name[title="A very long wallet alias"]');
   await expect(name).toBeVisible();
   expect(await name.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
@@ -36,7 +36,7 @@ for (const symbol of ["NVDA", "NOVA"] as const) test(`${symbol} phone descriptio
   expect(inserted).toBe(1);
   await page.goto(`/#/coins/${symbol}${symbol === "NVDA" ? "?assetType=stock" : ""}`);
   await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
-  const rows = page.locator(".fd-source-row:not(.total) .t3-asset-label-name");
+  const rows = page.locator(".fd-source-row:not(.total) > b");
   await expect(rows).toHaveCount(2);
   const summary = page.locator(".fd-coin-head .coin-source-summary");
   await expect(summary.locator(".coin-source-name")).toHaveCount(1);
@@ -63,7 +63,7 @@ for (const width of [390, 820]) for (const locale of ["en", "zh"] as const) test
   const header = page.locator(".fd-coin-head");
   await expect(header).toBeVisible();
   await expect(header.getByRole("button", { name: /\+13/ })).toBeVisible();
-  for (const label of await page.locator(".coin-source-summary, .fd-source-row .t3-asset-label-name").allTextContents())
+  for (const label of await page.locator(".coin-source-summary, .fd-source-row > b").allTextContents())
     expect(label).not.toMatch(/[0-9a-f]{10,}/i);
   const description = (await header.locator("p").boundingBox())!;
   const action = (await header.locator(".fd-cost-link").boundingBox())!;

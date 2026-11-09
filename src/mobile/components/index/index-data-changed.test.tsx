@@ -277,15 +277,6 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
-  it("publishes a saved source alias to other phone views", async () => {
-    window.location.hash = "#/settings/configuration";
-    const view = renderApp();
-    fireEvent.click(await view.findByTestId("trigger-alias-save"));
-    window.location.hash = "#/summary";
-    await view.findByTestId("summary-range");
-    expect(lastDataChangedVersion).toBe(1);
-  });
-
   it("keeps the refresh runner mounted while moving from Overview to Wallets and back", async () => {
     vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     window.location.hash = "#/overview";
@@ -569,5 +560,14 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
       process.off("unhandledRejection", unhandledRejection);
       consoleWarn.mockRestore();
     }
+  });
+
+  it("publishes a saved source alias to other phone views", async () => {
+    window.location.hash = "#/settings/configuration";
+    const view = renderApp();
+    fireEvent.click(await view.findByTestId("trigger-alias-save"));
+    window.location.hash = "#/summary";
+    await view.findByTestId("summary-range");
+    expect(lastDataChangedVersion).toBe(1);
   });
 });

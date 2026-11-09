@@ -46,8 +46,8 @@ test("Wallets all sources uses the approved section order and stored source tota
         })), null, 2));
     expect((await page.locator(".fd-wallet-balances").boundingBox())?.y).toBe(729);
     expect((await page.locator(".fd-wallet-status").boundingBox())?.y).toBe(1123);
-    expect((await page.locator(".fd-wallet-matrix").boundingBox())?.y).toBe(1550);
-    expect((await page.locator(".fd-wallet-moved").boundingBox())?.y).toBe(2134);
+    expect((await page.locator(".fd-wallet-matrix").boundingBox())?.y).toBe(1548);
+    expect((await page.locator(".fd-wallet-moved").boundingBox())?.y).toBe(2132);
     await expect(page.locator(".fd-wallet-main-stat > strong")).toHaveCSS("font-size", "32px");
     expect((await page.locator(".fd-wallet-main-stat > strong").boundingBox())?.height).toBe(38);
     expect((await page.locator(".fd-wallet-main-stat > strong").boundingBox())?.y).toBe(391);
@@ -103,10 +103,10 @@ test("Wallets Binance filter shows the source value and balances", async ({ brow
           return { selector, x: r.x, y: r.y, w: r.width, h: r.height };
         })), null, 2));
     expect((await page.locator(".fd-wallet-allocation").boundingBox())?.y).toBe(320);
-    expect((await page.locator(".fd-wallet-allocation").boundingBox())?.height).toBe(374);
+    expect((await page.locator(".fd-wallet-allocation").boundingBox())?.height).toBe(350);
     expect((await page.locator(".fd-wallet-split").boundingBox())?.y).toBe(589);
     expect((await page.locator(".fd-wallet-legend").boundingBox())?.y).toBe(611);
-    expect((await page.locator(".fd-wallet-balances").boundingBox())?.y).toBe(706);
+    expect((await page.locator(".fd-wallet-balances").boundingBox())?.y).toBe(682);
     await page.screenshot({ path: "/tmp/fidelity/wallets/wallets-binance-phone.png" });
     await captureLong(page, "/tmp/fidelity/wallets/wallets-binance-phone-long.png");
   } finally { await context.close(); }
@@ -128,11 +128,11 @@ test("Wallets OKX filter shows failed status and last good values", async ({ bro
           return { selector, x: r.x, y: r.y, w: r.width, h: r.height };
         })), null, 2));
     expect((await page.locator(".fd-wallet-allocation").boundingBox())?.y).toBe(434);
-    expect((await page.locator(".fd-wallet-allocation").boundingBox())?.height).toBe(379);
+    expect((await page.locator(".fd-wallet-allocation").boundingBox())?.height).toBe(355);
     expect((await page.locator(".fd-wallet-allocation .fd-card-heading").boundingBox())?.height).toBe(50);
     await expect.poll(async () => (await page.locator(".fd-wallet-allocation.failed-source .fd-wallet-split").boundingBox())?.y).toBe(732);
     expect((await page.locator(".fd-wallet-allocation.failed-source .fd-wallet-legend").boundingBox())?.y).toBe(754);
-    expect((await page.locator(".fd-wallet-balances").boundingBox())?.y).toBe(825);
+    expect((await page.locator(".fd-wallet-balances").boundingBox())?.y).toBe(801);
     await expect(page.locator(".fd-wallet-failure")).toContainText("Next automatic try 10:11.");
     await page.screenshot({ path: "/tmp/fidelity/wallets/wallets-okx-phone.png" });
     await captureLong(page, "/tmp/fidelity/wallets/wallets-okx-phone-long.png");
@@ -155,7 +155,6 @@ test("Wallets opens with the saved shared date range", async ({ browser }) => {
   test.setTimeout(120_000);
   const { context, page } = await openWallets(browser);
   try {
-    await expect(page.locator(".fd-wallets")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
     await page.evaluate(() => localStorage.setItem("track3-assistant-date-range", '{"from":"2026-10-24","to":"2026-10-31"}'));
     await page.reload();
     await expect(page.locator(".fd-wallet-range").getByRole("radio", { name: "7D" })).toHaveAttribute("aria-checked", "true", { timeout: 30_000 });

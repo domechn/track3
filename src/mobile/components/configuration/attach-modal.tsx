@@ -1,4 +1,3 @@
-import AssetLabel from "@/components/common/asset-label";
 import { memo, useEffect, useState } from "react";
 import {
   Dialog,
@@ -9,6 +8,7 @@ import {
 } from "@/mobile/components/ui/dialog";
 import { LinkBreak2Icon } from "@radix-ui/react-icons";
 import { useTranslation } from "@/mobile/i18n";
+import { getWalletLogo } from "@/lib/utils";
 import type { AttachModalProps } from "@/components/configuration/types";
 import { isIOS } from "@/utils/platform";
 
@@ -114,7 +114,12 @@ const AttachModal = memo(function AttachModal({
                     }
                     onClick={() => selectOption(opt.value)}
                   >
-                    <AssetLabel kind="exchange" type={exType} name={opt.label} size={20} />
+                    <img
+                      className="w-[20px] h-[20px] rounded-full shrink-0"
+                      src={getWalletLogo(exType)}
+                      alt=""
+                    />
+                    <span className="text-sm truncate">{opt.label}</span>
                   </button>
                 );
               })}
@@ -142,7 +147,12 @@ const AttachModal = memo(function AttachModal({
                     }
                     onClick={() => selectOption(opt.value)}
                   >
-                    <AssetLabel kind="wallet" type={wType} name={opt.label} size={20} />
+                    <img
+                      className="w-[20px] h-[20px] rounded-full shrink-0"
+                      src={getWalletLogo(wType)}
+                      alt=""
+                    />
+                    <span className="text-sm truncate">{opt.label}</span>
                   </button>
                 );
               })}

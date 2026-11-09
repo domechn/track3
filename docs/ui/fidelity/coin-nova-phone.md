@@ -181,9 +181,9 @@ Summary: full, one-snapshot empty and loading. Coin: BTC value and price, BTC tr
 
 ## Captured comparison
 
-- App capture: `/tmp/ui39-app-final/coin-nova-phone.png`.
-- Reference render: `/tmp/ui39-source-final/nova-phone.png`.
-- 8 Nov 390 × 844 first-screen difference at DPR 2: **5.783%** (any RGB channel differs by more than 20). The product's 0.7% real portfolio share replaces the source's unavailable placeholder share; the app's native scrolling layer also rasterizes text differently from the standalone HTML render.
+- App capture: `/tmp/wui18-final-screens/coin-nova-phone.png`.
+- Reference render: `/tmp/wui18-source/nova-phone-viewport.png`.
+- Fresh 390 × 844 first-screen difference at DPR 2: **3.910%** (any RGB channel differs by more than 20). At a 40-channel threshold the ratio is **2.722%**. The product's 0.7% real portfolio share replaces the source's unavailable placeholder share; the app's native scrolling layer also rasterizes text differently from the standalone HTML render.
 - A full-page PNG comparison is not equivalent: the app scrolls inside its main landmark, whereas the source scrolls the document. The first-screen comparison uses identical viewport dimensions.
 
 ## Real-data limits
@@ -192,15 +192,8 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** coin-one-source 10.658% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-The 8 Nov 390 × 844 dark dense-data capture differs by **10.659%** from the static phone image at RGB-sum threshold 60. The fixture lacks the source's invented NOVA manual prices and holdings, so the product shows its actual empty price history and sources.
-
 The source NOVA card has manual prices and a designed no-market-feed explanation. It keeps that compact explanation and dated rows; truly empty sources, lots, and transactions use the shared empty state, for which no NOVA zero-data source page exists.
 
-- The 5.783% first-screen difference also includes the owner's shared active Overview tile.
 - The saved NOVA asset contributes $5,052 to the real portfolio total, so its share is 0.7%; the reference excludes its placeholder NOVA and prints an unavailable share.
 - The reference adds a sample-data disclaimer after the cards. A real saved custom asset has no sample-data footer, accounting for the remaining 52px page-height difference.
 - The source page scrolls the document; the product retains its main scroll container to preserve navigation scroll restoration. Chromium antialiases some small text differently in that layer.
-- The selected transaction filter uses the owner's shared active tint; the older source uses a solid grey selected fill.
-- The owner's shared active navigation style paints an Overview tab tile and edge; the older Coin source highlights only the tab text.

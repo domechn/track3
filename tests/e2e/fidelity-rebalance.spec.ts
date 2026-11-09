@@ -114,7 +114,7 @@ test("light theme keeps allocation text and inputs readable", async ({ page }) =
   const textColor = (selector: string) => page.locator(selector).first().evaluate((element) =>
     Number(getComputedStyle(element).color.match(/\d+/)?.[0] ?? 255));
   expect(await textColor(".pf-rebalance h1")).toBeLessThan(80);
-  expect(await textColor(".pf-asset .t3-asset-label-name")).toBeLessThan(80);
+  expect(await textColor(".pf-asset b")).toBeLessThan(80);
   expect(await textColor(".pf-target input")).toBeLessThan(80);
   const moreTab = page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: /More/ });
   expect(await textColor(".mobile-tab[aria-current='page']")).toBeLessThan(80);

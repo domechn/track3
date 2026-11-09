@@ -6,6 +6,7 @@ import { alertDraftFromRule, alertRuleFromDraft } from "@/middlelayers/ui-state/
 import { I18nProvider, useTranslation } from "@/i18n";
 import GoalsDesktop, { GoalsKinds } from "./goals-desktop";
 
+vi.mock("./fidelity-rail", () => ({ default: () => null }));
 
 const rule: AlertRule = alertRuleFromDraft({
   id: 1, kind: "asset_price_move", assetType: "stock", symbol: "AAPL",
@@ -95,7 +96,7 @@ it("localizes stored alert history instead of showing raw text", () => {
   expect(screen.queryByText("raw title")).not.toBeInTheDocument();
   expect(screen.queryByText("raw message")).not.toBeInTheDocument();
   expect(screen.getByText("AAPL 7d move below 10%")).toBeInTheDocument();
-  expect(document.querySelector(".t3-fidelity-history-row small")).toHaveTextContent(/^−10\.0% over 7 days: \$100\.00 to \$90\.00$/);
+  expect(screen.getByText("−10.0% over 7 days: $100.00 to $90.00")).toBeInTheDocument();
 });
 
 it("formats stored history values and firing thresholds for each rule kind", () => {
@@ -117,15 +118,6 @@ it("formats stored history values and firing thresholds for each rule kind", () 
   expect(screen.getByText("$752,683.57 on the 27 Oct refresh")).toBeInTheDocument();
 });
 
-it("shows a rule's exact measured value on its progress bar", () => {
-  render(<GoalsDesktop {...props({ rules: [rule] })} />);
-  const mark = document.querySelector(".t3-fidelity-goal-progress [data-chart-mark]");
-  expect(mark).not.toBeNull();
-  fireEvent.pointerEnter(mark!);
-  expect(screen.getByRole("tooltip")).toHaveTextContent("-100.00%");
-  expect(screen.getByRole("tooltip")).toHaveTextContent("-10.00");
-});
-
 it("keeps deleted move and allocation alerts readable when their rule details are gone", () => {
   render(<GoalsDesktop {...props({
     rules: [],
@@ -136,7 +128,7 @@ it("keeps deleted move and allocation alerts readable when their rule details ar
         message: "old alert", value: 3.1, triggeredAt: "2026-10-27T09:40:00.000Z", acknowledgedAt: null },
     ],
   })} />);
-  expect(document.querySelectorAll(".t3-fidelity-history-row small")[0]).toHaveTextContent(/^\+12\.5% on the 27 Oct refresh$/);
+  expect(screen.getByText("+12.5% on the 27 Oct refresh")).toBeInTheDocument();
   expect(screen.getByText("BTC was 3.1 pts off target on the 27 Oct refresh")).toBeInTheDocument();
 });
 

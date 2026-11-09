@@ -61,18 +61,10 @@ The source depicts the **wallets** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** sources-wallets 9.689% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-The 8 Nov 390 × 844 dark dense-data capture differs by **9.663%** from the static phone image at RGB-sum threshold 60. The product has 13 configured wallets and shows eight per page, with distinct shortened aliases and full accessible names; the source lists a few short sample accounts.
-
-- The approved source is dark only. In light mode the live page and rename dialog use the selected light theme; their colours cannot match that dark reference.
-- The static source uses its pencil for the full address editor and has no Rename flow. The live pencil opens Rename; the labeled source name opens the full editor, and the avatar retains its action menu.
-- The design shows 09:40 for wallets, while the existing snapshot stores one shared refresh time and the app shows the available 09:41. The design quota is 14 of 60; the live entitlement is 20 of 600 and must retain the real value.
-- Source logo artwork, some row icon strokes, value alignment, and sheet spacing still differ slightly; they could be matched but are not worth another round. The phone Sources page uses "Public Sans" to match the design CSS.
-- The live back control and bottom tabs preserve the app's routes and 44px targets; their icon shapes and text rendering differ from the static source. Row text has small glyph and vertical alignment differences with matching 356×181 first-row bounds.
-- The 8 Nov large-data layout pages configured wallets at eight rows and retains the full active count and value in the footer. The design image has fewer sources and no pager.
+- The design uses separate refresh times per source. The existing snapshot stores one shared refresh time, so the app shows the available snapshot time and a dash for paused Kraken.
+- Source logo artwork, some row icon strokes, and sheet spacing still differ from the approved render.
 
 ## Pixel difference
 
-- Last captured matched-fixture difference: **7.528% dark** and **99.134% light** at 390 × 844 CSS px, threshold 16 in any RGB channel. The light ratio compares the selected light theme with the dark-only source. The dark overage includes the live shell, shared refresh time, and real quota. A subsequent scoped font and value-position correction awaits recapture under the one-run limit.
-- Current measurements and screenshots: `/tmp/track3-source-rename/phone-dark-measure.json`, `phone-light-measure.json`, and `/tmp/track3-source-rename/phone-{dark,light}-{design,sample}-wallets.png`. Both dark rows begin at y=233.
+- Difference ratio: **5.810%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel.
+- Design viewport: `/tmp/fidelity/settings-a/design-sources-wallets.png` (top 780×1688); app viewport: `/tmp/fidelity/settings-a/sources-wallets.png` (780×1688).

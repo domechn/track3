@@ -10,7 +10,7 @@ import {
   prettyNumberKeepNDigitsAfterDecimalPoint,
   prettyNumberToLocaleString,
 } from "@/utils/currency";
-import { calculateTotalProfit, queryLatestAssets, queryTotalValue } from "@/middlelayers/charts";
+import { calculateTotalProfit, queryTotalValue } from "@/middlelayers/charts";
 import type { SummaryPreset, SummaryRange } from "@/middlelayers/summary-range";
 import { summaryProfitPercentage } from "@/middlelayers/summary-breakdown";
 import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
@@ -27,14 +27,25 @@ import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
 import ProfitAttribution from "@/mobile/components/profit-attribution";
 import { profitRanks } from "@/components/analyze-values";
-import { PartialProfitHint } from "@/components/profit-summary-hints";
 import { DeltaPill, ListRow, SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
+
+function getToneBadgeClass(value: number, quoteColor: QuoteColor) {
+  const tone = positiveNegativeTone(value, quoteColor);
+  if (tone === "green") {
+    return "bg-positive/15 text-positive";
+  }
+  if (tone === "red") {
+    return "bg-negative/15 text-negative";
+  }
+  return "bg-muted text-muted-foreground";
+}
 
 const App = ({
   currency,
@@ -55,8 +66,7 @@ const App = ({
   onRangeValueChange?: (range: SummaryPreset) => void;
   summaryRange?: SummaryRange;
 }) => {
-  const { t, locale } = useTranslation();
-  const dateLabel = (value: Date) => value.toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const { t } = useTranslation();
   const isMobile = useIsMobile();
   const [profit, setProfit] = useState<number | null>(0);
   // note: undefined means infinite
@@ -72,12 +82,11 @@ const App = ({
       isUnknown?: true;
     }[]
   >([]);
-  const [unknownCoins, setUnknownCoins] = useState<Awaited<ReturnType<typeof calculateTotalProfit>>["unknownCoins"]>([]);
   const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [view, setView] = useState<"summary" | "attribution">("summary");
   const [localProfitRange, setLocalProfitRange] = useState<"7D" | "1M" | "1Y" | "ALL">("ALL");
   const profitRange = rangeValue ?? localProfitRange;
-  const [positions, setPositions] = useState<number>();
+  const controlRange = rangeValue === "30D" ? "1M" : rangeValue === "All" ? "ALL" : rangeValue === "7D" || rangeValue === "1Y" ? rangeValue : localProfitRange;
   const [currentValue, setCurrentValue] = useState<number>();
   const [loadError, setLoadError] = useState(false);
   const { reportLoaded } = useContext(OverviewLoadingContext);
@@ -99,9 +108,8 @@ const App = ({
     setLoadError(false);
 
     Promise.all([calculateTotalProfit(selectedDateRange),
-      summaryRange ? queryLatestAssets(selectedDateRange) : Promise.resolve(undefined),
       summaryRange ? queryTotalValue(selectedDateRange) : Promise.resolve(undefined)])
-      .then(([res, assets, current]) => {
+      .then(([res, current]) => {
         if (gen !== loadGenRef.current) {
           return;
         }
@@ -110,8 +118,6 @@ const App = ({
         setProfit(res.total);
         setProfitPercentage(res.percentage);
         setCoinsProfit(sortedCoins);
-        setUnknownCoins(res.unknownCoins ?? []);
-        setPositions(assets?.length);
         setCurrentValue(current?.totalValue);
       })
       .catch(() => { if (gen === loadGenRef.current) setLoadError(true); })
@@ -158,7 +164,7 @@ const App = ({
     [profit, quoteColor],
   );
   const totalToneBadgeClass = useMemo(
-    () => profit === null ? "neutral" : positiveNegativeTone(profit, quoteColor) === "green" ? "positive" : positiveNegativeTone(profit, quoteColor) === "red" ? "negative" : "neutral",
+    () => profit === null ? "bg-muted text-muted-foreground" : getToneBadgeClass(profit, quoteColor),
     [profit, quoteColor],
   );
   const displayedPercentage = summaryRange && currentValue !== undefined
@@ -177,14 +183,6 @@ const App = ({
   const percentMissing = Boolean(summaryRange && displayedPercentage === null && !unavailable);
   const percentReason = percentMissing
     ? t("fidelity.summary.unknownPercentRange").replace("{range}", profitRange) : missingReason;
-  const breakeven = profit === null || currentValue === undefined ? undefined : currentValue - profit;
-  const positionNote = summaryRange ? summaryRange.databaseCount < 2 && summaryRange.snapshots.length === 1
-    ? t("fidelity.summary.inOneSnapshot")
-    : summaryRange.baseline && summaryRange.baseline < selectedDateRange.start
-      ? t("fidelity.summary.snapshotsSince")
-        .replace("{date}", dateLabel(summaryRange.baseline))
-        .replace("{count}", String(summaryRange.snapshots.length))
-      : t("fidelity.summary.snapshotsInRange").replace("{count}", String(summaryRange.snapshots.length)) : "";
   const positiveCount = useMemo(
     () => coinsProfit.filter((coin) => !coin.isUnknown && coin.value !== null && coin.value > 0).length,
     [coinsProfit],
@@ -268,11 +266,13 @@ const App = ({
               "{asset}",
               formatAssetLabel(d),
             )}</span>
+            <img
+              className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
+              src={resolveAssetLogoSrc(d, logoMap[getAssetLogoKey(d)])}
+              alt=""
+            />
             <AssetLabel
               asset={d}
-              src={logoMap[getAssetLogoKey(d)]}
-              size={20}
-              quiet
               className="min-w-0"
               labelClassName="font-medium text-sm"
             />
@@ -280,15 +280,13 @@ const App = ({
           </Link>
         </TableCell>
         <TableCell className="text-right py-1.5">
-          <div className={`text-sm ${d.isUnknown || d.value === null ? "text-muted-foreground" : positiveNegativeTextClass(d.value, quoteColor, 500)}`}>
+          <div title={d.isUnknown ? t("common.unknown") : undefined} className={`text-sm ${d.value === null ? "text-muted-foreground" : positiveNegativeTextClass(d.value, quoteColor, 500)}`}>
             {d.value === null ? "—" : (d.value < 0 ? "-" : "+") +
               currency.symbol +
               prettyNumberToLocaleString(
                 currencyWrapper(currency)(Math.abs(d.value)),
               )}
           </div>
-          {d.isUnknown && <PartialProfitHint names={[d.symbol]} affected={unknownCoins.filter((coin) => coin.symbol === d.symbol)}
-            period={d.symbol} t={t} />}
           {showCoinsProfitPercentage && (
             <div className="text-xs text-muted-foreground">
               {d.percentage === null ? "—" : <>
@@ -310,10 +308,9 @@ const App = ({
       const key = getAssetLogoKey(row);
       return <ListRow key={key} href={`#${buildAssetDetailsPath(row)}`}
         value={<span className="text-right">
-          <span className={`block text-sm ios-money ${row.isUnknown || row.value === null ? "text-muted-foreground" : positiveNegativeTextClass(row.value, quoteColor, 500)}`}>
+          <span title={row.isUnknown ? t("common.unknown") : undefined} className={`block text-sm ios-money ${row.value === null ? "text-muted-foreground" : positiveNegativeTextClass(row.value, quoteColor, 500)}`}>
             {row.value === null ? "—" : `${row.value < 0 ? "-" : "+"}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(row.value)))}`}
           </span>
-          {row.isUnknown && <span className="text-muted-foreground" title={t("common.unknown")}>?</span>}
           {showCoinsProfitPercentage && <span className="block text-xs">
             {row.percentage === null ? "—" : row.percentage === undefined ? t("common.infinity")
               : `${row.percentage < 0 ? "" : "+"}${prettyNumberKeepNDigitsAfterDecimalPoint(row.percentage, 2)}%`}
@@ -321,7 +318,9 @@ const App = ({
         </span>}>
         <span className="flex min-w-0 items-center gap-2">
           <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground mobile-mover-rank">#{index + 1}</span>
-          <AssetLabel asset={row} src={logoMap[key]} size={20} quiet labelClassName="truncate text-sm font-medium"
+          <img className="h-6 w-6 shrink-0 rounded-full"
+            src={resolveAssetLogoSrc(row, logoMap[key])} alt="" />
+          <AssetLabel asset={row} labelClassName="truncate text-sm font-medium"
             badgeClassName="hidden" />
         </span>
       </ListRow>;
@@ -352,7 +351,7 @@ const App = ({
         {view === "summary" && <>
         <div className="flex flex-wrap items-end justify-between gap-3 mobile-movers-total">
           <div className="space-y-1">
-            <div className={`text-xl font-semibold tracking-tight ios-money ${unavailable ? "text-muted-foreground" : totalToneClass}`}>
+            <div title={unavailable ? missingReason : undefined} className={`text-xl font-semibold tracking-tight ios-money ${unavailable ? "text-muted-foreground" : totalToneClass}`}>
               {unavailable ? missingValue : profit === null ? "—" : (profit < 0 ? "-" : "+") +
                 currency.symbol +
                 prettyNumberToLocaleString(
@@ -362,33 +361,23 @@ const App = ({
             <div className="text-xs text-muted-foreground">
               {summaryRange ? t(profitRange === "All" ? "fidelity.summary.netPnl" : "fidelity.summary.netPnl.range")
                 .replace("{range}", profitRange) : t(showRangeControl ? "profit.netPnlShort" : "profit.netPnl")}
-              {unknownCoins.length > 0 && <PartialProfitHint names={unknownCoins.map((coin) => coin.symbol)}
-                affected={unknownCoins} period={t("profit.netPnl")} t={t} />}
             </div>
-            {summaryRange && <small className="block text-xs text-muted-foreground">
-              {unavailable ? missingReason : t("profitSummary.since").replace("{date}", dateLabel(summaryRange.baseline!))} · {t(positions === 1 ? "fidelity.summary.positionCountOne" : "fidelity.summary.positionCount").replace("{count}", String(positions ?? 0))} · {positionNote}
-            </small>}
-            {percentMissing && <small className="block text-xs text-muted-foreground">{percentReason}</small>}
-            {summaryRange && <small className="block text-xs text-muted-foreground"
-              title={unavailable || breakeven === undefined ? missingReason || t("fidelity.summary.loading") : undefined}>
-              {t("fidelity.summary.breakeven")} {unavailable || breakeven === undefined ? missingValue
-                : `${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(breakeven))}`}
-            </small>}
           </div>
           <div>
             {isMobile && profit !== null && !unavailable && !percentMissing ? <DeltaPill value={profit} quoteColor={quoteColor}>{totalPercentageLabel}</DeltaPill>
-              : <span className="t3-tag" data-tone={unavailable || percentMissing ? "neutral" : totalToneBadgeClass}
-                title={unavailable || percentMissing ? percentReason : undefined}>
+              : <span title={unavailable || percentMissing ? percentReason : undefined}
+                className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${unavailable || percentMissing ? "bg-muted text-muted-foreground" : totalToneBadgeClass}`}>
                 {unavailable || percentMissing ? missingValue : totalPercentageLabel}
               </span>}
           </div>
         </div>
         {isMobile && showRangeControl && view === "summary" && <SegmentedControl
-          value={profitRange} onChange={(next) => rangeValue
-            ? onRangeValueChange?.(next as SummaryPreset) : setLocalProfitRange(next as typeof localProfitRange)} className="profit-range"
+          value={controlRange} onChange={(next) => rangeValue
+            ? onRangeValueChange?.(next === "1M" ? "30D" : next === "ALL" ? "All" : next as SummaryPreset)
+            : setLocalProfitRange(next as typeof localProfitRange)} className="profit-range"
           label={t("profit.range")}
-          options={(rangeValue ? ["1D", "7D", "30D", "90D", "1Y", "All"] as const : ["7D", "1M", "1Y", "ALL"] as const).map((value) => ({
-            value, label: rangeValue ? value : t(value === "ALL" ? "comparison.all" : `comparison.${value}`),
+          options={(["7D", "1M", "1Y", "ALL"] as const).map((value) => ({
+            value, label: t(value === "ALL" ? "comparison.all" : `comparison.${value}`),
           }))} />}
         </>}
       </CardHeader>

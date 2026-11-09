@@ -240,7 +240,7 @@ function WelcomePanel({
           {CAPABILITIES.map(({ key, Icon }) => (
             <span
               key={key}
-              className="t3-tag" data-tone="outline"
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--glass-border)] bg-card/60 px-2.5 py-1 text-xs text-foreground/80"
             >
               <Icon className="h-3 w-3 text-muted-foreground" />
               {t(key)}

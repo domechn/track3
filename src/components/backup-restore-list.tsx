@@ -33,7 +33,7 @@ export function BackupRestoreSummary({ data, rows, t, locale }: {
       .replace("{different}", String(counts.different))}</p>
     <div className="flex flex-wrap gap-2">
       {[...monthly].sort(([a], [b]) => a.localeCompare(b)).map(([month, count]) =>
-        <span key={month} className="t3-tag" data-tone="outline">
+        <span key={month} className="rounded-full border border-border bg-background px-2 py-1 text-xs">
           {t(count === 1 ? "data.restore.monthOne" : "data.restore.monthMany").replace("{month}", month).replace("{count}", String(count))}
         </span>)}
     </div>
