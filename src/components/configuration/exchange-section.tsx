@@ -49,7 +49,7 @@ import EmptyState from "@/components/empty-state";
 import { AliasRename } from "./alias-rename";
 import { sourceAliasFallback } from "@/components/source-display-name";
 
-const CONFIG_LIST_PAGE_SIZE = 30;
+const CONFIG_LIST_PAGE_SIZE = 8;
 
 const ExchangeSection = memo(function ExchangeSection({
   exchanges,
@@ -358,10 +358,11 @@ const ExchangeSection = memo(function ExchangeSection({
               </TableBody>
             </Table>
             {visibleExchanges.length > CONFIG_LIST_PAGE_SIZE && (
-              <div className="flex items-center justify-end gap-2">
+              <div data-layout-pager className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label={t("common.prev")}
                   onClick={() =>
                     onExchangePageChange(Math.max(exchangePage - 1, 0))
                   }
@@ -375,6 +376,7 @@ const ExchangeSection = memo(function ExchangeSection({
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label={t("common.next")}
                   onClick={() =>
                     onExchangePageChange(
                       Math.min(exchangePage + 1, exchangePageCount - 1),

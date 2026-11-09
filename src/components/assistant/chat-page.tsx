@@ -471,6 +471,7 @@ function ReadyChat({
       ref={layoutRef}
       className="t3-manage-assistant relative flex h-[calc(100vh-88px)] min-h-[560px] gap-4 overflow-hidden"
       data-testid="chat-session-layout"
+      data-layout-exempt="R5: the assistant design uses fixed 300px and 296px side panes"
     >
       {deleteError && (
         <p role="alert" className="absolute right-4 top-4 z-10 rounded bg-card px-4 py-2 text-sm text-destructive">
@@ -480,7 +481,8 @@ function ReadyChat({
       {drawer && <button type="button" className="absolute inset-0 z-[4] bg-[var(--overlay-scrim)]"
         data-testid="assistant-pane-scrim" aria-label={t("common.close")}
         onClick={() => setPane(drawer)} />}
-      <div className="t3-assistant-pane t3-assistant-chats-pane" id="assistant-chats"
+      <div data-card className="t3-assistant-pane t3-assistant-chats-pane" id="assistant-chats"
+        data-layout-exempt="R4: the empty chat list reserves scroll space above its fixed footer; R5: the assistant uses fixed side panes"
         data-testid="chats-pane" data-collapsed={!chatsOpen} data-drawer={drawer === "chats"}
         style={{ width: chatsOpen ? 300 : 44 }}>
         {chatsOpen ? <div className="w-[300px] h-full">
@@ -527,7 +529,7 @@ function ReadyChat({
        sidebarOpen={sidebarOpen}
         onToggleSidebar={handleToggleSidebar}
      />}
-     <div className="t3-assistant-pane t3-assistant-context-pane" id="assistant-context" data-testid="context-pane"
+     <div data-card className="t3-assistant-pane t3-assistant-context-pane" id="assistant-context" data-testid="context-pane"
        data-collapsed={!contextOpen} data-drawer={drawer === "context"} style={{ width: contextOpen ? 296 : 44 }}>
        {contextOpen ? <AssistantContextPanel config={config} sessions={sessions} baseCurrency={baseCurrency}
          onCollapse={() => setPane("context")} collapseRef={contextHeaderRef} controlsId="assistant-context" />

@@ -72,6 +72,10 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         const box = await toggle.boundingBox();
         expect(box!.y + box!.height).toBeLessThanOrEqual(900);
         await toggle.click();
+        await expect.poll(() => page.locator("aside.t3-desktop-rail").evaluate((rail) =>
+          Math.round(rail.getBoundingClientRect().width))).toBe(216);
+        await expect.poll(() => page.locator(".t3-desktop-column").evaluate((column) =>
+          Math.round(column.getBoundingClientRect().x))).toBe(216);
       }
       if (state.name === "overview-expanded-1024") {
         const controls = await page.locator(".t3-topbar-controls").boundingBox();
@@ -81,8 +85,11 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         const holdings = await page.locator(".t3-grid-holdings").boundingBox();
         expect(Math.abs(hero!.x - 244)).toBeLessThan(1);
         expect(Math.abs(hero!.y - 228)).toBeLessThan(1);
-        expect(Math.abs(hero!.height - 457)).toBeLessThan(1);
-        expect(Math.abs(holdings!.y - 701)).toBeLessThan(1);
+        for (const selector of [".t3-hero-chart", ".t3-ath-note"]) {
+          const content = (await page.locator(`.t3-grid-hero ${selector}`).boundingBox())!;
+          expect(content.y + content.height, selector).toBeLessThanOrEqual(hero!.y + hero!.height + 1);
+        }
+        expect(Math.abs(holdings!.y - (hero!.y + hero!.height + 16))).toBeLessThan(1);
         await expect(page.locator(".t3-live-label").first()).toBeVisible();
       }
       if (state.name === "overview-expanded-1440") {

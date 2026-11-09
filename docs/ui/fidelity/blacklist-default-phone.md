@@ -67,6 +67,8 @@ The source depicts the **default** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** blacklist 10.490% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 - The persisted blacklist stores token symbols only. Contract address, source wallet, and hidden date in the design have no stored fields, so the app shows the supported symbol and all sources label.
 - The symbol-only rows have no contract/source/date line, which moves each remove control and the informational card relative to the source. The stray **Token Blacklist** heading is visually hidden, the description is flush with the title, and action text uses the source's 13px size with a 44px target.
 - The token input uses 16px text to prevent iOS focus zoom; the source uses 13px. Row icons and text rasterization differ slightly.

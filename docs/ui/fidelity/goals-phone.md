@@ -26,6 +26,8 @@ Loading/query errors continue to use existing alert semantics. The design's illu
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** goals 12.704% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 The latest dark 390 × 844 source and app viewport captures differ by
 **8.52%** at an RGB-channel threshold of 20. Their Summary cards have
 identical computed x=16, y=140, width 358px, height 204px,

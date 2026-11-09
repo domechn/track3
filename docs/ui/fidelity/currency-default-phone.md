@@ -62,6 +62,8 @@ The source depicts the **default** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** currency 7.528% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 - The page title, rate timestamp, stablecoin switch, history page size, and unread badge match. Some descriptions wrap at different words, the preview card begins slightly lower, and the refresh and navigation icon strokes differ. The app's touch scroller does not paint the source browser's visible scrollbar. Locally bundled Public Sans rasterizes differently from the reference browser's web font.
 - The light-theme cards, selects, menu options, and update action now follow the page tokens.
 

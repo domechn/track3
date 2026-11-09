@@ -32,6 +32,8 @@ The design invents 1,284 snapshots and source refresh names/counts. The existing
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** history 9.084% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 The no-snapshot card now uses the source's dashed treatment, title, hint, and action. Its note describes the app's actual fixed page size rather than a setting that does not exist.
 
 The HTML source pages are present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. On 8 Nov 2026 they were re-rendered in Chromium with scrollbars hidden into `/tmp/ui43-source/`; branch captures before this merge are preserved in `/tmp/ui43-captures-phone/`. The source list card begins at (16, 148) with width 358 px and its card background is `rgb(19, 18, 23)` by `getBoundingClientRect()` and `getComputedStyle()`. Both images use a 390 × 844 viewport. A pixel differs when its summed absolute RGB difference exceeds 48. The source long page is 3687 px; the app's fixed shell scrolls inside its main area, so a `fullPage` screenshot captures only the 844 px viewport and cannot serve as a like-for-like long-page comparison. The viewport ratios below describe those captures.

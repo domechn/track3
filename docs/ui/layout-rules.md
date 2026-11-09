@@ -1,25 +1,21 @@
-# Page layout rules
+# Layout rules
 
-## R2b: No blank slabs
+Apply these checks to loaded content in the desktop and iOS shells at supported widths and in both themes. Measure rendered rectangles; allow only the tolerances below.
 
-After scrolling to the bottom of any page, there is no empty rectangle at least 120 × 120 px bounded by cards on at least two sides. When adjacent columns have different content heights, align the cards and fill their content, or keep each pane in the app viewport with its own scroll area.
+- **R1 Row alignment:** Cards beside each other in one row share top and bottom edges within 1 px.
+- **R2 Column balance:** Side by side columns end at the same bottom edge within 1 px. Stack columns when their content cannot balance.
+- **R3 No blank slabs:** No empty page background rectangle at least 120 × 120 px inside the content area with cards on at least two sides.
+- **R4 Card fill:** Empty space from the last rendered row to a card's bottom is less than 24 px, or less than 40 px when a pager follows. Rows spread more than 40 px apart inside a column card and content clipped past a card's bottom also fail. A row's own padding counts when visible content reaches its bottom; an empty stretched wrapper does not count. Content in a vertically scrollable region remains reachable.
+- **R5 Grid snap:** Card edges follow the page's 12 column grid with 16 px gutters. Each left or right edge equals a content edge or another card edge within 0.5 px.
+- **R6 Bounded collections:** Every list or grid driven by an unbounded array uses a pager or a documented visible cap.
+- **R7 Number fit:** Large numbers stay within their cell and never cross a divider, wrap, or sit partly cut at a scroll edge. A horizontal table must fit the pane at rest.
+- **R8 Stable chrome:** Sidebar, navigation and toolbar dimensions stay stable between routes with the same chrome variant (desktop rail; phone root, overview overlay, or collapsed bar; phone wallet/comparison compact back, records, settings, or regular pushed bar).
+- **R9 Theme tokens:** The existing raw colour guard applies to every themed surface.
 
-History uses a fixed-height master-detail row with independently scrolling list and detail panes. Coin detail aligns its chart and holdings cards at both edges and lets the chart plot grow with real content.
+An exemption needs `data-layout-exempt="R<n>: <design reason>"` on the affected element and a matching reason below. Empty states still need useful copy or an action.
 
-## Review sweep
+- Assistant R5: its design fixes the chats and context panes around a flexible thread. Empty chats R4: scroll space keeps the footer at the pane bottom.
+- History R5 at 1100–1179 px: eleven tracks keep its independent list and detail panes side by side. Sparse detail R4: the fixed pane reserves a scroll area.
+- Coin R4: a bordered chart area remains visible with fewer than three price points.
 
-The History review compared head and base at 1280 × 720 and 1440 × 900, with the page scrolled to the top, middle, and bottom. It checked Summary, Wallets, Comparison, Cost basis, Goals, Rebalance, BTC detail, History, and Settings Sources, Data, Sync, and Appearance. No page had a new bottom blank slab of at least 120 × 120 px.
-
-At the time of that review, BTC detail had a 538 × 339 px mid-scroll gap below its sticky side column on both head and base. The later Coin detail layout replaced that sticky column with aligned cards. At 1440 × 900, the sticky Settings navigation left 208 × 250 px of space below the rail; this space is outside the card content.
-
-Global audit follow-up: the History Playwright helper checks pane alignment, but does not scan for empty 120 × 120 px rectangles within or between cards. Audit those interior gaps at the top, middle, and bottom of each page across viewport sizes.
-
-## Coin detail
-
-- At widths where the chart and holdings sit side by side, their cards start at the same top edge and end at the same bottom edge, within 1 px. The heading and toolbar sit above the shared row.
-- The chart occupies the left column. The right card contains Holdings by source and Open lots, following the desktop design reference. Transactions follow in a full width card.
-- Card height follows real content. The chart plot may grow with a long source or lot table. Keep its axis, line, and range statistics visible. Do not stretch an empty card to fill a column.
-- Measure the last visible lot row, Show all button, or empty state against the right card's content bottom, and chart stats against the left. Each gap stays below 24 px. The manual price card also keeps its last row within 24 px of Set current price. No page background rectangle of at least 120 × 120 px may sit between cards, bounded by cards or the content edge on two sides.
-- Below the two column breakpoint, read in order: chart, holdings and lots, transactions. The same blank area rule applies.
-- The 820 px iPad metric grid uses a row of three and a row of two equal width cards. Neither row leaves an unused grid track.
-- Check sparse, dense, empty, stablecoin, and stock holdings in both themes. Include 1100, 1280, 1440, 1920, 820, and 390 px viewports.
+The audit captures every visited route at dense 1280 px desktop and 390 px phone sizes, plus full route captures at 1100 px, 1440 px, and 820 px. It measures both top and bottom scroll positions. For the dark real-scale routes it records design-page card rectangles and computed backgrounds, and counts viewport pixels whose summed absolute RGB difference exceeds 60. The main phone `diffRatios` compare the approved JPEGs; `desktopHtmlAtPhoneDiffRatios` are separate responsive HTML diagnostics. `tests/e2e/layout-audit.ts` needs the existing owner exception to pass the UI guard on a committed copy; CI requires domechn's `format-exception-approved` label.

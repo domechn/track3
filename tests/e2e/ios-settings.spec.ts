@@ -118,7 +118,11 @@ test("light custom asset editor keeps its controls and hints readable", async ({
   expect(Number(colors.select[0].match(/\d+/)![0])).toBeGreaterThan(230);
   expect(Number(colors.segment[0].match(/\d+/)![0])).toBeGreaterThan(230);
   expect(contrast(colors.select[0], colors.select[1])).toBeGreaterThanOrEqual(4.5);
-  expect(contrast(colors.segment[1], colors.segment[2])).toBeGreaterThanOrEqual(4.5);
+  const [red, green, blue, alpha = 1] = colors.segment[1].match(/[\d.]+/g)!.map(Number);
+  const background = colors.segment[0].match(/[\d.]+/g)!.slice(0, 3).map(Number);
+  const selected = `rgb(${[red, green, blue].map((channel, index) =>
+    Math.round(channel * alpha + background[index] * (1 - alpha))).join(", ")})`;
+  expect(contrast(selected, colors.segment[2])).toBeGreaterThanOrEqual(4.5);
   expect(contrast(colors.sheet, colors.hint)).toBeGreaterThanOrEqual(4.5);
   await page.screenshot({ path: "/tmp/wui30-light-custom-asset.png", animations: "disabled" });
 });
@@ -132,7 +136,7 @@ test("dark custom asset price segment keeps its original contrast", async ({ pag
   await page.getByRole("button", { name: "Add symbol" }).click();
   const segment = page.getByRole("dialog", { name: "Add custom asset" }).locator(".fidelity-custom-segment");
   await expect(segment).toHaveCSS("background-color", "rgb(28, 28, 32)");
-  await expect(segment.locator("[aria-checked='true']")).toHaveCSS("background-color", "rgb(48, 48, 54)");
+  await expect(segment.locator("[aria-checked='true']")).toHaveCSS("background-color", "rgba(72, 136, 213, 0.16)");
 });
 
 test("iPhone custom asset editor stays closed after switching source tabs", async ({ page }) => {

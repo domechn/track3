@@ -23,6 +23,7 @@ import { formatSignedMoney } from "./signed-money";
 import { dailyChangeTooltip, type DailyChange } from "./daily-change-tooltip";
 import { useChartHitArea } from "./chart-tooltip";
 import { Card } from "./ui/card";
+import { Pager, usePager } from "./ui/pager";
 import { deriveContributions, deriveOverviewSeries, selectBestDayContributionSnapshots, selectSevenDayContributionSnapshots, unavailableSources } from "./overview-derived";
 import { overviewRefreshRequestedEvent, sourceStatusesChangedEvent } from "./source-status-event";
 import { niceStep } from "./overview-chart-scale";
@@ -275,6 +276,8 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
     wallet: source.label, walletAlias: source.label, walletType: undefined as string | undefined,
     value: 0, percentage: 0, amount: 0, chartColor: "",
   }));
+  const sourcePage = usePager(listed, "overview-sources", 4);
+  const statusPage = usePager(statuses, "overview-statuses", 4);
   const displayLabels = sourceDisplayNames(listed.map((source) => ({
     id: source.wallet, wallet: source.wallet, alias: source.walletAlias, type: source.walletType,
   })), (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals);
@@ -288,7 +291,7 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
     <header className="t3-overview-panel-heading"><h2>{t("overview.design.sources")}</h2>
       <span>{t("overview.design.sourceCount").replace("{count}", String(statuses.length))}</span></header>
     {statuses.length ? <div className="t3-sources-list">
-      {statuses.map((source) => <div key={source.sourceId} className="t3-source-row">
+      {statusPage.rows.map((source) => <div key={source.sourceId} className="t3-source-row">
         <span className={`t3-source-dot ${source.status}`} aria-hidden="true" />
         <span className="t3-source-name"><strong>{source.label}</strong>
           <small>{source.lastSuccessAt && source.status !== "ok"
@@ -297,6 +300,7 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
         <span className="t3-tag" data-tone={source.status === "ok" ? "positive" : source.status === "failed" ? "negative" : "warning"}>{t(`refresh.status.${source.status}`)}</span>
       </div>)}
     </div> : <p className="t3-panel-empty">{t("overview.design.sourceEmpty")}</p>}
+    <Pager count={statuses.length} {...statusPage} t={t} ariaLabel={t("overview.design.sources")} />
     <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration">{t("overview.design.manageSources")}</a>
   </Card>;
   if (variant === "card") return <Card className="t3-overview-panel t3-sources-panel">
@@ -325,8 +329,8 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
       </div>
     </div>}
     {listed.length ? <div className="t3-sources-list">
-      {listed.map((source, index) => {
-        const label = displayLabels[index];
+      {sourcePage.rows.map((source, index) => {
+        const label = displayLabels[(sourcePage.page - 1) * sourcePage.pageSize + index];
         const status = matchSourceStatus({ id: source.wallet, label }, identities, statusSources, statuses);
         const kind = status?.kind ?? (source.walletType === "ibkr" ? "broker" : source.walletType === "binance" || source.walletType === "okx" ? "exchange" : "wallet");
         return <div key={source.wallet} className="t3-source-row">
@@ -347,6 +351,7 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
         </div>;
       })}
     </div> : <p className="t3-panel-empty">{t("overview.design.sourceEmpty")}</p>}
+    <Pager count={listed.length} {...sourcePage} t={t} ariaLabel={t("overview.design.sources")} />
     {listed.length < 3 && <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration">{t("overview.design.manageSources")}</a>}
   </Card>;
   return <section className="t3-overview-source-status" aria-label={t("overview.design.sources")}>
@@ -371,7 +376,8 @@ export function TopCoinsCard({ currency, rows, compact = false, overviewFidelity
   const sorted = useMemo(() => [...rows].sort((a, b) =>
     sort === "value" ? b.value - a.value : ((overviewFidelity ? b.weekChange : b.priceChange) ?? -Infinity) -
       ((overviewFidelity ? a.weekChange : a.priceChange) ?? -Infinity)), [rows, sort, overviewFidelity]);
-  const visible = compact && !expanded ? sorted.slice(0, 3) : sorted;
+  const topPage = usePager(sorted, sort, 8);
+  const visible = compact && !expanded ? sorted.slice(0, 3) : topPage.rows;
   const assetNames: Record<string, string> = {
     BTC: "Bitcoin", USDT: "Tether", ETH: "Ethereum", SOL: "Solana", BNB: "BNB", USDC: "USD Coin",
   };
@@ -413,6 +419,7 @@ export function TopCoinsCard({ currency, rows, compact = false, overviewFidelity
       {compact && rows.length > 3 && <button type="button" className="t3-top-more" onClick={() => setExpanded((value) => !value)}>
         {expanded ? t("overview.design.showFewer") : t("overview.design.showMore").replace("{count}", String(rows.length - 3))}
       </button>}
+      {(!compact || expanded) && <Pager count={sorted.length} {...topPage} t={t} ariaLabel={t("overview.design.topCoins")} />}
       <p className="t3-panel-footnote">{t("overview.design.rankNote")}</p>
     </> : <p className="t3-panel-empty">{t("overview.design.noCoins")}</p>}
   </Card>;

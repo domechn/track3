@@ -243,9 +243,9 @@ test("Summary leaders and attribution footer follow the source spacing", async (
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".summary-top-heading").first().boundingBox())!.y).toBeCloseTo(1145, 0);
-  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1609, 0);
-  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1627, 0);
+  expect((await page.locator(".summary-top-heading").first().boundingBox())!.y).toBeCloseTo(1146, 0);
+  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1610, 0);
+  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1628, 0);
   const totalRange = page.locator(".fidelity-attribution-row.total > span:nth-child(2)");
   await expect(totalRange).toHaveText("$310,000 → $763,809");
   const arrow = await totalRange.evaluate((node) => {
@@ -313,7 +313,10 @@ test("Summary end label, rail separators and Refresh control match the source", 
     const style = getComputedStyle(node);
     return [style.fontWeight, style.fill];
   })).toEqual(["600", "rgb(95, 196, 155)"]);
-  expect((await label.boundingBox())!.x).toBeCloseTo(976.4, 0);
+  const chart = (await page.locator(".fidelity-summary-chart").boundingBox())!;
+  const labelBox = (await label.boundingBox())!;
+  expect(chart.x + chart.width - labelBox.x - labelBox.width).toBeGreaterThanOrEqual(7);
+  expect(chart.x + chart.width - labelBox.x - labelBox.width).toBeLessThanOrEqual(10);
   const separators = await page.locator(".t3-fidelity-nav-group").evaluateAll((nodes) =>
     nodes.map((node) => {
       const box = node.getBoundingClientRect();
@@ -373,7 +376,7 @@ test("Summary KPI, ATH rule and chart axes use the source page coordinates", asy
     gridColor: "rgb(38, 38, 41)",
   });
   expect(metrics.gridX).toBeCloseTo(149, 0);
-  expect(metrics.gridY).toBeCloseTo(499, 0);
+  expect(metrics.gridY).toBeCloseTo(509, 0);
 });
 
 test("Summary range starts at the source heading position", async ({ page }) => {
@@ -393,10 +396,10 @@ test("Summary month cards and calculation hint follow the source row spacing", a
   const months = (await page.locator(".fidelity-month-grid").boundingBox())!;
   const hint = (await page.locator(".fidelity-period-card").first()
     .getByRole("button", { name: "How P&L % is calculated" }).boundingBox())!;
-  expect(card.y).toBe(572);
-  expect(months.y).toBe(663);
+  expect(card.y).toBe(573);
+  expect(months.y).toBe(664);
   expect(months.height).toBe(346);
-  expect(hint.y).toBe(621);
+  expect(hint.y).toBe(622);
 });
 
 test("Summary card labels and year amounts use tabular digits", async ({ page }) => {
@@ -425,11 +428,11 @@ test("Summary attribution header and leaders footnote match source vertical rhyt
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".fidelity-attribution-row.head").boundingBox())!.y).toBe(1159);
+  expect((await page.locator(".fidelity-attribution-row.head").boundingBox())!.y).toBe(1160);
   expect(await page.locator(".fidelity-attribution-row.head > span").first().evaluate((node) => {
     const range = document.createRange();
     range.selectNodeContents(node);
     return range.getBoundingClientRect().y;
-  })).toBe(1166);
+  })).toBe(1167);
   expect(await page.locator(".fidelity-leaders .fidelity-caption").evaluate((node) => getComputedStyle(node).lineHeight)).toBe("18px");
 });

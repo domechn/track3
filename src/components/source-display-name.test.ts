@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { previewSourceNames, sourceAliasFallback, sourceDisplayNames } from "./source-display-name";
+import { compactSourceName, previewSourceNames, sourceAliasFallback, sourceDisplayNames } from "./source-display-name";
 
 it("uses the portfolio source names when a config alias is cleared", () => {
   expect(sourceAliasFallback("exchange", "binance")).toBe("Binance");
@@ -115,4 +115,12 @@ it("numbers a past-only opaque id after current wallets without changing their n
   const past = "1234560123456789abcdef0123456789";
   expect(sourceDisplayNames([{ id: past }, { id: current }], undefined, { [current]: 1 }))
     .toEqual(["Wallet 2", "Wallet 1"]);
+});
+
+it("keeps different long source names distinct in a narrow row", () => {
+  expect(compactSourceName("Cold 1 storage account with a long descriptive source name"))
+    .toBe("Cold 1 sto…e name");
+  expect(compactSourceName("Cold 2 storage account with a long descriptive source name"))
+    .toBe("Cold 2 sto…e name");
+  expect(compactSourceName("Binance")).toBe("Binance");
 });

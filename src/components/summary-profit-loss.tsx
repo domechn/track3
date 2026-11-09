@@ -132,6 +132,7 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
     : t("summary.fidelity.loadingSubtitle");
   const displayedTotal = data?.total ?? (data?.unknownCoins.length ? data.knownTotal : null);
   const unavailable = noComparison || displayedTotal == null;
+  const breakevenUnavailable = unavailable || data?.total == null;
   const tone = unavailable ? "fidelity-faint" : displayedTotal! >= 0
     ? quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"
     : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive";
@@ -151,10 +152,9 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
   return <section className="fidelity-card fidelity-summary-pnl">
     <div className="fidelity-card-head"><h2>{t("summary.fidelity.profitLoss")}</h2><span>{t("summary.fidelity.netPnlUsd").replace("{currency}", currency.currency)}</span></div>
     <div className="fidelity-kpis fidelity-summary-pnl-kpis">
-      <div><span>{rangeLabel === "All" ? t("summary.fidelity.netPnlAll") : t("summary.fidelity.netPnlRange").replace("{range}", rangeLabel)}</span><strong className={cn("big", tone, netPnlLong && "fidelity-long-money")} title={unavailable ? missingReason : netPnlFull ?? undefined}>{netPnlLong && !unavailable ? <span className="whitespace-nowrap">{netPnlText}</span> : netPnlText}</strong><small>{unavailable ? missingReason : t("summary.fidelity.since").replace("{date}", date(baseline ?? dateRange.start))}</small>
-      </div>
+      <div><span>{rangeLabel === "All" ? t("summary.fidelity.netPnlAll") : t("summary.fidelity.netPnlRange").replace("{range}", rangeLabel)}</span><strong className={cn("big", tone, netPnlLong && "fidelity-long-money")} title={unavailable ? missingReason : netPnlFull ?? undefined}>{netPnlLong && !unavailable ? <span className="whitespace-nowrap">{netPnlText}</span> : netPnlText}</strong><small>{unavailable ? missingReason : t("summary.fidelity.since").replace("{date}", date(baseline ?? dateRange.start))}</small></div>
       <div><span>{t("summary.fidelity.pnlPercent")}</span><strong className={tone} title={unavailable || percentMissing ? percentMissingReason : undefined}>{percentageText}</strong><small>{unavailable || percentMissing ? percentMissingReason : t("summary.fidelity.onInvested").replace("{amount}", money(data?.investedCapital ?? 0, currency, 0).replace(/^[+−]/, ""))}</small></div>
-      <div><span>{t("summary.fidelity.breakeven")}</span><strong className={unavailable || data?.total == null ? "fidelity-faint" : undefined} title={unavailable ? missingReason : undefined}>{unavailable || !data || data.total == null ? missing : money(data.currentValue - data.total, currency, 0).replace(/^[+−]/, "")}</strong><small>{unavailable ? missingReason : t("summary.fidelity.breakevenNote").replace("{symbol}", currency.symbol)}</small></div>
+      <div><span>{t("summary.fidelity.breakeven")}</span><strong className={breakevenUnavailable ? "fidelity-faint" : undefined} title={breakevenUnavailable ? missingReason : undefined}>{breakevenUnavailable ? missing : money(data.currentValue - data.total!, currency, 0).replace(/^[+−]/, "")}</strong><small>{breakevenUnavailable ? missingReason : t("summary.fidelity.breakevenNote").replace("{symbol}", currency.symbol)}</small></div>
       <div><span>{t("summary.fidelity.positions")}</span><strong>{data?.positions ?? missing}</strong><small className={rangeLabel === "All" ? "whitespace-nowrap" : undefined}>{data && !oneSnapshot && <><span className={data.up === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-positive" : "text-negative"}>{data.up} {t("summary.fidelity.up")}</span> · <span className={data.down === 0 ? "fidelity-zero" : quoteColor === "green-up-red-down" ? "text-negative" : "text-positive"}>{data.down} {t("summary.fidelity.down")}</span> · {Math.max(0, data.positions - data.up - data.down)} {t("summary.fidelity.flat")}</>}{snapshotCount !== undefined && <>{data && !oneSnapshot && " · "}<span>{oneSnapshot && snapshotCount === 1 ? t("summary.fidelity.oneSnapshot") : baseline && snapshotCount > 0 && baseline < dateRange.start
         ? t("summary.fidelity.snapshotsSince").replace("{date}", date(baseline)).replace("{count}", String(snapshotCount))
         : snapshotCount === 1 ? t("summary.fidelity.snapshotInRangeOne")
@@ -182,8 +182,8 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
             const index = usablePoints.indexOf(point);
             return <text key={index} x={x(index)} y={height} textAnchor={index === 0 ? "start" : index === usablePoints.length - 1 ? "end" : "middle"} fill="#9b9da3" fontSize="12">{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { ...(index === 0 ? { day: "numeric" as const } : {}), month: "short", year: "2-digit" }).format(point.timestamp)}</text>;
           })}
-          <text data-direction-end="" x={x(usablePoints.length - 1) + 6} y={y(usablePoints.at(-1)!.value) + 4}
-            textAnchor="start" fill={directionColorVar(usablePoints.at(-1)!.value, quoteColor)}
+          <text data-direction-end="" x={width - 8} y={y(usablePoints.at(-1)!.value) + 4}
+            textAnchor="end" fill={directionColorVar(usablePoints.at(-1)!.value, quoteColor)}
             fontSize="12" fontWeight="600">{money(usablePoints.at(-1)!.value, currency, 0)}</text>
         </svg>
         {chart.tooltip}

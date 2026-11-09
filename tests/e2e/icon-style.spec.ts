@@ -164,7 +164,8 @@ if (stage !== "before") {
         names.every((name) => name.scrollWidth <= name.clientWidth + 1))).toBe(true);
       const collisions = await page.locator(".fidelity-history-detail tbody tr:not(.fidelity-history-total)")
         .evaluateAll((rows) => rows.flatMap((row) => {
-          const cells = [...row.querySelectorAll("td")].slice(1);
+          const cells = [...row.querySelectorAll("td")].slice(1)
+            .filter((cell) => getComputedStyle(cell).display !== "none");
           return cells.slice(0, -1).flatMap((cell, index) => {
             const left = document.createRange();
             const right = document.createRange();
@@ -208,8 +209,23 @@ if (stage !== "before") {
         await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
         await installManySourceFixture(page, 16);
         await page.goto("/#/wallets");
-        await expect(page.locator(".wallet-asset-change-scroll thead th")).toHaveCount(18, { timeout: 60_000 });
-        await checkTiles(page);
+        const sourceHeaders = page.locator(".wallet-asset-change-scroll thead th[title]");
+        await expect(page.locator(".wallet-asset-change-scroll thead th")).toHaveCount(7, { timeout: 60_000 });
+        const seen = new Set<string | null>();
+        const next = page.locator(".wallet-asset-change-card > nav[data-layout-pager]").getByRole("button", { name: "Next" });
+        let pages = 0;
+        do {
+          for (const name of await sourceHeaders.evaluateAll((headers) => headers.map((header) => header.getAttribute("title"))))
+            seen.add(name);
+          await checkTiles(page);
+          pages++;
+          if (!await next.isEnabled()) break;
+          const previous = await sourceHeaders.first().getAttribute("title");
+          await next.click();
+          await expect(sourceHeaders.first()).not.toHaveAttribute("title", previous!);
+        } while (pages < 4);
+        expect(pages).toBe(4);
+        expect(seen.size).toBe(16);
       } finally { await context.close(); }
     });
 
@@ -294,7 +310,14 @@ for (const theme of ["light", "dark"] as const) {
       await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
       await installManySourceFixture(page, 16);
       await page.goto("/#/wallets");
-      await expect(page.locator(".fd-wallet-chips button")).toHaveCount(17, { timeout: 60_000 });
+      const sourceChips = page.locator(".fd-wallet-chips button[title]");
+      await expect(page.locator(".fd-wallet-chips button")).toHaveCount(9, { timeout: 60_000 });
+      const firstPage = await sourceChips.evaluateAll((chips) => chips.map((chip) => chip.getAttribute("title")));
+      await checkTiles(page);
+      await page.locator(".fd-wallet-chips + nav[data-layout-pager]").getByRole("button", { name: "Next" }).click();
+      await expect(page.locator(".fd-wallet-chips button")).toHaveCount(9);
+      const secondPage = await sourceChips.evaluateAll((chips) => chips.map((chip) => chip.getAttribute("title")));
+      expect(new Set([...firstPage, ...secondPage]).size).toBe(16);
       await checkTiles(page);
     } finally { await context.close(); }
   });

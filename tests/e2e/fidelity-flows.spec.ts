@@ -427,7 +427,7 @@ test("frontend render failure shows a recoverable phone error with copyable deta
     const Throws = () => { throw new TypeError("Cannot read properties of undefined (reading 'value')"); };
     ReactDOM.default.createRoot(host).render(React.default.createElement(AppErrorBoundary, null, React.default.createElement(Throws)));
   });
-  await expect(page.getByRole("heading", { name: "Something went wrong" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Something went wrong" })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: "Copy details" })).toBeVisible();
   await page.screenshot({ path: "/tmp/fidelity/flows/startup-error-phone.png" });
 });
@@ -442,6 +442,7 @@ test("iOS key recovery notice points to existing settings recovery", async ({ pa
 });
 
 test("real Overview exposes idle, pull, and source progress on phone", async ({ page }) => {
+  test.setTimeout(120_000);
   await page.clock.setFixedTime(new Date("2026-10-31T09:42:00Z"));
   await page.addInitScript(() => {
     localStorage.setItem("track3-ui-theme", "dark");

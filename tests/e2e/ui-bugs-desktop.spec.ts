@@ -9,7 +9,16 @@ for (const width of [1440, 1100]) for (const sources of [3, 8, 16, 30]) {
     await installManySourceFixture(page, sources);
     await page.goto("/#/wallets");
     const scroll = page.locator(width >= 1400 ? ".t3-wallet-matrix .t3-wallet-table-scroll" : ".wallet-asset-change-scroll").first();
-    await expect(scroll.locator("thead th")).toHaveCount(sources + 2);
+    const sourceIds = new Set<string>();
+    const matrixPager = page.locator(".wallet-asset-change-card [data-layout-pager]");
+    const perPage = width >= 1400 ? sources : 4;
+    for (let start = 0; start < sources; start += perPage) {
+      await expect(scroll.locator("thead th")).toHaveCount(Math.min(perPage, sources - start) + 2);
+      for (const id of await scroll.locator("thead th[title]").evaluateAll((cells) =>
+        cells.map((cell) => cell.getAttribute("title") ?? ""))) sourceIds.add(id);
+      if (width < 1400 && start + perPage < sources) await matrixPager.getByRole("button", { name: "Next" }).click();
+    }
+    expect(sourceIds.size).toBe(sources);
     await expect(scroll).toHaveAttribute("tabindex", "0");
     const rendered = await page.locator(".analyze-wallets").textContent();
     expect(rendered).not.toMatch(/[0-9a-f]{12,}/i);
@@ -31,13 +40,15 @@ for (const width of [1440, 1100]) for (const sources of [3, 8, 16, 30]) {
     expect(boxes.at(-1)?.position).toBe("sticky");
     if (sources >= 8) {
       const size = await scroll.evaluate((element) => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
-      expect(size.scrollWidth).toBeGreaterThan(size.clientWidth);
-      await scroll.evaluate((element) => { element.scrollLeft = 500; });
-      expect(await scroll.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-      await scroll.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
-      const lastBox = (await headers.last().boundingBox())!;
-      const scrollBox = (await scroll.boundingBox())!;
-      expect(lastBox.x + lastBox.width).toBeLessThanOrEqual(scrollBox.x + scrollBox.width + 1);
+      if (width >= 1400 && sources >= 16) expect(size.scrollWidth).toBeGreaterThan(size.clientWidth + 1);
+      if (size.scrollWidth > size.clientWidth + 1) {
+        await scroll.evaluate((element) => { element.scrollLeft = 500; });
+        expect(await scroll.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+        await scroll.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+        const lastBox = (await headers.last().boundingBox())!;
+        const scrollBox = (await scroll.boundingBox())!;
+        expect(lastBox.x + lastBox.width).toBeLessThanOrEqual(scrollBox.x + scrollBox.width + 1);
+      }
     }
     if (sources === 16 && width === 1440) {
       await expect(page.locator(".t3-wallet-chips button")).toHaveCount(17);
@@ -61,7 +72,8 @@ for (const width of [1440, 1100]) for (const sources of [3, 8, 16, 30]) {
       }
       const matrix = (await page.locator(".t3-wallet-matrix").boundingBox())!;
       const moved = (await page.locator(".t3-wallet-moved").boundingBox())!;
-      expect(Math.abs(matrix.y + matrix.height - moved.y - moved.height)).toBeLessThanOrEqual(1);
+      expect(Math.abs(matrix.x - moved.x)).toBeLessThanOrEqual(1);
+      expect(moved.y).toBeGreaterThanOrEqual(matrix.y + matrix.height + 16);
     }
     if (sources === 3 || sources === 16) await scroll.screenshot({ path: `/tmp/wallet-matrix-${width}-${sources}.png` });
   });

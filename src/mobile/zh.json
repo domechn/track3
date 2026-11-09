@@ -2816,6 +2816,7 @@
   "fidelity.assistant.promptPlanRebalance": "制定再平衡计划",
   "fidelity.settings.sources.summary": "Track3 读取的来源：{exchanges} 个交易所、{wallets} 个钱包、{brokers} 个券商和 {custom} 个自定义资产。",
   "fidelity.settings.sources.summaryRich": "Track3 读取的来源：<b>{exchanges} 个交易所</b>、<b>{wallets} 个钱包</b>、<b>{brokers} 个券商</b>和 {custom} 个自定义资产。",
+  "fidelity.settings.sources.summaryRichOne": "Track3 读取的来源：<b>{exchanges} 个交易所</b>、<b>{wallets} 个钱包</b>、<b>{brokers} 个券商</b>和 {custom} 个自定义资产。",
   "fidelity.settings.sources.summaryEmpty": "{kind}尚未连接任何来源。",
   "fidelity.settings.sources.emptySummaryExchange": "尚未连接交易所。",
   "fidelity.settings.sources.addExchange": "添加交易所",

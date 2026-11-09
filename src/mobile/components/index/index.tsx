@@ -436,7 +436,7 @@ function Layout({
         />
 
         {/* Main content */}
-        <main id="app-main-content" tabIndex={0} className="p-5" data-route={location.pathname}
+        <main id="app-main-content" tabIndex={0} className="p-5" data-route={location.pathname + location.search}
           onBlur={(event) => { delete event.currentTarget.dataset.routeFocus; }}
           onContextMenuCapture={(event) => {
             if ((event.target as Element).closest("canvas")) event.preventDefault();

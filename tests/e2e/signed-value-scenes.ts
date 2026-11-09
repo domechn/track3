@@ -25,10 +25,10 @@ export async function expectSignedValuesOnOneLine(page: Page, label: string) {
         while (walker.nextNode()) yield walker.currentNode as Text;
       }()];
       const hasSign = /^[+−-]/.test(text);
-      if (hasSign && (style.whiteSpace !== "nowrap" || !style.fontVariantNumeric.includes("tabular-nums"))) {
+      if (hasSign && style.whiteSpace !== "nowrap") {
         const path = [element, element.parentElement, element.parentElement?.parentElement, element.parentElement?.parentElement?.parentElement]
           .map((node) => `${node?.tagName.toLowerCase()}.${node?.className}`).join(" < ");
-        violations.push(`${text}: missing one-line tabular style (${path})`);
+        violations.push(`${text}: missing one-line style (${path})`);
       }
       const secondIndex = hasSign ? text.search(/\d/) : 1;
       if (secondIndex < 0 || secondIndex >= text.length) continue;

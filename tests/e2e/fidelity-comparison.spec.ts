@@ -36,7 +36,7 @@ test("Comparison renders the October sample pair and ordered asset sections", as
     await expect(page.locator(".fd-comparison-info")).toHaveCSS("border-color", "rgb(31, 58, 92)");
     expect((await page.locator(".fd-comparison-mover.percent").first().boundingBox())?.height).toBe(44);
     const columns = await page.locator(".fd-comparison-movers.percent .fd-comparison-mover-list").first().evaluate((list) => getComputedStyle(list).gridTemplateColumns);
-    expect(columns).toBe("88px 160px 64px");
+    expect(columns).toBe("116px 132px 64px");
     await expect(page.locator(".fd-comparison-mover.percent").first()).toHaveCSS("grid-template-columns", /^subgrid/);
     const zero = Number((await page.locator(".fd-comparison-mover.percent").first().locator(":scope > span").first().getAttribute("style"))?.match(/--fd-zero: ([\d.]+)%/)?.[1]);
     expect(zero).toBe(15);

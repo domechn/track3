@@ -9,7 +9,7 @@ export default function EmptyState({ icon: Icon, title, hint, action, children, 
   children?: ReactNode;
   className?: string;
 }) {
-  return <div data-empty-state className={`t3-empty-state ${className}`}>
+  return <div data-empty-state data-card className={`t3-empty-state ${className}`}>
     <Icon aria-hidden="true" className="t3-empty-state-icon" />
     <h3>{title}</h3>
     <p>{hint}</p>

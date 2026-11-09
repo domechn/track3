@@ -25,6 +25,8 @@ The product's real profile validator rejects a saved 103% profile. The invalid s
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** rebalance 12.410% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 Fresh 8 Nov source and app first-screen captures at 390 × 844, DPR 2,
 measure **2.677%** for the populated plan and **2.448%** for the invalid
 draft, counting pixels whose RGB channels differ by more than 20. The
