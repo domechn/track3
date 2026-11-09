@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import CostBasisPage from "@/mobile/components/cost-basis";
+import { PhoneCostBasis } from "@/mobile/components/cost-basis-phone";
 import { getCostBasisMethod, saveCostBasisMethod } from "@/middlelayers/configuration";
 import { exportCostBasisReport, loadCostBasisReport } from "@/middlelayers/cost-basis-data";
 import { queryTransactionsBySymbolAndDateRange } from "@/middlelayers/charts-profit";
@@ -32,6 +33,31 @@ const report = {
   assets: [{ assetType: "crypto", symbol: "BTC", proceeds: 200, costBasis: 100, gainLoss: 100 }],
   totals: { proceeds: 200, costBasis: 100, gainLoss: 100, shortTerm: 0, longTerm: 100 },
 };
+
+it("limits phone lots to eight and gaps to six with visible card pagers", () => {
+  const many = {
+    ...report,
+    disposals: Array.from({ length: 17 }, (_, index) => ({ ...report.disposals[0], eventId: `sale-${index}` })),
+    warnings: Array.from({ length: 13 }, (_, index) => ({ ...report.warnings[0], eventId: `gap-${index}` })),
+  } as unknown as CostBasisReport;
+  const { container } = render(<PhoneCostBasis report={many} loading={false} method="FIFO" year="2026"
+    from="2026-01-01" to="2026-12-31" holdingDays="365" validRange filtersCurrent
+    quoteColor="green-up-red-down" onMethod={vi.fn()} onYear={vi.fn()} onFrom={vi.fn()}
+    onTo={vi.fn()} onHoldingDays={vi.fn()} onExport={vi.fn()} />);
+  expect(container.querySelectorAll(".fidelity-cost-lots .fidelity-lot-row")).toHaveLength(8);
+  expect(container.querySelectorAll(".fidelity-cost-gaps tbody tr")).toHaveLength(6);
+  expect(container.querySelector(".fidelity-cost-lots > .fidelity-pager")).toBeInTheDocument();
+  expect(container.querySelector(".fidelity-cost-gaps > .fidelity-pager")).toBeInTheDocument();
+});
+
+it("exposes the phone asset chart and prices as keyboard scroll regions", () => {
+  render(<PhoneCostBasis report={report as unknown as CostBasisReport} loading={false} method="FIFO" year="2026"
+    from="2026-01-01" to="2026-12-31" holdingDays="365" validRange filtersCurrent
+    quoteColor="green-up-red-down" onMethod={vi.fn()} onYear={vi.fn()} onFrom={vi.fn()}
+    onTo={vi.fn()} onHoldingDays={vi.fn()} onExport={vi.fn()} />);
+  for (const title of ["Realized P&L by asset", "Avg. buy/sell price (selected range)"])
+    expect(screen.getByRole("region", { name: title })).toHaveAttribute("tabindex", "0");
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -322,7 +348,7 @@ it("shows dated gap columns and folds sub-1e-8 residue into one dust row on phon
   expect(gaps).not.toHaveTextContent("5e-11");
 });
 
-it("filters phone gaps by reason and pages fifty real warnings", async () => {
+it("filters phone gaps by reason and pages six real warnings", async () => {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
   vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
     matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
@@ -340,15 +366,15 @@ it("filters phone gaps by reason and pages fifty real warnings", async () => {
   } as never);
   render(<CostBasisPage />);
   const table = await screen.findByRole("table", { name: "Data gaps to review" });
-  expect(within(table).getAllByRole("row")).toHaveLength(51);
+  expect(within(table).getAllByRole("row")).toHaveLength(7);
   expect(table).toHaveTextContent("1,234.12345679");
-  expect(table).not.toHaveTextContent("GAP-50");
+  expect(table).not.toHaveTextContent("GAP-6");
   fireEvent.click(screen.getByRole("button", { name: "Next page of Data gaps to review" }));
-  expect(table).toHaveTextContent("GAP-50");
+  expect(table).toHaveTextContent("GAP-6");
   fireEvent.change(screen.getByRole("combobox", { name: "Reason" }), { target: { value: "unknown-disposal" } });
   expect(within(table).getAllByRole("row")).toHaveLength(2);
   expect(table).toHaveTextContent("SOL");
-  expect(table).not.toHaveTextContent("GAP-50");
+  expect(table).not.toHaveTextContent("GAP-6");
 });
 
 it("keeps dated phone gaps visible when the range has no end date", async () => {
@@ -416,6 +442,17 @@ it("keeps assistant setup available on phones", async () => {
   }) as unknown as MediaQueryList);
   render(<CostBasisPage />);
   expect(await screen.findByText("Let the assistant set this up")).toBeVisible();
+});
+
+it("names the phone disposals scroll region without a trailing space", async () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
+  }) as unknown as MediaQueryList);
+  render(<CostBasisPage />);
+  await screen.findByRole("button", { name: "Dispositions 1" });
+  expect(document.querySelector(".fidelity-cost-lots .fidelity-card-scroll"))
+    .toHaveAttribute("aria-label", "Dispositions");
 });
 
 it("formats phone average quantities to four places and emphasizes the custom period", async () => {

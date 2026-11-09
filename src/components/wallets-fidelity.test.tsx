@@ -26,6 +26,13 @@ beforeEach(() => {
 });
 
 describe("WalletsFidelity", () => {
+  it("exposes the source status list as a keyboard scroll region", async () => {
+    render(<WalletsFidelity currency={currency} dateRange={dateRange}
+      quoteColor="green-up-red-down" selectedSource={null} onSelectSource={vi.fn()} statuses={[]} />);
+    const region = await screen.findByRole("region", { name: "Source status" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).toHaveClass("t3-wallet-status-list");
+  });
   it("uses a muted change line under total value", async () => {
     const { container } = render(<WalletsFidelity currency={currency} dateRange={dateRange}
       quoteColor="green-up-red-down" selectedSource={null} onSelectSource={vi.fn()} statuses={[]} />);

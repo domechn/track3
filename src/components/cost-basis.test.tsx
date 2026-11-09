@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import CostBasisPage from "./cost-basis";
+import { CostBasisDesktopView } from "./cost-basis-desktop-view";
 import { getCostBasisMethod, saveCostBasisMethod } from "@/middlelayers/configuration";
 import { exportCostBasisReport, loadCostBasisReport } from "@/middlelayers/cost-basis-data";
 import type { CostBasisReport } from "@/middlelayers/cost-basis-report";
@@ -42,6 +43,32 @@ const report = {
   assets: [{ assetType: "crypto", symbol: "BTC", proceeds: 200, costBasis: 100, gainLoss: 100 }],
   totals: { proceeds: 200, costBasis: 100, gainLoss: 100, shortTerm: 0, longTerm: 100 },
 };
+
+it("limits desktop disposition and gap rows while keeping the pager outside the list", () => {
+  const many = {
+    ...report,
+    disposals: Array.from({ length: 21 }, (_, index) => ({ ...report.disposals[0], eventId: `sale-${index}` })),
+    warnings: Array.from({ length: 17 }, (_, index) => ({ ...report.warnings[0], eventId: `gap-${index}` })),
+  } as unknown as CostBasisReport;
+  const { container } = render(<CostBasisDesktopView report={many} method="FIFO" year="2026"
+    quoteColor="green-up-red-down" t={(key) => key} locale="en" transactions={[]} from="2026-01-01"
+    to="2026-12-31" holdingPeriodDays={365} holdingValues={new Map()} onChooseYear={vi.fn()} />);
+  expect(container.querySelectorAll(".fidelity-cost-table tbody tr:not(.fidelity-subtotal):not(.fidelity-total)")).toHaveLength(10);
+  expect(container.querySelectorAll(".fidelity-cost-gaps tbody tr:not(.fidelity-gap-group)")).toHaveLength(8);
+  expect(container.querySelector(".fidelity-cost-table > .fidelity-pager")).toBeInTheDocument();
+  expect(container.querySelector(".fidelity-cost-gaps > .fidelity-pager")).toBeInTheDocument();
+});
+
+it("exposes desktop chart and prices as keyboard scroll regions", () => {
+  const { container } = render(<CostBasisDesktopView report={report as unknown as CostBasisReport} method="FIFO" year="2026"
+    quoteColor="green-up-red-down" t={(key) => key} locale="en" transactions={[]} from="2026-01-01"
+    to="2026-12-31" holdingPeriodDays={365} holdingValues={new Map()} onChooseYear={vi.fn()} />);
+  for (const title of ["finance.realizedByAsset", "cost.fidelity.averageTitle"]) {
+    const region = screen.getByRole("region", { name: title });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).toBe(container.querySelector(`.fidelity-cost-${title === "finance.realizedByAsset" ? "chart" : "averages"} .fidelity-card-scroll`));
+  }
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -267,6 +294,14 @@ it("aligns subtotal gains with gain cells and keeps their gain color", async () 
   expect(subtotal.querySelectorAll("td")[4]).toHaveClass("pos");
 });
 
+it("gives the desktop disposals scroll regions usable names and keyboard focus", async () => {
+  render(<CostBasisPage />);
+  await screen.findAllByText("BTC");
+  const table = screen.getByTestId("cost-desktop-table");
+  expect(table.querySelector(".fidelity-card-scroll")).toHaveAttribute("aria-label", "Dispositions");
+  expect(table.querySelector(".fidelity-table-scroll")).toHaveAttribute("tabindex", "0");
+});
+
 it("keeps the cost basis assistant setup action mounted for the records controls", async () => {
   render(<CostBasisPage />);
   await screen.findAllByText("BTC");
@@ -376,19 +411,19 @@ it("pages large realized and open-lot tables", async () => {
   await screen.findAllByText("SALE-0");
   const table = screen.getByTestId("cost-desktop-table");
   const rows = () => table.querySelectorAll("tbody tr:not(.fidelity-subtotal):not(.fidelity-total)");
-  expect(rows()).toHaveLength(50);
-  expect(table).toHaveTextContent("Page 1 of 2");
+  expect(rows()).toHaveLength(10);
+  expect(table).toHaveTextContent("Page 1 of 6");
   fireEvent.click(screen.getByRole("button", { name: "Next page of Realized disposals" }));
-  expect(rows()).toHaveLength(1);
-  expect(table).toHaveTextContent("Page 2 of 2");
+  expect(rows()).toHaveLength(10);
+  expect(table).toHaveTextContent("Page 2 of 6");
   fireEvent.click(screen.getByRole("button", { name: /Open lots/ }));
-  expect(rows()).toHaveLength(50);
+  expect(rows()).toHaveLength(10);
   fireEvent.click(screen.getByRole("button", { name: "Next page of Open lots at latest stored price" }));
-  expect(rows()).toHaveLength(1);
+  expect(rows()).toHaveLength(10);
   fireEvent.click(screen.getByRole("button", { name: "Custom range" }));
   fireEvent.change(screen.getByLabelText("From"), { target: { value: "2025-01-01" } });
-  expect(table).toHaveTextContent("Page 2 of 2");
-  expect(rows()).toHaveLength(1);
+  expect(table).toHaveTextContent("Page 2 of 6");
+  expect(rows()).toHaveLength(10);
 });
 
 it("pages warnings so a long history renders only the current page", async () => {
@@ -398,9 +433,9 @@ it("pages warnings so a long history renders only the current page", async () =>
   } as never);
   render(<CostBasisPage />);
   await screen.findAllByText(/GAP-0/);
-  expect(screen.queryAllByText(/GAP-50/)).toHaveLength(0);
+  expect(screen.queryAllByText(/GAP-8/)).toHaveLength(0);
   fireEvent.click(screen.getByRole("button", { name: "Next page of Data gaps to review" }));
-  expect(screen.getAllByText(/GAP-50/)).not.toHaveLength(0);
+  expect(screen.getAllByText(/GAP-8/)).not.toHaveLength(0);
 });
 
 it("folds a sub-1e-8 missing-lots residue into one dust row", async () => {
@@ -466,7 +501,7 @@ it("shows rows on page one when a new report has fewer rows than the previous pa
   render(<CostBasisPage />);
   await screen.findAllByText("SALE-0");
   fireEvent.click(screen.getByRole("button", { name: "Next page of Realized disposals" }));
-  expect(screen.getByTestId("cost-desktop-table")).toHaveTextContent("Page 2 of 2");
+  expect(screen.getByTestId("cost-desktop-table")).toHaveTextContent("Page 2 of 6");
   fireEvent.click(screen.getByRole("button", { name: "HIFO" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "HIFO" })).toHaveAttribute("aria-pressed", "true"));
   await waitFor(() => expect(screen.getByTestId("cost-desktop-table")).toHaveTextContent("NEW"));
@@ -494,7 +529,7 @@ it("returns data gaps to page one when the next report has fewer gaps", async ()
   render(<CostBasisPage />);
   await screen.findByText("GAP-0");
   fireEvent.click(screen.getByRole("button", { name: "Next page of Data gaps to review" }));
-  expect(screen.getByRole("table", { name: "Data gaps to review" })).toHaveTextContent("GAP-50");
+  expect(screen.getByRole("table", { name: "Data gaps to review" })).toHaveTextContent("GAP-8");
   fireEvent.click(screen.getByRole("button", { name: "HIFO" }));
   await waitFor(() => expect(screen.getByRole("table", { name: "Data gaps to review" })).toHaveTextContent("NEW-GAP"));
 });

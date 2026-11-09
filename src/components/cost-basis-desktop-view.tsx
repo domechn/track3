@@ -11,8 +11,9 @@ import { costBasisDisplayRows } from "./cost-basis-panels";
 import { ArchiveIcon, BarChartIcon, ExclamationTriangleIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import EmptyState from "./empty-state";
 import { directionPhysicalTone } from "@/utils/color";
+import { costBasisPageSizes } from "./cost-basis-page-sizes";
 
-const pageSize = 50;
+const { lots: lotPageSize, gaps: gapPageSize } = costBasisPageSizes.desktop;
 
 const date = (value: string, locale: string) => {
   const parsed = new Date(value);
@@ -107,7 +108,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
   const allGaps = useMemo(() => prepareCostBasisGaps(report.warnings, warningPrices), [report.warnings, open]);
   const gaps = reason === "all" ? allGaps : allGaps.filter((gap) => gap.kind === "dust" ? reason === "dust" : gap.code === reason);
   const gapReasons = [...new Set(allGaps.map((gap) => gap.kind === "dust" ? "dust" : gap.code))];
-  const pageGaps = gaps.slice(gapPage * pageSize, (gapPage + 1) * pageSize);
+  const pageGaps = gaps.slice(gapPage * gapPageSize, (gapPage + 1) * gapPageSize);
   const tableRows: (typeof open[number] | typeof disposed[number] | CostBasisWarning)[] =
     tab === "open" ? open : [...disposed, ...unknown];
   const symbols = [...new Set(tableRows.map((row) => `${row.assetType}:${row.symbol}`))].sort(byHoldingValue);
@@ -115,7 +116,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
     const rows = tableRows.filter((row) => `${row.assetType}:${row.symbol}` === key);
     return rows.map((row, index) => ({ row, index, groupLength: rows.length }));
   });
-  const pagedRows = flatRows.slice(tablePage * pageSize, (tablePage + 1) * pageSize);
+  const pagedRows = flatRows.slice(tablePage * lotPageSize, (tablePage + 1) * lotPageSize);
   const term = (value: "short" | "long") => isAverage ? "–" : <span className="fidelity-pill">{t(value === "long" ? "cost.fidelity.long" : "cost.fidelity.short")}</span>;
   const held = (value: string) => {
     const days = Math.max(0, Math.round((Date.now() - Date.parse(value)) / 86_400_000));
@@ -125,13 +126,13 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
   const metric = (label: string, value: number, note: string, signedValue = true) => <div className="fidelity-metric">
     <span>{label}</span><strong className={signedValue ? tone(value, quoteColor) : ""}>{signedValue ? signed(value) : money(value)}</strong><small>{note}</small>
   </div>;
-  const pager = (page: number, count: number, change: (page: number) => void, label: string) => count <= pageSize ? null : <div className="fidelity-pager">
-    <span>{t("cost.fidelity.pagerCount").replace("{start}", String(page * pageSize + 1))
-      .replace("{end}", String(Math.min((page + 1) * pageSize, count))).replace("{count}", String(count))}</span>
-    <span>{t("history.fidelity.pageOf").replace("{page}", String(page + 1)).replace("{pages}", String(Math.ceil(count / pageSize)))}</span>
+  const pager = (page: number, count: number, size: number, change: (page: number) => void, label: string) => count <= size ? null : <div className="fidelity-pager">
+    <span>{t("cost.fidelity.pagerCount").replace("{start}", String(page * size + 1))
+      .replace("{end}", String(Math.min((page + 1) * size, count))).replace("{count}", String(count))}</span>
+    <span>{t("history.fidelity.pageOf").replace("{page}", String(page + 1)).replace("{pages}", String(Math.ceil(count / size)))}</span>
     <button type="button" disabled={page === 0} aria-label={t("cost.previousPage").replace("{table}", label)}
       onClick={() => change(page - 1)}>{t("cost.fidelity.previous")}</button>
-    <button type="button" disabled={(page + 1) * pageSize >= count} aria-label={t("cost.nextPage").replace("{table}", label)}
+    <button type="button" disabled={(page + 1) * size >= count} aria-label={t("cost.nextPage").replace("{table}", label)}
       onClick={() => change(page + 1)}>{t("common.next")}</button>
   </div>;
   const buySellRows = [...new Set([...open, ...disposed].map((row) => `${row.assetType}:${row.symbol}`))].sort(byHoldingValue);
@@ -187,6 +188,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
       <section className="fidelity-card fidelity-cost-chart">
         <div className="fidelity-card-head"><h2>{t("finance.realizedByAsset")}</h2><span>{t("cost.fidelity.chartRange")
           .replace("{currency}", "USD").replace("{range}", year || t("cost.fidelity.selectedRange"))}</span></div>
+        <div className="fidelity-card-scroll" role="region" aria-label={t("finance.realizedByAsset")} tabIndex={0}>
         {byAsset.some((row) => row.gainLoss !== null) ? <ol>{byAsset.map((row) => <li key={`${row.assetType}:${row.symbol}`}
           className={row.gainLoss === null ? "unknown" : undefined}>
           <strong>{row.symbol}</strong><span className="fidelity-cost-chart-track"
@@ -199,9 +201,11 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
           <span className={tone(row.gainLoss, quoteColor)}>{row.gainLoss === null ? "–" : `${row.gainLoss > 0 ? "+" : "−"}${money(Math.round(Math.abs(row.gainLoss))) .slice(0, -3)}`}</span>
         </li>)}</ol> : <EmptyState icon={BarChartIcon} className="fidelity-empty"
           title={t("cost.fidelity.emptyChart")} hint={t("cost.chart.empty.hint")} />}
+        </div>
       </section>
-      <section className="fidelity-card fidelity-cost-averages" tabIndex={0}>
+      <section className="fidelity-card fidelity-cost-averages">
         <div className="fidelity-card-head"><h2>{t("cost.fidelity.averageTitle")}</h2></div>
+        <div className="fidelity-card-scroll" role="region" aria-label={t("cost.fidelity.averageTitle")} tabIndex={0}>
         {buySellRows.length ? <table><thead><tr>{["asset", "bought", "avgBuy", "sold", "avgSell"].map((key) => <th key={key}>{t(`cost.fidelity.${key}`)}</th>)}</tr></thead>
           <tbody>{buySellRows.map((key) => {
             const price = prices.get(key);
@@ -215,6 +219,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
               <td>{soldQty ? money(price!.averageSell) : <span className="zero">–</span>}</td></tr>;
           })}</tbody></table> : <EmptyState icon={BarChartIcon} className="fidelity-empty"
             title={t("cost.prices.empty.title")} hint={t("cost.prices.empty.hint")} />}
+        </div>
       </section>
       <section className="fidelity-card fidelity-cost-table" data-testid={pending ? undefined : "cost-desktop-table"}>
         <div className="fidelity-card-head">
@@ -226,6 +231,7 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
           </div>
           <span>{t(tab === "open" ? "cost.fidelity.openNote" : "cost.fidelity.gainNote")}</span>
         </div>
+        <div className="fidelity-card-scroll" role="region" aria-label={t(tab === "open" ? "cost.fidelity.openTab" : "cost.fidelity.dispositionsTab").replace("{count}", "").trim()} tabIndex={0}>
         {tableRows.length ? <div className="fidelity-table-scroll" tabIndex={0}><table><thead><tr>
           {["asset", "acquired", tab === "open" ? "held" : "soldDate", "quantity", "cost", tab === "open" ? "value" : "proceeds",
             tab === "open" ? "unrealized" : "gain", "term"].map((key) => <th key={key}>{t(`cost.fidelity.${key}`)}</th>)}
@@ -278,18 +284,20 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
           {tab !== "open" && <div><button type="button" onClick={() => setTab("open")}>{t("cost.fidelity.showOpen")}</button>
             <button type="button" onClick={onChooseYear}>{t("cost.fidelity.chooseYear")}</button></div>}
         </EmptyState>}
-        {pager(tablePage, flatRows.length, setTablePage, tab === "open" ? t("cost.unrealized") : t("cost.realized"))}
+        </div>
+        {pager(tablePage, flatRows.length, lotPageSize, setTablePage, tab === "open" ? t("cost.unrealized") : t("cost.realized"))}
       </section>
     </div>
     {!pending && <p className="fidelity-cost-footnote"><InfoCircledIcon aria-hidden="true" />
       {t("cost.fidelity.stablecoinFootnote")}</p>}
-    {!pending && allGaps.length > 0 && <section className="fidelity-card fidelity-cost-gaps" tabIndex={0}>
+    {!pending && allGaps.length > 0 && <section className="fidelity-card fidelity-cost-gaps">
       <div className="fidelity-card-head"><h2>{t("cost.warnings")}</h2>
         <label>{t("cost.fidelity.reason")} <select value={reason} onChange={(event) => { setReason(event.target.value); setGapPage(0); }}>
           <option value="all">{t("cost.fidelity.allReasons")}</option>
           {gapReasons.map((code) => <option key={code} value={code}>{t(code === "dust" ? "cost.fidelity.dust" : `cost.fidelity.reason.${code}`)}</option>)}
         </select></label>
       </div>
+      <div className="fidelity-card-scroll" role="region" aria-label={t("cost.warnings")} tabIndex={0}>
       <table aria-label={t("cost.warnings")}><thead><tr>{["date", "coin", "amount", "reason"].map((key) => <th key={key}>{t(`cost.fidelity.gap.${key}`)}</th>)}</tr></thead>
         <tbody>{pageGaps.map((gap, index) => {
           const code = gap.kind === "dust" ? "dust" : gap.code;
@@ -302,7 +310,8 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
               <td>{t(`cost.fidelity.reason.${gap.code}`)}</td></>}
           </tr></Fragment>;
         })}</tbody></table>
-      {pager(gapPage, gaps.length, setGapPage, t("cost.warnings"))}
+      </div>
+      {pager(gapPage, gaps.length, gapPageSize, setGapPage, t("cost.warnings"))}
     </section>}
   </>;
 }

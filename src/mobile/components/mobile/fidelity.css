@@ -801,7 +801,9 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-wallet-balance small { color:var(--fd-faint); line-height:18px; white-space:nowrap; }
 .fd-wallet-balance small:last-child { text-align:right; }
 .fd-wallet-status-error { color:var(--fd-loss); }
-.fd-wallet-status { min-height:413px; }
+.fd-wallet-status { display:flex; flex-direction:column; max-height:60vh; min-height:0; overflow:hidden; }
+.fd-wallet-status-scroll { min-height:0; flex:1; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; mask-image:linear-gradient(to bottom,#000 calc(100% - 12px),transparent); }
+.fd-wallet-status-scroll:focus-visible { outline:2px solid var(--fd-control); outline-offset:-2px; }
 .fd-wallet-status-row { display:grid; grid-template-columns:6px minmax(0,1fr) auto; align-items:center; gap:8px; min-height:52px; border-top:1px solid var(--fd-rule); }
 .fd-wallet-status-row:first-of-type { border-top:0; }
 .fd-wallet-status-row>div { padding:8px 0; }
