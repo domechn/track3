@@ -178,6 +178,13 @@ for (const state of ["default", "setup", "locked", "loading", "testing", "test-f
         if (state === "pop-never") await expect(page.getByRole("dialog").getByText("Never synced", { exact: true })).toBeVisible();
         if (state === "pop-error") {
           await expect(page.locator(".t3-b-sync-pop-diagnostics").getByText("Phase timings", { exact: true })).toBeVisible();
+          const headingStyle = await page.locator(".t3-b-sync-pop-diagnostics h3").first().evaluate((heading) => ({
+            color: getComputedStyle(heading).color,
+            titleColor: getComputedStyle(document.querySelector(".t3-b-sync-pop-head h2")!).color,
+            weight: Number(getComputedStyle(heading).fontWeight),
+          }));
+          expect(headingStyle.color).toBe(headingStyle.titleColor);
+          expect(headingStyle.weight).toBeGreaterThanOrEqual(600);
           await expect(page.getByRole("dialog").getByText("Network timeout", { exact: true })).toBeVisible();
           await expect(page.getByRole("dialog").getByText("PUT succeeded", { exact: true })).toBeVisible();
           await expect(page.getByRole("dialog").getByRole("button", { name: "Copy diagnostics" })).toBeVisible();

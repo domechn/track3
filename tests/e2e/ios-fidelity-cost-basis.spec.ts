@@ -83,6 +83,17 @@ test("average prices and quantities use transactions in the selected range", asy
     .toContainText("Bought – · sold 30");
 });
 
+test("short phone cost cards stay below the 60vh cap", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
+  await installFidelityRecords(page);
+  await page.goto("/#/cost-basis");
+  await expect(page.locator(".fidelity-cost-prices .fidelity-price-row").first()).toBeVisible();
+  for (const selector of [".fidelity-cost-by-asset", ".fidelity-cost-prices"]) {
+    const height = (await page.locator(selector).boundingBox())!.height;
+    expect(height).toBeLessThan(844 * 0.6 - 5);
+  }
+});
+
 test("selected-range averages keep stock and crypto with the same symbol separate", async ({ page }) => {
   await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
   await installFidelityRecords(page);
@@ -123,6 +134,14 @@ test("data gap amounts fit on one line within their cells", async ({ page }) => 
   await page.setViewportSize({ width: 320, height: 568 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await expect(page.locator(".fidelity-cost-gaps tbody td:nth-child(3)").first()).toHaveCSS("white-space", "nowrap");
+  const scrollBody = page.locator(".fidelity-cost-gaps .fidelity-card-scroll");
+  await expect(scrollBody).toHaveCSS("overflow-x", "auto");
+  const horizontal = await scrollBody.evaluate((node) => {
+    node.scrollLeft = node.scrollWidth;
+    return { range: node.scrollWidth - node.clientWidth, offset: node.scrollLeft };
+  });
+  expect(horizontal.range).toBeGreaterThan(0);
+  expect(horizontal.offset).toBeGreaterThan(0);
 });
 
 for (const locale of ["en", "zh"] as const) {
@@ -175,9 +194,9 @@ test("data gaps pager captures a second page of stored warning events", async ({
     VALUES ${warnings.join(",")}`);
   await page.goto("/#/cost-basis");
   const gaps = page.locator(".fidelity-cost-gaps");
-  await expect(gaps.locator("tbody tr")).toHaveCount(50, { timeout: 20_000 });
+  await expect(gaps.locator("tbody tr")).toHaveCount(6, { timeout: 20_000 });
   await gaps.getByRole("button", { name: "Next page of Data gaps to review" }).click();
-  await expect(gaps.locator(".fidelity-pager")).toContainText("51–");
+  await expect(gaps.locator(".fidelity-pager")).toContainText("7–");
   await gaps.screenshot({ path: `${dir}/cost-basis-gaps-page2-phone.png` });
 });
 
@@ -220,7 +239,12 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
   await expect(page.locator(".fidelity-year-select svg")).toBeVisible();
   expect((await page.locator(".fidelity-year-select").boundingBox())!.width).toBe(324);
   await expect(page.locator(".fidelity-cost-warning")).toContainText("It shows – and");
+  const lotPager = page.locator(".fidelity-cost-lots > .fidelity-pager");
+  await lotPager.getByRole("button", { name: "Next" }).click();
   await expect(page.locator(".fidelity-lot-row").filter({ hasText: "35.0000" }).locator(".fidelity-unknown-term")).toHaveText("–");
+  await lotPager.getByRole("button", { name: "Previous" }).click();
+  await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => document.getElementById("app-main-content")!.scrollTop)).toBe(0);
   const valueGaps = await page.locator(".fidelity-cost-kpis").evaluate((root) => {
     const gap = (selector: string) => {
       const [left, right] = [...root.querySelectorAll<HTMLElement>(selector)].map((node) => {
@@ -257,9 +281,9 @@ test("default, export, methods, range, lots and gaps", async ({ page }) => {
       y: Math.round(node.getBoundingClientRect().y), h: Math.round(node.getBoundingClientRect().height),
     })));
   expect(lotLayout.map(({ y, h }) => [y, h])).toEqual([
-    [2080, 25], [2105, 83], [2192, 40], [2232, 83], [2315, 83],
-    [2402, 40], [2442, 81], [2527, 40], [2567, 83], [2650, 83],
-    [2737, 40], [2777, 83], [2860, 83], [2947, 40], [2987, 83], [3070, 64],
+    [2072, 40], [2112, 83], [2199, 40], [2239, 83], [2322, 83],
+    [2409, 40], [2449, 83], [2532, 83], [2619, 40], [2659, 83],
+    [2742, 83], [2829, 40], [2869, 83], [2357, 64],
   ]);
   await page.screenshot({ path: `${dir}/cost-basis-phone-long.png`, fullPage: true,
     style: longPageCaptureStyle });

@@ -323,7 +323,8 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
   const moverPositive = Math.max(0, ...movers.map((item) => item.value));
   const moverNegative = Math.max(0, ...movers.map((item) => -item.value));
   const moverZero = moverNegative / (moverPositive + moverNegative || 1) * 92 + 4;
-  const moverUnit = (100 - moverZero - 4) / (moverPositive || 1);
+  const moverRightUnit = (96 - moverZero) / (moverPositive || 1);
+  const moverLeftUnit = (moverZero - 4) / (moverNegative || 1);
   const byValue = (view?.holdings ?? []).filter((asset) => asset.assetType === "crypto");
   const coins = byValue.map((asset, index) => {
     const key = `${asset.assetType}:${asset.coin}`;
@@ -486,10 +487,10 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
         <DailyChart daily={daily} currency={currency} quoteColor={quoteColor} />
       </section>
       <section className="fd-card fd-overview-moved"><div className="fd-card-heading"><h3>{t("overview.design.whatMoved")}</h3><span>{t("fidelity.overview.movedSubtitle").replace("{amount}", amt(weekChange, currency, 0, true))}</span></div>
-        {movers.map((item) => <Link key={item.key} className="fd-overview-mover" to={buildAssetDetailsPath({ symbol: item.symbol, assetType: item.key.startsWith("stock:") ? "stock" : "crypto" })}>
+        <div className="fd-overview-movers">{movers.map((item) => <Link key={item.key} className="fd-overview-mover" to={buildAssetDetailsPath({ symbol: item.symbol, assetType: item.key.startsWith("stock:") ? "stock" : "crypto" })}>
           <b>{item.symbol}</b><span style={{ "--fd-zero": `${moverZero}%` } as CSSProperties}>{item.value !== 0 && <i data-tone={tone(item.value)} style={item.value > 0
-            ? { left: `${moverZero}%`, width: `${item.value * moverUnit}%` }
-            : { right: `${100 - moverZero}%`, width: `${-item.value * moverUnit}%` }} />}</span><strong data-tone={tone(item.value)}>{amt(item.value, currency, 0, true)}</strong></Link>)}
+            ? { left: `${moverZero}%`, width: `${item.value * moverRightUnit}%` }
+            : { right: `${100 - moverZero}%`, width: `${-item.value * moverLeftUnit}%` }} />}</span><strong className="t3-signed-unit" data-tone={tone(item.value)}>{amt(item.value, currency, 0, true)}</strong></Link>)}</div>
       </section>
       <section className="fd-card fd-overview-rank" data-expanded={rankExpanded}><div className="fd-card-heading"><h3>{t("overview.design.topCoins")}</h3><div className="fd-overview-mini"><button aria-pressed={sort === "value"} onClick={() => setSort("value")}>{t("overview.design.byValue")}</button><button aria-pressed={sort === "change"} onClick={() => setSort("change")}>{t("overview.design.byPriceChange")}</button></div></div>
         {coins.slice(0, rankExpanded ? undefined : 3).map((coin) => <Link key={coin.coin} className="fd-overview-row" to={buildAssetDetailsPath({ symbol: coin.coin, assetType: coin.assetType })}>

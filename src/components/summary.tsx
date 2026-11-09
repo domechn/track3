@@ -39,6 +39,7 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
   const [selectedYear, setSelectedYear] = useState(dateRange.end.getFullYear());
   const [moverNames, setMoverNames] = useState<string[]>([]);
   const loaded = useRef(0);
+  const summaryGridRef = useRef<HTMLDivElement>(null);
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   const hasValidRange = dateRange.start.getTime() > new Date("1970-01-01").getTime() &&
     dateRange.end.getTime() >= dateRange.start.getTime();
@@ -52,6 +53,17 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
   useEffect(() => { setSummaryLoading(loading); }, [loading, setSummaryLoading]);
   useEffect(() => () => { setSummaryLoading(false); }, [setSummaryLoading]);
   useEffect(() => { setSelectedYear(dateRange.end.getFullYear()); }, [dateRange.end.getFullYear()]);
+  useLayoutEffect(() => {
+    if (loading) return;
+    const grid = summaryGridRef.current;
+    const monthPanel = grid?.querySelector<HTMLElement>(".fidelity-period-card:has(.fidelity-month-grid)");
+    if (!grid || !monthPanel) return;
+    const observer = new ResizeObserver(() => {
+      grid.style.setProperty("--fidelity-period-height", `${Math.max(360, monthPanel.getBoundingClientRect().height)}px`);
+    });
+    observer.observe(monthPanel);
+    return () => observer.disconnect();
+  }, [loading, oneSnapshot]);
 
   useLayoutEffect(() => {
     setLoading(hasValidRange);
@@ -104,7 +116,7 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
           : subtitle || t("summary.fidelity.defaultSubtitle")}</p>
       </header>
       {!hasValidRange ? <div className="fidelity-card fidelity-empty">{t("summary.noData")}</div> : <>
-        <div className="fidelity-summary-grid" style={loading ? { visibility: "hidden", position: "absolute", inset: 0, height: 0, overflow: "hidden", pointerEvents: "none" } : undefined}>
+        <div ref={summaryGridRef} className="fidelity-summary-grid" style={loading ? { visibility: "hidden", position: "absolute", inset: 0, height: 0, overflow: "hidden", pointerEvents: "none" } : undefined}>
           <SummaryProfitLoss currency={currency} dateRange={dateRange} quoteColor={quoteColor} oneSnapshot={oneSnapshot}
             baseline={selectedRange.baseline} snapshotCount={selectedRange.snapshots.length} rangeLabel={rangeLabel} />
           <AthValue fidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor} />

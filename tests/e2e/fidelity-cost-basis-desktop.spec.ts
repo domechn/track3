@@ -59,6 +59,19 @@ async function openCostBasis(page: Page) {
   await expect(page.getByRole("status", { name: /Loading/i })).toHaveCount(0);
 }
 
+test("narrow desktop data gaps can scroll to the Reason column", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await openCostBasis(page);
+  const body = page.locator(".fidelity-cost-gaps .fidelity-card-scroll");
+  await expect(body).toHaveCSS("overflow-x", "auto");
+  const horizontal = await body.evaluate((node) => {
+    node.scrollLeft = node.scrollWidth;
+    return { range: node.scrollWidth - node.clientWidth, offset: node.scrollLeft };
+  });
+  expect(horizontal.range).toBeGreaterThan(0);
+  expect(horizontal.offset).toBeGreaterThan(0);
+});
+
 test("FIFO report and data gaps table", async ({ page }) => {
   await openCostBasis(page);
   await expect(page.locator('a[href="#/goals"] > span[aria-hidden="true"]')).toBeVisible();
@@ -69,7 +82,7 @@ test("FIFO report and data gaps table", async ({ page }) => {
   await expect(page.getByRole("table", { name: "Data gaps to review" })).toBeVisible();
   await expect(page.locator(".fidelity-cost-filters")).toHaveCSS("margin-top", "16px");
   await expect.poll(async () => (await page.locator(".fidelity-cost-filters").boundingBox())!.y).toBeCloseTo(88, 0);
-  await expect.poll(async () => (await page.getByTestId("cost-desktop-table").boundingBox())!.y).toBeCloseTo(864.5, 0);
+  await expect.poll(async () => (await page.getByTestId("cost-desktop-table").boundingBox())!.y).toBeCloseTo(944, 0);
   await expect(page.locator("[data-ai-setup-card]")).toBeHidden();
   await expect(page.getByRole("button", { name: "Tax year" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".t3-topbar-ranges")).toHaveCount(0);
@@ -158,12 +171,12 @@ test("empty tax year retains open lots and chart empty state", async ({ page }) 
   await page.getByRole("button", { name: /Dispositions/ }).click();
   await page.getByRole("heading", { name: "Cost basis" }).click();
   const chartEmpty = (await page.locator(".fidelity-cost-chart .fidelity-empty").boundingBox())!;
-  expect(chartEmpty.height).toBeCloseTo(276.5, 0);
+  expect(chartEmpty.height).toBeCloseTo(356, 0);
   const tableEmpty = (await page.locator(".fidelity-cost-empty").boundingBox())!;
   expect(tableEmpty.height).toBeCloseTo(218.5, 0);
   expect(tableEmpty.y).toBeGreaterThan(chartEmpty.y);
-  expect((await page.getByRole("button", { name: "Show open lots" }).boundingBox())!.y).toBeCloseTo(1015, 0);
-  expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(1172);
+  expect((await page.getByRole("button", { name: "Show open lots" }).boundingBox())!.y).toBeCloseTo(1095, 0);
+  expect(await page.evaluate(() => document.getElementById("app-main-content")!.scrollHeight)).toBe(1252);
   expect((await page.getByTestId("cost-desktop-table").boundingBox())!.height).toBeCloseTo(308.5, 0);
   await capture(page, "cost-basis-empty");
   await expect.poll(() => page.evaluate(() =>
@@ -193,6 +206,7 @@ test("open lots uses the held and unrealized columns", async ({ page }) => {
   await page.getByRole("button", { name: /Open lots/ }).click();
   await expect(page.getByTestId("cost-desktop-table")).toContainText("Unrealized");
   await expect(page.locator(".fidelity-subtotal").first().locator("td").first()).toHaveAttribute("colspan", "3");
+  await page.getByRole("button", { name: "Next page of Open lots at latest stored price" }).click();
   await expect(page.locator(".fidelity-subtotal").filter({ hasText: "SOL subtotal" }).locator("td").last())
     .toHaveText("Mixed");
   await expect(page.locator(".fidelity-subtotal").filter({ hasText: "SOL subtotal" }).getByText("withdrawal unmatched"))

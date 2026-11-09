@@ -10,8 +10,9 @@ import { BottomSheet } from "@/mobile/components/mobile";
 import { ArchiveIcon, BarChartIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
 import { directionPhysicalTone } from "@/utils/color";
+import { costBasisPageSizes } from "@/components/cost-basis-page-sizes";
 
-const PAGE_SIZE = 50;
+const { lots: lotPageSize, gaps: gapPageSize } = costBasisPageSizes.phone;
 const methods: CostBasisMethod[] = ["FIFO", "LIFO", "HIFO", "AVERAGE"];
 const amountFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 8 });
 const moneyFormatter = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -99,6 +100,10 @@ export function PhoneCostBasis({
   const [gapReason, setGapReason] = useState("all");
   const [gapPage, setGapPage] = useState(0);
   const [lotPage, setLotPage] = useState(0);
+  useEffect(() => {
+    setGapPage(0);
+    setLotPage(0);
+  }, [report, method]);
   const custom = !year;
   const methodText = method === "AVERAGE" ? t("fidelity.cost.averageMethod") : method;
   const today = format(new Date(), "yyyy-MM-dd");
@@ -141,7 +146,7 @@ export function PhoneCostBasis({
   const gaps = useMemo(() => report ? gapRows(report, locale) : [], [report, locale]);
   const reasons = [...new Set(gaps.map((row) => row.reason))];
   const filteredGaps = gapReason === "all" ? gaps : gaps.filter((row) => row.reason === gapReason);
-  const pagedGaps = filteredGaps.slice(gapPage * PAGE_SIZE, (gapPage + 1) * PAGE_SIZE);
+  const pagedGaps = filteredGaps.slice(gapPage * gapPageSize, (gapPage + 1) * gapPageSize);
   const displayDisposals = useMemo(() => {
     if (!report || method !== "AVERAGE") return report?.disposals ?? [];
     const grouped = new Map<string, CostBasisReport["disposals"][number]>();
@@ -170,7 +175,7 @@ export function PhoneCostBasis({
       ...displayDisposals.map((row) => ({ kind: "lot" as const, row })),
       ...unknown.map((row) => ({ kind: "unknown" as const, row })),
     ];
-  const visibleLots = selectedLots.slice(lotPage * PAGE_SIZE, (lotPage + 1) * PAGE_SIZE);
+  const visibleLots = selectedLots.slice(lotPage * lotPageSize, (lotPage + 1) * lotPageSize);
   const lotGroups = new Map<string, (typeof visibleLots)[number][]>();
   const lotTypes = new Map<string, Set<string>>();
   for (const item of visibleLots) {
@@ -341,6 +346,7 @@ export function PhoneCostBasis({
       <section className="fidelity-cost-card fidelity-cost-by-asset">
         <div className="fidelity-card-heading"><h2>{t("finance.realizedByAsset")}</h2>
           <span>{t("fidelity.cost.assetRange").replace("{range}", year || t("fidelity.cost.selectedRange"))}</span></div>
+        <div className="fidelity-card-scroll" role="region" aria-label={t("finance.realizedByAsset")} tabIndex={0}>
         {byAsset.length || chartUnknown.length ? byAsset.map((row) => <div className="fidelity-asset-bar" key={`${row.assetType}:${row.symbol}`}>
           <strong>{row.symbol}</strong><span className="fidelity-bar-track" style={{ "--z": `${zero}%` } as CSSProperties}>
             {row.gainLoss !== 0 && <i data-tone={tone(row.gainLoss)}
@@ -355,9 +361,11 @@ export function PhoneCostBasis({
         {chartUnknown.map((row) => <div className="fidelity-asset-bar" key={`${row.assetType}:${row.symbol}:unknown`}>
           <strong>{row.symbol}</strong><span className="fidelity-bar-track" style={{ "--z": "0%" } as CSSProperties} /><span className="cost-gain" data-tone="neutral">–</span>
         </div>)}
+        </div>
       </section>
       <section className="fidelity-cost-card fidelity-cost-prices">
         <div className="fidelity-card-heading"><h2>{t("fidelity.cost.averagePrices")}</h2></div>
+        <div className="fidelity-card-scroll" role="region" aria-label={t("fidelity.cost.averagePrices")} tabIndex={0}>
         {averageRows.length ? averageRows.map(({ symbol, assetType }) => {
           const average = priceAverages[`${assetType}:${symbol}`];
           return <div className="fidelity-price-row" key={`${assetType}:${symbol}`}>
@@ -369,6 +377,7 @@ export function PhoneCostBasis({
               .replace("{sold}", average?.sold ? lotAmount(average.sold, assetType) : "–")}</small>
           </div>;
         }) : <EmptyState icon={BarChartIcon} title={t("cost.prices.empty.title")} hint={t("cost.prices.empty.hint")} />}
+        </div>
       </section>
       <section className="fidelity-cost-card fidelity-cost-lots">
         <div className="fidelity-segments" role="group" aria-label={t("cost.realized")}>
@@ -391,6 +400,7 @@ export function PhoneCostBasis({
             }}>{t("fidelity.cost.chooseAnotherYear")}</button>
           </div>
         </EmptyState>}
+        <div className="fidelity-card-scroll" role="region" aria-label={t(lotTab === "open" ? "fidelity.cost.openLotsTab" : "fidelity.cost.dispositions").replace("{count}", "").trim()} tabIndex={0}>
         {sortedLotGroups.map(([key, rows]) => <div className="fidelity-lot-group" key={key}>
           <div className="fidelity-lot-group-head"><strong>{rows[0].row.symbol}
             {lotTypes.get(rows[0].row.symbol)!.size > 1 && <> · {t(`coin.assetType.${rows[0].row.assetType}`)}</>}
@@ -431,6 +441,7 @@ export function PhoneCostBasis({
                 : t("fidelity.cost.costProceeds").replace("{cost}", money(item.row.costBasis)).replace("{proceeds}", money("proceeds" in item.row ? item.row.proceeds : 0))}</small>
             </div>)}
         </div>)}
+        </div>
         {selectedLots.length > 0 && <div className="fidelity-lot-total">
           <div><strong>{t(lotTab === "open" || !unknown.length ? "history.total" : "fidelity.cost.totalExcludingUnknown")}</strong>
             {gain(lotTab === "open" ? unrealized : report.totals.gainLoss)}</div>
@@ -439,12 +450,12 @@ export function PhoneCostBasis({
             : t("fidelity.cost.costProceeds").replace("{cost}", money(report.totals.costBasis))
               .replace("{proceeds}", money(report.totals.proceeds))}</small>
         </div>}
-        {selectedLots.length > PAGE_SIZE && <div className="fidelity-pager">
-          <span>{t("fidelity.cost.gapPage").replace("{start}", String(lotPage * PAGE_SIZE + 1))
-            .replace("{end}", String(Math.min((lotPage + 1) * PAGE_SIZE, selectedLots.length)))
+        {selectedLots.length > lotPageSize && <div className="fidelity-pager">
+          <span>{t("fidelity.cost.gapPage").replace("{start}", String(lotPage * lotPageSize + 1))
+            .replace("{end}", String(Math.min((lotPage + 1) * lotPageSize, selectedLots.length)))
             .replace("{count}", String(selectedLots.length))}</span>
           <button type="button" disabled={lotPage === 0} onClick={() => setLotPage(lotPage - 1)}>{t("fidelity.cost.previous")}</button>
-          <button type="button" disabled={(lotPage + 1) * PAGE_SIZE >= selectedLots.length}
+          <button type="button" disabled={(lotPage + 1) * lotPageSize >= selectedLots.length}
             onClick={() => setLotPage(lotPage + 1)}>{t("common.next")}</button>
         </div>}
       </section>
@@ -458,6 +469,7 @@ export function PhoneCostBasis({
               : t(`fidelity.cost.reason.${reason}`)}</option>)}
           </select><Icon kind="chevron" />
         </label>
+        <div className="fidelity-card-scroll" role="region" aria-label={t("cost.warnings")} tabIndex={0}>
         <table aria-label={t("cost.warnings")}><thead><tr>
           <th>{t("fidelity.cost.gapDate")}</th><th>{t("fidelity.cost.gapCoin")}</th>
           <th>{t("fidelity.cost.gapAmount")}</th><th>{t("fidelity.cost.gapReason")}</th>
@@ -466,14 +478,15 @@ export function PhoneCostBasis({
           <td>{row.dust ? t("fidelity.cost.gapDust").replace("{count}", String(row.dust)) :
             t(`fidelity.cost.reason.${row.reason}`)}</td>
         </tr>)}</tbody></table>
-        {filteredGaps.length > PAGE_SIZE && <div className="fidelity-pager">
-          <span>{t("fidelity.cost.gapPage").replace("{start}", String(gapPage * PAGE_SIZE + 1))
-            .replace("{end}", String(Math.min((gapPage + 1) * PAGE_SIZE, filteredGaps.length)))
+        </div>
+        {filteredGaps.length > gapPageSize && <div className="fidelity-pager">
+          <span>{t("fidelity.cost.gapPage").replace("{start}", String(gapPage * gapPageSize + 1))
+            .replace("{end}", String(Math.min((gapPage + 1) * gapPageSize, filteredGaps.length)))
             .replace("{count}", String(filteredGaps.length))}</span>
           <button type="button" aria-label={t("cost.previousPage").replace("{table}", t("cost.warnings"))}
             disabled={gapPage === 0} onClick={() => setGapPage(gapPage - 1)}>{t("fidelity.cost.previous")}</button>
           <button type="button" aria-label={t("cost.nextPage").replace("{table}", t("cost.warnings"))}
-            disabled={(gapPage + 1) * PAGE_SIZE >= filteredGaps.length} onClick={() => setGapPage(gapPage + 1)}>
+            disabled={(gapPage + 1) * gapPageSize >= filteredGaps.length} onClick={() => setGapPage(gapPage + 1)}>
             {t("common.next")}</button>
         </div>}
       </section>}

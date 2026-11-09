@@ -229,6 +229,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
               <small>{t(`fidelity.overview.kind.${source.kind}`)} · {percent(share(source))}</small><small data-tone={directionTone(view.base ? change : null)}>{view.base ? `${money(change, currency, 0, true)} · ${percent(source.baseValue ? change / source.baseValue : 0, 2, true)}` : "—"}</small></button>; })}
         </section>
         {!chosen && <section className="fd-card fd-wallet-status"><div className="fd-card-heading"><h3>{t("fidelity.wallets.sourceStatus")}</h3><span>{t("fidelity.wallets.today")}</span></div>
+          <div className="fd-wallet-status-scroll" role="region" aria-label={t("fidelity.wallets.sourceStatus")} tabIndex={0}>
           {sources.map((source) => { const sourceFailed = source.status?.status === "failed" || source.status?.status === "stale"; const next = source.status && retry.nextBySource[source.status.sourceId];
             return <div className="fd-wallet-status-row" key={source.id}><i className={sourceFailed ? "error" : ""} /><div><b>{source.label}</b>
               {sourceFailed ? <><small>{t(source.status?.category === "rateLimit" ? "fidelity.wallets.rateLimitStatus" : "fidelity.wallets.genericFailedStatus").replace("{last}", time(source.status?.lastSuccessAt))}</small>
@@ -236,6 +237,7 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
                   {next && <span>{t("fidelity.wallets.nextRetry").replace("{time}", time(new Date(next).toISOString()))}</span>}</div></> :
                 <small>{source.status?.detail || (source.kind === "exchange" ? t("fidelity.wallets.exchange") : source.kind === "broker" ? t("fidelity.wallets.broker") : t("fidelity.wallets.publicAddress"))}</small>}</div>
               <span>{sourceFailed ? t("fidelity.wallets.failed") : time(source.status?.lastSuccessAt)}</span></div>; })}
+          </div>
         </section>}
         {chosen ? <section className="fd-card fd-wallet-changes"><div className="fd-card-heading"><h3>{t("fidelity.wallets.assetChanges")}</h3><span>{range}, {currency.currency}</span></div>
           <MoverList items={movers} currency={currency} />

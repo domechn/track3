@@ -36,7 +36,7 @@ export function BlacklistDesign({ symbols, onAdd, onRemove }: Props) {
       {symbols.length ? <>
         <div className="table-head"><span>{t("fidelity.blacklist.token")}</span><span>{t("fidelity.blacklist.seen")}</span><span>{t("fidelity.blacklist.since")}</span><span /></div>
         {symbols.map((item) => <div className="table-row" key={item}>
-          <div className="identity"><span className="logo">{item.slice(0, 3)}</span><div><b>{item}</b><small>{t("fidelity.blacklist.unknownContract")}</small></div></div>
+          <div className="identity"><div><b>{item}</b><small>{t("fidelity.blacklist.unknownContract")}</small></div></div>
           <span className="muted">—</span><span className="muted">—</span>
           <ConfirmDeleteDialog
             trigger={<button type="button" className="remove" aria-label={t("data.removeFromBlacklistAria").replace("{symbol}", item)}><ResetIcon />{t("fidelity.blacklist.remove")}</button>}
