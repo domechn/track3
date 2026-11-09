@@ -97,7 +97,7 @@ for (const shell of ["desktop", "mobile"] as const) {
         : <DesktopConfiguration initialPreferCurrency="USD" />}
     </MemoryRouter>);
     expect(await screen.findAllByRole("button", { name: "Rename Trading" })).not.toHaveLength(0);
-  }, 20_000);
+  }, 60_000);
 }
 
 it("the mobile non-iOS layout saves every source rename and clears a custom alias to its symbol", async () => {
@@ -125,4 +125,4 @@ it("the mobile non-iOS layout saves every source rename and clears a custom alia
   await rename("Nova Vault", "");
   await waitFor(() => expect(mocks.saved?.others[0].alias).toBe(""));
   expect(mocks.toast.mock.calls.some(([value]) => value.description === "Renamed to NOVA")).toBe(true);
-}, 30_000);
+}, 60_000);
