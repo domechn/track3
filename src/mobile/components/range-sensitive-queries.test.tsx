@@ -305,7 +305,7 @@ describe("Range-sensitive component queries", () => {
     );
     const table = await screen.findByRole("table", { name: "Profit and loss by period" });
     expect(table).toHaveTextContent("+$25.00");
-    expect(table).toHaveTextContent("-$15.00");
+    expect(table).toHaveTextContent("−$15.00");
   });
 
   it("does not let an older PNL range overwrite the latest chart data", async () => {

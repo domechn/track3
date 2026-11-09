@@ -11,6 +11,7 @@ import { overviewUseLastKnownEvent, sourceStatusesChangedEvent } from "@/compone
 import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { buildAssetDetailsPath } from "@/utils/assets";
 import { currencyWrapper } from "@/utils/currency";
+import { formatSignedMoney } from "@/components/signed-money";
 import { useTranslation } from "@/mobile/i18n";
 import { rangeLabel } from "@/mobile/components/fidelity-range";
 import AssetLabel from "@/components/common/asset-label";
@@ -589,15 +590,15 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
         <DailyChart daily={daily} currency={currency} quoteColor={quoteColor} />
       </section>
       <section className="fd-card fd-overview-moved" data-chart-group=""><div className="fd-card-heading"><h3>{t("overview.design.whatMoved")}</h3><span>{t("fidelity.overview.movedSubtitle").replace("{amount}", amt(weekChange, currency, 0, true))}</span></div>
-        {movers.map((item, index) => <div key={item.key} className="fd-overview-mover">
+        <div className="fd-overview-movers">{movers.map((item, index) => <div key={item.key} className="fd-overview-mover">
           <Link to={buildAssetDetailsPath({ symbol: item.symbol, assetType: item.key.startsWith("stock:") ? "stock" : "crypto" })}><b><AssetLabel asset={{ symbol: item.symbol, assetType: item.key.startsWith("stock:") ? "stock" : "crypto" }} size={20} quiet /></b></Link>
           <button type="button" {...moverChart.markProps(index, `${item.symbol}: ${amt(item.value, currency, 2, true)}`,
             <><div>{item.symbol}</div><div data-tone={tone(item.value)}>{amt(item.value, currency, 2, true)}</div></>)}
             style={{ "--fd-zero": `${moverZero}%` } as CSSProperties}>{item.value !== 0 && <i data-tone={tone(item.value)} style={item.value > 0
             ? { left: `${moverZero}%`, width: `${item.value * moverUnit}%` }
             : { right: `${100 - moverZero}%`, width: `${-item.value * moverUnit}%` }} />}</button>
-          <Link to={buildAssetDetailsPath({ symbol: item.symbol, assetType: item.key.startsWith("stock:") ? "stock" : "crypto" })}><strong data-tone={tone(item.value)}>{amt(item.value, currency, 0, true)}</strong></Link>
-        </div>)}{moverChart.tooltip}
+          <Link to={buildAssetDetailsPath({ symbol: item.symbol, assetType: item.key.startsWith("stock:") ? "stock" : "crypto" })}><strong className="t3-signed-unit" data-tone={tone(item.value)}>{formatSignedMoney(item.value, currency, 0)}</strong></Link>
+        </div>)}</div>{moverChart.tooltip}
       </section>
       <section className="fd-card fd-overview-rank" data-expanded={rankExpanded}><div className="fd-card-heading"><h3>{t("overview.design.topCoins")}</h3><div className="fd-overview-mini"><button aria-pressed={sort === "value"} onClick={() => setSort("value")}>{t("overview.design.byValue")}</button><button aria-pressed={sort === "change"} onClick={() => setSort("change")}>{t("overview.design.byPriceChange")}</button></div></div>
         {coins.slice(0, rankExpanded ? undefined : 3).map((coin) => <Link key={coin.coin} className="fd-overview-row" to={buildAssetDetailsPath({ symbol: coin.coin, assetType: coin.assetType })}>

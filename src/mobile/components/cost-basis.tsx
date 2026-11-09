@@ -190,9 +190,9 @@ export default function CostBasisPage({ quoteColor = "green-up-red-down" }: { qu
     : value.toLocaleString(undefined, { maximumFractionDigits: 2 });
   const mobileDate = (value: string) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US",
     { year: "numeric", month: "short", day: "numeric" }).format(new Date(value));
-  const gain = (value: number) => <span className="cost-gain ios-money"
+  const gain = (value: number) => <span className="cost-gain ios-money t3-signed-unit"
     data-tone={directionPhysicalTone(value, quoteColor)}>
-    {value > 0 ? "+" : value < 0 ? "−" : ""}{isMobile ? "$" : ""}{Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+    {`${value > 0 ? "+" : value < 0 ? "−" : ""}${isMobile ? "$" : ""}${Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
   </span>;
   const qty = (value: number) => value !== 0 && Math.abs(value) < 1e-8
     ? String(value) : value.toLocaleString(undefined, { maximumFractionDigits: 8 });

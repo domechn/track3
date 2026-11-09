@@ -485,7 +485,7 @@ const App = ({
           const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
           const cardContent = <>
             <div className="text-xs text-muted-foreground">{item.label}</div>
-            <div className={cn("mt-1 text-sm font-semibold tracking-tight",
+            <div className={cn("t3-signed-unit mt-1 text-sm font-semibold tracking-tight",
               value === null ? "text-muted-foreground" : getToneClass(value, quoteColor))}>
               {item.hasData ? renderAmount(value) : "—"}
             </div>

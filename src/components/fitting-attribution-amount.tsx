@@ -26,7 +26,7 @@ export function FittingAttributionAmount({ full, compact, minBarWidth }: {
     return () => observer.disconnect();
   }, [full, minBarWidth]);
 
-  return <span ref={root} className="relative block min-w-0 w-full overflow-hidden whitespace-nowrap">
+  return <span ref={root} className="t3-signed-unit relative block min-w-0 w-full overflow-hidden whitespace-nowrap">
     <span ref={probe} className="absolute invisible whitespace-nowrap" aria-hidden="true" />
     {fits ? full : compact}
   </span>;

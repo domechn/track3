@@ -62,7 +62,7 @@ function formatSignedNumber(value: number, suffix = "") {
     return `+${prettyNumberToLocaleString(value)}${suffix}`;
   }
   if (value < 0) {
-    return `-${prettyNumberToLocaleString(Math.abs(value))}${suffix}`;
+    return `−${prettyNumberToLocaleString(Math.abs(value))}${suffix}`;
   }
   return `0${suffix}`;
 }
@@ -321,22 +321,20 @@ const App = ({
                       {row.walletAliasText}
                     </TableCell>
                     <TableCell
-                      className={`py-1.5 text-right text-sm ${getToneClass(row.changePercentage, quoteColor)}`}
+                      className={`t3-signed-unit py-1.5 text-right text-sm ${getToneClass(row.changePercentage, quoteColor)}`}
                     >
                       {formatSignedNumber(row.changePercentage, "%")}
                     </TableCell>
                     <TableCell
-                      className={`py-1.5 text-right text-sm ${getToneClass(row.changeValue, quoteColor)}`}
+                      className={`t3-signed-unit py-1.5 text-right text-sm ${getToneClass(row.changeValue, quoteColor)}`}
                     >
-                      {row.changeValue < 0
-                        ? "-"
+                      {`${row.changeValue < 0
+                        ? "−"
                         : row.changeValue > 0
                           ? "+"
-                          : ""}
-                      {currency.symbol}
-                      {prettyNumberToLocaleString(
+                          : ""}${currency.symbol}${prettyNumberToLocaleString(
                         currencyWrapper(currency)(Math.abs(row.changeValue)),
-                      )}
+                      )}`}
                     </TableCell>
                   </TableRow>
                 );

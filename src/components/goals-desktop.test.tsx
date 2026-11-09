@@ -95,7 +95,7 @@ it("localizes stored alert history instead of showing raw text", () => {
   expect(screen.queryByText("raw title")).not.toBeInTheDocument();
   expect(screen.queryByText("raw message")).not.toBeInTheDocument();
   expect(screen.getByText("AAPL 7d move below 10%")).toBeInTheDocument();
-  expect(screen.getByText("−10.0% over 7 days: $100.00 to $90.00")).toBeInTheDocument();
+  expect(document.querySelector(".t3-fidelity-history-row small")).toHaveTextContent(/^−10\.0% over 7 days: \$100\.00 to \$90\.00$/);
 });
 
 it("formats stored history values and firing thresholds for each rule kind", () => {
@@ -136,7 +136,7 @@ it("keeps deleted move and allocation alerts readable when their rule details ar
         message: "old alert", value: 3.1, triggeredAt: "2026-10-27T09:40:00.000Z", acknowledgedAt: null },
     ],
   })} />);
-  expect(screen.getByText("+12.5% on the 27 Oct refresh")).toBeInTheDocument();
+  expect(document.querySelectorAll(".t3-fidelity-history-row small")[0]).toHaveTextContent(/^\+12\.5% on the 27 Oct refresh$/);
   expect(screen.getByText("BTC was 3.1 pts off target on the 27 Oct refresh")).toBeInTheDocument();
 });
 

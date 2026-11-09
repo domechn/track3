@@ -7,6 +7,7 @@ import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import FidelityIcon from "./fidelity-icon";
 import AssetLabel from "./common/asset-label";
+import { SignedInlineText } from "./common/signed-inline-text";
 import "./rebalance-desktop.css";
 import { useChartHitArea } from "./chart-tooltip";
 
@@ -155,7 +156,7 @@ export default function RebalanceDesktop(props: Props) {
     {partialSnapshot && <p role="status" className="t3-fidelity-error">{t("rebalance.partialPause")}</p>}
     <div className="t3-fidelity-grid">
       <section className="t3-fidelity-card t3-fidelity-kpis" data-testid="rebalance-summary" data-valid={complete}>
-        {summary.map((item) => <div key={item.label}><span>{item.label}</span><strong data-tone={item.tone}>{item.value}</strong><small>{item.note}</small></div>)}
+        {summary.map((item) => <div key={item.label}><span>{item.label}</span><strong data-tone={item.tone}><SignedInlineText text={item.value} /></strong><small><SignedInlineText text={item.note} /></small></div>)}
       </section>
       <section className="t3-fidelity-card t3-fidelity-allocation" data-chart-group="">
         <div className="t3-fidelity-card-head"><h2>{t("rebalance.targets")}</h2><span>{t(empty ? "rebalance.fidelity.barScale" : "rebalance.fidelity.tickScale").replace("{scale}", fixed(barScale, 0))}</span></div>
@@ -252,7 +253,7 @@ export default function RebalanceDesktop(props: Props) {
           </Fragment>)}
           {sells.length > 0 && buys.length === 0 && <tr className="subtotal"><td /><td colSpan={2}>{t("rebalance.fidelity.totalSells")}</td><td className="t3-fidelity-amount">{money(sellTotal)}</td><td colSpan={3} /></tr>}
           <tr className="subtotal"><td /><td colSpan={2}>{t("rebalance.fidelity.totalBuys")}</td><td className="t3-fidelity-amount">{money(buyTotal)}</td><td colSpan={3} /></tr>
-          <tr className="net"><td /><td colSpan={2}><b>{t("rebalance.fidelity.net")}</b></td><td className="t3-fidelity-amount"><b>{netCash < 0 ? "−" : ""}{money(Math.abs(netCash))}</b></td><td colSpan={3}>{t(Math.abs(netCash) < .005 ? "rebalance.fidelity.netHint" : netCash < 0 ? "rebalance.fidelity.netHintSpent" : "rebalance.fidelity.netHintReserve")}</td></tr>
+          <tr className="net"><td /><td colSpan={2}><b>{t("rebalance.fidelity.net")}</b></td><td className="t3-fidelity-amount"><b className="t3-signed-unit">{`${netCash < 0 ? "−" : ""}${money(Math.abs(netCash))}`}</b></td><td colSpan={3}>{t(Math.abs(netCash) < .005 ? "rebalance.fidelity.netHint" : netCash < 0 ? "rebalance.fidelity.netHintSpent" : "rebalance.fidelity.netHintReserve")}</td></tr>
         </tbody></table> : <div className="t3-fidelity-empty"><b>{bad ? t("rebalance.fidelity.must100") : invalid ? props.validation || t(optionsInvalid ? "rebalance.validationOptions" : "rebalance.validationOther") : t("rebalance.fidelity.noTargets")}</b>
           <span>{bad ? t("rebalance.fidelity.pausedHint").replace("{total}", `${fixed(targetTotal)}%`) : invalid ? props.validation || t(optionsInvalid ? "rebalance.validationOptions" : "rebalance.validationOther") : t("rebalance.fidelity.emptyHint")}</span>
           <div>{bad ? <button className="accent" onClick={props.onNormalize}>{t("rebalance.normalize")}</button> : !invalid && <>

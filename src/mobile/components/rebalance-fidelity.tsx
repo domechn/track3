@@ -1,4 +1,5 @@
 import AssetLabel from "@/components/common/asset-label";
+import { SignedInlineText } from "@/components/common/signed-inline-text";
 import { useRef, useState } from "react";
 import type { RebalanceHolding, RebalanceResult, RebalanceTarget } from "@/middlelayers/rebalance";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
@@ -51,7 +52,7 @@ const inputNumber = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 })
 const money = (value: number, symbol: string) => `${symbol}${nf(2).format(Math.abs(value))}`;
 const pct = (value: number) => `${nf(1).format(value)}%`;
 const kpi = (label: string, value: string, note: string, tone = "") =>
-  <div className="pf-kpi"><span>{label}</span><strong className={tone}>{value}</strong><small>{note}</small></div>;
+  <div className="pf-kpi"><span>{label}</span><strong className={tone}><SignedInlineText text={value} /></strong><small><SignedInlineText text={note} /></small></div>;
 
 export default function RebalanceFidelity({
   currency, holdings, targets, result, tolerance, minimumTradeValue, ignoreBelowValue,
@@ -285,7 +286,7 @@ export default function RebalanceFidelity({
         <div className="pf-trade-sub"><span>{t("fidelity.rebalance.totalSells")}</span>{money(sellTotal, currency.symbol)}</div>
         {buys.map((row, i) => tradeRow(row, sells.length + i + 1))}
         <div className="pf-trade-sub"><span>{t("fidelity.rebalance.totalBuys")}</span>{money(buyTotal, currency.symbol)}</div>
-        <div className="pf-trade-sub pf-trade-net"><b>{t("fidelity.rebalance.net")}</b><strong>{netCashChange < 0 ? "−" : netCashChange > 0 ? "+" : ""}{money(netCashChange, currency.symbol)}</strong></div>
+        <div className="pf-trade-sub pf-trade-net"><b>{t("fidelity.rebalance.net")}</b><strong className="t3-signed-unit">{`${netCashChange < 0 ? "−" : netCashChange > 0 ? "+" : ""}${money(netCashChange, currency.symbol)}`}</strong></div>
       </div> : <div className="pf-empty">
         <b>{allUnset ? t("fidelity.rebalance.noTargetsYet") : t("fidelity.rebalance.must100")}</b>
         <span>{allUnset ? t("fidelity.rebalance.emptyTradeHelp") :

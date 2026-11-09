@@ -1,4 +1,5 @@
 import AssetLabel from "./common/asset-label";
+import { SignedInlineText } from "./common/signed-inline-text";
 import { useState } from "react";
 import type { AlertHistory, AlertKind, AlertPrices, AlertRule, AlertSnapshot, AlertWindow } from "@/middlelayers/alerts";
 import { measureRule } from "@/middlelayers/alerts";
@@ -259,7 +260,7 @@ export default function GoalsDesktop(props: Props) {
                   <><div>{ruleTitle(rule, t)}</div><div>{fixed(raw, 2)}%</div><div>{measurement.value === undefined ? t("goals.unavailable") : fixed(measurement.value, 2)}</div></>)}>
                 <u className={triggered ? "warn" : ""} style={{ width: `${Math.min(100, Math.max(0, raw))}%` }} /></i>
                 <strong>{measurement.status === "ready" ? raw >= 100 ? "100%+" : `${fixed(raw)}%` : "–"}</strong></div>
-                <small>{describeProgress(rule, measurement.value, raw)}</small></div>
+                <small><SignedInlineText text={describeProgress(rule, measurement.value, raw)} /></small></div>
               <div className="t3-fidelity-goal-kind">{kindName(rule.kind, t)}<small>{t("goals.fidelity.cooldownShort").replace("{window}", cooldownLabel(Number(alertDraftFromRule(rule).cooldownMinutes)))}</small></div>
               <div className="t3-tag" data-tone={!rule.enabled ? "neutral" : triggered ? "warning" : "accent"}>{t(!rule.enabled ? "goals.fidelity.status.off" : triggered ? "goals.fidelity.status.triggered" : "goals.fidelity.status.watching")}</div>
               <div className="t3-fidelity-goal-actions"><button aria-label={t("goals.fidelity.editAction")} onClick={(event) => openEdit(rule, event.currentTarget)}><FidelityIcon name="edit" /></button>
@@ -283,7 +284,7 @@ export default function GoalsDesktop(props: Props) {
         {props.loading ? <div className="t3-fidelity-empty" role="status">{t("goals.loading")}</div> : history.length ? <><div className="t3-fidelity-history-list">{historyPaging.rows.map((alert) => {
           const text = historyText(alert);
           return <div key={alert.id} className={`t3-fidelity-history-row ${alert.acknowledgedAt ? "" : "unread"}`}>
-          <i /><div><b>{text.title}</b><small>{text.message}</small><small>{dateLabel(alert.triggeredAt)}{alert.ruleId === null ? ` · ${t("goals.fidelity.ruleDeleted")}` : ""}</small></div>
+          <i /><div><b>{text.title}</b><small><SignedInlineText text={text.message} /></small><small>{dateLabel(alert.triggeredAt)}{alert.ruleId === null ? ` · ${t("goals.fidelity.ruleDeleted")}` : ""}</small></div>
           {alert.acknowledgedAt ? <span><FidelityIcon name="check" />{t("goals.fidelity.read")}</span> : <button onClick={() => props.onAcknowledge(alert.id)}>{t("goals.ack")}</button>}
         </div>})}</div><AttributionPager count={history.length} {...historyPaging} t={t} ariaLabel={t("goals.history")} />
         <div className="t3-fidelity-foot"><FidelityIcon name="info" />{t("goals.fidelity.historyFoot")}</div></>

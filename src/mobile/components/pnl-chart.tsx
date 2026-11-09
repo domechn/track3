@@ -287,7 +287,7 @@ const App = ({
           <span>{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US",
             { month: "short", day: "numeric" }).format(new Date(plottedPNL[scrub.index].timestamp))}</span>
           <strong data-tone={directionPhysicalTone(plottedPNL[scrub.index].change, quoteColor)}>
-            {plottedPNL[scrub.index].change < 0 ? "−" : plottedPNL[scrub.index].change > 0 ? "+" : ""}{currency.symbol}{Math.abs(plottedPNL[scrub.index].change).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            {`${plottedPNL[scrub.index].change < 0 ? "−" : plottedPNL[scrub.index].change > 0 ? "+" : ""}${currency.symbol}${Math.abs(plottedPNL[scrub.index].change).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
           </strong>
         </div>}
       </div>
@@ -301,7 +301,7 @@ const App = ({
         <thead><tr><th scope="col">{t("profitMetrics.date")}</th><th scope="col">{t("history.change")}</th></tr></thead>
         <tbody>{plottedPNL.map(({ change, timestamp }, index) => <tr key={`${timestamp}-${index}`}>
           <td>{timeToDateStr(timestamp)}</td>
-          <td>{change < 0 ? "-" : "+"}{currency.symbol}{Math.abs(change).toFixed(2)}</td>
+          <td>{`${change < 0 ? "−" : "+"}${currency.symbol}${Math.abs(change).toFixed(2)}`}</td>
         </tr>)}</tbody>
       </table>}
     </div>

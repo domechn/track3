@@ -1,4 +1,5 @@
 import AssetLabel from "@/components/common/asset-label";
+import { SignedInlineText } from "@/components/common/signed-inline-text";
 import { useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -438,13 +439,13 @@ export default function GoalsFidelity({
                 checked={rule.enabled} onChange={(event) => onToggle(rule, event.currentTarget.checked)} /></label>
             <div className="pf-goal-progress"><div className="pf-progress-line" role="button"
               {...chart.markProps(index, `${titleFor(rule)}: ${pct(progress)}, ${measured.value === undefined ? t("goals.unavailable") : digits(2).format(measured.value)}`,
-                <><div>{titleFor(rule)}</div><div>{pct(progress)}</div><div>{currentText}</div></>)}>
+                <><div>{titleFor(rule)}</div><div>{pct(progress)}</div><div><SignedInlineText text={currentText} /></div></>)}>
               <span role="progressbar"
               aria-label={t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`))}
               aria-valuemin={0} aria-valuemax={100} aria-valuenow={Number(Math.min(100, progress).toFixed(1))}>
               <i className={triggered ? "pf-amber" : ""}
               style={{ width: `${Math.min(100, progress)}%` }} /></span><b>{progress >= 100 ? "100%+" : pct(progress)}</b></div>
-              <small>{currentText}</small></div>
+              <small><SignedInlineText text={currentText} /></small></div>
             <div className="pf-goal-kind">{kindFor(rule.kind)}<small>{t("fidelity.goals.cooldownShort")
               .replace("{duration}", cooldownShort(cooldownMinutes))}</small></div>
             <span className="t3-tag pf-goal-status" data-tone={!rule.enabled ? "neutral" : triggered ? "warning" : "accent"}>
@@ -468,7 +469,7 @@ export default function GoalsFidelity({
             const text = alertText(alert, t, locale, rules.find((rule) => rule.id === alert.ruleId),
               { snapshots, prices, targets });
             return <div className={`pf-alert-row ${alert.acknowledgedAt ? "" : "pf-unread"}`} key={alert.id}>
-              <i className="pf-alert-dot" /><div><b>{text.title}</b><small>{text.message}</small>
+              <i className="pf-alert-dot" /><div><b>{text.title}</b><small><SignedInlineText text={text.message} /></small>
                 <small>{when(alert.triggeredAt)}{alert.ruleId === null ? t("fidelity.goals.ruleDeleted") : ""}</small></div>
               <div className="pf-alert-action">{alert.acknowledgedAt ? <span><PlanIcon name="check" />{t("fidelity.goals.read")}</span>
                 : <button onClick={() => onAck(alert)}>{t("goals.ack")}</button>}</div>
