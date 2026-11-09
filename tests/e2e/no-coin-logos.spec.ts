@@ -90,6 +90,15 @@ async function checkPage(page: Page, route: string) {
   expect(result.overflow, `${route}: horizontal overflow`).toBeLessThanOrEqual(1);
 }
 
+async function expectSourceLogo(page: Page, name: string, asset: string) {
+  const image = page.locator("tr, .fidelity-source-row").filter({ hasText: name }).locator("img").first();
+  await expect(image).toBeVisible();
+  await expect.poll(async () => image.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0);
+  const expected = await page.evaluate(async (path) =>
+    (await import(/* @vite-ignore */ path)).default as string, `/src/assets/icons/${asset}-logo.svg?import`);
+  await expect(image).toHaveAttribute("src", expected);
+}
+
 for (const width of [1280, 390] as const) {
   for (const theme of ["light", "dark"] as const) {
     test(`${width}x${width === 390 ? 844 : 720} ${theme}: assets use text and Settings keeps source logos`, async ({ browser }) => {
@@ -148,15 +157,11 @@ for (const width of [1280, 390] as const) {
           await page.screenshot({ path: `${dir}/${route.replace("/", "-")}.png`, animations: "disabled" });
         }
         await page.goto("/#/settings/configuration?section=sources");
-        const logos = (name: string) => page.locator(`img[src*='${name}-logo']`);
-        await expect.poll(async () => logos("binance").count()).toBeGreaterThan(0);
-        await expect.poll(async () => logos("binance").first().evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
-        if (await logos("btc").count() === 0) {
-          const walletTab = page.getByRole("button", { name: /^wallets?\b/i }).first();
-          await walletTab.click();
-        }
-        await expect.poll(async () => logos("btc").count()).toBeGreaterThan(0);
-        await expect.poll(async () => logos("btc").first().evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+        await expectSourceLogo(page, "Binance", "binance");
+        await expectSourceLogo(page, "OKX", "okex");
+        if (phone) await page.getByRole("tab", { name: /^wallets$/i }).click();
+        else await page.locator(".t3-settings-source-tabs").getByRole("button", { name: /^wallets?\b/i }).click();
+        await expectSourceLogo(page, "Ledger cold wallet", "btc");
         await page.screenshot({ path: `${dir}/settings-sources.png`, animations: "disabled" });
       } finally {
         await context.close();

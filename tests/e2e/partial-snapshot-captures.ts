@@ -28,7 +28,9 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
     await expect(page.getByText("Dotted gap: partial refreshes are omitted from this chart.")).toBeVisible();
     const label = await page.locator(".t3-hero-header .text-sm").boundingBox();
     const amount = await page.locator(".t3-hero-value").boundingBox();
-    expect(label && amount && label.y + label.height + 4 <= amount.y).toBe(true);
+    expect(label).not.toBeNull();
+    expect(amount).not.toBeNull();
+    expect(label!.y + label!.height + 4).toBeLessThanOrEqual(amount!.y);
     await expect(page.getByText("Insights", { exact: true })).toBeVisible();
     await expect(page.getByText("Daily change", { exact: true })).toBeVisible();
     await expect(page.getByText("Top coins", { exact: true })).toBeVisible();

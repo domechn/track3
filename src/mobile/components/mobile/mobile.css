@@ -3039,6 +3039,7 @@ body:has(.fidelity-history, .fidelity-history-detail) {
     display: grid; flex: none; width: 28px; height: 28px; place-items: center;
     border: 0; border-radius: 7px; background: #26262c; color: #cfd0d4; font-size: 10px; font-weight: 700;
   }
+  .fidelity-source-identity .ios-d3-source-avatar img { width: 22px; height: 22px; }
   .fidelity-source-row > [role="switch"] { grid-area: sw; justify-self: end; width: 44px; height: 44px; min-height: 44px; margin: -10px -6px -10px 0; }
   .fidelity-source-row > [role="switch"]::before { top: 0; left: 10px; }
   .fidelity-source-row > [role="switch"] span { position: relative; top: -12px; width: 16px; height: 16px; margin-left: 5px; }

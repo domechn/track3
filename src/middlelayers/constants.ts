@@ -31,6 +31,7 @@ export const SUPPORT_CONS = [
 export const WALLET_LOGS: { [k: string]: string } = {
   binance: BinanceLogo,
   okex: OkexLogo,
+  okx: OkexLogo,
   bitget: BitgetLogo,
   gate: GateLogo,
   kraken: KrakenLogo,

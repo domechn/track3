@@ -89,8 +89,8 @@ test("populated history shows the selected snapshot beside the list", async ({ p
   await expect(page.getByTestId("history-snapshot-row").first()).toContainText("$763,809.27");
   const goalsBadge = page.locator('a[href="#/goals"] > span[aria-hidden="true"]');
   await expect(goalsBadge).toBeVisible();
-  expect((await goalsBadge.boundingBox())!.x).toBeCloseTo(31, 0);
-  expect((await goalsBadge.boundingBox())!.y).toBeCloseTo(373, 0);
+  expect((await goalsBadge.boundingBox())!.x).toBeCloseTo(34, 0);
+  expect((await goalsBadge.boundingBox())!.y).toBeCloseTo(409, 0);
   await expect(goalsBadge).toHaveCSS("border", "2px solid rgb(13, 13, 14)");
   await expect(page.getByTestId("history-desktop-detail")).toContainText("$763,809.27");
   await expect(page.getByTestId("history-snapshot-row").filter({ hasText: "28 Oct 08:51" })).toBeVisible();

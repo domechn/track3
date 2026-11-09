@@ -542,7 +542,7 @@ export function MobileSources(props: MobileSourcesProps) {
 
 function SourceAvatar({ type, label }: { type: string; label?: string }) {
   const logo = getWalletLogo(type);
-  return <span className="ios-d3-source-avatar" aria-hidden="true">{label ?? (logo === UnknownLogo ? type.slice(0, 2).toUpperCase() : <img src={logo} alt="" />)}</span>;
+  return <span className="ios-d3-source-avatar" aria-hidden="true">{logo === UnknownLogo ? label ?? type.slice(0, 2).toUpperCase() : <img src={logo} alt="" />}</span>;
 }
 
 function Field({ id, label, value, onChange, secret = false, onPaste, readOnly = false, invalid = false, error }: {

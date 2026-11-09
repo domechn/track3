@@ -236,9 +236,9 @@ for (const state of states) test(`Overview desktop captures ${state.name} with s
         await expect(page.locator(".t3-moved-list li").last()).toContainText("AAPL");
         const firstBar = await page.locator(".t3-moved-list li:first-child .t3-moved-track > span").boundingBox();
         const lastBar = await page.locator(".t3-moved-list li:last-child .t3-moved-track > span").boundingBox();
-        expect(Math.abs(firstBar!.x - 1077.6)).toBeLessThan(2);
+        expect(Math.abs(firstBar!.x - 1097.4)).toBeLessThan(2);
         expect(Math.abs(firstBar!.width - 193)).toBeLessThan(3);
-        expect(Math.abs(lastBar!.x + lastBar!.width - 1077.6)).toBeLessThan(2);
+        expect(Math.abs(lastBar!.x + lastBar!.width - 1097.4)).toBeLessThan(2);
         await expect(page.locator(".t3-top-head")).toContainText("24h");
         await expect(page.locator(".t3-top-head")).toContainText("7D");
         await expect(page.getByTestId("overview-coin-row").first()).toContainText("+6.4%");

@@ -1288,7 +1288,7 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
 .fidelity-facts > div > span:first-child { color: #b4b6bc; }
 .fidelity-facts > div > span:last-child { text-align: right; }
 .fidelity-period-card { display: flex; flex-direction: column; min-height: 454px; padding: 0; }
-.fidelity-period-card:has(.fidelity-month-grid) { align-self: start; min-height: 360px; }
+.fidelity-period-card:has(.fidelity-month-grid) { align-self: start; min-height: 0; }
 .fidelity-year-section:has(.fidelity-year-stack) { height: var(--fidelity-period-height, 360px); min-height: 0; }
 .fidelity-period-card > div:first-child { padding: 20px 20px 0; }
 .fidelity-period-card > div:first-child > div { align-items: baseline; }
@@ -2966,8 +2966,8 @@ body:not(:has(.app-layout)):has(.t3-refresh-overview) .t3-fidelity-ranges { disp
     padding: var(--card-pad) var(--card-pad) 0;
   }
   body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card > .t3-hero-header button { pointer-events: auto; }
-  body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card > .t3-hero-content { padding: 32px 20px 24px; }
-  body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card:has(.t3-hero-value > span) > .t3-hero-content { padding-top: calc(var(--card-pad) + var(--card-pad)); }
+  body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card > .t3-hero-content { padding: 40px 20px 24px; }
+  body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card:has(.t3-hero-value > span) > .t3-hero-content { padding-top: calc(var(--card-pad) + var(--card-pad) + 4px); }
   body:not(:has(.app-layout)) .t3-pnl-compact { position: relative; top: -8px; }
   body:not(:has(.app-layout)) .t3-total-overview > .t3-hero-card:not(.mobile-hero-card) .t3-pnl-compact .t3-pnl-compact-card > div { padding-left: 0 !important; }
   body:not(:has(.app-layout)) .t3-pnl-compact-card > div > div > div:first-child { padding-left: 20px !important; }
