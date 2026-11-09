@@ -62,18 +62,18 @@ it("uses the existing expiry translation key for the date phrase", () => {
 });
 
 it("shows a trialing subscription with the active status tone", () => {
-  render(<SystemInfoCard title="Track3 Pro" status={{ label: "Trialing", value: "trialing" }} version="0.9.9" t={(key) => key} />);
+  render(<SystemInfoCard title="Track3 Pro" status={{ label: "Trialing", value: "trialing" }} version="0.9.10" t={(key) => key} />);
   expect(screen.getByText("Trialing")).toHaveClass("t3-tag");
   expect(screen.getByText("Trialing")).toHaveAttribute("data-tone", "positive");
 });
 
 it.each(["expired", "canceled"])("shows a %s subscription with the negative status tone", (status) => {
-  render(<SystemInfoCard title="Track3 Pro" status={{ label: "Expired", value: status }} version="0.9.9" t={(key) => key} />);
+  render(<SystemInfoCard title="Track3 Pro" status={{ label: "Expired", value: status }} version="0.9.10" t={(key) => key} />);
   expect(screen.getByText("Expired")).toHaveAttribute("data-tone", "negative");
 });
 
 it("keeps separators with the following plan segment when the summary wraps", () => {
-  render(<SystemInfoCard title="Track3 Pro" description="Yearly plan · renews Nov 28, 2026 · in 31 days" version="0.9.9" t={(key) => key} />);
+  render(<SystemInfoCard title="Track3 Pro" description="Yearly plan · renews Nov 28, 2026 · in 31 days" version="0.9.10" t={(key) => key} />);
   const segments = screen.getByText(/Yearly plan/).closest("p")!.querySelectorAll("span");
   expect(Array.from(segments, (segment) => segment.textContent)).toEqual([
     "Yearly plan", "·\u00a0renews Nov 28, 2026", "·\u00a0in 31 days",

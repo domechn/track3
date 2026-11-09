@@ -41,7 +41,7 @@ async function setup(page: Page, fixture: string, theme: "light" | "dark") {
   else if (fixture === "rebalance") await installPlanFidelityScene(page, "rebalance");
   else {
     await seedDesktopSourceStatuses(page);
-    await installSampleBridge(page, { fidelitySample: "full", appVersion: "0.9.9" });
+    await installSampleBridge(page, { fidelitySample: "full", appVersion: "0.9.10" });
   }
 }
 
@@ -138,7 +138,7 @@ if (stage !== "before") {
       userAgent: iphone, isMobile: true, hasTouch: true, reducedMotion: "reduce" });
     try {
       const page = await context.newPage();
-      await installSampleBridge(page, { fidelitySample: "full", appVersion: "0.9.9" });
+      await installSampleBridge(page, { fidelitySample: "full", appVersion: "0.9.10" });
       await page.goto("/#/wallets");
       const source = page.locator(".fd-wallet-chips button").filter({ hasText: "Binance" });
       await expect(source).toBeVisible({ timeout: 40_000 });
