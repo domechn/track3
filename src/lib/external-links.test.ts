@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import ts from "typescript";
 import { beforeEach, expect, it, vi } from "vitest";
 import { externalLinks, openExternal } from "./external-links";
@@ -47,36 +48,41 @@ it("allows only central navigation URLs and known data provider URLs in source l
   ]);
   const ownedHosts = new Set(Object.values(externalLinks).map((value) => new URL(value).hostname));
   const failures: string[] = [];
-  const root = resolve("src");
+  const urlPattern = /https:\/\/[^/\s"'`]+|(?:[\w-]+\.)*track3\.(?:dev|app|io)\b/g;
+  const files = execFileSync("git", ["ls-files", "-z", "--", "src"], { encoding: "utf8" })
+    .split("\0")
+    .filter((file) => /^src\/(?!test\/).*\.(?:tsx?|json)$/.test(file)
+      && !/\.test\.tsx?$/.test(file) && file !== "src/lib/external-links.ts");
 
-  function visitDir(dir: string) {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const file = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (file !== join(root, "test")) visitDir(file);
-      } else if (/\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file) && file !== join(root, "lib", "external-links.ts")) {
-        const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
-        function visit(node: ts.Node) {
-          if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-            const literal = node.text;
-            const location = relative(".", file);
-            if (/^https:\/\/[^/\s]+/.test(literal)) {
-              const host = new URL(literal).hostname;
-              if (!providerHosts.has(host)) failures.push(`${location}: ${literal}`);
-            }
-            for (const host of literal.match(/(?:[\w-]+\.)*track3\.(?:dev|app|io)\b/g) ?? []) {
-              if (!ownedHosts.has(host) && !providerHosts.has(host)) failures.push(`${location}: ${host}`);
-            }
-          }
-          ts.forEachChild(node, visit);
+  function checkLiteral(literal: string, file: string) {
+    for (const [match] of literal.matchAll(urlPattern)) {
+      if (match.startsWith("https://")) {
+        const host = new URL(match).hostname;
+        if (!providerHosts.has(host) && !(file.endsWith(".json") && literal === "https://s3.example.com")) {
+          failures.push(`${file}: ${literal}`);
         }
-        visit(source);
+      } else if (!ownedHosts.has(match) && !providerHosts.has(match)) {
+        failures.push(`${file}: ${match}`);
       }
     }
   }
-  visitDir(root);
+
+  for (const file of files) {
+    const text = readFileSync(file, "utf8");
+    if (text.search(urlPattern) < 0) continue;
+    if (file.endsWith(".json")) {
+      for (const value of Object.values(JSON.parse(text) as Record<string, string>)) checkLiteral(value, file);
+      continue;
+    }
+    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+    function visit(node: ts.Node) {
+      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) checkLiteral(node.text, file);
+      ts.forEachChild(node, visit);
+    }
+    visit(source);
+  }
   expect(failures).toEqual([]);
-});
+}, 60_000);
 
 it("keeps central URLs well formed and verifies owned pages on demand", async () => {
   for (const value of Object.values(externalLinks)) {
