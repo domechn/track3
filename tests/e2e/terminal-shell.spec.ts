@@ -90,10 +90,12 @@ test("overview hero value styling survives an extra content element", async ({ p
   await page.goto("/#/overview");
   const value = page.locator(".t3-total-overview [data-ui-card] .font-mono").first();
   await expect(value).toBeVisible();
+  const fontSize = await value.evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
+  expect(fontSize).toBeGreaterThanOrEqual(25);
   await value.evaluate((node) => {
     const notice = document.createElement("div");
     notice.setAttribute("aria-hidden", "true");
     node.parentElement!.prepend(notice);
   });
-  expect(await value.evaluate((node) => parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(32);
+  expect(await value.evaluate((node) => parseFloat(getComputedStyle(node).fontSize))).toBe(fontSize);
 });

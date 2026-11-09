@@ -11,6 +11,7 @@ import { readStoredStatuses } from "@/middlelayers/ui-state/source-status-store"
 import { useTranslation } from "@/i18n";
 import { sourceStatusesChangedEvent } from "@/components/source-status-event";
 import { LicenseCenter, type ProUsage } from "@/middlelayers/license";
+import { WALLET_LOGS } from "@/middlelayers/constants";
 import type { ExchangeDraft, ExchangeRow, OtherRow, StockBrokerDraft, StockBrokerRow, WalletDraft, WalletRow } from "./types";
 import { SourceEditorDesign } from "./source-editor-design";
 import EmptyState from "@/components/empty-state";
@@ -243,7 +244,9 @@ export function SourceDesign({
           const toggle = () => kind === "exchange" ? onExchangeToggle(row.type, row.apiKey)
             : kind === "wallet" ? onWalletToggle(row.type, row.address) : onBrokerToggle(row.type, row.queryId);
           return <div className={`t3-fidelity-source-row ${stale ? "error" : ""}`} key={`${kind}:${identity}`}>
-            <div className="t3-fidelity-source-id"><span className="t3-fidelity-source-logo">{kind === "wallet" ? row.type === "erc20" ? "ETH" : row.type.slice(0, 3).toUpperCase() : kind === "broker" ? "IB" : ({ binance: "BN", okex: "OK", kraken: "KR" } as Record<string, string>)[row.type] ?? row.type.slice(0, 2).toUpperCase()}</span><div><button type="button" className="t3-fidelity-source-name" aria-label={`${t("fidelity.source.edit")} ${name}`} onClick={() => setEditor(tab)}><b title={name}>{name}</b></button><small>{metadata}{kind === "wallet" && row.type === "erc20" && <span className="t3-fidelity-source-pro">Pro</span>}</small></div></div>
+            <div className="t3-fidelity-source-id"><span className="t3-fidelity-source-logo">{WALLET_LOGS[row.type]
+              ? <img src={WALLET_LOGS[row.type]} alt="" width="22" height="22" />
+              : kind === "wallet" ? row.type.slice(0, 3).toUpperCase() : kind === "broker" ? "IB" : row.type.slice(0, 2).toUpperCase()}</span><div><button type="button" className="t3-fidelity-source-name" aria-label={`${t("fidelity.source.edit")} ${name}`} onClick={() => setEditor(tab)}><b title={name}>{name}</b></button><small>{metadata}{kind === "wallet" && row.type === "erc20" && <span className="t3-fidelity-source-pro">Pro</span>}</small></div></div>
             <div><span className={`t3-fidelity-source-pill ${stale ? "error" : active ? "on" : ""}`}><i />{stale ? t("fidelity.source.error") : active ? t("fidelity.source.active") : t("fidelity.source.paused")}</span></div>
             <div className={stale ? "t3-fidelity-source-warning" : active ? "" : "t3-fidelity-source-faint"}>{stale && latestGood ? `${t("fidelity.source.lastGood")} ${latestGood}` : active && latestGood ? `${t("fidelity.source.today")} ${latestGood}` : !active && sourceStatus?.lastSuccessAt
               ? new Date(sourceStatus.lastSuccessAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).replace(" at ", ", ")

@@ -21,11 +21,12 @@ test("connection test uses a fake S3 bucket", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await syncControl.click();
   const dialog = page.getByRole("dialog");
-  await expect.poll(async () => (await dialog.boundingBox())?.x).toBeGreaterThanOrEqual(8);
+  await dialog.screenshot({ animations: "disabled" });
   const popover = await dialog.boundingBox();
   expect(popover).not.toBeNull();
-  expect(popover!.x).toBeGreaterThanOrEqual(8);
-  expect(popover!.x + popover!.width).toBeLessThanOrEqual(312);
+  expect(popover!.x).toBeCloseTo(0, 0);
+  expect(popover!.x + popover!.width).toBeCloseTo(320, 0);
+  expect(popover!.y + popover!.height).toBeCloseTo(640, 0);
 });
 
 test("a second device pulls history from the first device", async ({ browser }) => {

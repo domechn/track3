@@ -240,9 +240,9 @@ test("Summary leaders and attribution footer follow the source spacing", async (
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".summary-top-heading").first().boundingBox())!.y).toBeCloseTo(1145, 0);
-  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1609, 0);
-  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1627, 0);
+  expect((await page.locator(".summary-top-heading").first().boundingBox())!.y).toBeCloseTo(1087, 0);
+  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1551, 0);
+  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1569, 0);
   const totalRange = page.locator(".fidelity-attribution-row.total > span:nth-child(2)");
   await expect(totalRange).toHaveText("$310,000 → $763,809");
   const arrow = await totalRange.evaluate((node) => {
@@ -393,7 +393,7 @@ test("Summary month cards and calculation hint follow the source row spacing", a
     .getByRole("button", { name: "How P&L % is calculated" }).boundingBox())!;
   expect(card.y).toBe(572);
   expect(months.y).toBe(663);
-  expect(months.height).toBe(346);
+  expect(months.height).toBe(316);
   expect(hint.y).toBe(621);
 });
 
@@ -423,11 +423,11 @@ test("Summary attribution header and leaders footnote match source vertical rhyt
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".fidelity-attribution-row.head").boundingBox())!.y).toBe(1159);
+  expect((await page.locator(".fidelity-attribution-row.head").boundingBox())!.y).toBe(1101);
   expect(await page.locator(".fidelity-attribution-row.head > span").first().evaluate((node) => {
     const range = document.createRange();
     range.selectNodeContents(node);
     return range.getBoundingClientRect().y;
-  })).toBe(1166);
+  })).toBe(1108);
   expect(await page.locator(".fidelity-leaders .fidelity-caption").evaluate((node) => getComputedStyle(node).lineHeight)).toBe("18px");
 });

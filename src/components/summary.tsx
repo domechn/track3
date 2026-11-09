@@ -59,7 +59,7 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
     const monthPanel = grid?.querySelector<HTMLElement>(".fidelity-period-card:has(.fidelity-month-grid)");
     if (!grid || !monthPanel) return;
     const observer = new ResizeObserver(() => {
-      grid.style.setProperty("--fidelity-period-height", `${Math.max(360, monthPanel.getBoundingClientRect().height)}px`);
+      grid.style.setProperty("--fidelity-period-height", `${monthPanel.getBoundingClientRect().height}px`);
     });
     observer.observe(monthPanel);
     return () => observer.disconnect();
