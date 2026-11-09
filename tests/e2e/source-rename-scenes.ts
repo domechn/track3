@@ -160,7 +160,8 @@ export async function verifySourceRename(page: Page, theme: "light" | "dark", mo
   await page.goto("/#/overview");
   await check(page.getByText("Vault wallet", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Source status" }).click();
-  await check(page.getByRole("alertdialog", { name: "Source status" })).toContainText("Vault wallet");
+  await check(page.getByRole("alertdialog", { name: "Source status" })
+    .getByRole("group", { name: /^Vault wallet(?: \(|$)/ })).toBeVisible();
   await page.getByRole("alertdialog", { name: "Source status" }).getByRole("button", { name: "Close" }).click();
   if (!mobile) {
     await page.goto("/#/history");
@@ -191,7 +192,23 @@ export async function verifySourceRename(page: Page, theme: "light" | "dark", mo
     : page.locator("table tbody tr td span[title]", { hasText: longAlias }).first();
   await check(longLabel).toBeVisible();
   await check(longLabel).toHaveAttribute("title", longAlias);
-  expect(await longLabel.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+  if (mobile) {
+    expect(await longLabel.evaluate((node) => {
+      const text = document.createRange();
+      text.selectNodeContents(node);
+      return getComputedStyle(node).textOverflow === "ellipsis" &&
+        text.getBoundingClientRect().right > node.getBoundingClientRect().right;
+    })).toBe(true);
+  } else {
+    const visibleAlias = longLabel.locator('[aria-hidden="true"]');
+    await check(visibleAlias).toContainText("…");
+    expect(await visibleAlias.evaluate((node) => {
+      const visible = node.getBoundingClientRect();
+      const cell = node.parentElement!.getBoundingClientRect();
+      return visible.width > 0 && visible.right <= cell.right &&
+        node.scrollWidth <= node.clientWidth;
+    })).toBe(true);
+  }
   await check(page.getByRole("dialog")).toHaveCount(0);
   await check(page.getByText(`Renamed to ${longAlias}`, { exact: true })).toHaveCount(0);
   await page.screenshot({ path: `${screenshotPrefix}.png`, fullPage: true, animations: "disabled" });

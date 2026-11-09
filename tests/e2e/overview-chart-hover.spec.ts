@@ -55,12 +55,16 @@ test("dense seven digit history keeps tooltips and captions clear at desktop wid
     for (const width of [1100, 1280, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 });
       await expect(chart).toBeVisible();
-      const canvas = (await chart.boundingBox())!;
-      const cardBox = (await card.boundingBox())!;
+      await expect.poll(() => chart.evaluate((element: HTMLCanvasElement) =>
+        Math.abs(element.width - element.getBoundingClientRect().width)),
+      { message: JSON.stringify({ width, theme }) }).toBeLessThanOrEqual(1);
+      let canvas = (await chart.boundingBox())!;
+      let cardBox = (await card.boundingBox())!;
       await card.locator(".t3-chart-best-day").focus();
       await expect(page.locator("[data-chart-tooltip]")).toBeVisible();
-      const bestPoint = (await card.locator("[data-chart-active-point]").boundingBox())!;
       await expect.poll(async () => {
+        const bestPoint = (await card.locator("[data-chart-active-point]").boundingBox())!;
+        const currentCanvas = (await chart.boundingBox())!;
         const markerX = await chart.evaluate((element: HTMLCanvasElement) => {
           const { width, height } = element;
           const pixels = element.getContext("2d")!.getImageData(0, 0, width, height).data;
@@ -73,8 +77,10 @@ test("dense seven digit history keeps tooltips and captions clear at desktop wid
           }
           return right < 0 ? null : (left + right) / 2 * element.getBoundingClientRect().width / width;
         });
-        return markerX === null ? Infinity : Math.abs(markerX - (bestPoint.x + bestPoint.width / 2 - canvas.x));
+        return markerX === null ? Infinity : Math.abs(markerX - (bestPoint.x + bestPoint.width / 2 - currentCanvas.x));
       }, { message: JSON.stringify({ width, theme }) }).toBeLessThanOrEqual(2);
+      canvas = (await chart.boundingBox())!;
+      cardBox = (await card.boundingBox())!;
       await chart.focus();
       await page.keyboard.press("ArrowRight");
       const first = (await card.locator("[data-chart-active-point]").boundingBox())!;
@@ -111,14 +117,17 @@ test("dense seven digit history keeps tooltips and captions clear at desktop wid
           tip.y + tip.height <= note.y || note.y + note.height <= tip.y,
           JSON.stringify({ tip, note, point, width, theme, fraction })).toBe(true);
       }
+      canvas = (await chart.boundingBox())!;
       await page.mouse.move(canvas.x - 4, canvas.y - 4);
+      const finalCanvas = (await chart.boundingBox())!;
+      const finalCardBox = (await card.boundingBox())!;
       const tag = (await card.locator(".t3-chart-end-value").boundingBox())!;
       const note = (await card.locator(".t3-chart-best-day").boundingBox())!;
       const plot = (await card.locator(".t3-chart-plot").boundingBox())!;
-      expect(tag.x).toBeGreaterThan(canvas.x + canvas.width * .75);
+      expect(tag.x).toBeGreaterThan(finalCanvas.x + finalCanvas.width * .75);
       expect(tag.x - last.x).toBeGreaterThanOrEqual(4);
       expect(tag.x - last.x).toBeLessThanOrEqual(20);
-      expect(tag.x + tag.width).toBeLessThanOrEqual(cardBox.x + cardBox.width - 8);
+      expect(tag.x + tag.width).toBeLessThanOrEqual(finalCardBox.x + finalCardBox.width - 8);
       expect(note.y + note.height).toBeLessThanOrEqual(plot.y);
       await card.screenshot({ path: `/tmp/overview-chart-hover/desktop-${width}-${theme}.png` });
     }

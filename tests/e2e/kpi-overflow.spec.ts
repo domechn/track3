@@ -64,6 +64,7 @@ for (const route of routes) {
     for (const width of [1100, 1280, 1440, 1920]) {
       await page.setViewportSize({ width, height: 1000 });
       await expect(page.locator("#app-main-content").locator(desktopRouteRoot[route]).first()).toBeVisible();
+      await expect.poll(async () => (await findKpiOverflows(page)).failures).toEqual([]);
       const result = await findKpiOverflows(page);
       expect(result.inspected, `${route} at ${width}px`).toBeGreaterThan(0);
       expect(result.failures.map((failure) => `${width}: ${failure}`)).toEqual([]);

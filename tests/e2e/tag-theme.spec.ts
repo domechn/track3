@@ -108,9 +108,9 @@ test("Top mover tags use theme colors, compact height, and aligned ticker rows a
       expect(colors.radius).toBe("999px");
       expect(colors.fontSize).toBe("11px");
       expect(colors.padding).toBe("0px 6px");
-      const ticker = await rows.first().locator(".t3-cmp-asset-ticker").boundingBox();
+      const ticker = await rows.first().locator(".t3-asset-label-name").boundingBox();
       const tag = await rows.first().locator(".t3-tag").boundingBox();
-      const normal = await rows.nth(2).locator(".t3-cmp-asset-ticker").boundingBox();
+      const normal = await rows.nth(2).locator(".t3-asset-label-name").boundingBox();
       expect(ticker && tag && normal).toBeTruthy();
       expect(Math.abs(ticker!.y + ticker!.height / 2 - tag!.y - tag!.height / 2)).toBeLessThanOrEqual(1);
       expect(Math.abs(ticker!.x - normal!.x)).toBeLessThanOrEqual(1);

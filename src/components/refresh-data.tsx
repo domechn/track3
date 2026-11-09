@@ -72,6 +72,7 @@ const App = ({
   const [statusPosition, setStatusPosition] = useState<{ top: number; right: number }>();
   const [showLastKnownOffer, setShowLastKnownOffer] = useState(false);
   const [sourceStatuses, setSourceStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
+  const hadStoredStatuses = useRef(sourceStatuses.length > 0);
   const currentSourceStatuses = useCurrentSourceStatuses(sourceStatuses);
   const [pendingSources, setPendingSources] = useState<Array<{ sourceId: string; label: string }>>([]);
   const [liveSources, setLiveSources] = useState<PortfolioSourceResult[]>([]);
@@ -113,7 +114,11 @@ const App = ({
   useEffect(() => {
     if (!statusDialogOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setStatusDialogOpen(false);
+      if (event.key === "Escape") {
+        // This Escape closes Source status without dismissing the newest toast.
+        event.stopPropagation();
+        setStatusDialogOpen(false);
+      }
     };
     window.addEventListener("keydown", closeOnEscape, true);
     return () => window.removeEventListener("keydown", closeOnEscape, true);
@@ -387,7 +392,7 @@ const App = ({
   }, []);
 
   useLayoutEffect(() => {
-    if (!overviewFlow || !desktopFlow || !liveTotalVisible || sourceStatuses.length === 0) return;
+    if (!overviewFlow || !desktopFlow || !liveTotalVisible || !hadStoredStatuses.current || sourceStatuses.length === 0) return;
     const source = sourceTriggerRef.current;
     const live = document.querySelector<HTMLButtonElement>(".t3-desktop-column .t3-live-trigger");
     if (!source || !live) return;
