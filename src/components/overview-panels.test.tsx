@@ -5,6 +5,7 @@ import { DailyChangeCard, WhatMovedCard, SourceStatusCard, TopCoinsCard } from "
 
 const usd = { currency: "USD", rate: 1, alias: "US Dollar", symbol: "$" };
 const eur = { currency: "EUR", rate: 2, alias: "Euro", symbol: "€" };
+const cny = { currency: "CNY", rate: 1, alias: "Yuan", symbol: "¥" };
 
 describe("overview panels", () => {
   it("shows the best day and separates gain from loss in the daily chart", () => {
@@ -51,6 +52,15 @@ describe("overview panels", () => {
     expect(screen.getByText("Last 3 snapshots")).toBeInTheDocument();
     expect(screen.getByText("+$40.00")).toBeInTheDocument();
     expect(screen.getByText("−$25.00")).toBeInTheDocument();
+  });
+  it("renders a long CNY contribution as one signed text unit", () => {
+    render(<MemoryRouter><WhatMovedCard currency={cny} count={7} rows={[
+      { symbol: "BTC", assetType: "crypto", value: -600_061.17 },
+    ]} /></MemoryRouter>);
+    const amount = screen.getByText("−¥600,061.17");
+    expect(amount).toHaveClass("t3-signed-unit");
+    expect(amount.childNodes).toHaveLength(1);
+    expect(amount.firstChild?.nodeType).toBe(Node.TEXT_NODE);
   });
   it("uses shared direction tokens for What moved bars and coin changes", () => {
     render(<MemoryRouter>
