@@ -197,6 +197,16 @@ describe.each([
   });
 });
 
+it("keeps focus in the open popover when a sync report becomes available", () => {
+  render(<DesktopIndicator />);
+  fireEvent.click(screen.getByRole("button", { name: /Not synced yet - open Backup & sync/ }));
+  const syncNow = screen.getByRole("button", { name: "Sync now" });
+  syncNow.focus();
+  expect(syncNow).toHaveFocus();
+  publish({ mode: "ready", sync: { phase: "idle", report: zeroReport } });
+  expect(screen.getByRole("button", { name: "Sync now" })).toHaveFocus();
+});
+
 it("shows the phone first-sync sheet with its status and settings action", () => {
   window.location.hash = "#/settings/sync";
   publish({ mode: "ready", sync: { phase: "idle", report: { ...zeroReport,
@@ -236,7 +246,7 @@ it("shows the phone successful sheet with last upload and inline details", () =>
   const sheet = screen.getByRole("dialog");
   expect(sheet).toHaveTextContent("Last upload");
   expect(sheet).toHaveTextContent("Cloudflare R2 · sync-fixture");
-  expect(sheet.querySelector(".fidelity-sync-sheet-actions details")).toBeInTheDocument();
+  expect(sheet.querySelector(".fidelity-sync-sheet-actions .t3-sync-details-toggle")).toHaveAttribute("aria-expanded", "false");
   expect(sheet.querySelector(".fidelity-sync-sheet-actions")).not.toHaveTextContent("Settings");
 });
 
@@ -245,8 +255,8 @@ it("shows the known failure in expanded phone diagnostics", () => {
   publish({ mode: "ready", sync: { phase: "error", error: "bucket", report: zeroReport } });
   render(<SyncStatusIndicatorView t={(key) => (mobileEn as Record<string, string>)[key] ?? key} mobile />);
   fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
-  const details = screen.getByRole("dialog").querySelector("details");
-  expect(details).toHaveAttribute("open");
+  const details = screen.getByRole("dialog").querySelector(".t3-sync-details");
+  expect(details?.querySelector(".t3-sync-details-toggle")).toHaveAttribute("aria-expanded", "true");
   expect(details).toHaveTextContent("Bucket not found");
   expect(details).not.toHaveTextContent("None");
   expect(screen.getByRole("dialog").querySelector(".fidelity-sync-sheet-actions")).toHaveTextContent("Retry now");
