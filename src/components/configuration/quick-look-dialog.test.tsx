@@ -12,7 +12,6 @@ describe("QuickLookDialog", () => {
         title="Test Wallet"
         loading={true}
         data={[]}
-        logoMap={{}}
       />,
     );
 
@@ -30,7 +29,6 @@ describe("QuickLookDialog", () => {
         title="Test Wallet"
         loading={false}
         data={[]}
-        logoMap={{}}
       />,
     );
 
@@ -48,7 +46,6 @@ describe("QuickLookDialog", () => {
           { symbol: "BTC", amount: 1.5 },
           { symbol: "ETH", amount: 10 },
         ]}
-        logoMap={{}}
       />,
     );
 
@@ -66,7 +63,6 @@ describe("QuickLookDialog", () => {
         title="My Exchange"
         loading={false}
         data={[]}
-        logoMap={{}}
       />,
     );
 

@@ -19,6 +19,7 @@ import { matchSourceStatus } from "./source-status-match";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { buildAssetDetailsPath } from "@/utils/assets";
 import { currencyWrapper } from "@/utils/currency";
+import { formatSignedMoney } from "./signed-money";
 import { Card } from "./ui/card";
 import { deriveContributions, deriveOverviewSeries, selectBestDayContributionSnapshots, selectSevenDayContributionSnapshots, unavailableSources } from "./overview-derived";
 import { overviewRefreshRequestedEvent, sourceStatusesChangedEvent } from "./source-status-event";
@@ -129,8 +130,7 @@ export function useOverviewPanelsData(dateRange: TDateRange, allTimeRange: TDate
   return { series, bestDayContribution, contributions, contributionCount, weekBased, coins, statuses, sources };
 }
 
-const signedMoney = (value: number, currency: CurrencyRateDetail) =>
-  `${value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${Math.abs(currencyWrapper(currency)(value)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const signedMoney = formatSignedMoney;
 const money = (value: number, currency: CurrencyRateDetail) =>
   `${currency.symbol}${currencyWrapper(currency)(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const signedMoney0 = (value: number, currency: CurrencyRateDetail) =>
@@ -220,7 +220,7 @@ export function WhatMovedCard({ currency, rows, count, weekBased = false, deskto
             ...(desktopFidelity ? row.value >= 0 ? { left: `${zero}%` } : { right: `${100 - zero}%` } : {}),
           }} />
         </span>
-        <strong className={directionClass(row.value, quoteColor)}>{weekBased ? signedMoney0(row.value, currency) : signedMoney(row.value, currency)}</strong>
+        <strong className={`t3-signed-unit ${directionClass(row.value, quoteColor)}`}>{weekBased ? signedMoney0(row.value, currency) : formatSignedMoney(row.value, currency)}</strong>
       </li>)}
     </ol> : <p className="t3-panel-empty">{t("overview.design.needTwoSnapshots")}</p>}
   </Card>;

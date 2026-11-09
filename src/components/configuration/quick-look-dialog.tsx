@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/dialog";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
-import { resolveAssetLogoSrc } from "@/utils/assets";
 import { prettyPriceNumberToLocaleString } from "@/utils/currency";
 import type { QuickLookDialogProps } from "./types";
 
@@ -18,7 +17,6 @@ const QuickLookDialog = memo(function QuickLookDialog({
   title,
   loading,
   data,
-  logoMap,
 }: QuickLookDialogProps) {
   const { t } = useTranslation();
 
@@ -53,11 +51,6 @@ const QuickLookDialog = memo(function QuickLookDialog({
                   className="grid grid-cols-2 text-sm px-2 py-1.5 rounded hover:bg-muted items-center"
                 >
                   <div className="flex items-center">
-                    <img
-                      className="inline-block w-[20px] h-[20px] mr-2 rounded-full"
-                      src={resolveAssetLogoSrc(item, logoMap[item.symbol])}
-                      alt={item.symbol}
-                    />
                     <span className="font-medium">{item.symbol}</span>
                   </div>
                   <span className="text-right">

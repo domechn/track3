@@ -7,13 +7,9 @@ import { OverviewLoadingContext } from "@/contexts/overview-loading";
 
 const {
   calculateTotalProfitMock,
-  getImageApiPathMock,
-  appCacheDirMock,
   queryAttributionMock,
 } = vi.hoisted(() => ({
   calculateTotalProfitMock: vi.fn(),
-  getImageApiPathMock: vi.fn(),
-  appCacheDirMock: vi.fn(),
   queryAttributionMock: vi.fn(),
 }));
 
@@ -23,14 +19,6 @@ vi.mock("@/middlelayers/charts", () => ({
 
 vi.mock("@/middlelayers/charts-attribution-data", () => ({
   queryAttribution: queryAttributionMock,
-}));
-
-vi.mock("@/utils/app", () => ({
-  getImageApiPath: getImageApiPathMock,
-}));
-
-vi.mock("@tauri-apps/api/path", () => ({
-  appCacheDir: appCacheDirMock,
 }));
 
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
@@ -46,16 +34,10 @@ describe("Profit loading", () => {
         { symbol: "ETH", value: 20, percentage: 2, buyAmount: 1, sellAmount: 0, costAvgPrice: 10, sellAvgPrice: 0 },
       ],
     });
-    appCacheDirMock.mockResolvedValue("/tmp/track3-cache");
     queryAttributionMock.mockResolvedValue({ attribution: { entries: [], totals: { priceEffect: 0, flowEffect: 0, residual: 0, totalChange: 0 }, startValue: 0, endValue: 0 }, aliases: {} });
-    getImageApiPathMock.mockImplementation(
-      () => new Promise<string>(() => {
-        // keep pending to assert logos do not block the loading signal
-      })
-    );
   });
 
-  it("reports loaded after profit data arrives even if logo lookup is still pending", async () => {
+  it("reports loaded after profit data arrives", async () => {
     const reportLoaded = vi.fn();
 
     render(

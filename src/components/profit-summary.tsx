@@ -126,6 +126,7 @@ const App = ({
   const { t, locale } = useTranslation();
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
+  const yearScrollRef = useRef<HTMLDivElement>(null);
   const monthlyCacheRef = useRef<
     Map<
       string,
@@ -463,8 +464,19 @@ const App = ({
   }, [availableYears, yearlyProfitsMap]);
   const yearPaging = usePager(yearCards, rangeKey, 4);
   useEffect(() => {
-    const index = yearCards.findIndex((item) => item.year === selectedYear);
-    if (index >= 0) yearPaging.goTo(Math.floor(index / yearPaging.pageSize) + 1);
+    if (summaryType !== "year") return;
+    if (!fidelity) {
+      const index = yearCards.findIndex((item) => item.year === selectedYear);
+      if (index >= 0) yearPaging.goTo(Math.floor(index / yearPaging.pageSize) + 1);
+      return;
+    }
+    const region = yearScrollRef.current;
+    const selected = region?.querySelector(".fidelity-year-card.selected");
+    if (!region || !selected) return;
+    const viewport = region.getBoundingClientRect();
+    const card = selected.getBoundingClientRect();
+    if (card.top < viewport.top) region.scrollTop += card.top - viewport.top;
+    else if (card.bottom > viewport.bottom) region.scrollTop += card.bottom - viewport.bottom;
   }, [selectedYear, rangeKey, summaryType]);
 
   const visibleSummaryStats = useMemo(() => {
@@ -609,7 +621,8 @@ const App = ({
 
   function renderYearSummary() {
     if (fidelity) return oneSnapshot || unavailableReason ? <div className="fidelity-empty fidelity-period-empty">{unavailableReason || t("summary.fidelity.yearEmpty")}</div> : <>
-      <div className="fidelity-year-stack" data-paged={yearCards.length > 2}>{yearPaging.rows.map((item) => {
+      <div ref={yearScrollRef} className="fidelity-year-stack" data-scrollable={yearCards.length > 2}
+        role="region" aria-label={t("summary.fidelity.byYear")} tabIndex={0}>{yearCards.map((item) => {
       const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
       const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
       const span = yearSpan(item.year, dateRange.start, dateRange.end);
@@ -624,8 +637,6 @@ const App = ({
         <span className="fidelity-year-foot"><span><span className={countTone(item.count?.up ?? 0, true, quoteColor)}>{t(item.count?.up === 1 ? "profitSummary.monthUp" : "profitSummary.monthsUp").replace("{n}", String(item.count?.up ?? 0))}</span> · <span className={countTone(item.count?.down ?? 0, false, quoteColor)}>{t(item.count?.down === 1 ? "profitSummary.monthDown" : "profitSummary.monthsDown").replace("{n}", String(item.count?.down ?? 0))}</span></span><span>{span.last - span.first + 1} {t(span.last === span.first ? "summary.fidelity.month" : "summary.fidelity.months")}</span></span>
       </button>{partial && renderPartialInfo(item.unknownCoins, String(item.year), true)}</div>;
     })}</div>
-      {yearCards.length > 2 && <div className="fidelity-year-pager"><Pager count={yearCards.length} {...yearPaging} t={t}
-        ariaLabel={t("summary.fidelity.byYear")} /></div>}
     </>;
 
     return (

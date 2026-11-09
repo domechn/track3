@@ -4,7 +4,6 @@ import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import { ASSISTANT_APP_ACTION_EVENT, validateActionArgs } from "@/middlelayers/ai/actions";
 import { setCurrentComparisonDates, readAssistantComparisonDates, clearAssistantComparisonDates } from "@/middlelayers/ui-state/page-prefs";
-import bluebird from "bluebird";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
@@ -12,9 +11,6 @@ import {
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
 import { parseDateToTS, timeToDateStr } from "@/utils/date";
-import { getImageApiPath } from "@/utils/app";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import { downloadCoinLogos } from "@/middlelayers/data";
 import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
 import { positiveNegativeTone } from "@/utils/color";
 import { StaggerContainer, FadeUp } from "@/components/motion";
@@ -24,9 +20,7 @@ import PageLoadingOverlay from "@/mobile/components/page-loading-overlay";
 import AssetLabel from "@/components/common/asset-label";
 import {
   formatAssetLabel,
-  getAssetLogoKey,
-  resolveAssetLogoSrc,
-  shouldDownloadCryptoLogo,
+  getAssetKey,
 } from "@/utils/assets";
 import {
   CalendarIcon,
@@ -131,10 +125,7 @@ const App = ({
   const [headData, setHeadData] = useState<Asset[]>([]);
 
   const [shouldMaskValue, setShouldMaskValue] = useState<boolean>(false);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const dataChangedVersion = useDataChangedVersion();
-  const downloadedLogosRef = useRef<Set<string>>(new Set());
-  const appCacheDirRef = useRef<string>("");
 
   useEffect(() => {
     if (!baseId || !headId) {
@@ -270,12 +261,12 @@ const App = ({
 
   const coinComparisons = useMemo((): CoinComparison[] => {
     const buildMap = (items: typeof baseData) =>
-      new Map(items.map((asset) => [getAssetLogoKey(asset), asset]));
+      new Map(items.map((asset) => [getAssetKey(asset), asset]));
     const baseMap = buildMap(baseData);
     const headMap = buildMap(headData);
     const assetKeys = Array.from(
       new Set(
-        [...baseData, ...headData].map((asset) => getAssetLogoKey(asset)),
+        [...baseData, ...headData].map((asset) => getAssetKey(asset)),
       ),
     );
 
@@ -312,61 +303,6 @@ const App = ({
         : 0,
     };
   }, [baseData, headData]);
-
-  const symbolsForLogos = useMemo(
-    () =>
-      coinComparisons
-        .filter((coin) => shouldDownloadCryptoLogo(coin))
-        .filter(
-          (coin, idx, arr) =>
-            arr.findIndex(
-              (c) => getAssetLogoKey(c) === getAssetLogoKey(coin),
-            ) === idx,
-        ),
-    [coinComparisons],
-  );
-
-  useEffect(() => {
-    if (symbolsForLogos.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-    const missingSymbols = symbolsForLogos.filter(
-      (asset) => !downloadedLogosRef.current.has(getAssetLogoKey(asset)),
-    );
-
-    if (missingSymbols.length > 0) {
-      missingSymbols.forEach((asset) =>
-        downloadedLogosRef.current.add(getAssetLogoKey(asset)),
-      );
-      downloadCoinLogos(
-        missingSymbols.map((asset) => ({ symbol: asset.symbol, price: 0 })),
-      );
-    }
-
-    (async () => {
-      if (!appCacheDirRef.current) {
-        appCacheDirRef.current = await getAppCacheDir();
-      }
-      const kvs = await bluebird.map(symbolsForLogos, async (asset) => {
-        const path = await getImageApiPath(
-          appCacheDirRef.current,
-          asset.symbol,
-        );
-        return { [getAssetLogoKey(asset)]: path };
-      });
-
-      if (cancelled) {
-        return;
-      }
-      setLogoMap((prev) => ({ ...prev, ...Object.assign({}, ...kvs) }));
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [symbolsForLogos]);
 
   useEffect(() => {
     if (!currentQuickCompare || dateOptions.length === 0) {
@@ -704,13 +640,9 @@ const App = ({
               <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
                 {coinComparisons.map((coin) => (
                   <CoinCard
-                    key={getAssetLogoKey(coin)}
+                    key={getAssetKey(coin)}
                     coin={coin}
-                    logo={resolveAssetLogoSrc(
-                      coin,
-                      logoMap[getAssetLogoKey(coin)],
-                    )}
-                    baseDate={baseDate}
+
                     headDate={headDate}
                     formatVal={formatVal}
                     formatChangePercent={formatChangePercent}
@@ -941,7 +873,6 @@ function formatSnapshotLabel(createdAt: string | undefined, index: number) {
 
 function CoinCard({
   coin,
-  logo,
   baseDate,
   headDate,
   formatVal,
@@ -950,7 +881,6 @@ function CoinCard({
   changeClass,
 }: {
   coin: CoinComparison;
-  logo: string;
   baseDate?: string;
   headDate?: string;
   formatVal: (val: number, type: "price" | "amount" | "value") => string;
@@ -975,12 +905,7 @@ function CoinCard({
   return (
     <Card>
       <CardContent className="pt-4 pb-3">
-        <div className="flex items-center gap-2 mb-3">
-          <img
-            src={logo}
-            alt={formatAssetLabel(coin)}
-            className="w-[18px] h-[18px] rounded-full"
-          />
+        <div className="flex items-center mb-3">
           <AssetLabel asset={coin} labelClassName="text-sm font-medium" />
         </div>
 

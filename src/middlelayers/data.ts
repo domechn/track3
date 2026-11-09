@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { Analyzer, GlobalConfig, WalletCoin } from "./datafetch/types";
 import { BTCAnalyzer } from "./datafetch/coins/btc";
 import { combineCoinLists, getAssetType } from "./datafetch/utils/coins";
@@ -81,15 +80,6 @@ export async function queryCoinPrices(
     cpq = new CoinPriceQuery();
   }
   return cpq.listAllCoinPrices(symbols);
-}
-
-export async function downloadCoinLogos(
-  coins: {
-    symbol: string;
-    price: number;
-  }[],
-): Promise<void> {
-  return invoke("download_coins_logos", { coins });
 }
 
 function uniqueIdentities(identities: string[]): string[] {
