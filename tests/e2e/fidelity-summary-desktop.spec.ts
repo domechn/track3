@@ -233,7 +233,7 @@ test("Summary KPI values align with the net value and selected rail has a visibl
     const rule = getComputedStyle(node, "::before");
     const box = node.getBoundingClientRect();
     return { left: Math.round(parseFloat(rule.left) + box.left), width: rule.width };
-  })).toEqual({ left: 0, width: "2px" });
+  })).toEqual({ left: 0, width: "3px" });
 });
 
 test("Summary leaders and attribution footer follow the source spacing", async ({ page }) => {
@@ -314,10 +314,10 @@ test("Summary end label, rail separators and Refresh control match the source", 
   const separators = await page.locator(".t3-fidelity-nav-group").evaluateAll((nodes) =>
     nodes.map((node) => {
       const box = node.getBoundingClientRect();
-      const style = getComputedStyle(node, "::before");
-      return [box.x + parseFloat(style.left), style.width, style.backgroundColor];
+      const style = getComputedStyle(node);
+      return [box.x, box.width, style.borderTopWidth, style.borderTopColor];
     }));
-  expect(separators).toEqual([[16, "23px", "rgb(34, 34, 36)"], [16, "23px", "rgb(34, 34, 36)"]]);
+  expect(separators).toEqual([[8, 40, "1px", "rgb(34, 34, 36)"], [8, 40, "1px", "rgb(34, 34, 36)"]]);
   const refresh = page.locator(".t3-fidelity-topbar .t3-refresh-button");
   expect(await refresh.evaluate((node) => {
     const button = getComputedStyle(node);
@@ -416,7 +416,7 @@ test("Goals unread dot follows the source rail geometry", async ({ page }) => {
     const box = node.getBoundingClientRect();
     const style = getComputedStyle(node);
     return { x: box.x, y: box.y, width: box.width, height: box.height, border: style.borderTopWidth, color: style.backgroundColor };
-  })).toEqual({ x: 31, y: 360, width: 7, height: 7, border: "2px", color: "rgb(238, 106, 130)" });
+  })).toEqual({ x: 34, y: 409, width: 7, height: 7, border: "2px", color: "rgb(238, 106, 130)" });
 });
 
 test("Summary attribution header and leaders footnote match source vertical rhythm", async ({ page }) => {

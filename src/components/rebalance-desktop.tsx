@@ -5,7 +5,6 @@ import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { useTranslation } from "@/i18n";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
-import FidelityRail from "./fidelity-rail";
 import FidelityIcon from "./fidelity-icon";
 import "./rebalance-desktop.css";
 
@@ -144,7 +143,6 @@ export default function RebalanceDesktop(props: Props) {
   const canSave = complete && !props.validation && !optionsInvalid;
 
   return <div className="t3-fidelity-page t3-fidelity-rebalance">
-    <FidelityRail isProUser={props.isProUser} />
     <header className="t3-fidelity-head">
       <div><h1>{t("rebalance.title")}</h1><p>{subtitle}</p></div>
       {refreshTime && <span className={`t3-fidelity-stamp ${refreshStale ? "stale" : ""}`}><i />{t("rebalance.fidelity.pricesAsOf")} {refreshLabel}</span>}

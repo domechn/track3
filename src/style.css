@@ -1,3 +1,4 @@
+@import "./sidebar-tokens.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -1704,24 +1705,57 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
 .t3-settings-content label[for="light"] > div > div > div { background: hsl(var(--foreground)); }
 .t3-settings-content label[for="light"] > div .bg-muted { background: rgb(194 201 210); }
 .t3-settings-content label[for="light"] > div .bg-muted\/60 { background: rgb(234 237 241); }
-.t3-fidelity-sidebar { padding: 12px 10px; gap: 2px; background: #0d0d0e; }
-.t3-fidelity-sidebar > div:first-child { height: 36px; min-height: 36px; margin: 0 0 12px 1px; padding: 0; }
-.t3-fidelity-sidebar nav { margin-inline: -10px; padding: 0 10px; gap: 2px; }
-.t3-fidelity-sidebar[style*="--sidebar-width"] > div:nth-last-child(2) { margin-inline: -10px; }
-.t3-fidelity-sidebar nav > div:first-of-type { margin-top: 10px; }
-.t3-fidelity-sidebar nav a { height: 36px; padding: 0 9px; color: #8c8e95; }
-.t3-fidelity-sidebar > div:nth-last-child(2) a { color: #8c8e95; }
-.t3-fidelity-sidebar nav > div:not(:last-child) a { margin-bottom: 2px; }
-.t3-fidelity-sidebar nav a[aria-current="page"] { background: #1c1c20; color: #fff; }
-.t3-fidelity-sidebar nav a > span[aria-hidden="true"] { top: 7px; right: 7px; border: 2px solid #0d0d0e; background: #ee6a82; box-shadow: none; }
-.t3-fidelity-sidebar nav > div:last-child { border-top: 0; padding-top: 0; }
-.t3-fidelity-sidebar .t3-fidelity-nav-group { position: relative; border-top: 0; padding-top: 9px; }
-.t3-fidelity-sidebar .t3-fidelity-nav-group::before { content: ""; position: absolute; top: -2px; left: 6px; width: 23px; height: 1px; background: #222224; }
+.t3-desktop-rail {
+  --nav-rail-inset: 10px; --nav-scroll-inset: 10px; --nav-rail-end-inset: 10px;
+  gap: 0; padding: 12px 10px 8px; border-right: 1px solid var(--sidebar-border);
+  background: var(--sidebar-background); color: var(--sidebar-foreground);
+}
+.t3-desktop-rail.t3-rail-collapsed {
+  --nav-rail-inset: 8px; --nav-scroll-inset: 8px; --nav-rail-end-inset: 7px;
+  padding-inline: 8px 7px;
+}
+.t3-desktop-rail > div:first-child { height: 44px; min-height: 44px; margin-bottom: 12px; padding: 0; }
+.t3-desktop-rail > div:first-child a { min-width: 44px; height: 44px; }
+.t3-desktop-rail.t3-rail-collapsed > div:first-child a { width: 44px; margin-left: -2px; }
+.t3-desktop-rail nav {
+  gap: 0; margin-inline: calc(-1 * var(--nav-scroll-inset)) calc(-1 * var(--nav-rail-end-inset));
+  padding: 0 var(--nav-rail-end-inset) 0 var(--nav-scroll-inset);
+}
+.t3-desktop-rail nav .t3-nav-item { width: 100%; }
+.t3-desktop-rail.t3-rail-collapsed .t3-nav-item { height: var(--nav-item-size); }
+.t3-desktop-rail nav .t3-nav-divider {
+  display: flex; flex-direction: column; gap: 4px;
+  border-top: 1px solid var(--sidebar-border); margin-top: 8px; padding-top: 8px;
+}
+.t3-desktop-rail .t3-rail-group-label { color: var(--sidebar-muted); }
+.t3-desktop-rail .t3-rail-footer {
+  display: flex; flex-direction: column; gap: 4px;
+  border-top: 1px solid var(--sidebar-border); padding: 8px 0;
+}
+.t3-desktop-rail.t3-rail-collapsed a[href="#/goals"] > span[aria-hidden="true"] {
+  top: 7px; right: 7px; border: 2px solid var(--sidebar-background);
+  background: var(--sidebar-badge); box-shadow: none;
+}
+.t3-desktop-rail > button:last-child {
+  flex: none; width: 100%; height: 40px; min-height: 40px; margin: 0;
+  padding-inline: 9px; color: var(--sidebar-muted);
+}
+.t3-desktop-rail > button:last-child:hover { background: var(--sidebar-hover-bg); color: var(--sidebar-foreground); }
+.t3-desktop-rail.t3-rail-collapsed > button:last-child { padding: 0; justify-content: center; }
 @media (pointer: coarse) {
-  .t3-fidelity-sidebar { padding-inline: 5px; }
-  .t3-fidelity-sidebar > div:first-child { height: 44px; min-height: 44px; }
-  .t3-fidelity-sidebar > div:first-child button { display: grid; place-items: center; width: 44px; height: 44px; }
-  .t3-fidelity-sidebar nav a { min-width: 44px; min-height: 44px; }
+  .t3-desktop-rail.t3-rail-collapsed { --nav-rail-inset: 6px; }
+  .t3-desktop-rail.t3-rail-collapsed .t3-nav-item {
+    width: 44px; height: 44px; min-height: 44px; margin-left: -2px;
+    padding: 2px; border-radius: 10px; background-clip: content-box;
+  }
+  .t3-desktop-rail.t3-rail-collapsed nav .t3-nav-divider { margin-top: 6px; padding-top: 6px; }
+  .t3-desktop-rail.t3-rail-collapsed > button:last-child { width: 44px; height: 44px; min-height: 44px; margin-left: -2px; }
+  .t3-desktop-rail:not(.t3-rail-collapsed) .t3-nav-item {
+    height: 44px; min-height: 44px; padding: 4px;
+    border-radius: 12px; background-clip: content-box;
+  }
+  .t3-desktop-rail:not(.t3-rail-collapsed) .t3-nav-item > svg { margin-left: 5px; }
+  .t3-desktop-rail:not(.t3-rail-collapsed) nav .t3-nav-divider { margin-top: 4px; padding-top: 4px; }
 }
 .t3-settings-content .grid.max-w-2xl:has(label[for="light"]) { max-width: none; }
 .t3-system-about { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 16px; }
@@ -2790,8 +2824,6 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
 body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-fidelity-ranges,
 body:not(:has(.app-layout)):has(.t3-refresh-overview) .t3-fidelity-ranges { display: none; }
 @media (min-width: 761px) {
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-desktop-rail nav { padding-top: 7px; }
-  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-desktop-rail nav a { height: 40px; }
   body:not(:has(.app-layout)) .t3-overview-grid { gap: 16px; }
   body:not(:has(.app-layout)) .t3-overview-footer {
     display: flex; align-items: center; justify-content: space-between;
@@ -3804,7 +3836,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 @media (min-width: 761px) {
   .t3-records-fidelity-shell > main { max-width: 1560px; padding: 20px 28px 40px; }
   .t3-records-toolbar { position: fixed; z-index: 30; left: 56px; bottom: 10px; width: max-content; max-width: calc(100vw - 68px); }
-  body:has(.t3-records-fidelity-shell):has(.fidelity-records-rail:not(.fidelity-records-rail-collapsed)) .t3-records-toolbar {
+  body:has(.t3-records-fidelity-shell):has(.t3-desktop-rail:not(.t3-rail-collapsed)) .t3-records-toolbar {
     left: var(--sidebar-width); max-width: calc(100vw - var(--sidebar-width) - 12px);
   }
   .t3-records-toolbar-panel { width: max-content; min-width: 280px; max-width: calc(100vw - 68px); border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--card)); box-shadow: var(--shadow-card); }
@@ -3816,28 +3848,8 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   body:has(.t3-records-toolbar[data-open="true"]) .fidelity-cost-assistant {
     display: block; position: fixed; z-index: 30; left: 56px; bottom: 60px; width: min(430px, calc(100vw - 72px));
   }
-  body:has(.t3-records-fidelity-shell):has(.fidelity-records-rail:not(.fidelity-records-rail-collapsed)) .fidelity-cost-assistant {
+  body:has(.t3-records-fidelity-shell):has(.t3-desktop-rail:not(.t3-rail-collapsed)) .fidelity-cost-assistant {
     left: var(--sidebar-width);
-  }
-  .fidelity-records-rail-collapsed > div:first-child { height: 62px; }
-  .fidelity-records-rail-collapsed .fidelity-records-rail-group {
-    position: relative; display: flex; flex-direction: column; gap: 2px;
-    margin-top: 10px; padding-top: 11px; border-top: 0;
-  }
-  .fidelity-records-rail-collapsed .fidelity-records-rail-group::before {
-    position: absolute; top: 0; left: 6px; right: 6px; height: 1px;
-    background: hsl(var(--border)); content: "";
-  }
-  .fidelity-records-rail-collapsed a[href="#/goals"] > span[aria-hidden="true"] {
-    top: 7px; right: 7px; border: 2px solid #0d0d0e;
-    background: #ee6a82; box-shadow: none;
-  }
-  .fidelity-records-rail-collapsed a[aria-current="page"] { background: hsl(var(--raised)); }
-  .fidelity-records-rail nav { padding-bottom: 12px; }
-  .fidelity-records-rail-collapsed nav > div:last-child { border-top: 0; }
-  .fidelity-records-rail-collapsed > div:last-child {
-    position: absolute; right: 0; bottom: 48px; left: 0;
-    background: hsl(var(--background));
   }
 }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost, :where(body:has(.t3-records-fidelity-shell)) .fidelity-history {

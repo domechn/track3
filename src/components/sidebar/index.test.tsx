@@ -31,7 +31,7 @@ it.each([false, true])("gives History filters a distinct footer icon when collap
   expect(filters).toHaveAttribute("aria-controls", "t3-records-toolbar-panel");
   expect(filters).toHaveAttribute("aria-expanded", "false");
   expect(filters).toHaveAttribute("aria-pressed", "false");
-  expect(filters).toHaveClass("focus-visible:ring-2");
+  expect(filters).toHaveClass("t3-nav-item");
   if (!collapsed) expect(filters).toHaveTextContent("History filters");
 });
 
@@ -49,4 +49,17 @@ it("reports the History filters panel state and dispatches its toggle", () => {
   expect(filters).toHaveAttribute("aria-expanded", "true");
   expect(filters).toHaveAttribute("aria-pressed", "true");
   window.removeEventListener("records-controls-toggle", toggle);
+});
+
+it.each(["/overview", "/summary", "/history"])("uses the same rail rows and footer slots on %s", (route) => {
+  render(<MemoryRouter initialEntries={[route]}>
+    <Sidebar collapsed onToggle={() => {}} isProUser={false} fidelity={route === "/summary"} />
+  </MemoryRouter>);
+  const rail = document.querySelector("aside.t3-desktop-rail")!;
+  expect(rail).toHaveClass("t3-rail-collapsed");
+  expect(rail.querySelectorAll("nav .t3-nav-item")).toHaveLength(8);
+  expect(rail.querySelectorAll("nav .t3-nav-divider")).toHaveLength(2);
+  expect(rail.querySelectorAll("nav [aria-current='page']")).toHaveLength(1);
+  expect(rail.querySelector(".t3-rail-footer .t3-records-control")).toBeTruthy();
+  expect(rail.querySelector(".t3-rail-footer .t3-nav-item")).toBeTruthy();
 });

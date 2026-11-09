@@ -61,8 +61,6 @@ for (const state of ["list", "delete", "edit", "edit-error", "empty", "kinds"] a
     if (state === "list" || state === "empty") {
       await page.screenshot({ path: `${output}/${state}-viewport.png`, animations: "disabled" });
     }
-    // Full-page captures need the rail positioned within the scrolled content.
-    await page.addStyleTag({ content: ".t3-fidelity-rail { position: absolute !important; top: -20px !important; left: -84px !important; height: 1000px !important; bottom: auto !important; }" });
     await page.screenshot({ path: `${output}/${state}.png`, fullPage: true, animations: "disabled" });
     if (state === "kinds") {
       await expect(page.getByRole("heading", { name: "Rule kinds" })).toBeVisible();

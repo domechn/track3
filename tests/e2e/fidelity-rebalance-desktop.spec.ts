@@ -32,20 +32,17 @@ for (const state of ["plan", "empty", "invalid"] as const) {
     }
     await page.waitForTimeout(350);
     await expect(page.locator(".t3-fidelity-page").locator("xpath=..")).toHaveCSS("opacity", "1");
-    // Full-page Chromium captures offset fixed rails by the overflow height.
-    // Pin it to the page origin for the capture; the live rail stays fixed.
-    await page.addStyleTag({ content: ".t3-fidelity-rail { position: absolute !important; top: -20px !important; left: -84px !important; height: 1000px !important; bottom: auto !important; }" });
     await mkdir(output, { recursive: true });
     await page.screenshot({ path: `${output}/${state}.png`, fullPage: true, animations: "disabled" });
     await expect(page.getByText("Target allocation", { exact: true })).toBeVisible();
     await expect(page.getByText("Rules", { exact: true })).toBeVisible();
     await expect(page.getByText("Result", { exact: true })).toBeVisible();
     if (state === "plan") {
-      await expect(page.locator(".t3-fidelity-rail-badge")).toBeVisible();
+      await expect(page.locator('.t3-desktop-rail a[href="#/goals"] span[aria-hidden="true"]')).toBeVisible();
       await expect(page.getByTestId("rebalance-summary")).toContainText("$763,809.27");
       await expect(page.getByRole("table", { name: "Suggested trades" })).toBeVisible();
     } else if (state === "empty") {
-      await expect(page.locator(".t3-fidelity-rail-badge")).toBeVisible();
+      await expect(page.locator('.t3-desktop-rail a[href="#/goals"] span[aria-hidden="true"]')).toBeVisible();
       await expect(page.getByText("No targets set yet")).toBeVisible();
       await page.getByRole("button", { name: "Set" }).first().click();
       await expect(page.getByRole("dialog").getByLabel("Target percentage for BTC")).toBeVisible();
@@ -80,8 +77,8 @@ for (const [name, targets] of [
     await page.getByText("Manual setup").click();
     await expect(page.getByRole("spinbutton", { name: name === "type" ? "Target percentage for Crypto" : "Target percentage for BTC" })).toBeVisible();
     await expect(page.locator(".t3-manage-rebalance.t3-fidelity-page")).toBeVisible();
-    await expect(page.locator(".t3-fidelity-rail")).toBeVisible();
-    await expect(page.locator("aside.fixed.inset-y-0")).toBeHidden();
+    await expect(page.locator(".t3-desktop-rail")).toBeVisible();
+    await expect(page.locator(".t3-fidelity-rail")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Allocation deviations" })).toBeVisible();
     await expect(page.getByText(name === "type" ? "AAPL -16.5 pp" : "BTC -43.1 pp")).toBeVisible();
     await expect(page.getByText("Type targets follow the current mix of untargeted holdings. Cash includes stablecoins.")).toBeVisible();

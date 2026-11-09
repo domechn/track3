@@ -51,7 +51,7 @@ it("allows only central navigation URLs and known data provider URLs in source l
   const urlPattern = /https:\/\/[^/\s"'`]+|(?:[\w-]+\.)*track3\.(?:dev|app|io)\b/g;
   const files = execFileSync("git", ["ls-files", "-z", "--", "src"], { encoding: "utf8" })
     .split("\0")
-    .filter((file) => /^src\/(?!test\/).*\.(?:tsx?|json)$/.test(file)
+    .filter((file) => existsSync(file) && /^src\/(?!test\/).*\.(?:tsx?|json)$/.test(file)
       && !/\.test\.tsx?$/.test(file) && file !== "src/lib/external-links.ts");
 
   function checkLiteral(literal: string, file: string) {

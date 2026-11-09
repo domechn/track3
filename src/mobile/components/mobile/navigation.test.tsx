@@ -10,6 +10,13 @@ function Path() {
 }
 
 describe("mobile navigation", () => {
+  it("uses one navigation item and divider structure on iPad and phone", () => {
+    const rendered = render(<MemoryRouter initialEntries={["/summary"]}><MobileSidebar collapsed /></MemoryRouter>);
+    expect(document.querySelectorAll(".mobile-sidebar .t3-nav-item")).toHaveLength(10);
+    expect(document.querySelectorAll(".mobile-sidebar .t3-nav-divider")).toHaveLength(4);
+    rendered.rerender(<MemoryRouter initialEntries={["/summary"]}><MobileNavigation /></MemoryRouter>);
+    expect(document.querySelectorAll(".mobile-tab-bar .t3-nav-item")).toHaveLength(4);
+  });
   it("shows grouped routes and the unread alert on the regular-width rail", () => {
     render(<MemoryRouter initialEntries={["/goals"]}>
       <MobileSidebar unread={3} />
