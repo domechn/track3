@@ -538,7 +538,7 @@ test("light cost basis keeps the page, selected segments and tab bar legible", a
   });
   expect(colors.ground).not.toBe("rgb(13, 13, 14)");
   expect(colors.ground).not.toBe("rgba(0, 0, 0, 0)");
-  expect(colors.tab).toBe(colors.ground);
+  expect(colors.tab).toBe("rgb(255, 255, 255)");
   expect(colors.segment).not.toBe(colors.segmentGround);
   expect(Math.min(colors.titleContrast, colors.tabContrast, colors.segmentContrast, colors.warningContrast))
     .toBeGreaterThanOrEqual(4.5);

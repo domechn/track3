@@ -59,21 +59,21 @@ test("rules and triggered alerts follow the approved order", async ({ page }) =>
   await expect(page.locator(".pf-alert-action button").first()).toHaveCSS("font-weight", "500");
   await expect(page.locator(".pf-history-actions button").first()).toHaveCSS("color", "rgb(155, 157, 163)");
   await expect(page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }))
-    .toHaveCSS("font-weight", "400");
+    .toHaveCSS("font-weight", "500");
   const tabCenters = await page.locator(".mobile-tab-bar .mobile-tab").evaluateAll((tabs) =>
     tabs.map((tab) => {
       const box = tab.getBoundingClientRect();
       return Math.round(box.x + box.width / 2);
     }));
-  expect(tabCenters).toEqual([53, 153, 253, 348]);
-  await expect(page.locator(".mobile-tab-bar")).toHaveCSS("padding-top", "0px");
+  expect(tabCenters).toEqual([49, 146, 244, 341]);
+  await expect(page.locator(".mobile-tab-bar")).toHaveCSS("padding-top", "2px");
   const moreBadge = await page.locator(".mobile-tab-bar .mobile-tab-badge").evaluate((node) => {
     const bounds = node.getBoundingClientRect();
     const style = getComputedStyle(node);
     return { x: Math.round(bounds.x), y: Math.round(bounds.y), width: bounds.width, height: bounds.height,
       color: style.color, background: style.backgroundColor, fontSize: style.fontSize, padding: style.padding };
   });
-  expect(moreBadge).toEqual({ x: 354, y: 790, width: 17, height: 16, color: "rgb(26, 5, 9)",
+  expect(moreBadge).toEqual({ x: 351, y: 791, width: 17, height: 16, color: "rgb(26, 5, 9)",
     background: "rgb(238, 106, 130)", fontSize: "10px", padding: "0px 5px" });
   await expect(page.getByRole("heading", { name: "Triggered" })).toBeVisible();
   await expect(page.getByText("SOL 7d move", { exact: true })).toBeVisible({ timeout: 15_000 });
@@ -129,7 +129,7 @@ test("older alert dates follow the selected phone language", async ({ page }) =>
       const box = tab.getBoundingClientRect();
       return Math.round(box.x + box.width / 2);
     }));
-  expect(tabCenters).toEqual([53, 153, 253, 348]);
+  expect(tabCenters).toEqual([49, 146, 244, 341]);
   await capture(page, "goals-zh");
 });
 

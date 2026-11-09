@@ -258,7 +258,7 @@ test("Coin rail, chart ranges and transaction filter follow source positions", a
   await page.evaluate(() => document.fonts.ready);
   const rail = await page.locator(".t3-fidelity-sidebar nav a svg").evaluateAll((nodes) =>
     nodes.slice(0, 9).map((node) => node.getBoundingClientRect().y));
-  expect(rail).toEqual([71, 128, 166, 204, 242, 290, 326, 362, 398]);
+  expect(rail).toEqual([79, 136, 180, 224, 268, 325, 369, 413, 457]);
   const range = (await page.locator(".coin-fidelity-chart-controls .coin-fidelity-controls").nth(1).boundingBox())!;
   expect([range.x, range.width]).toEqual([823.578125, 92]);
   const filter = (await page.locator(".coin-fidelity-transactions .coin-fidelity-controls").boundingBox())!;
@@ -370,7 +370,7 @@ test("Coin rail separators, range segments and chevron use the source geometry",
   await page.goto("/#/coins/BTC");
   await expect(page.locator(".coin-fidelity-chart-controls")).toBeVisible({ timeout: 40_000 });
   const separators = await page.locator(".t3-fidelity-nav-group").evaluateAll((nodes) =>
-    nodes.map((node) => node.getBoundingClientRect().y + parseFloat(getComputedStyle(node, "::before").top)));
+    nodes.map((node) => node.getBoundingClientRect().y));
   const segment = page.locator(".coin-fidelity-chart-controls .coin-fidelity-controls").nth(1);
   const first = (await segment.locator("button").first().boundingBox())!;
   const second = (await segment.locator("button").last().boundingBox())!;
@@ -378,7 +378,7 @@ test("Coin rail separators, range segments and chevron use the source geometry",
     const style = getComputedStyle(node, "::after");
     return [style.width, style.height, style.borderRightWidth, style.borderBottomWidth];
   });
-  expect(separators).toEqual([108, 279]);
+  expect(separators).toEqual([116, 305]);
   expect([first.width, second.x]).toEqual([40, first.x + 40]);
   expect(chevron).toEqual(["7px", "7px", "1px", "1px"]);
 });

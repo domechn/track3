@@ -61,7 +61,7 @@ function Navigation({ unread = 0, onTabSwitch, sidebar = false, collapsed = fals
           onTabSwitch?.(selected === id);
         }
       }}
-      className="mobile-tab" aria-current={selected === id ? "page" : undefined}>
+      className="t3-nav-item mobile-tab" aria-current={selected === id ? "page" : undefined}>
       <span className="mobile-tab-icon"><MobileIcon name={id} filled={selected === id} />{id === "analytics" && analyticsMenuAvailable &&
         <ChevronUpIcon className="mobile-analytics-disclosure" aria-hidden="true" />}{id === "more" && unread > 0 &&
         <span className="mobile-tab-badge" aria-hidden="true">{unread > 99 ? "99+" : unread}</span>}</span>
@@ -101,11 +101,12 @@ export function MobileSidebar(props: { unread?: number; onTabSwitch?: (rootTap: 
   ];
   const renderItem = (item: typeof groups[number]["items"][number]) => {
     const label = t(item.key);
-    const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+    const active = pathname === item.to || pathname.startsWith(`${item.to}/`) ||
+      (item.to === "/overview" && pathname.startsWith("/coins/"));
     const badgeText = item.to === "/goals" && unread > 0 ? t("goals.unread").replace("{count}", String(unread)) : "";
     const Icon = item.icon;
     return <Link key={item.to} to={item.to} onClick={() => onTabSwitch?.(false)}
-      className="mobile-rail-item" aria-current={active ? "page" : undefined}
+      className="t3-nav-item mobile-rail-item" aria-current={active ? "page" : undefined}
       aria-label={collapsed || badgeText ? `${label}${badgeText ? ` ${badgeText}` : ""}` : undefined}
       title={collapsed ? label : undefined}>
       <Icon aria-hidden="true" />
@@ -118,17 +119,19 @@ export function MobileSidebar(props: { unread?: number; onTabSwitch?: (rootTap: 
     <Link to="/overview" className="mobile-rail-brand" aria-label="Track3" onClick={() => onTabSwitch?.(false)}>
       <TrackLogo size={28} decorative />{!collapsed && <b>{t("app.brand")}</b>}
     </Link>
-    <div className="mobile-rail-scroll">{groups.map((group, index) => <div className="mobile-rail-group" key={index}>
+    <div className="mobile-rail-scroll">{groups.map((group, index) => <div className="t3-nav-divider mobile-rail-group" key={index}>
       {group.label && !collapsed && <div className="mobile-rail-group-label">{group.label}</div>}
       {group.items.map(renderItem)}
     </div>)}</div>
     <div className="mobile-rail-spacer" />
-    {renderItem({ to: "/settings", key: "nav.settings", icon: GearIcon })}
-    <button type="button" className="mobile-sidebar-collapse" onClick={onCollapse}
-      aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")} aria-expanded={!collapsed}>
-      {collapsed ? <ChevronRightIcon aria-hidden="true" /> : <ChevronLeftIcon aria-hidden="true" />}
-      {!collapsed && <span className="mobile-nav-label">{t("sidebar.collapse")}</span>}
-    </button>
+    <div className="t3-nav-divider mobile-rail-footer">
+      {renderItem({ to: "/settings", key: "nav.settings", icon: GearIcon })}
+      <button type="button" className="mobile-sidebar-collapse" onClick={onCollapse}
+        aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")} aria-expanded={!collapsed}>
+        {collapsed ? <ChevronRightIcon aria-hidden="true" /> : <ChevronLeftIcon aria-hidden="true" />}
+        {!collapsed && <span className="mobile-nav-label">{t("sidebar.collapse")}</span>}
+      </button>
+    </div>
   </nav>;
 }
 

@@ -1,6 +1,6 @@
 .fd-page { --fd-ground:hsl(var(--background)); --fd-surface:hsl(var(--card)); --fd-raised:hsl(var(--raised)); --fd-sunken:hsl(var(--sunken)); --fd-border:hsl(var(--border)); --fd-rule:hsl(var(--rule)); --fd-control:hsl(var(--control)); --fd-text:hsl(var(--foreground)); --fd-muted:hsl(var(--muted-foreground)); --fd-faint:hsl(var(--faint)); --fd-accent:hsl(var(--accent-data)); --fd-positive:hsl(var(--positive)); --fd-negative:hsl(var(--negative)); --fd-gain:var(--fd-positive); --fd-loss:var(--fd-negative); --fd-warning:hsl(var(--warning)); --fd-selected:hsl(var(--secondary)); --fd-primary-bg:hsl(var(--primary)); --fd-primary-fg:hsl(var(--primary-foreground)); color:var(--fd-text); background:var(--fd-ground); font:400 13px/18px "Public Sans Variable","Public Sans",sans-serif; font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased; }
 .dark .fd-page { --fd-ground:#0d0d0e; --fd-surface:#131217; --fd-raised:#1b1a20; --fd-sunken:#0a0a0b; --fd-border:#222224; --fd-rule:#1b1a1f; --fd-control:#3a3a3e; --fd-text:#fff; --fd-muted:#b4b6bc; --fd-faint:#9b9da3; --fd-accent:#4a8ad6; --fd-positive:#5fc39c; --fd-negative:#ee6a82; --fd-warning:#d9a441; --fd-selected:#2a2a30; --fd-primary-bg:#fff; --fd-primary-fg:#0d0d0e; }
-body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile-tab-bar { background:hsl(var(--background)); }
+body:has(.fd-page), .app-layout:has(.fd-page) { background:hsl(var(--background)); }
 .fd-page[data-quote-color="red-up-green-down"], :root[data-quote="red-up"] .fd-page { --fd-gain:var(--fd-negative); --fd-loss:var(--fd-positive); }
 .fd-page [data-tone="gain"] { color:var(--fd-gain); }
 .fd-page [data-tone="loss"] { color:var(--fd-loss); }
@@ -261,9 +261,6 @@ body:has(.fd-page), .app-layout:has(.fd-page), .app-layout:has(.fd-page) .mobile
 .fd-position { margin-top:17px; }
 .fd-position-grid { grid-template-rows:72px 54px 72px; row-gap:16px; }
 .fd-position-grid>.fd-coin-metric { min-height:0; }
-.app-layout:has(.fd-page) .mobile-tab-bar { display:grid; grid-template-columns:27.1154% 24.2949% 27.1154% 21.4743%; padding:0 var(--mobile-safe-right) var(--mobile-safe-bottom) var(--mobile-safe-left); }
-.app-layout:has(.fd-page) .mobile-tab { flex:none; font-size:11px; font-weight:400; line-height:18px; }
-.app-layout:has(.fd-page) .mobile-tab-badge { top:-4px; left:100%; min-width:16px; padding:0 5px; font-size:10px; font-weight:700; }
 .fd-coin-stats { margin-top:11px; }
 .fd-lot-header { height:24px; }
 .fd-tx-row { height:64px; min-height:64px; padding:10px 0; }

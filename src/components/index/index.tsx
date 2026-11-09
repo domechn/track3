@@ -206,7 +206,7 @@ function TopBar({
               </button>;
             })}
           </div>}
-          {!railFidelityPage && !recordsPage && !pageOwnsSync && <SyncStatusIndicator overviewFidelity={isOverview} />}
+          {!recordsPage && !pageOwnsSync && <SyncStatusIndicator overviewFidelity={isOverview} />}
           {!railFidelityPage && !fidelityPage && !recordsPage && <Link to="/goals" aria-label={t("overview.fidelity.alerts")} className="t3-topbar-bell">
             <BellIcon aria-hidden="true" />
             {unreadAlerts > 0 && <span aria-hidden="true">{unreadAlerts > 99 ? "99+" : unreadAlerts}</span>}
@@ -335,13 +335,17 @@ function Layout({
   const assistantPage = location.pathname === "/assistant" || location.pathname.startsWith("/assistant/");
   const settingsPage = location.pathname.startsWith("/settings");
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
   const wideViewport = viewportWidth >= 1500;
   useEffect(() => {
-    const onResize = () => setViewportWidth(window.innerWidth);
+    const onResize = () => {
+      setViewportWidth(window.innerWidth);
+      setViewportHeight(window.innerHeight);
+    };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-  const railFidelityPage = wideViewport && darkTheme && (location.pathname === "/rebalance" || location.pathname === "/goals" || location.pathname === "/goals/kinds");
+  const railFidelityPage = wideViewport && viewportHeight >= 820 && sidebarCollapsed && darkTheme && (location.pathname === "/rebalance" || location.pathname === "/goals" || location.pathname === "/goals/kinds");
   const recordsPage = location.pathname === "/history" || location.pathname === "/cost-basis";
   const pageOwnsSync = viewportWidth >= 1400 && (location.pathname === "/comparison" || location.pathname === "/wallets");
   const sidebarWidth = sidebarCollapsed ? 56 : 216;

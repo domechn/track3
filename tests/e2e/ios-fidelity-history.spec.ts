@@ -36,7 +36,7 @@ test("phone list aligns values and uses the source text hierarchy", async ({ pag
     const text = document.createRange();
     text.selectNodeContents(badge);
     return text.getBoundingClientRect().x;
-  }))).toBe(359);
+  }))).toBe(356);
 });
 
 test("light history and detail keep backgrounds and text legible", async ({ page }) => {
@@ -52,7 +52,7 @@ test("light history and detail keep backgrounds and text legible", async ({ page
   const ground = await page.locator("#app-main-content").evaluate((node) => getComputedStyle(node).backgroundColor);
   const tab = await page.locator(".mobile-tab-bar").evaluate((node) => getComputedStyle(node).backgroundColor);
   expect(ground).not.toBe("rgb(13, 13, 14)");
-  expect(tab).toBe(ground);
+  expect(tab).toBe("rgb(255, 255, 255)");
   await expect(page.locator(".fidelity-history-chips button.selected")).toHaveCSS("color", /rgb\(\d+, \d+, \d+\)/);
   const chip = await page.locator(".fidelity-history-chips button.selected").evaluate((node) => ({
     color: getComputedStyle(node).color,
@@ -218,13 +218,13 @@ test("list, filter, swipe, delete, undo", async ({ page }) => {
     buttons.map((button) => Math.round(button.getBoundingClientRect().width)));
   expect(chipWidths).toEqual([118, 134, 69]);
   await expect(page.locator(".fidelity-history-chips button").first()).toHaveCSS("font-variant-numeric", "tabular-nums");
-  expect(Math.round((await page.locator(".mobile-tab-badge").boundingBox())!.y)).toBe(790);
+  expect(Math.round((await page.locator(".mobile-tab-badge").boundingBox())!.y)).toBe(791);
   const tabCenters = await page.locator(".mobile-tab-bar .mobile-tab").evaluateAll((tabs) =>
     tabs.map((tab) => Math.round(tab.getBoundingClientRect().x + tab.getBoundingClientRect().width / 2)));
-  for (const [index, target] of [53, 153, 253, 348].entries()) {
+  for (const [index, target] of [49, 146, 244, 341].entries()) {
     expect(Math.abs(tabCenters[index] - target)).toBeLessThanOrEqual(1);
   }
-  await expect(page.locator(".mobile-tab-bar .mobile-tab").first()).toHaveCSS("line-height", "18px");
+  await expect(page.locator(".mobile-tab-bar .mobile-tab").first()).toHaveCSS("line-height", "16.5px");
   const partial = page.locator(".history-mobile-snapshot").filter({ hasText: "4 of 5 sources" }).first();
   await expect(partial.locator(".fidelity-history-sources")).not.toHaveCSS("color", "rgb(217, 164, 65)");
   await expect(partial.locator(".fidelity-history-source-count")).toHaveCSS("color", "rgb(217, 164, 65)");

@@ -127,7 +127,6 @@ div.t3-fidelity-goal-drawer { position: fixed; top: 0; right: 0; bottom: 0; left
 :root.light .t3-fidelity-kinds .t3-fidelity-card { border-color: hsl(var(--border)); background: hsl(var(--card)); box-shadow: none; }
 :root.light .t3-fidelity-kinds :is(.t3-fidelity-head p,.t3-fidelity-kind-card p,.t3-fidelity-kind-row > span,.t3-fidelity-kind-row small) { color: hsl(var(--muted-foreground)); }
 :root.light .t3-fidelity-kinds .t3-fidelity-info { border-color: hsl(var(--border)); background: hsl(var(--accent)); }
-:root.light .t3-fidelity-kinds .t3-fidelity-rail { display: none; }
 @media (max-width: 1200px) {
   .t3-fidelity-goal-rules,.t3-fidelity-triggered,.t3-fidelity-kind-card.top,.t3-fidelity-kind-card.bottom { grid-column: 1 / -1; }
   .t3-fidelity-goal-row { grid-template-columns: 44px 1fr 1fr 96px 84px 76px; }

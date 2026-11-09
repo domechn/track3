@@ -90,6 +90,15 @@ vi.mock("../overview", () => ({
 vi.mock("../comparison", () => ({
   default: () => <div>comparison</div>,
 }));
+vi.mock("../rebalance", () => ({
+  default: () => <div>rebalance</div>,
+}));
+vi.mock("../goals-alerts", () => ({
+  default: () => <div>goals</div>,
+}));
+vi.mock("../goals-desktop", () => ({
+  GoalsKinds: () => <div>rule kinds</div>,
+}));
 vi.mock("../wallet-analytics", () => ({
   default: () => <div>wallets</div>,
 }));
@@ -112,7 +121,7 @@ vi.mock("../date-picker", () => ({
   default: () => <div>date picker</div>,
 }));
 vi.mock("../sidebar", () => ({
-  default: () => null,
+  default: ({ onToggle }: { onToggle: () => void }) => <button type="button" onClick={onToggle}>toggle sidebar</button>,
 }));
 vi.mock("../motion", () => ({
   AnimatedPage: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -257,6 +266,49 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
+  it.each(["/rebalance", "/goals", "/goals/kinds"])("keeps sync status available in the wide dark rail on %s", async (route) => {
+    vi.stubGlobal("innerWidth", 1600);
+    vi.stubGlobal("innerHeight", 900);
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-color-scheme: dark)",
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    syncMocks.snapshot = { mode: "ready", sync: { phase: "idle", report: undefined } };
+    window.location.hash = `#${route}`;
+    try {
+      const view = renderApp();
+      const rail = view.container.querySelector(".t3-fidelity-rail-refresh-inner");
+      expect(rail).toBeInTheDocument();
+      expect(await view.findByRole("button", { name: "Not synced yet - open Backup & sync" })).toBeInTheDocument();
+      expect(rail?.querySelector(".desktop-sync-status-indicator")).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it.each(["short window", "expanded sidebar"])("keeps sync available in the top bar for a %s", async (scenario) => {
+    vi.stubGlobal("innerWidth", 1600);
+    vi.stubGlobal("innerHeight", scenario === "short window" ? 700 : 900);
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-color-scheme: dark)",
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    syncMocks.snapshot = { mode: "ready", sync: { phase: "idle", report: undefined } };
+    window.location.hash = "#/goals";
+    try {
+      const view = renderApp();
+      if (scenario === "expanded sidebar") fireEvent.click(view.getByRole("button", { name: "toggle sidebar" }));
+      expect(await view.findByRole("button", { name: "Not synced yet - open Backup & sync" })).toBeInTheDocument();
+      expect(view.container.querySelector(".t3-fidelity-rail-refresh-inner")).not.toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("keeps the Pro live portfolio control on wide Goals pages", async () => {
     vi.stubGlobal("innerWidth", 1600);
     vi.mocked(getLicenseIfIsPro).mockResolvedValue("pro");

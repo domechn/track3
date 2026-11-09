@@ -6,7 +6,6 @@ import { alertDraftFromRule, alertRuleFromDraft } from "@/middlelayers/ui-state/
 import { I18nProvider, useTranslation } from "@/i18n";
 import GoalsDesktop, { GoalsKinds } from "./goals-desktop";
 
-vi.mock("./fidelity-rail", () => ({ default: () => null }));
 
 const rule: AlertRule = alertRuleFromDraft({
   id: 1, kind: "asset_price_move", assetType: "stock", symbol: "AAPL",
