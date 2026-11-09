@@ -161,17 +161,6 @@ beforeEach(() => {
 });
 
 describe("ChatPage", () => {
-  it("opens context as a drawer at 1100px", async () => {
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1100 });
-    vi.mocked(loadAIConfig).mockResolvedValue(config);
-    vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
-    renderAt("/assistant", true);
-    expect(await screen.findByTestId("context-pane")).toHaveAttribute("data-collapsed", "true");
-    await userEvent.click(screen.getByRole("button", { name: "Expand context" }));
-    expect(screen.getByTestId("context-pane")).toHaveAttribute("data-drawer", "true");
-    expect(screen.getByTestId("assistant-pane-scrim")).toBeInTheDocument();
-  });
-
   it("collapses both desktop panes into accessible rails and restores focus on expand", async () => {
     vi.mocked(loadAIConfig).mockResolvedValue(config);
     vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);

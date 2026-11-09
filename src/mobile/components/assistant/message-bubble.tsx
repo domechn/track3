@@ -199,7 +199,7 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
               ?.replace("{count}", String(activities.length)).replace("{status}", t?.(`assistant.chat.toolStatus.${state}`) ?? state)}</span>
             <span className="fidelity-tool-pills">
               {activities.map((activity) => <span key={activity.taskId}
-                className="t3-tag fidelity-tool-pill" data-tone={activity.status === "completed" ? "positive" : activity.status === "failed" ? "negative" : "accent"}>
+                className={`fidelity-tool-pill is-${activity.status}`}>
                 <span className={`ios-d3-tool-status ios-d3-tool-status-${activity.status === "completed" ? "done" : activity.status}`} aria-hidden="true" />
                 <span>{activity.description}</span>
                 <small>{activity.status === "completed" && activity.resultPreview
@@ -308,7 +308,7 @@ export default function MessageBubble({
               </p>
             ) : (
               <>
-              {isIOS() && precedingApprovedAlert && <div className="t3-tag fidelity-created-chip" data-tone="positive"><CheckIcon aria-hidden="true" />
+              {isIOS() && precedingApprovedAlert && <div className="fidelity-created-chip"><CheckIcon aria-hidden="true" />
                 <strong>{t("fidelity.assistant.createdAlert")}</strong>
                 <span>{t("fidelity.assistant.createdAlertDetail").replace("{symbol}", precedingApprovedAlert.symbol)
                   .replace("{threshold}", new Intl.NumberFormat("en-US", { style: "currency", currency: "USD",

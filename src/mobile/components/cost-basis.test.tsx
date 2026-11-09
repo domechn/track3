@@ -154,20 +154,6 @@ it("rounds phone chart gains to whole dollars as in the design", async () => {
   const assets = (await screen.findByRole("heading", { name: "Realized P&L by asset" })).closest("section")!;
   expect(within(assets).getByText("+$1,891")).toBeInTheDocument();
 });
-
-it("shows the exact gain on the phone realized gain bar", async () => {
-  Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
-  vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
-    matches: query.includes("pointer: coarse"), addEventListener: vi.fn(), removeEventListener: vi.fn(),
-  }) as unknown as MediaQueryList);
-  vi.mocked(loadCostBasisReport).mockResolvedValue({
-    ...report, assets: [{ ...report.assets[0], gainLoss: 1891.2 }],
-  } as never);
-  render(<CostBasisPage />);
-  const chart = (await screen.findByRole("heading", { name: "Realized P&L by asset" }, { timeout: 10_000 })).closest("section")!;
-  fireEvent.pointerEnter(chart.querySelector(".fidelity-bar-track")!);
-  expect(screen.getByRole("tooltip")).toHaveTextContent("+$1,891.20");
-}, 15_000);
 it("keeps manual setup open after a filter reload", async () => {
   render(<CostBasisPage />);
   await screen.findAllByText("BTC");

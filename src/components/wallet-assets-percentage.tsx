@@ -29,7 +29,6 @@ import { useDataChangedVersion } from "@/contexts/data-changed";
 import { sourceDisplayNames } from "./source-display-name";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Pager, usePager } from "./ui/pager";
 import { WALLET_ANALYZER } from "@/middlelayers/charts";
 import { ChartResizeContext } from "@/App";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
@@ -37,7 +36,7 @@ import AssetLabel from "./common/asset-label";
 import { useWindowSize } from "@/utils/hook";
 import { WALLET_DETAIL_URLS } from "@/middlelayers/constants";
 import { useTranslation } from "@/i18n";
-import { SourceAllocationList, sourceIconKind } from "./source-allocation-list";
+import { SourceAllocationList } from "./source-allocation-list";
 import {
   classifyWalletType,
   pickTileTextColor,
@@ -326,7 +325,6 @@ const App = ({
     () => [...walletAssetsPercentage].sort((a, b) => b.value - a.value || a.wallet.localeCompare(b.wallet)),
     [walletAssetsPercentage],
   );
-  const sourcePage = usePager(sortedWallets, symbol ?? "sources", 8);
   const walletOrdinals = useLatestWalletOrdinals();
   const sourceLabels = useMemo(() => {
     const labels = sourceDisplayNames(sortedWallets.map((item) => ({
@@ -541,11 +539,9 @@ const App = ({
     <Card data-card-boundary="true" className="analyze-wallet-allocation">
       {!symbol && onSelectSource && <nav className="analyze-source-picker" aria-label={t("wallets.h1")}>
         <button type="button" aria-pressed={selectedSource === null} onClick={() => onSelectSource(null)}>{t("wallets.allSources")}</button>
-        {sourcePage.rows.map((wallet) => <button type="button" key={wallet.wallet} aria-pressed={selectedSource === wallet.wallet}
-          onClick={() => onSelectSource(wallet.wallet)} title={wallet.wallet}><AssetLabel kind={sourceIconKind(wallet.walletType)}
-            type={wallet.walletType} name={displayName(wallet)} size={16} /></button>)}
+        {sortedWallets.map((wallet) => <button type="button" key={wallet.wallet} aria-pressed={selectedSource === wallet.wallet}
+          onClick={() => onSelectSource(wallet.wallet)} title={wallet.wallet}>{displayName(wallet)}</button>)}
       </nav>}
-      {!symbol && onSelectSource && <Pager count={sortedWallets.length} {...sourcePage} t={t} ariaLabel={t("wallets.allSources")} />}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-3">
         <CardTitle className="flex flex-wrap items-center gap-1 text-sm font-medium text-muted-foreground">
           {symbol ? (
@@ -798,8 +794,7 @@ const App = ({
                 <span
                   key={s.category}
                   data-testid={`type-pill-${s.category}`}
-                  className="t3-tag"
-                  data-tone="neutral"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/40 px-2 py-0.5"
                 >
                   <span
                     className="inline-block h-2.5 w-2.5 rounded-sm"
@@ -807,7 +802,7 @@ const App = ({
                       background: tileBackground(s.category, 0, 1),
                     }}
                   />
-                  <span>
+                  <span className="text-foreground">
                     {t(WALLET_CATEGORY_BASE_COLORS[s.category].labelKey)}
                   </span>
                   <span className="text-muted-foreground mono">

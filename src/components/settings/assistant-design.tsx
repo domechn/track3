@@ -129,7 +129,7 @@ export function AssistantDesign(p: Props) {
   return <div className="t3-b-ai t3-b-grid">
     <section className="t3-b-card t3-b-connection">
       <div className="t3-b-card-head"><div><h3>{t("fidelity.settingsB.ai.connection")}</h3><p>{t("fidelity.settingsB.ai.connectionDesc")}</p></div>
-        <span className="t3-tag" data-tone={status === "connected" ? "positive" : status === "testing" ? "accent" : status === "failed" ? "negative" : "neutral"}>{t(`fidelity.settingsB.ai.${status}`)}</span></div>
+        <span className={`t3-b-pill ${status}`}>{t(`fidelity.settingsB.ai.${status}`)}</span></div>
       <div className="t3-b-stack">
         <Field label={t("settings.assistant.endpoint")} htmlFor="assistant-endpoint" hint={t("fidelity.settingsB.ai.endpointHint")}>
           <input className={`${inputClass} mono`} id="assistant-endpoint" data-testid="assistant-endpoint" value={p.endpoint}

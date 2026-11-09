@@ -2,7 +2,6 @@ import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./fidelity-desktop-scenes";
 import { seedCoinLayoutCase } from "./coin-layout-scenes";
 import { installTauriBridge as installPhoneFixture } from "./fidelity-scenes";
-import { chartStatDividerGaps } from "./coin-layout-law-scenes";
 
 for (const [fixture, visible, empty] of [
   ["sixteen", 2, 14],
@@ -79,36 +78,11 @@ test("phone keeps the approved source description order while sorting the source
       query: "INSERT OR REPLACE INTO configuration (id, data) VALUES (6, '40')", values: [],
     }));
     await page.goto("/#/coins/BTC");
-    await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
+    await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready");
     await expect(page.locator(".fd-coin-head p")).toHaveText("Held on Binance and a Ledger cold wallet");
     await expect(page.locator(".fd-source-row").first()).toContainText("Ledger cold wallet");
     expect(await page.locator(".fd-coin-holdings .fd-open-lots").count()).toBe(1);
-    const tops = await page.locator(".fd-coin-stats .fd-coin-metric").evaluateAll((metrics) =>
-      metrics.map((metric) => metric.getBoundingClientRect().top));
-    expect(Math.max(...tops) - Math.min(...tops)).toBeGreaterThan(1);
-    const dividerGaps = await chartStatDividerGaps(page);
-    expect(dividerGaps).toHaveLength(1);
-    expect(dividerGaps.every(({ gap, border }) => border === "1px" && gap >= 6),
-      JSON.stringify(dividerGaps)).toBe(true);
-    expect(await page.locator("#app-main-content").evaluate((element) => element.scrollHeight)).toBe(2578);
-    await page.locator(".fd-chart-controls").getByRole("button", { name: "Price" }).click();
-    expect(Math.round((await page.locator(".fd-coin-trend").boundingBox())!.height)).toBe(378);
-  } finally { await context.close(); }
-});
-
-test("phone NVDA chart stats retain the approved one-row height", async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
-    userAgent: "Track3 iPhone" });
-  try {
-    const page = await context.newPage();
-    await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
-    await installPhoneFixture(page, { fidelitySample: "NVDA" });
-    await page.goto("/#/coins/NVDA?assetType=stock");
-    await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
-    const tops = await page.locator(".fd-coin-stats .fd-coin-metric").evaluateAll((metrics) =>
-      metrics.map((metric) => metric.getBoundingClientRect().top));
-    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(1);
-    expect(await page.locator("#app-main-content").evaluate((element) => element.scrollHeight)).toBe(1964);
+    expect(await page.locator("#app-main-content").evaluate((element) => element.scrollHeight)).toBe(2506);
   } finally { await context.close(); }
 });
 

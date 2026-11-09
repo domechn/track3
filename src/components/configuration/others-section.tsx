@@ -44,7 +44,7 @@ import EmptyState from "@/components/empty-state";
 import { AliasRename } from "./alias-rename";
 import { sourceAliasFallback } from "@/components/source-display-name";
 
-const CONFIG_LIST_PAGE_SIZE = 8;
+const CONFIG_LIST_PAGE_SIZE = 30;
 
 const OthersSection = memo(function OthersSection({
   others,
@@ -116,7 +116,7 @@ const OthersSection = memo(function OthersSection({
                     <TableHead>{t("config.alias")}</TableHead>
                     <TableHead>{t("config.symbol")}</TableHead>
                     <TableHead>{t("config.amount")}</TableHead>
-                    <TableHead className="w-[140px] text-right">
+                    <TableHead className="w-[84px] touch:w-[120px] text-right">
                       {t("config.actions")}
                     </TableHead>
                   </TableRow>
@@ -185,7 +185,7 @@ const OthersSection = memo(function OthersSection({
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="inline-flex items-center justify-end gap-1">
+                          <div className="inline-flex items-center justify-end gap-0">
                             <AliasRename alias={o.alias} name={o.alias || o.symbol} fallback={sourceAliasFallback("custom", o.symbol)}
                               names={renameNames ?? others.map((item) => item.alias || item.symbol)} index={renameOffset + globalIdx}
                               onRename={(alias) => onRename?.(globalIdx, alias)} />
@@ -241,11 +241,10 @@ const OthersSection = memo(function OthersSection({
                 </TableBody>
               </Table>
               {others.length > CONFIG_LIST_PAGE_SIZE && (
-                <div data-layout-pager className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-end gap-2">
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-label={t("common.prev")}
                     onClick={() =>
                       onOthersPageChange(Math.max(othersPage - 1, 0))
                     }
@@ -259,7 +258,6 @@ const OthersSection = memo(function OthersSection({
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-label={t("common.next")}
                     onClick={() =>
                       onOthersPageChange(
                         Math.min(othersPage + 1, othersPageCount - 1),

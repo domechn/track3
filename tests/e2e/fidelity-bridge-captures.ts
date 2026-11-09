@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { installTauriBridge as installBaseBridge } from "./tauri-bridge";
 import { fidelityRecordsFixture } from "./fidelity-records-captures";
 
-type RecordsFixture = "history" | "history-large" | "history-master-detail" | "history-single" | "history-empty" | "cost";
+type RecordsFixture = "history" | "history-large" | "history-single" | "history-empty" | "cost";
 type FidelityOptions = {
   fidelityRecords: RecordsFixture;
   seedLockedSync?: boolean;
@@ -46,7 +46,7 @@ function fixtureStatements(mode: RecordsFixture): Statement[] {
   } else if (mode === "history-single") {
     statements.push({ query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
       VALUES ('fidelity-only', '2026-10-31T09:41:00.000Z', 'Wallet', 'crypto', 'BTC', 1, 50000, 50000)` });
-  } else if (mode === "history" || mode === "history-large" || mode === "history-master-detail") {
+  } else if (mode === "history" || mode === "history-large") {
     const holdings = fixture.cost.holdings;
     const sourceAssets = fixture.history.sources.flatMap((source) =>
       Object.entries(source.pos).map(([symbol, amount]) => ({ source: source.name, symbol, amount })));
@@ -64,7 +64,6 @@ function fixtureStatements(mode: RecordsFixture): Statement[] {
       const designDetail = detailed ? fixture.history.detail : undoDetail ? fixture.history.undoDetail : null;
       let used = 0;
       for (const [assetIndex, asset] of sourceAssets.entries()) {
-        if (mode === "history-master-detail" && detailed) continue;
         const holding = holdings.find((item) => item.symbol === asset.symbol)!;
         const detail = designDetail?.find((item) => item.symbol === asset.symbol);
         const amount = detail ? asset.amount * detail.amount / holding.amount : asset.amount;
@@ -75,24 +74,17 @@ function fixtureStatements(mode: RecordsFixture): Statement[] {
         assets.push([uuid, createdAt, asset.source, holding.type === "stable" ? "crypto" : holding.type,
           asset.symbol, amount, value, detail ? detail.price : value / amount]);
       }
-      if (mode === "history-master-detail" && detailed) {
-        for (let assetIndex = 0; assetIndex < 47; assetIndex++) {
-          const value = assetIndex === 46 ? row.total - 4600 : 100;
-          assets.push([uuid, createdAt, `Source ${String(assetIndex % 17 + 1).padStart(2, "0")}`,
-            "crypto", `TEST${String(assetIndex).padStart(2, "0")}`, 1, value, value]);
-        }
-      }
     }
     if (mode === "history-large") {
       for (let index = 0; index < 60; index++) assets.push(["fidelity-oct-45", "2026-10-28T08:51:00.000Z", "extra source", "crypto",
         `EXTRA${String(index).padStart(2, "0")}`, 1, 1, 1]);
     }
-    for (let index = 0; index < (mode === "history-master-detail" ? 988 : 1234); index++) {
+    for (let index = 0; index < 1234; index++) {
       const createdAt = new Date(Date.UTC(2026, 8, 30) - index * 86_400_000).toISOString();
       assets.push([`fidelity-old-${String(index).padStart(4, "0")}`, createdAt, "BTC", "crypto", "BTC", 1, 700000, 700000]);
     }
     statements.push(...insertRows("assets_v2", ["uuid", "createdAt", "wallet", "asset_type", "symbol", "amount", "value", "price"], assets));
-    if (mode !== "history-master-detail") statements.push({ query: `INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
+    statements.push({ query: `INSERT INTO transactions (uuid, assetID, asset_type, wallet, symbol, amount, price, txnType, txnCreatedAt)
       VALUES (?, (SELECT id FROM assets_v2 WHERE uuid = ? AND symbol = 'AAPL' LIMIT 1), 'stock',
         'Interactive Brokers', 'AAPL', 150, 238, 'buy', '2026-10-28T08:51:00.000Z')`, values: [detailUuid, detailUuid] });
     statements.push({ query: `INSERT INTO snapshot_edit_log
@@ -103,16 +95,6 @@ function fixtureStatements(mode: RecordsFixture): Statement[] {
       (snapshot_uuid, edited_at, origin, target, action, asset_type, symbol, wallet, old_value, new_value)
       VALUES (?, '2026-10-28T11:20:00.000Z', 'local', 'transaction', 'price', 'stock', 'AAPL',
         'Interactive Brokers', '236.31', '238.00')`, values: [detailUuid] });
-    if (mode === "history-master-detail") {
-      statements.push({ query: `INSERT INTO snapshot_edit_log
-        (snapshot_uuid, edited_at, origin, target, action, asset_type, symbol, wallet, old_value, new_value)
-        VALUES (?, '2026-10-28T11:20:00.000Z', 'local', 'asset', 'delete', 'crypto', 'TEST01',
-          'Source 02', '{"amount":1,"value":100,"price":100}', NULL)`, values: [detailUuid] });
-      statements.push({ query: `INSERT INTO snapshot_edit_log
-        (snapshot_uuid, edited_at, origin, target, action, asset_type, symbol, wallet, old_value, new_value)
-        VALUES (?, '2026-10-28T11:21:00.000Z', 'local', 'asset', 'restore', 'crypto', 'TEST01',
-          'Source 02', NULL, '{"amount":1,"value":100,"price":100}')`, values: [detailUuid] });
-    }
     for (const [date, missing] of [
       ["22 Oct 21:37", [{ wallet: "0x4f…a91c", kind: "wallet", provider: "Ethereum", category: "network" }]],
       ["5 Oct 18:53", [{ wallet: "Interactive Brokers", kind: "cex", provider: "Interactive Brokers", category: "network" }]],
@@ -123,7 +105,7 @@ function fixtureStatements(mode: RecordsFixture): Statement[] {
       statements.push({ query: `INSERT INTO snapshot_partial (uuid, sources_total, missing, fill, created_at)
         VALUES (?, 5, ?, 'last_known', ?)`, values: [uuid, JSON.stringify(missing), `2026-10-${date.slice(0, 2)}T${date.slice(7)}:00.000Z`] });
     }
-    statements.push({ query: `INSERT INTO configuration (id, data) VALUES (6, '${mode === "history-master-detail" ? 1038 : 50}')` });
+    statements.push({ query: "INSERT INTO configuration (id, data) VALUES (6, '50')" });
   }
   return statements;
 }
@@ -161,7 +143,6 @@ export async function installTauriBridge(page: Page, options: FidelityOptions) {
     const invoke = (window as any).__TAURI_INTERNALS__.invoke;
     for (const { query, values } of queries) await invoke("plugin:sql|execute", { db: "sqlite:e2e.db", query, values: values ?? [] });
   }, statements);
-  if (fidelityRecords === "history-master-detail") await page.reload();
 }
 
 export async function seedFidelityCompletedSync(page: Page) {

@@ -113,6 +113,7 @@ export async function refreshAllData(setProgress) {
         await expect(page.locator(".t3-fidelity-toast")).toHaveCount(1, { timeout: 30_000 });
         await expect(page.locator(".t3-hero-value")).toContainText("$763,809.27");
         await expect(page.locator(".t3-fidelity-toast")).toContainText("5 of 5 sources refreshed at 09:41.");
+        await page.keyboard.press("Escape");
         await expect(page.getByRole("alertdialog")).toHaveCount(0);
         await expect(page.locator(".t3-insights-summary")).toBeVisible();
         const canvas = page.locator(".t3-hero-chart canvas");
@@ -138,11 +139,9 @@ export async function refreshAllData(setProgress) {
         await expect(page.locator(".t3-fidelity-toast")).toHaveCount(1);
         await expect(page.locator(".t3-fidelity-toast").first()).toContainText("Pro refresh limit nearly used");
         await expect(page.locator(".t3-fidelity-toast").first()).toContainText("48 of 50 ERC20 refreshes used. Resets 1 Nov.");
-        await expect(page.getByRole("alertdialog", { name: "Refresh finished" })).toHaveCount(0);
-        await page.getByRole("button", { name: "Source status" }).click();
         await expect(page.getByRole("alertdialog", { name: "Refresh finished" })).toBeVisible();
         await expect(page.locator("[aria-busy='true']")).toHaveCount(0);
-        await page.locator(".t3-refresh-overlay").click({ position: { x: 1, y: 1 } });
+        await page.keyboard.press("Escape");
         await expect(page.getByRole("alertdialog")).toHaveCount(0);
         await expect(page.getByRole("button", { name: "See usage" })).toBeVisible();
         await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible({ timeout: 10_000 });
@@ -151,13 +150,10 @@ export async function refreshAllData(setProgress) {
         await expect(page.locator(".t3-fidelity-toast")).toHaveCount(2);
         await expect(page.locator(".t3-fidelity-toast").last()).toContainText("OKX refresh failed");
         await expect(page.locator(".t3-fidelity-toast").last()).toContainText("Source timed out");
-        await expect(page.getByRole("alertdialog", { name: "Refresh finished" })).toHaveCount(0);
-        await page.getByRole("button", { name: "Source status" }).click();
         await expect(page.getByRole("alertdialog", { name: "Refresh finished" })).toBeVisible();
         await expect(page.locator("[aria-busy='true']")).toHaveCount(0);
         await page.keyboard.press("Escape");
         await expect(page.getByRole("alertdialog")).toHaveCount(0);
-        await expect(page.locator(".t3-fidelity-toast").last()).toContainText("OKX refresh failed");
         await page.goto("/#/history");
         await page.getByTestId("history-snapshot-row").first().click();
         await page.getByTestId("history-desktop-detail").getByRole("button", { name: "Delete", exact: true }).click();

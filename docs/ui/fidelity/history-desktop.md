@@ -48,48 +48,6 @@ Chromium briefly sets a 1 × 1 viewport during some full page screenshots. The d
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** history 10.773% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-At 1280 px, the real-scale CNY fixture keeps the four visible History detail columns and full values within the card. With the expanded rail, the detail table uses a 10 px numeric font to keep seven-digit values readable while preserving the adjacent list pane. The source uses shorter USD amounts.
-
-At 1100–1499 px the merged fixed-height two-pane layout keeps large CNY values readable. The list places asset and source counts below the date and shows Date, Total and Change columns; the detail places Share below each asset and shows Asset, Quantity, Price and Value columns. The same values remain visible without a horizontally cut amount. The reference fits its shorter USD values in five columns. At 1100–1179 px the merged History grid uses eleven tracks to keep both panes usable, so its edges differ from the general twelve-track rule. With only two saved assets, the fixed-height detail pane retains unused scroll area; no asset rows are invented.
-
-The compact list uses complete English and Chinese source-status sentences. Partial snapshots retain the warning dot, and asset names remain clear of the detail row's Delete button. The reference has shorter values and no row Delete action, which explains the remaining compact column widths.
-
-On 8 Nov 2026 the source HTML was rendered again in Chromium with scrollbars hidden at 1600 × 1024. `getBoundingClientRect()` puts its filter at (84, 88), its list at (84, 164) with width 861.33 px, and its detail at (961.33, 164) with width 610.67 px; `getComputedStyle()` reports 13/18 px body text and `rgb(19, 18, 23)` card backgrounds. The branch captures before this merge are preserved in `/tmp/ui43-captures-desktop/` and the source renders and measurements are in `/tmp/ui43-source/`. A pixel differs when the summed absolute RGB difference exceeds 60, with black padding to the larger canvas.
-
-| State at 1600 × 1024 | Current source versus app difference |
-| --- | ---: |
-| Populated | 8.87% |
-| Delete confirmation | 6.19% |
-| Empty | 1.37% |
-| Loading | 1.63% |
-| Undo | 8.10% |
-
-The populated, delete, and undo captures exceed 3% because History now follows the required fixed-height master-detail layout. The reference has a standalone full-width filter and 46 px rows on a 1271.5 px scrolling page. The app pins the filter inside the list, uses 39 px rows, pins the pager and detail header, and scrolls each pane separately. The section chips and expanders are also absent from the reference. The KPI/header block is taller relative to a short fixed pane; at 900 × 560 the detail has about 120 px of scrollable content. Those changes keep both panes aligned and all controls reachable at every tested height. The earlier ratios below use different fixtures or page structures and are retained as measurement history.
-
-At 900–1099 px the app keeps Change visible by placing the amount above its percent in the 39 px row and using compact source text. The source table overflows its card at those widths. At 700 px desktop width the existing searchable detail opens as a full-window surface with Back; the source uses a phone-style layout below 760 px, so the two screens have different content density. The 700 px Back button initially shows the dialog's focus ring, a small visible difference kept for keyboard focus feedback. At 820 px the app shows one pane at a time with Back, while the source still shows two narrow columns. The iPad detail has no pointer-open focus outline; a keyboard Enter keeps a visible focus outline.
-
-Before the fixed-height pane update, the 8 Nov 1600 × 1024 captures in `/tmp/fidelity-desktop/history/` differed from `/tmp/rv1103b/design/` by 6.26% populated, 4.54% delete, 1.45% empty, 0.66% loading, and 5.67% undo at the same RGB-sum threshold 60. Populated, delete, and undo compare the shared first 1024 px because the source document extends below the app's fixed viewport. The selected-row, stored-edit, scroll-gutter, sync, and shared-icon differences below explain those visible gaps.
-
-UI42 uses the approved website-style neutral tile for saved asset and source marks. The older History page design renders those marks differently.
-
-An earlier 8 Nov 2026 1600 × 1024 app viewport differs by **6.076%**
-from the same area of the rendered `records-history.html` source at RGB-sum
-threshold 60. Captures are `.local/tag-theme/desktop-history-edited-app.png`
-and `/tmp/ui21-source-fresh/history.png`. This isolated fixture shows the
-product's default newest selection and no completed sync, while the source
-preselects the edited 28 Oct row and prints a synced stamp. The app selects
-newest on load and shows a sync stamp only after a real completed pass. The
-app's first column measures 207.45 px at x=85, against the
-source's recorded 209.61 px at 1600 px, leaving room for date, time and
-the Edited tag. The fixed-height shell and stored edit differences below
-also remain visible.
-
-The overflow fixture in `fix_ui37.md` describes 40/32/28 px amounts, while a fresh Chromium render of the authoritative History HTML measures 22/28 px amounts and 20 px column padding at 1600 px (`/tmp/history-kpi-overflow/design-history-bounds.json`). The app follows the rendered amount size. It uses 24 px padding when the three values fit, then 16 px, then 12 px, and finally stacks the rows to keep values unwrapped with at least 16 px between them. Wide cards distribute the three columns evenly. The fixed-height layout aligns the list and detail bottoms at both 1272 and 1024 px; the pager stays pinned within the list card.
-
-At 761–899 px the app shows one pane at a time; at 900 px and above the cards sit side by side. The narrow two-pane layout uses 7/5 grid columns through 1099 px, 5/6 at 1100–1179 px, then 6/6 through 1279 px so shared asset icons, delete controls, KPI amounts, and numeric values fit. The Asset column is 72 px at 900–1099 px, 104 px at 1100–1279 px, and 124 px at larger widths. At 1280–1599 px the table sizes its numeric columns from their content, so large currency values stay clear of the Share column. The static source keeps fixed column fractions in that range.
-
 The 7 Nov 2026 populated History capture is **5.71%** different from the
 saved 1600 × 1272 source render at RGB-sum threshold 60 when the app's
 1600 × 1024 scroll viewport is padded to the source height. The fixed shell
@@ -97,10 +55,6 @@ and truthful stored edits below explain the larger full-page ratio. The
 sync stamp now uses a neutral cloud icon where the source has a green dot;
 this distinguishes backup sync from live prices. Its button remains pinned
 at x=1465 with a 92 px width, and the icon stays inside its box.
-
-On 8 Nov, the current app capture at 1600 × 1272 differs by **5.81%** from the source page rendered at the same size (`/tmp/history-kpi-overflow/history-design-fixture-expanded.png` and `design-history-1600.png`; RGB-sum threshold 60). The previous capture measured **5.72%**. The source KPI strip starts at x=982.33 and uses 189.55 px columns with 20 px padding; the app starts at x=973.58 and uses 187.47 px columns with 24 px padding. Both use 22/28 px values. The app's 15 px scroll gutter and fixed shell shift the whole content grid, while the source scrolls the document. The current shared rail and asset icon styling also differs from the static source. The older **2.38%** expanded capture suppressed that gutter, so its ratio uses a different capture geometry. The page retains its visible scrollbar and working keyboard/page navigation. The owner's 11-asset extreme fixture has no matching source page; its 1100–1920 px screenshots and geometry checks are in `/tmp/history-kpi-overflow/`.
-
-The CI capture test no longer opens machine-local source pages. The separate guarded source test measures the source at 1600 px.
 
 With no saved snapshots, the shared empty state adds a centred icon and a 200px minimum to the source's dashed explanation. The Refresh action and disabled filters retain their existing behaviour.
 
@@ -122,7 +76,7 @@ The 6 Nov app captures are `/tmp/ui21-history-expanded2.png`, `/tmp/ui21-history
 - The source shows asset-level USDC quantity and AAPL market-price edits. The product's edit records support asset delete/restore and transaction price edits, not those snapshot value edits. The closest stored records are a USDC restore, worth +$39,853.99 to the snapshot, and an AAPL trade price edit, worth $0 to the snapshot. The Price column keeps the saved AAPL market price and has no `was` line; the Edits row labels the trade price as a transaction edit. A restore has no before quantity or value; the asset table shows `was –`, and the audit row shows `– → $39,853.99`. Using the previous day's 40,000 USDC as a before value would misstate what the record knows.
 - After deleting the sole edited snapshot, the query returns `Edited 0`; the source still says `Edited 1`. The product reflects its remaining stored edit logs.
 - The current two-peak mark and Settings cog differ from the source's blue chart tile and sun. History detail now resolves saved wallet aliases, exchange names and broker names. The source illustration has five named sources, while the three-source alias and exchange fixtures have no pixel-identical reference page.
-- The populated Asset column is 124 px wide in the current app and holds the shared icon, symbol, and working 32 px delete target. The source has no delete targets, so its narrower Asset column and following header positions differ.
+- The populated Asset header starts at x=973.58 in the app rather than x=982.33 in the source, and Quantity starts at x=1045.58 rather than x=1033.52. The app reserves a 72 px Asset column for each working 32 px delete target and its symbol; the source table has no delete targets. This shifts the remaining desktop headers while keeping every target inside its symbol cell.
 
 The fidelity fixture includes two stored unread Goals alerts, matching the source rail's red badge.
 

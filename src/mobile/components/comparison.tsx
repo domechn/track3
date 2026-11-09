@@ -25,6 +25,7 @@ import AssetLabel from "@/components/common/asset-label";
 import {
   formatAssetLabel,
   getAssetLogoKey,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import {
@@ -100,8 +101,8 @@ const App = ({
         const raw = readAssistantComparisonDates();
         if (raw === undefined) return;
         const dates = validateActionArgs("set_comparison_dates", raw);
-        const base = dateOptions.find((option) => parseDateToTS(option.label) === parseDateToTS(String(dates.base)));
-        const head = dateOptions.find((option) => parseDateToTS(option.label) === parseDateToTS(String(dates.head)));
+        const base = dateOptions.find((option) => option.label === dates.base);
+        const head = dateOptions.find((option) => option.label === dates.head);
         if (base && head) {
           clearAssistantComparisonDates();
           setCurrentQuickCompare(null);
@@ -700,12 +701,15 @@ const App = ({
             </FadeUp>
 
             <FadeUp>
-              <div className="comparison-assets-grid grid gap-3 grid-cols-1 md:grid-cols-2">
+              <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
                 {coinComparisons.map((coin) => (
                   <CoinCard
                     key={getAssetLogoKey(coin)}
                     coin={coin}
-                    logo={logoMap[getAssetLogoKey(coin)]}
+                    logo={resolveAssetLogoSrc(
+                      coin,
+                      logoMap[getAssetLogoKey(coin)],
+                    )}
                     baseDate={baseDate}
                     headDate={headDate}
                     formatVal={formatVal}
@@ -946,7 +950,7 @@ function CoinCard({
   changeClass,
 }: {
   coin: CoinComparison;
-  logo?: string;
+  logo: string;
   baseDate?: string;
   headDate?: string;
   formatVal: (val: number, type: "price" | "amount" | "value") => string;
@@ -972,7 +976,12 @@ function CoinCard({
     <Card>
       <CardContent className="pt-4 pb-3">
         <div className="flex items-center gap-2 mb-3">
-          <AssetLabel asset={coin} src={logo} size={20} quiet labelClassName="text-sm font-medium" />
+          <img
+            src={logo}
+            alt={formatAssetLabel(coin)}
+            className="w-[18px] h-[18px] rounded-full"
+          />
+          <AssetLabel asset={coin} labelClassName="text-sm font-medium" />
         </div>
 
         <div className="comparison-metric-header grid grid-cols-[56px_minmax(0,1fr)_96px_minmax(0,1fr)] mb-1 gap-2">

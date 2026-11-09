@@ -250,7 +250,7 @@ export default function OnboardingGuide({ open, variant, step, onStep, onClose, 
                 <li><PointIcon kind="eye" />{t("onboarding.welcome.point.readOnly")}</li>
               </ul>}
               {id === "sources" && <p className="ob-note">{t("onboarding.sources.note")}</p>}
-              {id === "deeper" && variant === "desktop" && <p className="ob-note"><span className="t3-tag ob-pro" data-tone="accent">{t("app.proBadge").toLowerCase().replace(/^./, (first) => first.toUpperCase())}</span>{t("onboarding.deeper.pro")}</p>}
+              {id === "deeper" && variant === "desktop" && <p className="ob-note"><span className="ob-pro">{t("app.proBadge").toLowerCase().replace(/^./, (first) => first.toUpperCase())}</span>{t("onboarding.deeper.pro")}</p>}
               {id === "backup" && <p className="ob-note">{t("onboarding.backup.sync")}</p>}
             </motion.div>
             <div className="ob-foot">

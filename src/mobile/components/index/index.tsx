@@ -238,9 +238,9 @@ function TopBar({
           </TooltipProvider>
         </div>
       </div>
-      {refreshButtonLoading && (
+      {refreshProgress > 0 && refreshButtonLoading && (
         <div className="absolute left-0 right-0 top-full z-20 flex items-center justify-center pt-1 pointer-events-none">
-          <Progress value={refreshProgress} aria-label={t("refresh.fidelity.progressAria")} className="h-[3px] w-[80%]" />
+          <Progress value={refreshProgress} className="w-[80%]" />
         </div>
       )}
     </div>
@@ -436,7 +436,7 @@ function Layout({
         />
 
         {/* Main content */}
-        <main id="app-main-content" tabIndex={0} className="p-5" data-route={location.pathname + location.search}
+        <main id="app-main-content" tabIndex={0} className="p-5" data-route={location.pathname}
           onBlur={(event) => { delete event.currentTarget.dataset.routeFocus; }}
           onContextMenuCapture={(event) => {
             if ((event.target as Element).closest("canvas")) event.preventDefault();

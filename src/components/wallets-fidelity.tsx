@@ -15,10 +15,6 @@ import { matchSourceStatus } from "./source-status-match";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { overviewRefreshRequestedEvent } from "./source-status-event";
 import SyncStatusIndicator from "./sync-status-indicator";
-import AssetLabel from "./common/asset-label";
-import { Pager, usePager } from "./ui/pager";
-
-import { useChartHitArea } from "./chart-tooltip";
 
 type Source = ReturnType<typeof deriveSourceChanges>["sources"][number];
 type Matrix = ReturnType<typeof deriveSourceChanges>;
@@ -57,8 +53,6 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
   onLoaded?: () => void;
 }) {
   const { t } = useTranslation();
-  const chart = useChartHitArea();
-  const moverChart = useChartHitArea();
   const version = useDataChangedVersion();
   const walletOrdinals = useLatestWalletOrdinals();
   const [data, setData] = useState<SnapshotData | null>(null);
@@ -144,20 +138,6 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
   const largestAsset = sourceAssets[0];
   const allocation = chosen ? sourceAssets.map((asset) => ({ name: asset.symbol, value: asset.value }))
     : sources.map((source) => ({ name: source.label, value: source.value }));
-  const chipPage = usePager(sources, "chips", 8);
-  const legendPage = usePager(allocation, selectedSource ?? "all", 8);
-  const sourceBalancePage = usePager(sources, "source-balances", 8);
-  const assetBalancePage = usePager(sourceAssets, selectedSource ?? "asset-balances", 8);
-  const balancePage = chosen ? assetBalancePage : sourceBalancePage;
-  const statusPage = usePager(sources, "statuses", 8);
-  const matrixAssetPage = usePager(matrixAssets, "matrix-assets", 8);
-  const matrixSourcePage = usePager(sources, "matrix-sources", 5);
-  const moverPage = usePager(movers, selectedSource ?? "all-movers", 10);
-  useEffect(() => {
-    if (!selectedSource) return;
-    const index = sources.findIndex((source) => source.id === selectedSource);
-    if (index >= 0) chipPage.goTo(Math.floor(index / chipPage.pageSize) + 1);
-  }, [selectedSource, sources, chipPage.pageSize]);
   const allocationTotal = chosen?.value ?? total;
   const requestedRange = Math.round((dateRange.end.getTime() - dateRange.start.getTime()) / 86400000);
   const activeRange = days.findIndex((value) => value === requestedRange);
@@ -192,17 +172,14 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
     return kind === "exchange" ? t("wallets.fidelity.apiReadOnly")
       : kind === "broker" ? t("wallets.fidelity.flexQuery") : t("wallets.fidelity.publicAddress");
   };
-  const renderMovers = (items: typeof movers) => <div className="t3-wallet-movers" data-chart-group="">
-    {items.map((asset, index) => <div key={asset.symbol}>
-      <strong><AssetLabel symbol={asset.symbol} size={20} quiet /></strong><span className="t3-wallet-mover-track" role="button"
-        {...moverChart.markProps(index, `${asset.symbol}: ${signedMoney(asset.delta)}`,
-          <><div>{asset.symbol}</div><div className={tone(asset.delta)}>{signedMoney(asset.delta)}</div></>)}
-        style={{ "--zero": `${moverZero}%` } as CSSProperties}><i className={tone(asset.delta)}
+  const renderMovers = (items: typeof movers) => <div className="t3-wallet-movers">
+    {items.map((asset) => <div key={asset.symbol}>
+      <strong>{asset.symbol}</strong><span className="t3-wallet-mover-track" style={{ "--zero": `${moverZero}%` } as CSSProperties}><i className={tone(asset.delta)}
         style={{ width: `${Math.max(.5, Math.abs(asset.delta) * moverUnit)}%`,
           left: asset.delta >= 0 ? `${moverZero}%` : undefined,
           right: asset.delta < 0 ? `${100 - moverZero}%` : undefined }} /></span>
       <span className={tone(asset.delta)}>{signedMoney(asset.delta, 0)}</span>
-    </div>)}{moverChart.tooltip}
+    </div>)}
   </div>;
 
   return <div className="t3-wallet-fidelity" aria-busy={loading}>
@@ -229,12 +206,11 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
           <UpdateIcon aria-hidden="true" />{t("common.refresh")}</button>
       </div>
     </header>
-    <section className="t3-wallet-picker"><nav className="analyze-source-picker t3-wallet-chips" aria-label={t("wallets.h1")}>
+    <nav className="analyze-source-picker t3-wallet-chips" aria-label={t("wallets.h1")}>
       <button type="button" aria-pressed={selectedSource === null} onClick={() => onSelectSource(null)}>{t("wallets.allSources")}</button>
-      {chipPage.rows.map((source) => <button key={source.id} type="button" title={source.id} aria-pressed={selectedSource === source.id}
-        onClick={() => onSelectSource(source.id)}>{statusFor(source)?.status === "failed" && <i />}
-        <AssetLabel kind={sourceKind(statusFor(source), source, data?.latest)} type={data?.identities[source.id]?.type ?? source.label} name={source.label} size={16} /></button>)}
-    </nav><Pager count={sources.length} {...chipPage} t={t} ariaLabel={t("wallets.fidelity.sourcePages")} /></section>
+      {sources.map((source) => <button key={source.id} type="button" title={source.id} aria-pressed={selectedSource === source.id}
+        onClick={() => onSelectSource(source.id)}>{statusFor(source)?.status === "failed" && <i />}{source.label}</button>)}
+    </nav>
     {chosen && selectedFailed && selectedStatus && <div className="t3-wallet-failure-banner" role="alert">
       <ExclamationTriangleIcon aria-hidden="true" /><div><strong>{t("wallets.refreshFailed").replace("{source}", chosen.label)}</strong>
         <span>{selectedStatus.detail || t(`wallets.failure.${selectedStatus.category ?? "other"}`)}
@@ -277,15 +253,10 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
                 ? t("wallets.fidelity.ofSource").replace("{share}", `${(largestAsset.value / allocationTotal * 100).toFixed(1)}%`)
                 : t("wallets.fidelity.currentCount").replace("{current}", currentCount).replace("{total}", String(sources.length))}</small></div>
           </div>
-          <div className="t3-wallet-split" data-chart-group="">{allocation.map((item, index) => {
-            const detail = `${item.name}: ${money(item.value)} · ${allocationTotal ? (item.value / allocationTotal * 100).toFixed(2) : "0.00"}%`;
-            return <i key={item.name} role="button" {...chart.markProps(index, detail, detail)}
-              style={{ width: `${allocationTotal ? item.value / allocationTotal * 100 : 0}%`, background: sourceColors[index % sourceColors.length] }} />;
-          })}</div>
-          {chart.tooltip}
-          <div className="t3-wallet-legend">{legendPage.rows.map((item, index) => <span key={item.name}><i style={{ background: sourceColors[(index + (legendPage.page - 1) * legendPage.pageSize) % sourceColors.length] }} />
+          <div className="t3-wallet-split">{allocation.map((item, index) => <i key={item.name}
+            style={{ width: `${allocationTotal ? item.value / allocationTotal * 100 : 0}%`, background: sourceColors[index % sourceColors.length] }} />)}</div>
+          <div className="t3-wallet-legend">{allocation.map((item, index) => <span key={item.name}><i style={{ background: sourceColors[index % sourceColors.length] }} />
             {item.name} <b>{allocationTotal ? `${(item.value / allocationTotal * 100).toFixed(1)}%` : "—"}</b></span>)}</div>
-          <Pager count={allocation.length} {...legendPage} t={t} ariaLabel={t("wallets.fidelity.allocation")} />
         </section>
         <section className="t3-wallet-card t3-wallet-balances"><div className="t3-wallet-card-head">
           <h2>{chosen ? t("wallets.fidelity.balances") : t("wallets.fidelity.balancesBySource")}</h2>
@@ -296,30 +267,27 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
           <div className="t3-wallet-table-scroll"><table><thead><tr>{(chosen
             ? ["asset", "amount", "price", "value", "share", "change30", "changePct"]
             : ["source", "value", "share", "change30", "changePct"]).map((field) => <th key={field}>{t(`wallets.fidelity.col.${field}`)}</th>)}</tr></thead>
-          <tbody>{chosen ? assetBalancePage.rows.map((asset) => <tr key={`${asset.assetType}:${asset.symbol}`}><th><AssetLabel asset={asset} size={20} quiet secondary={knownAssetNames[asset.symbol]} /></th>
+          <tbody>{chosen ? sourceAssets.map((asset, index) => <tr key={`${asset.assetType}:${asset.symbol}`}><th><i style={{ background: sourceColors[index % sourceColors.length] }} />{asset.symbol}{knownAssetNames[asset.symbol] && <small>{knownAssetNames[asset.symbol]}</small>}</th>
             <td>{asset.amount.toLocaleString("en-US", { maximumFractionDigits: 4, minimumFractionDigits: ["USDT", "USDC"].includes(asset.symbol) ? 2 : 0 })}</td>
             <td>{money(asset.price)}</td><td>{money(asset.value)}</td><td>{`${(asset.value / allocationTotal * 100).toFixed(1)}%`}</td>
             <td className={tone(asset.delta)}>{signedMoney(asset.delta)}</td><td className={tone(asset.pct)}>{percent(asset.pct)}</td></tr>)
-            : sourceBalancePage.rows.map((source) => <tr key={source.id}><th><AssetLabel kind={sourceKind(statusFor(source), source, data?.latest)}
-              type={data?.identities[source.id]?.type ?? source.label} name={source.label} size={20}
-              secondary={sourceKind(statusFor(source), source, data?.latest)} /></th>
+            : sources.map((source, index) => <tr key={source.id}><th><i style={{ background: sourceColors[index % sourceColors.length] }} />{source.label}<small>{sourceKind(statusFor(source), source, data?.latest)}</small></th>
               <td>{money(source.value)}</td><td>{share(source.value)}</td><td className={tone(source.change)}>{signedMoney(source.change)}</td>
               <td className={tone(source.percentage ?? 0)}>{source.percentage === null ? "—" : percent(source.percentage)}</td></tr>)}</tbody>
           <tfoot><tr><th>{t("wallets.fidelity.total")}</th>{chosen && <><td /><td /></>}
             <td>{money(allocationTotal)}</td><td>100.0%</td><td className={tone(chosen?.change ?? change)}>{signedMoney(chosen?.change ?? change)}</td>
             <td className={tone(chosen?.percentage ?? (previousTotal ? change / previousTotal * 100 : 0))}>{percent(chosen?.percentage ?? (previousTotal ? change / previousTotal * 100 : 0))}</td></tr></tfoot>
-          </table></div><Pager count={chosen ? sourceAssets.length : sources.length} {...balancePage} t={t}
-            ariaLabel={chosen ? t("wallets.fidelity.balances") : t("wallets.fidelity.balancesBySource")} /></section>
+          </table></div></section>
         <section className="t3-wallet-card t3-wallet-side"><div className="t3-wallet-card-head"><h2>{chosen ? t("wallets.fidelity.assetChanges") : t("wallets.fidelity.sourceStatus")}</h2>
           <span>{chosen ? t("wallets.fidelity.thirtyUsd") : t("wallets.fidelity.today")}</span></div>
-          {chosen ? <>{renderMovers(moverPage.rows)}<Pager count={movers.length} {...moverPage} t={t} ariaLabel={t("wallets.fidelity.assetChanges")} /><div className="t3-wallet-facts"><div><span>{t("wallets.fidelity.sourceChange")}</span><b className={tone(chosen.change)}>{signedMoney(chosen.change)}</b></div>
+          {chosen ? <>{renderMovers(movers)}<div className="t3-wallet-facts"><div><span>{t("wallets.fidelity.sourceChange")}</span><b className={tone(chosen.change)}>{signedMoney(chosen.change)}</b></div>
             <div><span>{t("wallets.fidelity.portfolioShareChange")}</span><b>{change ? `${(chosen.change / change * 100).toFixed(1)}%` : "—"}</b></div></div>
             <p>{t("wallets.fidelity.priceFootSelected")}</p></>
-            : <><div className="t3-wallet-status-list">{statusPage.rows.map((source) => {
+            : <div className="t3-wallet-status-list">{sources.map((source) => {
               const status = statusFor(source);
               const bad = status?.status === "failed" || status?.status === "stale";
-              return <div key={source.id} className={bad ? "failed" : ""}><div><i className={bad ? "err" : ""} /><strong><AssetLabel kind={sourceKind(status, source, data?.latest)} type={data?.identities[source.id]?.type ?? source.label} name={source.label} size={20} /></strong>
-                {bad ? <b className="t3-tag" data-tone="negative">{t("wallets.fidelity.failed")}</b> : <time>{formatTime(status?.finishedAt)}</time>}</div>
+              return <div key={source.id} className={bad ? "failed" : ""}><div><i className={bad ? "err" : ""} /><strong>{source.label}</strong>
+                {bad ? <b>{t("wallets.fidelity.failed")}</b> : <time>{formatTime(status?.finishedAt)}</time>}</div>
                 {bad ? <><p>{!status?.detail && status?.category === "rateLimit" && status.lastSuccessAt
                   ? t("wallets.fidelity.rateLimitWithLastGood").replace("{time}", formatTime(status.lastSuccessAt))
                   : <>{status?.detail || t(`wallets.failure.${status?.category ?? "other"}`)}
@@ -329,27 +297,20 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
                     {status && nextBySource?.[status.sourceId] && <span>{t("wallets.fidelity.nextTry")
                       .replace("{time}", formatTime(new Date(nextBySource[status.sourceId]).toISOString()))}</span>}</div></>
                   : <small>{providerText(source)}</small>}</div>;
-            })}</div><Pager count={sources.length} {...statusPage} t={t} ariaLabel={t("wallets.fidelity.sourceStatus")} /></>}
+            })}</div>}
         </section>
         {!chosen && <><section className="t3-wallet-card t3-wallet-matrix"><div className="t3-wallet-card-head"><h2>{t("wallets.fidelity.assetChangesBySource")}</h2>
           <span>{t("wallets.fidelity.thirtyVsUsd").replace("{date}", periodStart)}</span></div>
           <div className="t3-wallet-table-scroll" tabIndex={0} aria-label={t("wallets.fidelity.assetChangesBySource")}><table><thead><tr><th>{t("wallets.fidelity.col.asset")}</th>
-            {matrixSourcePage.rows.map((source) => <th key={source.id} title={source.id} aria-label={source.label}><AssetLabel
-              kind={sourceKind(statusFor(source), source, data?.latest)} type={data?.identities[source.id]?.type ?? source.label}
-              name={source.label} size={20} /></th>)}<th>{t("wallets.fidelity.total")}</th></tr></thead>
-          <tbody>{matrixAssetPage.rows.map((asset) => <tr key={asset.key}><th><AssetLabel
-            asset={{ symbol: asset.symbol, assetType: asset.key.startsWith("stock:") ? "stock" : "crypto" }} size={20} quiet /></th>
-            {matrixSourcePage.rows.map((source) => { const value = asset.values[source.id]; return <td key={source.id} className={value === undefined ? "" : tone(value)}>
+            {sources.map((source) => <th key={source.id} title={source.id} aria-label={source.label}><span>{source.label}</span></th>)}<th>{t("wallets.fidelity.total")}</th></tr></thead>
+          <tbody>{matrixAssets.map((asset) => <tr key={asset.key}><th>{asset.symbol}</th>
+            {sources.map((source) => { const value = asset.values[source.id]; return <td key={source.id} className={value === undefined ? "" : tone(value)}>
               {value === undefined ? "–" : signedMoney(value)}</td>; })}
             <td className={tone(asset.total)}>{signedMoney(asset.total)}</td></tr>)}</tbody>
-          <tfoot><tr><th>{t("wallets.fidelity.total")}</th>{matrixSourcePage.rows.map((source) => <td key={source.id} className={tone(source.change)}>{signedMoney(source.change)}</td>)}
-            <td className={tone(change)}>{signedMoney(change)}</td></tr></tfoot></table></div>
-          <Pager count={matrixAssets.length} {...matrixAssetPage} t={t} ariaLabel={t("wallets.fidelity.matrixAssetPages")}
-            visibleLabel={t("wallets.fidelity.assets")} />
-          <Pager count={sources.length} {...matrixSourcePage} t={t} ariaLabel={t("wallets.fidelity.matrixSourcePages")}
-            visibleLabel={t("wallets.fidelity.sources")} /></section>
+          <tfoot><tr><th>{t("wallets.fidelity.total")}</th>{sources.map((source) => <td key={source.id} className={tone(source.change)}>{signedMoney(source.change)}</td>)}
+            <td className={tone(change)}>{signedMoney(change)}</td></tr></tfoot></table></div></section>
           <section className="t3-wallet-card t3-wallet-moved"><div className="t3-wallet-card-head"><h2>{t("wallets.fidelity.whatMoved")}</h2>
-            <span>{t("wallets.fidelity.allSourcesThirty")}</span></div>{renderMovers(moverPage.rows)}<Pager count={movers.length} {...moverPage} t={t} ariaLabel={t("wallets.fidelity.whatMoved")} /><p>{t("wallets.fidelity.priceFoot")}</p></section></>}
+            <span>{t("wallets.fidelity.allSourcesThirty")}</span></div>{renderMovers(movers)}<p>{t("wallets.fidelity.priceFoot")}</p></section></>}
       </div>}
   </div>;
 }

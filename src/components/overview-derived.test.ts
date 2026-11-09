@@ -2,15 +2,6 @@ import { describe, expect, it } from "vitest";
 import { deriveOverviewSeries, deriveContributions, selectBestDayContributionSnapshots, selectContributionSnapshots, unavailableSources } from "./overview-derived";
 
 describe("overview render data", () => {
-  it("retains both closing totals for an exact daily percentage and ending value", () => {
-    const daily = deriveOverviewSeries([
-      { timestamp: Date.parse("2026-11-07T12:00:00Z"), totalValue: 1_715_000 },
-      { timestamp: Date.parse("2026-11-08T12:00:00Z"), totalValue: 1_662_685.93 },
-    ]).daily;
-    expect(daily[0]).toMatchObject({
-      value: -52_314.070000000065, previousTotal: 1_715_000, total: 1_662_685.93,
-    });
-  });
   it("uses the newest seven snapshots even though the database returns dates descending", () => {
     const dates = Array.from({ length: 12 }, (_, index) => ({ id: String(index), createdAt: `2026-01-${String(index + 1).padStart(2, "0")}` })).reverse();
     expect(selectContributionSnapshots(dates, new Date("2026-01-01"), new Date("2026-01-31"))).toEqual({ fromId: "5", toId: "11", count: 7 });
@@ -24,8 +15,8 @@ describe("overview render data", () => {
       { timestamp: day("2026-01-03"), totalValue: 90 },
       { timestamp: day("2026-01-04"), totalValue: 110 },
     ], { start: new Date("2026-01-03"), end: new Date("2026-01-04T23:59:59Z") })).toEqual({
-      daily: [{ timestamp: day("2026-01-04"), value: 20, previousTotal: 90, total: 110 }],
-      bestDay: { timestamp: day("2026-01-04"), value: 20, previousTotal: 90, total: 110 },
+      daily: [{ timestamp: day("2026-01-04"), value: 20 }],
+      bestDay: { timestamp: day("2026-01-04"), value: 20 },
       ath: { timestamp: day("2026-01-02"), value: 150 },
       distanceFromAth: -40 / 150 * 100,
     });
@@ -39,11 +30,11 @@ describe("overview render data", () => {
       { timestamp: day("2026-01-04"), totalValue: 110 },
     ])).toEqual({
       daily: [
-        { timestamp: day("2026-01-02"), value: -8, previousTotal: 100, total: 92 },
-        { timestamp: day("2026-01-03"), value: 25, previousTotal: 92, total: 117 },
-        { timestamp: day("2026-01-04"), value: -7, previousTotal: 117, total: 110 },
+        { timestamp: day("2026-01-02"), value: -8 },
+        { timestamp: day("2026-01-03"), value: 25 },
+        { timestamp: day("2026-01-04"), value: -7 },
       ],
-      bestDay: { timestamp: day("2026-01-03"), value: 25, previousTotal: 92, total: 117 },
+      bestDay: { timestamp: day("2026-01-03"), value: 25 },
       ath: { timestamp: day("2026-01-03"), value: 117 },
       distanceFromAth: -7 / 117 * 100,
     });
@@ -56,7 +47,7 @@ describe("overview render data", () => {
       { timestamp: timestamp("2026-01-01T13:00:00Z"), totalValue: 110 },
       { timestamp: timestamp("2026-01-02T12:00:00Z"), totalValue: 105 },
       { timestamp: timestamp("2026-01-02T13:00:00Z"), totalValue: 120 },
-    ]).daily).toEqual([{ timestamp: timestamp("2026-01-02T13:00:00Z"), value: 10, previousTotal: 110, total: 120 }]);
+    ]).daily).toEqual([{ timestamp: timestamp("2026-01-02T13:00:00Z"), value: 10 }]);
   });
 
   it("keeps empty and flat histories honest", () => {

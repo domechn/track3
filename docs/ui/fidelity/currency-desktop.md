@@ -10,8 +10,6 @@ State variants: `currency-select` opens a 220px dropdown aligned with the base c
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** currency 6.658% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.
 
 Settings toasts retain a visible 44px close × target for keyboard and pointer dismissal; the reference toasts omit it.

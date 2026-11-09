@@ -42,14 +42,7 @@ test("2024 phone year known P&L equals its months at 390px", async ({ browser })
     await year.getByRole("button", { name: "Explain partial profit for 2024" }).click();
     await expect(page.locator('[role="tooltip"][data-state="open"]')).toContainText("1 affected month(s)");
     await page.keyboard.press("Escape");
-    await year.getByRole("button", { name: "Recorded inflow breakdown" }).click();
-    await expect(page.locator('[role="tooltip"][data-state="open"]')).toContainText("Staking rewards");
-    await expect(page.locator('[role="tooltip"][data-state="open"]')).toContainText(/coins up · \d+ down/);
-    await page.keyboard.press("Escape");
-    const zeroDown = year.locator(".fd-year-foot [data-tone='neutral']");
-    await expect(zeroDown).toContainText("0 months down");
-    expect(await zeroDown.evaluate((node) => getComputedStyle(node).color))
-      .toBe(await year.locator(".fd-year-foot").evaluate((node) => getComputedStyle(node).color));
+    await expect(year.locator(".fd-year-foot")).toContainText("12 up · 0 down");
     expect(errors).toEqual([]);
     await page.screenshot({ path: ".local/ui46-final/additive-mobile-390.png", fullPage: true });
   } finally {
@@ -82,7 +75,7 @@ test("phone separates invested capital from unrecorded value in the P&L card", a
     await expect(card).toContainText("+$20.00");
     await expect(card).toContainText("+20.00%");
     await expect(card).toContainText("on $100");
-    await expect(card).toContainText("Unrecorded changes: +$120.00");
+    await expect(card.locator(".fd-primary-stat strong")).toHaveAttribute("title", "Unrecorded changes: +$120.00");
     await expect(card.locator(".fd-kpis > div").nth(1)).toContainText("$220");
     await expect(page.locator(".fd-month").filter({ hasText: "Feb" }).locator("small")).toHaveText("+20.00%");
     await expect(page.locator(".fd-year").filter({ hasText: "2024" }).locator("small")).toHaveText("+20.00%");

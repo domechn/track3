@@ -167,7 +167,7 @@ const App = () => {
         <div className="fidelity-b-card-head">
           <div><h2>{t("fidelity.b.ai.connection")}</h2>
             <p>{t("fidelity.b.ai.connectionHint")}</p></div>
-          <span className="t3-tag" data-tone={probeError ? "negative" : probeSuccess ? "positive" : "neutral"}>
+          <span className={`fidelity-b-pill ${probeError ? "is-error" : probeSuccess ? "is-positive" : ""}`}>
             {probeError ? t("fidelity.b.ai.failed") : probeSuccess
               ? t("fidelity.b.ai.connected") : configured ? t("fidelity.b.ai.configured") : t("fidelity.b.ai.notConfigured")}
           </span>

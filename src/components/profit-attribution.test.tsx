@@ -35,28 +35,6 @@ beforeEach(() => vi.clearAllMocks());
 function view() { return <ProfitAttribution currency={currency} dateRange={range} quoteColor="red-up-green-down" />; }
 
 describe("profit attribution", () => {
-  it("shows the precise market effect when an attribution bar is hovered", async () => {
-    vi.mocked(queryAttribution).mockResolvedValue(filled);
-    const { container } = render(view());
-    await screen.findByText("Top contributors");
-    fireEvent.pointerEnter(container.querySelector("ol .h-4")!, { pointerType: "mouse" });
-    expect(screen.getByRole("tooltip")).toHaveTextContent("+€40.00");
-  });
-  it("keeps a detractor tabbable after visiting the fourth contributor", async () => {
-    vi.mocked(queryAttribution).mockResolvedValue({
-      ...filled, attribution: { ...filled.attribution, entries: [
-        ...[40, 30, 20, 10].map((priceEffect, index) => ({
-          ...filled.attribution.entries[0], symbol: `GAIN${index}`, priceEffect,
-        })),
-        filled.attribution.entries[1],
-      ] },
-    });
-    render(view());
-    const figure = await screen.findByRole("figure", { name: "Top attribution contributors and detractors" });
-    const [contributors, detractors] = within(figure).getAllByRole("list");
-    fireEvent.pointerEnter(contributors.querySelectorAll("[data-chart-mark]")[3], { pointerType: "mouse" });
-    expect(detractors.querySelector("[data-chart-mark]")).toHaveAttribute("tabindex", "0");
-  });
   it("pages 47 groups while keeping all-row totals and leaders", async () => {
     vi.mocked(queryAttribution).mockResolvedValue(many);
     render(view());

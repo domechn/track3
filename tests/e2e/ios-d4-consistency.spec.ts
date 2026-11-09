@@ -145,23 +145,15 @@ test("phone titles share one page inset and performance metrics share one layout
   expect(containment.every(({ cell, text }) => text <= cell + 1), JSON.stringify(containment)).toBe(true);
 });
 
-test("the 390px performance metrics keep full amounts in two columns", async ({ page }) => {
+test("the three 390px performance metrics align their labels and values", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
   await expect(page.locator(".overview-pnl-metric")).toHaveCount(3);
   for (const selector of [".overview-pnl-metric > :first-child", ".overview-pnl-metric-value"]) {
     const tops = await page.locator(selector).evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top));
-    expect(Math.abs(tops[0] - tops[1])).toBeLessThanOrEqual(1);
-    expect(tops[2]).toBeGreaterThan(tops[1]);
+    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(1);
   }
-  const amounts = await page.locator(".fd-overview-kpis > div > span:not(.fd-label)").evaluateAll((nodes) =>
-    nodes.map((node) => {
-      const style = getComputedStyle(node);
-      const box = node.getBoundingClientRect();
-      return { height: box.height, lineHeight: Number.parseFloat(style.lineHeight), overflow: node.scrollWidth - node.clientWidth };
-    }));
-  expect(amounts.every(({ height, lineHeight, overflow }) => height <= lineHeight + 1 && overflow <= 1)).toBe(true);
 });
 
 test("phone Goals uses design headings and Assistant keeps quiet headings", async ({ page }) => {

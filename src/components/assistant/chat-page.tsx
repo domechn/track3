@@ -143,7 +143,7 @@ function AssistantPageHeading({ ready, isProUser, model, refreshedAt }: {
     <div className="t3-assistant-page-actions">
       <SyncStatusIndicator />
       {ready && <span className="t3-assistant-model"><span className="t3-assistant-model-dot" />{model}{refreshedAt ? ` · ${t("fidelity.assistant.dataAsOf")} ${new Date(refreshedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}</span>}
-      {isProUser && <span className="t3-tag" data-tone={ready ? "positive" : "warning"}>{ready ? t("fidelity.assistant.proBadge") : t("fidelity.assistant.keyMissing")}</span>}
+      {isProUser && <span className={`t3-assistant-pro ${ready ? "" : "missing"}`}>{ready ? t("fidelity.assistant.proBadge") : t("fidelity.assistant.keyMissing")}</span>}
     </div>
   </header>;
 }
@@ -471,18 +471,16 @@ function ReadyChat({
       ref={layoutRef}
       className="t3-manage-assistant relative flex h-[calc(100vh-88px)] min-h-[560px] gap-4 overflow-hidden"
       data-testid="chat-session-layout"
-      data-layout-exempt="R5: the assistant design uses fixed 300px and 296px side panes"
     >
       {deleteError && (
         <p role="alert" className="absolute right-4 top-4 z-10 rounded bg-card px-4 py-2 text-sm text-destructive">
           {t("assistant.chat.deleteFailed")}: {deleteError}
         </p>
       )}
-      {drawer && <button type="button" className="absolute inset-0 z-[4] bg-[var(--overlay-scrim)]"
+      {drawer && <button type="button" className="absolute inset-0 z-[4] bg-black/40"
         data-testid="assistant-pane-scrim" aria-label={t("common.close")}
         onClick={() => setPane(drawer)} />}
-      <div data-card className="t3-assistant-pane t3-assistant-chats-pane" id="assistant-chats"
-        data-layout-exempt="R4: the empty chat list reserves scroll space above its fixed footer; R5: the assistant uses fixed side panes"
+      <div className="t3-assistant-pane t3-assistant-chats-pane" id="assistant-chats"
         data-testid="chats-pane" data-collapsed={!chatsOpen} data-drawer={drawer === "chats"}
         style={{ width: chatsOpen ? 300 : 44 }}>
         {chatsOpen ? <div className="w-[300px] h-full">
@@ -529,7 +527,7 @@ function ReadyChat({
        sidebarOpen={sidebarOpen}
         onToggleSidebar={handleToggleSidebar}
      />}
-     <div data-card className="t3-assistant-pane t3-assistant-context-pane" id="assistant-context" data-testid="context-pane"
+     <div className="t3-assistant-pane t3-assistant-context-pane" id="assistant-context" data-testid="context-pane"
        data-collapsed={!contextOpen} data-drawer={drawer === "context"} style={{ width: contextOpen ? 296 : 44 }}>
        {contextOpen ? <AssistantContextPanel config={config} sessions={sessions} baseCurrency={baseCurrency}
          onCollapse={() => setPane("context")} collapseRef={contextHeaderRef} controlsId="assistant-context" />
@@ -801,7 +799,7 @@ function NotConfiguredCard() {
             >
               <RocketIcon className="h-4 w-4" />
             </span>
-            <span className="t3-tag" data-tone="positive">
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               {t("assistant.phase6.syncBadge")}
             </span>
           </div>
@@ -909,7 +907,7 @@ function UpgradeCard() {
             >
               <RocketIcon className="h-4 w-4" />
             </span>
-            <span className="t3-tag" data-tone="accent">
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Pro
             </span>
           </div>

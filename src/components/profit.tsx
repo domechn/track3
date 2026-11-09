@@ -25,13 +25,24 @@ import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import ProfitAttribution from "./profit-attribution";
 import { profitRanks } from "./analyze-values";
-import { PartialProfitHint } from "./profit-summary-hints";
+
+function getToneBadgeClass(value: number, quoteColor: QuoteColor) {
+  const tone = positiveNegativeTone(value, quoteColor);
+  if (tone === "green") {
+    return "bg-positive/15 text-positive";
+  }
+  if (tone === "red") {
+    return "bg-negative/15 text-negative";
+  }
+  return "bg-muted text-muted-foreground";
+}
 
 const App = ({
   currency,
@@ -130,7 +141,7 @@ const App = ({
     [profit, quoteColor],
   );
   const totalToneBadgeClass = useMemo(
-    () => profit === null ? "neutral" : positiveNegativeTone(profit, quoteColor) === "green" ? "positive" : positiveNegativeTone(profit, quoteColor) === "red" ? "negative" : "neutral",
+    () => profit === null ? "bg-muted text-muted-foreground" : getToneBadgeClass(profit, quoteColor),
     [profit, quoteColor],
   );
   const positiveCount = useMemo(
@@ -216,11 +227,13 @@ const App = ({
               "{asset}",
               formatAssetLabel(d),
             )}</span>
+            <img
+              className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
+              src={resolveAssetLogoSrc(d, logoMap[getAssetLogoKey(d)])}
+              alt=""
+            />
             <AssetLabel
               asset={d}
-              src={logoMap[getAssetLogoKey(d)]}
-              size={20}
-              quiet
               className="min-w-0"
               labelClassName="font-medium text-sm"
             />
@@ -228,15 +241,13 @@ const App = ({
           </Link>
         </TableCell>
         <TableCell className="text-right py-1.5">
-          <div className={`text-sm ${d.isUnknown || d.value === null ? "text-muted-foreground" : positiveNegativeTextClass(d.value, quoteColor, 500)}`}>
+          <div title={d.isUnknown ? t("common.unknown") : undefined} className={`text-sm ${d.value === null ? "text-muted-foreground" : positiveNegativeTextClass(d.value, quoteColor, 500)}`}>
             {d.value === null ? "—" : (d.value < 0 ? "-" : "+") +
               currency.symbol +
               prettyNumberToLocaleString(
                 currencyWrapper(currency)(Math.abs(d.value)),
               )}
           </div>
-          {d.isUnknown && <PartialProfitHint names={[d.symbol]} affected={unknownCoins.filter((coin) => coin.symbol === d.symbol)}
-            period={d.symbol} t={t} />}
           {showCoinsProfitPercentage && (
             <div className="text-xs text-muted-foreground">
               {d.percentage === null ? "—" : <>
@@ -272,7 +283,8 @@ const App = ({
         {view === "summary" && <>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="space-y-1">
-            <div className={`text-xl font-semibold tracking-tight ${totalToneClass}`}>
+            <div title={unknownCoins.length ? t("profitSummary.partial").replace("{n}", String(unknownCoins.length)) : undefined}
+              className={`text-xl font-semibold tracking-tight ${totalToneClass}`}>
               {profit === null ? "—" : (profit < 0 ? "-" : "+") +
                 currency.symbol +
                 prettyNumberToLocaleString(
@@ -281,12 +293,10 @@ const App = ({
             </div>
             <div className="text-xs text-muted-foreground">
               {t("profit.netPnl")}
-              {unknownCoins.length > 0 && <PartialProfitHint names={unknownCoins.map((coin) => coin.symbol)}
-                affected={unknownCoins} period={t("profit.netPnl")} t={t} />}
             </div>
           </div>
           <div
-            className="t3-tag" data-tone={totalToneBadgeClass}
+            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${totalToneBadgeClass}`}
           >
             {profitPercentage === null ? "—" : profitPercentage === undefined
               ? t("common.infinity")

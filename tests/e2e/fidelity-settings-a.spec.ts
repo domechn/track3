@@ -514,7 +514,7 @@ for (const state of [
       }
       if (state === "language-zh-toast") {
         await expect(page.getByText("语言已切换")).toBeVisible();
-        await expect(page.locator(".fidelity-language-toast")).toHaveCSS("border-left-color", "rgb(95, 196, 155)");
+        await expect(page.locator(".fidelity-language-toast")).toHaveCSS("border-left-color", "rgb(95, 195, 156)");
       }
     }
     await page.evaluate(() => document.fonts.ready);

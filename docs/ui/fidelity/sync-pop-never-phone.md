@@ -141,8 +141,7 @@ Capture: `/tmp/fidelity/settings-b/sync-pop-never.png` (full page: `sync-pop-nev
 - The fixture now creates three real configuration conflicts and the unlocked page renders resolution controls. The runtime does not expose the source mockup’s per-setting device names or change times; locked/setup captures cannot show resolvable conflicts before unlock.
 - The page title, 16px sans-serif connection inputs, input surfaces, status pill and sync sheets now follow the source geometry. The reference reveals portions of credentials and includes item-size totals or per-setting metadata that the runtime does not expose.
 - The sheet now shows **Sync**, **Never synced**, a dimmed backdrop, a white **Sync now** action, and **Settings**. The source estimates first-upload item count and size, which the runtime does not expose before a sync.
-- The app retains the sync control's status line above the sheet title. The static source sheet has no status line.
 
 ## Pixel difference
 
-Viewport: **7.826%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture, measured 8 Nov 2026).
+Viewport: **7.661%** of pixels differ by more than 16/255 in any RGB channel (source-page Chromium render versus app Chromium capture).

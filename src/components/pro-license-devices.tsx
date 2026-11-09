@@ -21,7 +21,7 @@ export function ProLicenseDevices({ value, locale, t }: {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">{device.platform ? t(`system.devices.platform.${device.platform}`) : t("system.devices.unknown")}</span>
             <span className="font-mono text-xs text-muted-foreground">{device.id.slice(0, 8)}</span>
-            {device.current && <span className="t3-tag" data-tone="accent">{t("system.devices.current")}</span>}
+            {device.current && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{t("system.devices.current")}</span>}
           </div>
           {device.appVersion && <p className="mt-1 text-xs text-muted-foreground">{t("system.devices.version").replace("{version}", device.appVersion)}</p>}
         </div>

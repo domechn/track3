@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
@@ -21,7 +21,6 @@ import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { addToBlacklist } from "@/middlelayers/configuration";
 import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
 import { useOptimisticDelete } from "./common/use-optimistic-delete";
-import AssetLabel from "./common/asset-label";
 import { HistoryPartialDetails } from "./history-partial";
 import SyncStatusIndicator from "./sync-status-indicator";
 import { FidelityDateInput } from "./fidelity-date-input";
@@ -54,7 +53,6 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<HistoricalData | null>(null);
   const [edits, setEdits] = useState<SnapshotEdit[] | null>(null);
-  const kpiRef = useRef<HTMLDivElement>(null);
   const [editLogError, setEditLogError] = useState(false);
   const [sourceAssets, setSourceAssets] = useState<AssetModel[]>([]);
   const [sourceIdentities, setSourceIdentities] = useState<Awaited<ReturnType<WalletAnalyzer["listWalletAliases"]>>>({});
@@ -63,9 +61,6 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [detailPage, setDetailPage] = useState(0);
-  const [showAllAssets, setShowAllAssets] = useState(false);
-  const [showAllSources, setShowAllSources] = useState(false);
-  const [narrowDetailOpen, setNarrowDetailOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteAssetId, setDeleteAssetId] = useState<number | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -82,10 +77,6 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   detailRef.current = detail;
   const latestVersion = useRef(version);
   latestVersion.current = version;
-  const listScrollRef = useRef<HTMLDivElement>(null);
-  const detailScrollRef = useRef<HTMLDivElement>(null);
-  const detailPaneRef = useRef<HTMLElement>(null);
-  const focusDetailOnLoadRef = useRef(false);
   const { run: runDelete, isDeleting } = useOptimisticDelete(setRows);
   const { run: runAssetDelete, isDeleting: isDeletingAsset } = useOptimisticDelete(setDetail);
 
@@ -135,9 +126,6 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   useEffect(() => {
     if (!selectedId) { setDetail(null); setEdits(null); setSourceAssets([]); setSourceIdentities({}); return; }
     setDetailPage(0);
-    setShowAllAssets(false);
-    setShowAllSources(false);
-    if (detailScrollRef.current) detailScrollRef.current.scrollTop = 0;
     let active = true;
     if (detailRef.current?.id !== selectedId) {
       setDetail(null);
@@ -160,29 +148,6 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
     });
     return () => { active = false; };
   }, [selectedId, version]);
-
-  useEffect(() => {
-    const pane = listScrollRef.current;
-    const row = [...(pane?.querySelectorAll<HTMLTableRowElement>("[data-testid=history-snapshot-row]") ?? [])]
-      .find((item) => item.dataset.snapshotId === selectedId);
-    if (!pane || !row || narrowDetailOpen) return;
-    const paneBox = pane.getBoundingClientRect();
-    const rowBox = row.getBoundingClientRect();
-    const headHeight = pane.querySelector("thead")?.getBoundingClientRect().height ?? 0;
-    if (rowBox.top < paneBox.top + headHeight) pane.scrollTop += rowBox.top - paneBox.top - headHeight;
-    else if (rowBox.bottom > paneBox.bottom) pane.scrollTop += rowBox.bottom - paneBox.bottom;
-  }, [selectedId, rows, narrowDetailOpen]);
-  useEffect(() => {
-    if (detailScrollRef.current) detailScrollRef.current.scrollTop = 0;
-  }, [detail?.id]);
-  useEffect(() => {
-    if (detailLoading || detail?.id !== selectedId || (!narrowDetailOpen && !focusDetailOnLoadRef.current)) return;
-    if (detailPaneRef.current) {
-      detailPaneRef.current.dataset.keyboardFocus = String(focusDetailOnLoadRef.current);
-      detailPaneRef.current.focus({ preventScroll: true });
-    }
-    focusDetailOnLoadRef.current = false;
-  }, [detailLoading, detail?.id, selectedId, narrowDetailOpen]);
 
   const money = (value: number) => `${currency.symbol}${currencyWrapper(currency)(Math.abs(value)).toLocaleString(
     locale === "zh" ? "zh-CN" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 },
@@ -226,8 +191,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   const previousForChange = filter === "all" ? previous : undefined;
   const previousTotal = previousForChange?.total ?? (selected?.change === null || !selected ? 0 : selected.total - selected.change);
   const assets = detail?.assets.slice().sort((a, b) => b.value - a.value) ?? [];
-  const visibleAssets = assets.slice(detailPage * PAGE_SIZE, (detailPage + 1) * PAGE_SIZE)
-    .slice(0, showAllAssets ? PAGE_SIZE : 12);
+  const visibleAssets = assets.slice(detailPage * PAGE_SIZE, (detailPage + 1) * PAGE_SIZE);
   const editDelta = (edits ?? []).reduce((sum, edit) => {
     if (edit.target !== "asset" || (edit.action !== "delete" && edit.action !== "restore")) return sum;
     const value = assetEditValue(edit, edit.action === "delete", "value");
@@ -247,92 +211,12 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   const sourceLabels = useMemo(() => sourceDisplayNames(sources.map(([id]) => ({ id, ...sourceIdentities[id] })),
     (index) => t("wallets.fallbackName").replace("{number}", String(index)), walletOrdinals), [sources, sourceIdentities, t, walletOrdinals]);
   const valueTotal = detail?.total ?? selected?.total ?? 0;
-  useLayoutEffect(() => {
-    const strip = kpiRef.current;
-    if (!strip) return;
-    let active = true;
-    let frame = 0;
-    const check = () => {
-      if (!active || !strip.clientWidth) return;
-      for (const fit of ["roomy", "tight", "compact"] as const) {
-        strip.dataset.fit = fit;
-        const widths = [...strip.children].map((cell) => {
-          const style = getComputedStyle(cell);
-          const textWidth = Math.max(...[...cell.children].map((text) => {
-            const range = document.createRange();
-            range.selectNodeContents(text);
-            return range.getBoundingClientRect().width;
-          }));
-          return textWidth + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) +
-            parseFloat(style.borderLeftWidth);
-        });
-        if (widths.reduce((sum, width) => sum + width, 0) <= strip.clientWidth + 1) {
-          if (fit === "roomy" && Math.max(...widths) * 3 <= strip.clientWidth + 1)
-            strip.dataset.fit = "spread";
-          return;
-        }
-      }
-      strip.dataset.fit = "stacked";
-    };
-    check();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(check);
-    });
-    if (strip.parentElement) observer?.observe(strip.parentElement);
-    document.fonts?.ready.then(check);
-    return () => { active = false; cancelAnimationFrame(frame); observer?.disconnect(); };
-  }, [detail, selected, edits, currency, locale, sources.length]);
   const pages = Math.ceil(count / PAGE_SIZE);
   const issueCount = statusCounts.partial;
   const editedCount = statusCounts.edited;
   const noSnapshots = !loading && count === 0 && range === "all" && !from && !to && filter === "all";
   const rangeOptions = ["7", "30", "90", "all"] as const;
   const switchRange = (next: typeof range) => { setRange(next); setFrom(""); setTo(""); setPage(0); };
-  const selectSnapshot = (id: string, open = true) => {
-    setSelectedId(id);
-    if (open && window.innerWidth < 900) setNarrowDetailOpen(true);
-  };
-  const returnToList = () => {
-    focusDetailOnLoadRef.current = false;
-    setNarrowDetailOpen(false);
-    requestAnimationFrame(() => listScrollRef.current?.querySelector<HTMLButtonElement>(
-      `[data-snapshot-id="${selectedId}"] button`,
-    )?.focus({ preventScroll: true }));
-  };
-  const onListKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!(event.target instanceof HTMLButtonElement)) return;
-    const rowId = event.target.closest<HTMLTableRowElement>("[data-testid=history-snapshot-row]")?.dataset.snapshotId;
-    if (!rowId) return;
-    if (event.key === "Escape") { returnToList(); return; }
-    if (event.key === "Enter") {
-      event.preventDefault();
-      focusDetailOnLoadRef.current = true;
-      selectSnapshot(rowId, true);
-      if (window.innerWidth >= 900 && detail?.id === rowId && !detailLoading) {
-        if (detailPaneRef.current) detailPaneRef.current.dataset.keyboardFocus = "true";
-        detailPaneRef.current?.focus({ preventScroll: true });
-        focusDetailOnLoadRef.current = false;
-      }
-      return;
-    }
-    const current = rows.findIndex((row) => row.id === selectedId);
-    const visible = Math.max(1, Math.floor((listScrollRef.current?.clientHeight ?? 390) / 39) - 1);
-    const next = event.key === "ArrowDown" ? current + 1 : event.key === "ArrowUp" ? current - 1
-      : event.key === "Home" ? 0 : event.key === "End" ? rows.length - 1
-        : event.key === "PageDown" ? current + visible : event.key === "PageUp" ? current - visible : -1;
-    if (next < 0 && event.key !== "ArrowUp" && event.key !== "PageUp") return;
-    event.preventDefault();
-    const target = rows[Math.max(0, Math.min(rows.length - 1, next))];
-    if (!target) return;
-    selectSnapshot(target.id, false);
-    listScrollRef.current?.querySelector<HTMLButtonElement>(`[data-snapshot-id="${target.id}"] button`)?.focus();
-  };
-  const scrollToSection = (id: string) => {
-    const pane = detailScrollRef.current;
-    const section = pane?.querySelector<HTMLElement>(`#${id}`);
-    if (pane && section) pane.scrollTo({ top: section.offsetTop, behavior: "smooth" });
-  };
 
   function compare() {
     if (!selected || !previous) return;
@@ -424,7 +308,14 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
     return <>{before}<strong>{t("history.fidelity.historyCount")}</strong>{after}</>;
   };
 
-  const filters = <section className={`fidelity-card fidelity-history-filters${noSnapshots ? " fidelity-history-filters-empty" : ""}`}>
+  return <div className="fidelity-history" aria-busy={loading} data-testid="history-content">
+    <header className="fidelity-page-head"><div><h1>{t("history.fidelity.title")}</h1>
+      <p>{listError ? t("history.fidelity.listLoadFailed") : count ? <>{subtitleBeforeCount}<strong>{count.toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}</strong>{
+        subtitleAfterCount.replace("{latest}", latest ? dateLatest(latest.createdAt) : "–")}</>
+        : loading ? t("common.loading") : t(noSnapshots ? "history.fidelity.emptySubtitle" : "history.fidelity.noResults")}</p></div>
+      <div className="fidelity-head-actions"><SyncStatusIndicator recordsStamp /></div>
+    </header>
+    <section className={`fidelity-card fidelity-history-filters${noSnapshots ? " fidelity-history-filters-empty" : ""}`}>
       <div className="fidelity-filter-group"><span>{t("history.fidelity.range")}</span>
         <div className="fidelity-segment" role="group" aria-label={t("history.fidelity.range")}>{rangeOptions.map((option) =>
           <button type="button" key={option} aria-pressed={range === option && !from && !to}
@@ -446,16 +337,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
               : `history.fidelity.filter.${value}`).replace("{count}", String(value === "partial" ? issueCount : editedCount))}</button>)}
         </div>
       </div>
-    </section>;
-
-  return <div className={`fidelity-history${narrowDetailOpen ? " fidelity-history-detail-open" : ""}`} aria-busy={loading} data-testid="history-content">
-    <header className="fidelity-page-head"><div><h1>{t("history.fidelity.title")}</h1>
-      <p>{listError ? t("history.fidelity.listLoadFailed") : count ? <>{subtitleBeforeCount}<strong>{count.toLocaleString(locale === "zh" ? "zh-CN" : "en-US")}</strong>{
-        subtitleAfterCount.replace("{latest}", latest ? dateLatest(latest.createdAt) : "–")}</>
-        : loading ? t("common.loading") : t(noSnapshots ? "history.fidelity.emptySubtitle" : "history.fidelity.noResults")}</p></div>
-      <div className="fidelity-head-actions"><SyncStatusIndicator recordsStamp /></div>
-    </header>
-    {(listError || (!loading && count === 0)) && filters}
+    </section>
     {listError ? <section className="fidelity-card fidelity-history-empty"><h2>{t("history.fidelity.snapshots")}</h2>
       <p role="alert">{t("history.fidelity.listLoadFailed")}</p>
       <button type="button" onClick={() => setReload((value) => value + 1)}>{t("history.fidelity.retry")}</button>
@@ -470,36 +352,26 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
           }}>
             <ReloadIcon aria-hidden="true" />{t("history.fidelity.refreshNow")}</button>} />
       {noSnapshots && <p><InfoCircledIcon aria-hidden="true" /><span>{richHint("history.fidelity.localHintRich")}</span></p>}
-    </section> : <div className="fidelity-history-grid"
-      data-layout-exempt="R5: merged History uses eleven tracks at 1100 to 1179 pixels to keep both panes usable">
-      <section className="fidelity-card fidelity-history-list" aria-label={t("history.fidelity.snapshots")}>
+    </section> : <div className="fidelity-history-grid">
+      <section className="fidelity-card fidelity-history-list">
         <div className="fidelity-card-head"><h2>{t("history.fidelity.snapshots")}</h2>
           <span>{loading ? t("history.fidelity.loading") : t("history.fidelity.newestFirst")}</span></div>
-        {filters}
-        <div className="fidelity-history-list-scroll" ref={listScrollRef} onKeyDown={onListKeyDown}
-          tabIndex={0} role="group" aria-label={t("history.fidelity.snapshots")}><table><thead><tr>
+        <div className="fidelity-history-list-scroll"><table><thead><tr>
           {["dateTime", "totalValue", "changePrevious", "assets", "sources"].map((key) =>
             <th key={key}>{t(`history.fidelity.${key}`)}</th>)}
-        </tr></thead><tbody data-layout-page-size={PAGE_SIZE} data-layout-rendered={loading ? 0 : rows.length} data-layout-total={count}>{loading ? Array.from({ length: 14 }, (_, index) => <tr key={index}>
+        </tr></thead><tbody>{loading ? Array.from({ length: 14 }, (_, index) => <tr key={index}>
           {[120, 90, 130, 20, 60].map((width, cell) => <td key={cell}><span className="fidelity-skeleton" style={{ width }} /></td>)}
         </tr>) : rows.map((row) => {
           const percent = row.change === null ? null : row.total - row.change === 0 ? null : row.change / (row.total - row.change) * 100;
           const sourceText = row.sourcesTotal === undefined ? t("history.fidelity.allRefreshed")
             : `${row.sourcesTotal - (row.missingCount ?? 0)} ${t("history.fidelity.of")} ${row.sourcesTotal}`;
-          return <tr key={row.id} data-testid="history-snapshot-row" data-snapshot-id={row.id} className={row.id === selectedId ? "selected" : ""}
-            onClick={() => selectSnapshot(row.id)}>
-            <td><button type="button" onClick={(event) => { event.stopPropagation(); selectSnapshot(row.id); }}
+          return <tr key={row.id} data-testid="history-snapshot-row" className={row.id === selectedId ? "selected" : ""}
+            onClick={() => setSelectedId(row.id)}>
+            <td><button type="button" onClick={() => setSelectedId(row.id)}
               aria-label={`${dateShort(row.createdAt)} · ${t("history.viewSnapshot").replace("{date}", dateLong(row.createdAt))}`}>
               {dateDay(row.createdAt)} <span className="fidelity-history-row-time">{dateTime(row.createdAt)}</span>
-              {row.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}
-            </button><small className="fidelity-history-compact-meta">
-              {row.sourcesTotal !== undefined && <i className="warn" aria-hidden="true" />}
-              {row.sourcesTotal === undefined
-                ? t("history.fidelity.compactMetaAll").replace("{assets}", String(row.assetCount))
-                : t("history.fidelity.compactMetaPartial").replace("{assets}", String(row.assetCount))
-                  .replace("{ready}", String(row.sourcesTotal - (row.missingCount ?? 0)))
-                  .replace("{total}", String(row.sourcesTotal))}
-            </small></td>
+              {row.edited && <span className="fidelity-edit-pill">{t("history.editLog.edited")}</span>}
+            </button></td>
             <td>{money(row.total)}</td>
             <td style={{ color: row.change === null ? undefined : color(row.change) }}>
               {row.change === null ? "–" : <><span className="fidelity-change-abs">{signed(row.change)}</span>
@@ -510,7 +382,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
               {sourceText}</td>
           </tr>;
         })}</tbody></table></div>
-        <div className="fidelity-history-footer">{loading ? <div className="fidelity-history-pager fidelity-history-pager-loading">
+        {loading ? <div className="fidelity-history-pager fidelity-history-pager-loading">
           <span className="fidelity-skeleton" style={{ width: 90, height: 12 }} />
         </div> : <>
         <div className="fidelity-history-pager">
@@ -521,7 +393,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
             <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)}>{t("cost.fidelity.previous")}</button>
             <button type="button" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>{t("common.next")}</button></div>
         </div>
-        <p className="fidelity-history-hint" title={t("history.fidelity.pageHintRich").replace("{setting}", t("history.fidelity.historyCount"))}><InfoCircledIcon aria-hidden="true" /><span>{richHint("history.fidelity.pageHintRich")}</span></p></>}</div>
+        <p className="fidelity-history-hint"><InfoCircledIcon aria-hidden="true" /><span>{richHint("history.fidelity.pageHintRich")}</span></p></>}
       </section>
       {loading || detailLoading ? <section className="fidelity-card fidelity-history-detail" data-testid="history-desktop-loading">
         <span className="fidelity-skeleton" style={{ width: 210, height: 22 }} />
@@ -533,15 +405,10 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
         {Array.from({ length: 9 }, (_, index) => <div className="fidelity-history-skeleton-row" key={index}>
           {[55, 85, 90, 55].map((width, cell) => <span key={cell} className="fidelity-skeleton" style={{ width }} />)}
         </div>)}
-      </section> : <section className="fidelity-card fidelity-history-detail" data-testid="history-desktop-detail"
-        data-layout-exempt={assets.length <= 2 ? "R4: a fixed-height detail pane reserves its scroll area when the snapshot contains at most two assets" : undefined}
-        ref={detailPaneRef} tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") returnToList(); }}>
+      </section> : <section className="fidelity-card fidelity-history-detail" data-testid="history-desktop-detail">
         {selected && detail && <>
-          <div className="fidelity-history-detail-header">
-            <button type="button" className="fidelity-history-back"
-              onClick={returnToList}>{t("history.fidelity.backToSnapshots")}</button>
-            <h2>{dateLong(selected.createdAt)} {selected.edited && <span className="t3-tag" data-tone="accent">{t("history.editLog.edited")}</span>}</h2>
-          <div ref={kpiRef} className="fidelity-history-detail-kpis">
+          <h2>{dateLong(selected.createdAt)} {selected.edited && <span className="fidelity-edit-pill">{t("history.editLog.edited")}</span>}</h2>
+          <div className="fidelity-history-detail-kpis">
             <div><span>{t("history.fidelity.totalValue")}</span><strong>{money(valueTotal)}</strong>
               <small>{edits?.length ? t("history.fidelity.includesEdits").replace("{count}", String(edits.length)) : t("history.fidelity.asOfRefresh")}</small></div>
             <div><span>{t("history.fidelity.change")}</span><strong style={{ color: selected.change === null ? undefined : color(selected.change) }}>
@@ -562,24 +429,15 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
             <button type="button" onClick={() => setEditOpen(true)}><Pencil1Icon aria-hidden="true" />{t("history.fidelity.edit")}</button>
             <button type="button" onClick={() => setDeleteOpen(true)} disabled={isDeleting}><TrashIcon aria-hidden="true" />{t("common.delete")}</button>
           </div>
-          </div>
-          <nav className="fidelity-history-section-nav" aria-label={t("history.fidelity.sections")}>
-            <button type="button" onClick={() => scrollToSection("history-assets")}>{t("history.fidelity.assets")}</button>
-            {!!edits?.length && <button type="button" onClick={() => scrollToSection("history-edits")}>{t("history.fidelity.edits")}</button>}
-            <button type="button" onClick={() => scrollToSection("history-sources")}>{t("history.fidelity.sources")}</button>
-          </nav>
-          <div className="fidelity-history-detail-scroll" ref={detailScrollRef}
-            tabIndex={0} role="group" aria-label={t("history.fidelity.sections")}>
-          <div id="history-assets" className="fidelity-card-head"><h3>{t("history.fidelity.assetsAtTime")}</h3><span>{t("history.assetCount").replace("{n}", String(assets.length))}</span></div>
+          <div className="fidelity-card-head"><h3>{t("history.fidelity.assetsAtTime")}</h3><span>{t("history.assetCount").replace("{n}", String(assets.length))}</span></div>
           <table><thead><tr>{["asset", "quantity", "price", "value", "share"].map((key) =>
-            <th key={key}>{t(`history.fidelity.${key}`)}</th>)}</tr></thead><tbody data-layout-page-size={PAGE_SIZE} data-layout-rendered={visibleAssets.length} data-layout-total={assets.length}>
+            <th key={key}>{t(`history.fidelity.${key}`)}</th>)}</tr></thead><tbody>
             {visibleAssets.map((asset) => {
               const editedPrice = (edits ?? []).find((edit) => edit.symbol === asset.symbol &&
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "price");
               const restoredAsset = (edits ?? []).find((edit) => edit.symbol === asset.symbol &&
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "restore");
-              return <tr key={`${asset.assetType}:${asset.symbol}`}><td><AssetLabel asset={asset} size={20} quiet tag="" />
-                <small className="fidelity-history-compact-share"><span className="sr-only">{t("history.fidelity.share")} </span>{valueTotal ? `${(asset.value / valueTotal * 100).toFixed(1)}%` : "–"}</small>
+              return <tr key={`${asset.assetType}:${asset.symbol}`}><td>{asset.symbol}
                 <button type="button" className="t3-icon-button" aria-label={t("history.fidelity.deleteAsset").replace("{asset}", asset.symbol)}
                   disabled={isDeletingAsset} onClick={() => setDeleteAssetId(asset.id)}><TrashIcon aria-hidden="true" /></button></td>
               <td>{restoredAsset ? <><span className="fidelity-edited-value">{quantity(asset.assetType === "crypto" &&
@@ -591,11 +449,10 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
                 : price(asset, asset.price)}</td><td>{money(asset.value)}</td>
               <td>{valueTotal ? `${(asset.value / valueTotal * 100).toFixed(1)}%` : "–"}</td></tr>;
             })}
-            <tr className="fidelity-history-total"><td>{t("cost.fidelity.total")}<small className="fidelity-history-compact-share"><span className="sr-only">{t("history.fidelity.share")} </span>{valueTotal ? "100.0%" : "–"}</small></td><td /><td />
+            <tr className="fidelity-history-total"><td>{t("cost.fidelity.total")}</td><td /><td />
               <td>{money(valueTotal)}</td><td>{valueTotal ? "100.0%" : "–"}</td></tr>
           </tbody></table>
-          {assets.length > 12 && <button type="button" className="fidelity-history-expand" onClick={() => { setShowAllAssets(!showAllAssets); setDetailPage(0); }}>{t(showAllAssets ? "history.fidelity.showLess" : "history.fidelity.showAll").replace("{count}", String(assets.length))}</button>}
-          {showAllAssets && assets.length > PAGE_SIZE && <div className="fidelity-history-pager fidelity-detail-pager">
+          {assets.length > PAGE_SIZE && <div className="fidelity-history-pager fidelity-detail-pager">
             <span>{t("history.fidelity.showingAssets")
               .replace("{start}", String(detailPage * PAGE_SIZE + 1))
               .replace("{end}", String(Math.min((detailPage + 1) * PAGE_SIZE, assets.length)))
@@ -607,7 +464,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
           </div>}
           {detail.partial && <div className="fidelity-history-section">
             <HistoryPartialDetails partial={detail.partial} t={t} locale={locale} /></div>}
-          {(editLogError || edits === null || edits.length > 0) && <section id="history-edits" className="fidelity-history-section fidelity-history-edit-log" aria-label={t("history.fidelity.edits")}>
+          {(editLogError || edits === null || edits.length > 0) && <section className="fidelity-history-section fidelity-history-edit-log" aria-label={t("history.fidelity.edits")}>
             <div className="fidelity-card-head"><h3>{t("history.fidelity.edits")}</h3>
               {!!edits?.length && <span>{editSummaryBeforeAmount}<span className={
                 editDeltaTone === "gain" ? "pos" : editDeltaTone === "loss" ? "neg" : "zero"}>
@@ -633,14 +490,12 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
                     </li>;
                   })}</ol>}
           </section>}
-          <div id="history-sources" className="fidelity-history-section"><div className="fidelity-card-head"><h3>{t("history.fidelity.sources")}</h3>
+          <div className="fidelity-history-section"><div className="fidelity-card-head"><h3>{t("history.fidelity.sources")}</h3>
             <span>{t("history.fidelity.sourceDetail").replace("{count}", String(sources.length))}</span></div>
-            {sources.slice(0, showAllSources ? undefined : 12).map(([wallet, value], index) => <div className="fidelity-history-section-row fidelity-history-source-row" key={wallet}>
+            {sources.map(([wallet, value], index) => <div className="fidelity-history-section-row fidelity-history-source-row" key={wallet}>
               <span title={wallet}><i />{sourceLabels[index]}</span>
               <span>{money(value)}</span>
-            </div>)}
-            {sources.length > 12 && <button type="button" className="fidelity-history-expand" onClick={() => setShowAllSources(!showAllSources)}>{t(showAllSources ? "history.fidelity.showLess" : "history.fidelity.showAll").replace("{count}", String(sources.length))}</button>}</div>
-          </div>
+            </div>)}</div>
         </>}
         {detailError && <p role="alert">{t("history.detailLoadFailed")}</p>}
       </section>}

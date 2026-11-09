@@ -12,9 +12,6 @@ import { AttributionPager, useAttributionPage } from "./attribution-pager";
 import { sourceDisplayNames } from "./source-display-name";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { attributionAmount, attributionRoundedValue } from "./attribution-amount";
-import AssetLabel from "./common/asset-label";
-
-import { useChartHitArea } from "./chart-tooltip";
 
 type Data = Awaited<ReturnType<typeof queryAttribution>>;
 const dimensions: AttributionDimension[] = ["coin", "source", "wallet", "assetType"];
@@ -26,8 +23,6 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
   const [dimension, setDimension] = useState<AttributionDimension>("coin");
   const dataChangedVersion = useDataChangedVersion();
   const walletOrdinals = useLatestWalletOrdinals();
-  const contributorChart = useChartHitArea();
-  const detractorChart = useChartHitArea();
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   const data = loaded?.rangeKey === rangeKey ? loaded.result : null;
 
@@ -66,17 +61,6 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
   const displayGroup = (group: { key: string; label: string }) =>
     dimension === "wallet" ? walletLabels[group.key] ?? t("common.unknown")
       : dimension === "source" && group.label === "unknown" ? t("common.unknown") : group.label;
-  const groupLabel = (group: { key: string; label: string }) => {
-    const asset = dimension === "coin" ? {
-      symbol: group.key.slice(group.key.indexOf(":") + 1),
-      assetType: group.key.startsWith("stock:") ? "stock" as const : "crypto" as const,
-    } : undefined;
-    const type = data?.aliases[group.key]?.type ?? group.key;
-    const kind = dimension === "wallet" ? "wallet" : type === "ibkr" ? "broker" :
-      dimension === "source" ? "exchange" : "custom";
-    return <AssetLabel asset={asset} kind={asset ? undefined : kind} type={type}
-      name={displayGroup(group)} tag={asset?.assetType === "stock" ? "" : undefined} size={20} quiet />;
-  };
   const error = <div role="alert" className="py-8 text-center text-sm text-muted-foreground">{label("error")}</div>;
 
   if (status === "loading" && !data) return <div role="status" aria-live="polite" className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</div>;
@@ -87,16 +71,13 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
   const max = Math.max(...groups.map((group) => Math.abs(group.priceEffect)), 1);
   const contributors = groups.filter((group) => group.priceEffect > 0).sort((a, b) => b.priceEffect - a.priceEffect).slice(0, 5);
   const detractors = groups.filter((group) => group.priceEffect < 0).sort((a, b) => a.priceEffect - b.priceEffect).slice(0, 5);
-  const bars = (items: typeof groups, chart: ReturnType<typeof useChartHitArea>) => (
+  const bars = (items: typeof groups) => (
     items.length === 0 ? <p className="text-xs text-muted-foreground">{label("noMarketChange")}</p> :
-    <ol className="space-y-2" data-chart-group="">
-      {items.map((group, index) => (
+    <ol className="space-y-2">
+      {items.map((group) => (
         <li key={group.key} className="grid grid-cols-[minmax(5rem,1fr)_minmax(4rem,2fr)_auto] items-center gap-2 text-xs sm:text-sm">
-          <span className="truncate font-medium" title={displayGroup(group)}>{groupLabel(group)}</span>
-          <span className="h-4 rounded-full bg-muted" role="button" {...chart.markProps(index, `${displayGroup(group)}: ${exact(group.priceEffect)}`,
-            <><span>{displayGroup(group)}</span><div className={tone(group.priceEffect)}>{exact(group.priceEffect)}</div></>)}>
-            <span className={`block h-full rounded-full ${barTone(group.priceEffect)}`} style={{ width: `${Math.abs(group.priceEffect) / max * 100}%` }} />
-          </span>
+          <span className="truncate font-medium" title={displayGroup(group)}>{displayGroup(group)}</span>
+          <span className="h-4 rounded-full bg-muted" aria-hidden="true"><span className={`block h-full rounded-full ${barTone(group.priceEffect)}`} style={{ width: `${Math.abs(group.priceEffect) / max * 100}%` }} /></span>
           <span className={`min-w-[5.5rem] whitespace-nowrap text-right tabular-nums ${tone(group.priceEffect)}`} title={exact(group.priceEffect)}>{format(group.priceEffect)}</span>
         </li>
       ))}
@@ -118,8 +99,8 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
       {dimensions.map((value) => <ButtonGroupItem key={value} value={value} className="touch:min-h-11 px-2 text-xs sm:px-3 sm:text-sm">{label(value)}</ButtonGroupItem>)}
     </ButtonGroup>
     <figure className="grid gap-4 sm:grid-cols-2" aria-label={label("chart")}>
-      <section className="space-y-2"><h3 className="text-xs font-medium text-muted-foreground">{label("contributors")}</h3>{bars(contributors, contributorChart)}{contributorChart.tooltip}</section>
-      <section className="space-y-2"><h3 className="text-xs font-medium text-muted-foreground">{label("detractors")}</h3>{bars(detractors, detractorChart)}{detractorChart.tooltip}</section>
+      <section className="space-y-2"><h3 className="text-xs font-medium text-muted-foreground">{label("contributors")}</h3>{bars(contributors)}</section>
+      <section className="space-y-2"><h3 className="text-xs font-medium text-muted-foreground">{label("detractors")}</h3>{bars(detractors)}</section>
     </figure>
     <div className="max-w-full overflow-x-auto rounded-md border border-border/50">
       <Table className="min-w-[760px] text-xs sm:text-sm">
@@ -132,7 +113,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
           <TableHead className="whitespace-nowrap text-right">{label("totalChange")}</TableHead>
         </TableRow></TableHeader>
         <TableBody>{paging.rows.map((group) => <TableRow key={group.key} className="h-[52px]">
-          <TableCell className="max-w-[130px] truncate py-2 font-medium" title={displayGroup(group)}>{groupLabel(group)}</TableCell>
+          <TableCell className="max-w-[130px] truncate py-2 font-medium" title={displayGroup(group)}>{displayGroup(group)}</TableCell>
           {(["priceEffect", "flowEffect", "residual", "totalChange"] as const).map((key) => <TableCell key={key} className={`whitespace-nowrap py-2 text-right tabular-nums ${tone(group[key])}`} title={exact(group[key])}>{format(group[key])}</TableCell>)}
         </TableRow>)}</TableBody>
       </Table>

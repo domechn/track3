@@ -64,7 +64,7 @@ const LegacyOverview = ({
     [dateRange.start, dateRange.end],
   );
   const dataChangedVersion = useDataChangedVersion();
-  const { series, bestDayContribution, contributions, contributionCount, coins, statuses } = useOverviewPanelsData(dateRange, allTimeRange ?? dateRange);
+  const { series, contributions, contributionCount, coins, statuses } = useOverviewPanelsData(dateRange, allTimeRange ?? dateRange);
   useLayoutEffect(() => {
     setPageLoading(true);
     loadedCountRef.current = 0;
@@ -100,7 +100,6 @@ const LegacyOverview = ({
                   metrics={<PNL currency={currency} dateRange={dateRange} quoteColor={quoteColor} compact />}
                   ath={series.ath && { ...series.ath, distanceFromAth: series.distanceFromAth }}
                   bestDay={series.bestDay}
-                  bestDayContribution={bestDayContribution}
                 />
               </FadeUp>
             <FadeUp className="t3-grid-holdings"><LatestAssetsPercentage currency={currency} dateRange={dateRange} holdings /></FadeUp>

@@ -200,7 +200,7 @@ export default function SyncSettingsPage() {
             ? <h2 className="fidelity-b-sync-connection-title">{t("fidelity.b.sync.connection")}</h2>
             : <CardTitle>{t("sync.title")}</CardTitle>}
           <p className="text-sm text-muted-foreground">{t(phone ? "fidelity.b.sync.connectionHint" : "sync.intro")}</p>
-          {phone && <span className="t3-tag" data-tone={connectionFailed ? "negative" : status.mode === "ready" ? "positive" : "neutral"}>
+          {phone && <span className={`fidelity-b-pill ${connectionFailed ? "is-error" : status.mode === "ready" ? "is-positive" : ""}`}>
             {t(connectionFailed ? "fidelity.b.sync.connectionFailed" : status.mode === "disabled" ? "fidelity.b.sync.notConnected"
               : status.mode === "ready" ? "fidelity.b.sync.connected" : "fidelity.b.sync.configured")}</span>}
         </CardHeader>

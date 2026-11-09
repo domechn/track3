@@ -2,25 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-.t3-signed-unit { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: normal; }
-.overview-pnl-metric-value, .overview-pnl-metric-amount,
-:is(.fd-overview-mover, .fd-wallet-mover, .fd-comparison-mover) > :is(strong, small),
-.fd-overview-row > small:last-child,
-.fd-month :is(strong, small),
-.fd-year :is(strong, small),
-.fd-attr-row > strong,
-.fd-coin-metric strong,
-.history-mobile-snapshot-delta,
-.profit-metric-value,
-.fd-comparison-total > :is(strong, small),
-.fd-comparison-asset > :is(strong, span:nth-of-type(2)),
-.fd-comparison-kpis strong,
-.ios-d3-goals strong,
-.pf-rebalance :is(.pf-kpi strong, .pf-drift, .pf-current, .pf-trade-row strong, .pf-trade-net strong),
-[data-chart-tooltip] strong {
-  flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; overflow-wrap: normal; word-break: normal;
-}
-
 .ios-safe-area {
   padding: var(--mobile-safe-top) var(--mobile-safe-right) var(--mobile-safe-bottom) var(--mobile-safe-left);
 }
@@ -36,7 +17,6 @@
 
 @layer base {
   :root {
-    color-scheme: light;
     --mobile-safe-top: env(safe-area-inset-top);
     --mobile-safe-right: env(safe-area-inset-right);
     --mobile-safe-bottom: env(safe-area-inset-bottom);
@@ -84,17 +64,6 @@
     --negative: 349 70% 40%;
     --warning: 37 79% 32%;
     --accent-data: 213 63% 43%;
-    --sheet-handle: hsl(var(--muted-foreground));
-    --sync-lock-handle: hsl(var(--muted-foreground));
-    --fd-sheet-selected: hsl(var(--secondary));
-    --fd-info-surface: hsl(var(--accent-data) / .12);
-    --fd-info-border: hsl(var(--accent-data) / .35);
-    --custom-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%235e5e64' stroke-width='2'%3E%3Cpath d='m4 7 6 6 6-6'/%3E%3C/svg%3E");
-    --custom-asset-segment: hsl(var(--secondary));
-    --custom-asset-selected: hsl(var(--card));
-    --custom-asset-avatar: hsl(var(--raised));
-    --custom-asset-avatar-ink: hsl(var(--foreground));
-    --custom-asset-danger-edge: hsl(var(--negative) / .4);
     --track-logo-tint: 213 63% 65%;
     --chart-blue-soft: 204 48% 43%;
     --chart-green-soft: 165 30% 38%;
@@ -105,8 +74,6 @@
     --radius-overlay: 10px;
     --shadow-card: 0 12px 28px rgb(13 13 14 / .08);
     --shadow-overlay: 0 18px 44px rgb(13 13 14 / .18);
-    --overlay-scrim-ink: 0 0% 0%;
-    --overlay-scrim: hsl(var(--overlay-scrim-ink) / .55);
     --focus-ring: 0 0 0 3px hsl(var(--ring) / .18);
     --glass-blur: 0px;
     --glass-bg: hsl(var(--card));
@@ -114,20 +81,9 @@
     --glass-shadow: var(--shadow-card);
     --sidebar-width: 216px;
     --sidebar-collapsed-width: 56px;
-    --sidebar-background: hsl(var(--card));
-    --mobile-tab-badge-foreground: #fff;
-    --sidebar-foreground: hsl(var(--foreground));
-    --sidebar-muted: hsl(var(--muted-foreground));
-    --sidebar-border: hsl(var(--border));
-    --sidebar-active-bg: hsl(var(--accent-data) / .12);
-    --sidebar-active-fg: hsl(var(--foreground));
-    --sidebar-hover-bg: hsl(var(--raised));
-    --mobile-topbar-background: hsl(var(--card));
-    --mobile-overview-alert-border: hsl(var(--border));
   }
 
   .dark {
-    color-scheme: dark;
     --ios-segment-selected: hsl(var(--raised));
     --background: 240 4% 5%;
     --foreground: 0 0% 100%;
@@ -158,17 +114,6 @@
     --negative: 349 81% 67%;
     --warning: 39 66% 55%;
     --accent-data: 213 63% 56%;
-    --sheet-handle: #44454b;
-    --sync-lock-handle: #535158;
-    --fd-sheet-selected: #212023;
-    --fd-info-surface: #14243a;
-    --fd-info-border: #1f3a5c;
-    --custom-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239b9da3' stroke-width='2'%3E%3Cpath d='m4 7 6 6 6-6'/%3E%3C/svg%3E");
-    --custom-asset-segment: #1c1c20;
-    --custom-asset-selected: #303036;
-    --custom-asset-avatar: #26262c;
-    --custom-asset-avatar-ink: #cfd0d4;
-    --custom-asset-danger-edge: #4a2530;
     --track-logo-tint: 213 63% 73%;
     --chart-blue-soft: 204 48% 64%;
     --chart-green-soft: 165 30% 60%;
@@ -179,23 +124,10 @@
     --radius-overlay: 10px;
     --shadow-card: 0 12px 28px rgb(0 0 0 / .2);
     --shadow-overlay: 0 18px 44px rgb(0 0 0 / .5);
-    --overlay-scrim-ink: 0 0% 0%;
-    --overlay-scrim: hsl(var(--overlay-scrim-ink) / .55);
     --focus-ring: 0 0 0 3px hsl(var(--ring) / .22);
     --glass-bg: hsl(var(--card));
     --glass-border: hsl(var(--border));
     --glass-shadow: var(--shadow-card);
-    --sidebar-background: hsl(var(--background));
-    --mobile-tab-badge-foreground: #1a0509;
-    --sidebar-group-label: var(--shell-faint);
-    --sidebar-foreground: hsl(var(--foreground));
-    --sidebar-muted: hsl(var(--muted-foreground));
-    --sidebar-border: hsl(var(--border));
-    --sidebar-active-bg: hsl(var(--accent-data) / .16);
-    --sidebar-active-fg: #fff;
-    --sidebar-hover-bg: hsl(var(--raised));
-    --mobile-topbar-background: #0d0d0e;
-    --mobile-overview-alert-border: #3a3a3e;
   }
   :root[data-quote="red-up"] { --gain: var(--negative); --loss: var(--positive); }
 }

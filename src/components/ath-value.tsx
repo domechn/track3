@@ -16,7 +16,6 @@ import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { athDistance, athDistanceText } from "./analyze-values";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
-import { SignedInlineText } from "./common/signed-inline-text";
 
 const App = ({
   dateRange,
@@ -126,7 +125,7 @@ const App = ({
       <div className="fidelity-small">{hasHistory ? `${fmtDate(maxTotalValueData.date)} · ${daysAgo} ${t("summary.fidelity.daysAgo")}` : `${fmtDate(maxTotalValueData.date)}, ${t("summary.fidelity.onlySnapshot")}`}</div>
       <div className="fidelity-ath-meter" role="progressbar" aria-label={t("ath.progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={distance?.progressPercent ?? 0}><i style={{ width: `${Math.min(100, distance?.progressPercent ?? 0)}%` }} /><b /></div>
       <div className="fidelity-ath-meter-caption">{hasHistory ? <><span>{t("summary.fidelity.nowPercent").replace("{percent}", (distance?.progressPercent ?? 0).toFixed(1))}</span><span>ATH</span></> : t("summary.fidelity.atHigh")}</div>
-      <div className="fidelity-facts">{facts.map(([label, value]) => <div key={label}><span>{label}</span><span>{typeof value === "string" ? <SignedInlineText text={value} /> : value}</span></div>)}</div>
+      <div className="fidelity-facts">{facts.map(([label, value]) => <div key={label}><span>{label}</span><span>{value}</span></div>)}</div>
     </section>;
   }
 

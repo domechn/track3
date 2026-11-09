@@ -128,8 +128,8 @@ for (const state of ["default", "setup", "locked", "loading", "testing", "test-f
       await expect(page.locator(".t3-sync-devices .t3-b-sync-skeleton")).toHaveCount(0);
     }
     if (state === "default") {
-      await expect(page.locator('.t3-sync-connection .t3-tag[data-tone="positive"]')).toHaveText("Connected");
-      await expect(page.locator('.t3-sync-passphrase .t3-tag[data-tone="positive"]')).toHaveText("Unlocked");
+      await expect(page.locator(".t3-sync-connection .t3-b-pill.connected")).toHaveText("Connected");
+      await expect(page.locator(".t3-sync-passphrase .t3-b-pill.connected")).toHaveText("Unlocked");
       await expect(page.locator(".t3-sync-conflicts")).toContainText("Base currency");
       await expect(page.locator(".t3-sync-conflicts")).toContainText("History count");
       await expect(page.locator(".t3-sync-conflicts")).toContainText("2 to resolve");

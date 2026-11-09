@@ -133,8 +133,8 @@ vi.mock("@/mobile/components/wallet-assets-percentage", () => ({
 }));
 
 vi.mock("@/components/common/asset-label", () => ({
-  default: ({ asset, symbol, name }: { asset?: { symbol: string }; symbol?: string; name?: string }) => (
-    <span data-testid="asset-label">{name ?? asset?.symbol ?? symbol}</span>
+  default: ({ asset }: { asset: { symbol: string } }) => (
+    <span data-testid="asset-label">{asset.symbol}</span>
   ),
 }));
 
@@ -297,19 +297,6 @@ it("shows unknown profit after switching from a priced coin to an unmatched with
   const profitCard = screen.getByText("Return").closest(".coin-metric-card");
   expect(profitCard).toHaveTextContent(/—.*—/);
   expect(profitCard).not.toHaveTextContent("—%");
-});
-
-it("shows known coin profit with a partial badge after an unpaired withdrawal", async () => {
-  mocks.calculateTotalProfit.mockResolvedValue({
-    total: null, knownTotal: 20, percentage: null,
-    unknownCoins: [{ symbol: "BTC", assetType: "crypto", intervals: ["2024-04-15T00:00:00.000Z"], months: 1 }],
-    coins: [],
-  });
-  renderCoinAnalysis();
-  const card = screen.getByText("Return").closest(".coin-metric-card")!;
-  await waitFor(() => expect(card).toHaveTextContent("$20.00"));
-  expect(within(card as HTMLElement).getByRole("button", { name: /Explain partial profit/ })).toHaveTextContent("?");
-  expect(card).toHaveTextContent("—");
 });
 
 function renderCoinAnalysis(
@@ -750,8 +737,8 @@ async function openTransactionDialogByType(
     expect(mocks.listWalletAliases).toHaveBeenCalled();
   });
 
-  const transactionTypeCell = screen.getAllByText(transactionType).find((element) => element.closest("tr"));
-  const transactionRow = transactionTypeCell?.closest("tr");
+  const transactionTypeCell = screen.getByText(transactionType);
+  const transactionRow = transactionTypeCell.closest("tr");
   expect(transactionRow).not.toBeNull();
 
   const editButtons = within(transactionRow!).getAllByTestId(

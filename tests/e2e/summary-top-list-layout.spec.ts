@@ -37,6 +37,6 @@ test("desktop Summary includes unrecorded quantity additions in the loss percent
   await seedElevenAssetSummary(page, false);
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  await expect(page.locator(".summary-top-row").filter({ has: page.locator('.t3-asset-label-name:text-is("1211.HK")') }).locator("small"))
+  await expect(page.locator(".summary-top-row").filter({ has: page.locator('b:text-is("1211.HK")') }).locator("small"))
     .toHaveText("−94.5%");
 });

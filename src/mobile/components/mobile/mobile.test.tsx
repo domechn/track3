@@ -1,28 +1,13 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ActionSheet, BottomSheet, MobileRecordList, PullToRefresh, SegmentedControl, SwipeableRow, useIsMobile } from "@/mobile/components/mobile";
-import { publishRefreshProgress } from "@/mobile/components/refresh-progress-event";
 
 function MobileLayoutProbe() {
   return <span>{useIsMobile() ? "mobile layout" : "desktop layout"}</span>;
 }
 
 describe("mobile interactions", () => {
-  it("does not announce a second progress region for a button refresh", () => {
-    render(<PullToRefresh onRefresh={() => {}} sourceProgress><div>Content</div></PullToRefresh>);
-    act(() => publishRefreshProgress({ active: true, total: 2, completed: ["OKX"] }));
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
-  });
-  it("shows source progress during an unreleased pull", () => {
-    render(<PullToRefresh onRefresh={() => {}} sourceProgress><div>Content</div></PullToRefresh>);
-    const area = screen.getByTestId("pull-to-refresh");
-    fireEvent.touchStart(area, { touches: [{ clientX: 100, clientY: 20 }] });
-    fireEvent.touchMove(area, { touches: [{ clientX: 100, clientY: 100 }] });
-    act(() => publishRefreshProgress({ active: true, total: 2, completed: ["OKX"] }));
-    expect(screen.getByText("Refreshing sources")).toBeVisible();
-    expect(area.querySelector(".mobile-pull-indicator")).not.toBeInTheDocument();
-  });
   it("keeps the mobile presentation when no media query matches", () => {
     const agent = vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)");
     const matchMedia = vi.spyOn(window, "matchMedia").mockImplementation((query) => ({

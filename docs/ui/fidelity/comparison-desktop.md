@@ -23,40 +23,6 @@ With fewer than two stored snapshots, the page shows an empty explanation and no
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** comparison 9.287% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-The dense 1440 px Snapshots card follows its content height, so the space below its controls stays below the layout-audit limit. The source's fixed card height can differ by a few pixels.
-
-- UI42's approved neutral logo tiles replace the bare marks in the older design page. On the iPad mover rows, the STOCK tag sits below its ticker so the ticker, movement bar and signed value remain visible within the available columns.
-
-After merging the active-navigation change, the dark 1440 × 900 source
-and app viewports differ by **5.51%** at RGB-sum threshold 60. The
-callout still shares x=105, y=853.5, and height 62px; the source is
-15px wider because the app reserves a scroll rail. The source's fixed
-mover ranking and attribution, the app's actual sync state, and the
-owner-required active navigation tile account for the visible
-differences. Captures and computed bounds are in
-`.local/tag-theme/desktop-comparison-*`.
-
-Before the navigation merge, the 8 Nov 2026 tag review rendered the dark
-source page at 1440 × 900 beside the app viewport: **5.419%** of pixels differ at RGB-sum
-threshold 60. The price-only callout starts at (105, 853.5) in both,
-measures 62 px high, and its backgrounds are RGB (20, 36, 58) and
-(20, 36, 57). The 15 px width difference is the app's scroll rail. Captures
-and computed bounds are in `.local/tag-theme/desktop-comparison-*`. The
-absolute-movement ranking, computed attribution and product sync state
-remain visible differences below.
-
-An 8 Nov source-page render and current dark 1440 × 900 app capture differ
-by **6.385%** at an RGB-channel threshold of 20. The required
-absolute-change ranking, expanding mover cards, and computed attribution
-account for the large regions below the Per asset table. Top mover uses
-the shared 20 px theme tag; its 11 px label, border, and padding differ
-from the source's 12 px dark pill. In light theme its tint follows the
-accent token, and the subtitle amount and price-movement callout use
-readable light surfaces. The source supplies no light-theme page.
-- The 8 Nov large-data layout pages the Per asset table at ten rows, while the total and mover facts still use all assets. The older pixel ratios below use the source's eight-asset state.
-
 Fresh renders of the source HTML and app with the source's eight assets both measure 1600 × 1452 px. The default state differs at **5.27%** of pixels with any RGB channel above 20, or **4.21%** above 60. With picker A open the ratios are **5.36%** and **4.23%**, respectively. The captures and `getBoundingClientRect`/`getComputedStyle` measurements are in `/tmp/ui14-current/`. The required mover layout accounts for the largest region of changed pixels. The source cannot display the required 11-asset state, so these ratios measure the same eight-asset data on both sides.
 
 - The source ranks mover rows by signed change, uses 42 px rows and fixed 459 px cards, and puts its zero axis and value columns at different positions. The product ranks by absolute size, uses 36 px rows, one diverging scale and shared columns per card, and grows the cards for up to ten rows plus expansion. Matching the source here would restore the overflow or break the required behavior.

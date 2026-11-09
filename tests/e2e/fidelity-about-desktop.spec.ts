@@ -42,7 +42,7 @@ for (const state of ["default", "checking", "check-error", "downloading", "guide
         await expect(page.getByRole("dialog")).toBeVisible();
         if (state === "update") {
           await expect(page.locator(".t3-b-about-update-dialog > button.absolute")).toBeHidden();
-          await expect(page.getByRole("dialog").getByRole("button", { name: "Download and install" }).locator("svg:visible")).toHaveCount(1);
+          await expect(page.getByRole("dialog").getByRole("button", { name: "Download and install" })).toBeVisible();
         }
         await expect(page.getByRole("dialog").getByText("Sync status shows phase timings, request counters and a Copy diagnostics button.")).toBeVisible();
         await expect(page.getByRole("dialog").getByText("Released 30 Oct 2026", { exact: false })).toBeVisible();
@@ -52,7 +52,11 @@ for (const state of ["default", "checking", "check-error", "downloading", "guide
         }
         if (state === "downloading" || state === "ready") {
           await page.getByRole("dialog").getByRole("button", { name: "Download and install" }).click();
-          await expect(page.getByText(state === "ready" ? "Downloaded and installed" : "Downloading update", { exact: false })).toBeVisible();
+          if (state === "ready") {
+            await expect(page.getByRole("dialog", { name: "Ready to restart" })).toBeVisible();
+          } else {
+            await expect(page.getByRole("dialog", { name: "Downloading Track3 0.9.5" }).getByRole("progressbar")).toBeVisible();
+          }
         }
       }
       if (state === "checking") await expect(page.getByRole("button", { name: /Checking/ })).toBeVisible();

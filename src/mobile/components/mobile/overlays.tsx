@@ -52,7 +52,7 @@ export function ConfirmSheet({ title, children, onDismiss, className, panelClass
   title: string; children: ReactNode; onDismiss?: () => void; className?: string; panelClassName?: string;
 }) {
   const ref = useModal(onDismiss);
-  return createPortal(<div ref={ref} tabIndex={-1} role="alertdialog" aria-modal="true" aria-label={title} onClick={(event) => { if (event.target === event.currentTarget) onDismiss?.(); }} className={`fixed inset-0 z-50 flex items-end bg-[var(--overlay-scrim)] p-3 ${className ?? ""}`}>
+  return createPortal(<div ref={ref} tabIndex={-1} role="alertdialog" aria-modal="true" aria-label={title} onClick={(event) => { if (event.target === event.currentTarget) onDismiss?.(); }} className={`fixed inset-0 z-50 flex items-end bg-black/50 p-3 ${className ?? ""}`}>
     <div className={`w-full space-y-2 rounded-2xl bg-card p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] ${panelClassName ?? ""}`}>
       {children}
     </div>

@@ -2,7 +2,6 @@ import type { CostBasisReport } from "@/middlelayers/cost-basis-report";
 import { Card } from "./ui/card";
 import type { QuoteColor } from "@/middlelayers/types";
 import { directionBackgroundClass, directionClass } from "@/utils/color";
-import { useChartHitArea } from "./chart-tooltip";
 
 type Row = {
   assetType: CostBasisReport["disposals"][number]["assetType"];
@@ -52,7 +51,6 @@ export function CostBasisPanels({ report, quoteColor, t }: {
   quoteColor: QuoteColor;
   t: (key: string) => string;
 }) {
-  const chart = useChartHitArea();
   const rows = costBasisDisplayRows(report);
   const preview = rows.slice(0, 8);
   const unrealized = report.unrealized.reduce((sum, lot) => sum + lot.gainLoss, 0);
@@ -86,14 +84,11 @@ export function CostBasisPanels({ report, quoteColor, t }: {
     </Card>
     <Card className="cost-dashboard-assets">
       <h2>{t("finance.realizedByAsset")}</h2>
-      {rows.length ? <ol data-chart-group="">{preview.map((row, index) => <li key={`${row.assetType}:${row.symbol}`}
-        {...chart.markProps(index, `${row.symbol}: ${row.gainLoss === null ? "—" : signed(row.gainLoss)}`,
-          `${row.symbol}: ${row.gainLoss === null ? "—" : signed(row.gainLoss)}`)}>
+      {rows.length ? <ol>{preview.map((row) => <li key={`${row.assetType}:${row.symbol}`}>
         <strong>{row.symbol}</strong>
         <span className="cost-dashboard-bar"><span className={directionBackgroundClass(row.gainLoss, quoteColor)} style={{ width: `${Math.abs(row.gainLoss ?? 0) / maximum * 100}%` }} /></span>
         <span className={tone(row.gainLoss)}>{row.gainLoss === null ? "—" : signed(row.gainLoss)}</span>
       </li>)}</ol> : <p className="cost-dashboard-empty">{t("cost.noDisposals")}</p>}
-      {chart.tooltip}
     </Card>
     <Card className="cost-dashboard-prices">
       <h2>{t("cost.design.soldLotAvgPrices")}</h2>

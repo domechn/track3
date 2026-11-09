@@ -37,12 +37,10 @@ export function SystemInfoCard({ title, displayTitle, headingLevel = 3, status, 
   t: Translate;
 }) {
   const tone = status?.value === "active" || status?.value === "trialing"
-    ? "positive"
+    ? "bg-green-500/10 text-green-700 dark:text-green-400"
     : status?.value === "past_due"
-      ? "warning"
-      : status?.value === "expired" || status?.value === "canceled"
-        ? "negative"
-        : "neutral";
+      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+      : "bg-muted text-muted-foreground";
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return <Card data-ui-card="" data-ui-system-card="" data-testid="system-info-card" className="overflow-hidden">
     <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
@@ -51,7 +49,7 @@ export function SystemInfoCard({ title, displayTitle, headingLevel = 3, status, 
           <Heading className="text-lg font-semibold tracking-tight" aria-label={displayTitle ? title : undefined}>
             {displayTitle ?? title}
           </Heading>
-          {status && <span className="t3-tag" data-tone={tone}>
+          {status && <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${tone}`}>
             <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
             {status.label}
           </span>}

@@ -36,26 +36,13 @@ Source chips filter the page; Refresh and Retry call the existing source refresh
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** wallets 11.073% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-At 1440 px, 16 real sources require paged chips, balances, status rows and allocation legend; the eleven-asset matrix pages eight assets and five source columns independently. Its total still covers all sources. The five-source USD design page cannot depict those extra rows or the required controls.
-
-The matrix shows separate visible Assets and Sources pager labels. Selecting a source on a later chip page brings its pressed chip into view.
-
-At 1500 px and wider, portfolios with at most five source statuses place the status card after the balances card. Five real statuses cannot fill a card as tall as the eleven-asset balance table; the source's fixed side-by-side mockup would leave a large blank area. The cards keep their full values and remain aligned to the page grid.
-
-The 8 Nov dense-data 1280 × 800 dark capture differs by **11.058%** from `analyze-wallets.html` at RGB-sum threshold 60. The source has five short USD sources; the product has 16 CNY sources, eight visible source chips per page, and a pager inset 20 px from the card border. The large-data rows, different values, and responsive stacking account for the remaining difference.
-
-UI42 uses the approved website-style neutral tile for asset and source marks. The older Wallets page design renders those marks differently.
-- The 8 Nov large-data layout pages sources and matrix assets at eight rows per view and stacks Wallets cards below 1500 px. The static source uses five sources and eight assets, so the older pixel ratios below do not cover the paged state.
-
 With no wallets or exchanges, the page uses the shared 200px empty state and an add-source route. The supplied Wallets source pages show populated source filters, so there is no matching zero-source screenshot.
 
 On 5 Nov 2026, the source HTML was rendered again in Chromium and compared with current 1600 px app captures. With an RGB-difference sum greater than 60, the visible viewport differs by **3.32%** for All sources, **2.47%** for Binance, and **2.78%** for OKX. The fixed app shell scrolls its content, so its All sources screenshot is 900 px tall while the source full page is 1322 px. Expanding only the capture scroll host gives a 1326 px app image and **3.53%** full-content difference. The stored-status limitation in the Source status card `(1087,374)-(1572,783)` accounts for 0.81 percentage points of the viewport and 0.54 of the full content; the differences outside it are **2.51%** and **2.99%**, respectively. Fresh source images and computed bounds are in `/tmp/ui3-remeasure/`.
 
 - All states: the current two-peak brand mark and Settings cog differ from the source's blue chart tile and sun. Small type raster and baseline differences remain visible. Card bounds, grid order, titles, data and large colour areas match. The Wallets scroll host keeps vertical scrolling while using overlay scrollbar space, so the right card edge is the source's x=1572.
 - All sources: the KPI split bar, 52 px balance rows and both table column boundaries now match the source measurements within 1 px. The bar segment strokes, legend baselines, Source status row spacing and a few right-aligned numbers still differ.
-- With 16 or more sources and 47 holdings, source rows and matrix assets use a pager; values still include every stored holding. Matrix columns remain horizontally scrollable and keyboard reachable.
+- With 16 or more sources and 47 assets, the matrix and What moved cards grow to contain their rows. The source page illustrates only five sources and eight assets, so that larger data state has no source pixel ratio. Matrix columns remain horizontally scrollable and keyboard reachable.
 - Binance and OKX: the selected source split bars omit the source's thin dividing strokes. The Binance Amount cell ends at the source design's x=400 edge. The selected source footnote stays on one line.
 - Failed OKX in all and selected states: the stored source-status normalizer retains the `rateLimit` category but sanitizes the raw `HTTP 429` detail. The card truthfully expands it to `Rate limit exceeded. Showing the last good balances from 09:12.` in two lines. The real retry scheduler computes `09:42` at the frozen `09:41` clock, while the design says `10:11`; the UI cannot invent a different scheduler time or retain unsupported raw HTTP detail. This status content contributes to the All sources result above 3%.
 - The Wallets header owns the sync indicator at 1400 px and wider. A configured sync still opens Backup & sync there, verified by the Wallets desktop test. When sync is disabled the status indicator is absent, as it is on other pages; Settings remains the route for enabling sync.

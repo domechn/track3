@@ -625,7 +625,7 @@ const App = ({
               </div>
               <div className="relative flex h-full flex-col gap-3 rounded-lg border border-primary p-4" data-testid="yearly-plan-card">
                 {yearlySavingsLabel && <div className="absolute -top-2 right-3">
-                  <span className="t3-tag" data-tone="accent">{yearlySavingsLabel}</span>
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">{yearlySavingsLabel}</span>
                 </div>}
                 <div className="text-sm font-medium">{t("system.yearly")}</div>
                 <div className="text-2xl font-semibold tracking-tight">

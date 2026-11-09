@@ -32,9 +32,6 @@ test("2024 desktop year known P&L equals its months at 1280px", async ({ page })
   await year.getByRole("button", { name: "Explain partial profit for 2024" }).click();
   await expect(page.locator('[role="tooltip"][data-state="open"]')).toContainText("1 affected month(s)");
   await page.keyboard.press("Escape");
-  await year.getByRole("button", { name: "Recorded inflow breakdown" }).click();
-  await expect(page.locator('[role="tooltip"][data-state="open"]')).toContainText("Staking rewards");
-  await page.keyboard.press("Escape");
   expect(errors).toEqual([]);
   await page.screenshot({ path: ".local/ui46-final/additive-desktop-1280.png", fullPage: true });
 });

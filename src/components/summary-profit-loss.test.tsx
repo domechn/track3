@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { calculateTotalProfit, queryPNLChartValue, queryTotalValue } from "@/middlelayers/charts";
 import SummaryProfitLoss from "./summary-profit-loss";
@@ -51,7 +51,7 @@ it("colours cumulative P&L above and below zero with gain and loss tokens", asyn
     currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
     quoteColor="green-up-red-down"
   />);
-  const chart = await screen.findByRole("group", { name: /Cumulative net P&L/ });
+  const chart = await screen.findByRole("img", { name: /Cumulative net P&L/ });
   const segments = [...chart.querySelectorAll("[data-direction]")];
   expect(segments.map((segment) => segment.getAttribute("data-direction"))).toEqual(["loss", "loss", "loss", "gain"]);
   expect(segments.slice(0, 3).every((segment) => segment.getAttribute("stroke") === "hsl(var(--loss))")).toBe(true);
@@ -115,8 +115,8 @@ it("reports zero snapshots when the database is empty", async () => {
   render(<SummaryProfitLoss dateRange={{ start: at(9), end: at(9) }}
     currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
     quoteColor="green-up-red-down" oneSnapshot snapshotCount={0} />);
-  expect(await screen.findByText("Positions")).toBeVisible();
-  expect(screen.getByText("in 0 snapshots")).toBeVisible();
+  const positions = (await screen.findByText("Positions")).closest("div")!;
+  expect(positions.querySelector("small")).toHaveAttribute("title", "in 0 snapshots");
 });
 
 it("explains n/a when a selected range has no earlier baseline", async () => {
@@ -148,7 +148,7 @@ it("explains an unavailable percentage when net P&L is known", async () => {
   expect(percent).toHaveTextContent("Invested capital for 7D is unavailable.");
 });
 
-it("keeps the positions movement breakdown beside the snapshot note", async () => {
+it("keeps the positions movement breakdown and puts snapshot detail in its title", async () => {
   vi.mocked(calculateTotalProfit).mockResolvedValue({
     total: 50, percentage: 5, knownTotal: 50, unknownCoins: [],
     coins: [
@@ -161,28 +161,7 @@ it("keeps the positions movement breakdown beside the snapshot note", async () =
     quoteColor="green-up-red-down" baseline={at(1)} rangeLabel="7D" snapshotCount={2} />);
   const positions = (await screen.findByText("Positions")).closest("div")!;
   expect(positions).toHaveTextContent("1 up · 1 down · 0 flat");
-  expect(positions).toHaveTextContent("2 in range");
-});
-
-it("reveals exact cumulative P&L at each Summary point on hover", async () => {
-  vi.mocked(queryPNLChartValue).mockResolvedValue([
-    { timestamp: Date.parse("2026-08-15"), totalValue: 100 },
-    { timestamp: Date.parse("2026-09-15"), totalValue: 90 },
-    { timestamp: Date.parse("2026-10-15"), totalValue: 120 },
-  ]);
-  vi.mocked(calculateTotalProfit).mockImplementation(async (range) => ({
-    total: range.end.toISOString().startsWith("2026-10") ? 12_345.67 : 100,
-    percentage: 0, coins: [], knownTotal: 100, unknownCoins: [],
-  } as never));
-  render(<SummaryProfitLoss
-    dateRange={{ start: new Date("2026-08-01T00:00:00Z"), end: new Date("2026-10-31T23:59:59Z") }}
-    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
-    quoteColor="green-up-red-down"
-  />);
-  const mark = (await screen.findByRole("group", { name: /Cumulative net P&L/ })).querySelectorAll("circle")[3];
-  fireEvent.pointerEnter(mark, { pointerType: "mouse" });
-  expect(screen.getByRole("tooltip")).toHaveTextContent("+$300.00");
-  expect(screen.getByRole("tooltip")).toHaveTextContent("15 Oct");
+  expect(positions.querySelector("small")).toHaveAttribute("title", "since 1 Apr 2026 · 2 in range");
 });
 
 it("adds disjoint interval profits into each cumulative chart point", async () => {
@@ -201,7 +180,7 @@ it("adds disjoint interval profits into each cumulative chart point", async () =
     currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
     quoteColor="green-up-red-down"
   />);
-  const chart = await screen.findByRole("group", { name: /Cumulative net P&L/ });
+  const chart = await screen.findByRole("img", { name: /Cumulative net P&L/ });
   expect([...chart.querySelectorAll("[data-point]")].map((point) => point.getAttribute("aria-label")))
     .toEqual(["1 Aug 2026: $0.00", "15 Aug 2026: +$5.00", "15 Sept 2026: +$15.00", "15 Oct 2026: +$12.00"]);
 });
@@ -217,8 +196,7 @@ it("shows known Summary P&L and unrecorded change separately", async () => {
     quoteColor="green-up-red-down"
   />);
   expect(await screen.findByText("+$30.00")).toBeInTheDocument();
-  expect(screen.getByText("Unrecorded changes: −$120.00")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /Explain partial profit/ })).toBeInTheDocument();
+  expect(screen.getByText("+$30.00")).toHaveAttribute("title", "+$30.00\nPartial 1: BTC\nUnrecorded changes: −$120.00");
 });
 
 it("masks break-even when only a partial P&L is known", async () => {
@@ -266,7 +244,7 @@ it("renders one chart point when the opening date is also the first snapshot", a
     currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
     quoteColor="green-up-red-down"
   />);
-  await screen.findByRole("group", { name: /Cumulative net P&L/ });
+  await screen.findByRole("img", { name: /Cumulative net P&L/ });
   expect(container.querySelectorAll("[data-point]")).toHaveLength(3);
 });
 
@@ -281,5 +259,5 @@ it("hides unrecorded changes below half a cent in display currency", async () =>
     quoteColor="green-up-red-down"
   />);
   await screen.findByText("+$10.00");
-  expect(screen.queryByText(/Unrecorded changes/)).not.toBeInTheDocument();
+  expect(screen.getByText("+$10.00")).toHaveAttribute("title", "+$10.00");
 });

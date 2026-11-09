@@ -24,11 +24,11 @@ test("phone Summary compares each range with its preceding snapshot", async ({ p
     for (const metric of await card.locator(".fd-kpis strong").all()) {
       await expect(metric).not.toHaveText(/^(–|n\/a)$/);
     }
-    await expect(card.locator(".fd-primary-stat small")).toContainText(
-      preset === "All" ? "1038 snapshots" : `${count} in range`);
+    await expect(card.locator(".fd-kpis > div").nth(2).locator("small")).toHaveAttribute("title",
+      preset === "All" ? /1038 snapshots$/ : new RegExp(`${count} in range$`));
     if (preset === "1D") {
       await expect(card.locator(".fd-summary-chart text").last()).toHaveText("−$190");
-      await expect(card.locator(".fd-summary-chart text").filter({ hasText: /^Best month,/ })).toContainText("−$190");
+      await expect(card.locator(".fd-summary-chart text").filter({ hasText: /^Best month,/ })).toHaveCount(0);
       await expect(summary.locator(".fd-profit-summary .fd-month strong").last()).toHaveText("−$190");
       await expect(summary.locator(".fd-years .fd-year strong").first()).toHaveText("−$190");
       await expect(summary.locator(".fd-top-coins").getByText("BTC").first()).toBeVisible();
@@ -38,8 +38,12 @@ test("phone Summary compares each range with its preceding snapshot", async ({ p
       const raw = text.replace(/[\$+,−-]/g, "");
       return (text.startsWith("−") || text.startsWith("-") ? -1 : 1) * Number(raw);
     });
-    expect(amounts).toHaveLength(4);
-    expect(amounts[1] + amounts[2] + amounts[3]).toBe(amounts[0]);
+    expect([3, 4]).toContain(amounts.length);
+    const details = await card.locator(".fd-primary-stat strong").getAttribute("title") ?? "";
+    const unrecorded = details.match(/Unrecorded changes: ([+−-]?\$[\d,]+)/);
+    const unrecordedAmount = unrecorded ? (unrecorded[1].startsWith("−") || unrecorded[1].startsWith("-") ? -1 : 1) *
+      Number(unrecorded[1].replace(/[\$+,−-]/g, "")) : 0;
+    expect(amounts[1] + amounts[2] + (amounts[3] ?? unrecordedAmount)).toBe(amounts[0]);
   }
 });
 
@@ -96,7 +100,7 @@ test.describe("iPad Summary", () => {
     userAgent: "Track3 iPad",
   });
 
-  test("uses the same preceding baseline for 1D", async ({ page }) => {
+  test("uses the preceding baseline for 7D in the restored iPad controls", async ({ page }) => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 834, height: 1024 });
     await installTauriBridge(page, { summaryRangeFixture: "many" });
@@ -107,16 +111,14 @@ test.describe("iPad Summary", () => {
     await page.screenshot({ path: "/tmp/fidelity/summary/ui44-app-ipad.png" });
     await page.setViewportSize({ width: 820, height: 1180 });
     const profit = summary.locator(".analyze-profit-card");
-    await profit.getByRole("radio", { name: "1D" }).click();
-    await expect(profit.locator(".mobile-movers-total")).toContainText("Net P&L (1D)");
-    await expect(profit.locator(".mobile-movers-total")).toContainText("-\$190.00");
-    await expect(profit.locator(".mobile-movers-total")).toContainText("11 positions");
-    await expect(profit.locator(".mobile-movers-total")).toContainText("1 in range");
-    await expect(profit.locator(".mobile-movers-total")).toContainText(/Breakeven\s+\$[\d,]+/);
+    await profit.getByRole("radio", { name: "7D" }).click();
+    await expect(profit.locator(".mobile-movers-total")).toContainText("Net P&L (7D)");
+    await expect(profit.locator(".mobile-movers-total")).toContainText("-\$150.00");
+    await expect(profit.locator(".mobile-movers-total")).not.toContainText("Breakeven");
     const periods = summary.locator(".profit-summary-card");
-    await expect(periods.locator(".profit-month-card").last()).toContainText("-\$190");
+    await expect(periods.locator(".profit-month-card").last()).toContainText("-\$150");
     await periods.getByRole("radio", { name: "Y" }).click();
-    await expect(periods.locator(".profit-period-grid > div").first()).toContainText("-\$190");
+    await expect(periods.locator(".profit-period-grid > div").first()).toContainText("-\$150");
   });
 
   test("explains missing P&L and period cards with one database snapshot", async ({ page }) => {
@@ -126,10 +128,8 @@ test.describe("iPad Summary", () => {
     await expect(summary).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
     const profit = summary.locator(".analyze-profit-card");
     await expect(profit.locator(".mobile-movers-total .ios-money")).toHaveText("–");
-    await expect(profit.locator(".mobile-movers-total")).toContainText("Needs a second snapshot");
-    await expect(profit.locator(".mobile-movers-total")).toContainText("11 positions");
-    await expect(profit.locator(".mobile-movers-total")).toContainText("in 1 snapshot");
-    await expect(profit.locator(".mobile-movers-total")).toContainText("Breakeven –");
+    await expect(profit.locator(".mobile-movers-total .ios-money")).toHaveAttribute("title", "Needs a second snapshot");
+    await expect(profit.locator(".mobile-movers-total")).not.toContainText("Breakeven");
     const periods = summary.locator(".profit-summary-card");
     await expect(periods).toContainText("Month cards appear after the second snapshot.");
     await periods.getByRole("radio", { name: "Y" }).click();

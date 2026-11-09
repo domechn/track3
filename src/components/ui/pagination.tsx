@@ -53,10 +53,9 @@ const PaginationLink = ({
       aria-current={isActive ? "page" : undefined}
       className={cn(
         buttonVariants({
-          variant: "ghost",
+          variant: isActive ? "outline" : "ghost",
           size,
         }),
-        isActive && "t3-pagination-current",
         className
       )}
       {...props}

@@ -172,7 +172,7 @@ for (const phone of phones) {
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await installTauriBridge(page, { emptyPortfolio: true });
     await page.goto("/#/overview");
-    await expect(page.getByRole("heading", { name: "Add your first source" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: "Add your first source" })).toBeVisible();
     await page.screenshot({ path: `test-results/mobile/ios-${phone.name}-first-launch.png` });
     await page.getByRole("button", { name: "Add an exchange" }).click();
     await expect(page).toHaveURL(/#\/settings\/configuration$/);
@@ -182,11 +182,9 @@ for (const phone of phones) {
     await form.getByRole("textbox", { name: "Symbol" }).fill("ETH");
     await form.getByRole("textbox", { name: "Amount" }).fill("2");
     await form.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByRole("button", { name: "Edit ETH", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit ETH" })).toBeVisible();
     await page.getByRole("navigation", { name: "Tabs" }).getByRole("link", { name: "Overview" }).click();
     await page.getByRole("button", { name: "Refresh now" }).click();
-    await expect(page.getByRole("alertdialog", { name: "Source status" })).toHaveCount(0);
-    await page.getByRole("button", { name: "Source status" }).click();
     await expect(page.getByRole("alertdialog", { name: "Source status" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phone.width);
   });
@@ -208,7 +206,7 @@ for (const phone of phones) {
     await wallet.getByRole("button", { name: "Add wallet" }).click();
     await expect(wallet).not.toBeVisible();
     await page.getByRole("tab", { name: "Wallets" }).click();
-    await expect(page.getByRole("region", { name: "Wallet" }).getByRole("button", { name: "Edit Long-term BTC", exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Wallet" }).getByRole("button", { name: "Edit Long-term BTC" })).toBeVisible();
 
     await page.getByRole("tab", { name: "Exchanges" }).click();
     await page.getByRole("button", { name: "Add exchange" }).click();
@@ -219,15 +217,12 @@ for (const phone of phones) {
     await exchange.getByRole("textbox", { name: "API secret" }).fill("e2e-api-secret");
     await exchange.getByRole("button", { name: "Save and test" }).click();
     await expect(exchange).not.toBeVisible();
-    await expect(page.getByRole("region", { name: "Exchanges" }).getByRole("button", { name: "Edit Portfolio Binance", exact: true })).toBeVisible();
-    await page.getByRole("region", { name: "Exchanges" }).getByRole("button", { name: "Edit Portfolio Binance", exact: true }).click();
-    await expect(page.getByRole("dialog", { name: "Edit data source" })).toBeVisible();
-    await page.getByRole("dialog", { name: "Edit data source" }).getByRole("button", { name: "Close" }).click();
+    await expect(page.getByRole("region", { name: "Exchanges" }).getByRole("button", { name: "Edit Portfolio Binance" })).toBeVisible();
     await page.reload();
     await page.getByRole("tab", { name: "Wallets" }).click();
-    await expect(page.getByRole("region", { name: "Wallet" }).getByRole("button", { name: "Edit Long-term BTC", exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Wallet" }).getByRole("button", { name: "Edit Long-term BTC" })).toBeVisible();
     await page.getByRole("tab", { name: "Exchanges" }).click();
-    await expect(page.getByRole("region", { name: "Exchanges" }).getByRole("button", { name: "Edit Portfolio Binance", exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Exchanges" }).getByRole("button", { name: "Edit Portfolio Binance" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(phone.width);
     await page.screenshot({ path: `test-results/mobile/ios-${phone.name}-added-sources.png` });
   });

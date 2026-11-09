@@ -12,11 +12,11 @@ The sample source assumes two devices and an already completed Cloudflare R2 syn
 
 ## Capture and pixel difference
 
-App: `/tmp/fidelity/overview/overview-sync-phone.png`. Source: `/tmp/fidelity/overview/design-overview-sync.png`. Both are 390 × 844px. **10.260%** of pixels differ by more than 20 in one RGB channel. The images were viewed side by side and compared through a Chromium canvas.
+App: `/tmp/fidelity/overview/overview-sync-phone.png`. Source: `/tmp/fidelity/overview/design-overview-sync.png`. Both are 390 × 844px. **10.08%** of pixels differ by more than 20 in one RGB channel. The images were viewed side by side and compared through a Chromium canvas.
 
 ## Remaining differences
 
-- The refreshed 8 Nov 2026 390px viewport pixel diff is **10.260%** (any RGB channel
+- The refreshed 7 Nov 2026 390px viewport pixel diff is **10.08%** (any RGB channel
   differs by more than 20). The same saved source and refreshed app capture
   are 390 × 844 px.
 - The source's connected green price and sync dots are replaced by the phone

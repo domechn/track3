@@ -31,14 +31,20 @@ for (const [size, width, height] of [["desktop", 1280, 800], ["phone", 390, 844]
             if (cmd === "plugin:updater|check") {
               return Promise.resolve({ rid: 84, currentVersion: "0.9.5", version: "0.9.6", date: "2026-11-01", body });
             }
-            if (cmd === "plugin:updater|download_and_install") {
+            if (cmd === "plugin:updater|download") {
               args.onEvent.onmessage({ event: "Started", data: { contentLength: 100 } });
               args.onEvent.onmessage({ event: "Progress", data: { chunkLength: 50 } });
               return new Promise((resolve, reject) => {
-                (window as any).__finishDownload = (failed: boolean) =>
-                  failed ? reject(new Error("local fixture connection reset")) : resolve(null);
+                (window as any).__finishDownload = (failed: boolean) => {
+                  if (failed) reject(new Error("local fixture connection reset"));
+                  else {
+                    args.onEvent.onmessage({ event: "Finished" });
+                    resolve(85);
+                  }
+                };
               });
             }
+            if (cmd === "plugin:updater|install") return Promise.resolve(null);
             return invoke(cmd, args, options);
           };
         }, notes);

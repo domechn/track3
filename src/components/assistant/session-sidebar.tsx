@@ -210,8 +210,10 @@ function SessionItem({
   return (
       <div
         className={cn(
-          "t3-selected-list-row group relative mx-2 rounded-md px-3 py-2 text-left transition-colors",
+          "group relative mx-2 rounded-md px-3 py-2 text-left transition-colors border-l-2",
           "hover:bg-accent/60",
+          isActive && "bg-accent border-primary",
+          !isActive && "border-transparent",
         )}
         data-testid={`session-item-${session.id}`}
         data-active={isActive ? "true" : undefined}

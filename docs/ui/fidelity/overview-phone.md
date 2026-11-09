@@ -25,44 +25,16 @@ Public Sans with tabular numerals; body 13/18 regular. `--ground #0d0d0e`, `--su
 
 Numbers use commas and two USD decimals except explanatory whole dollars, chart axes, and contributor bars. Signed changes use `+` or true minus `−`; dates use day + short month. Missing values stay a grey dash and real zeros display as zero. The quote-colour setting applies to gain and loss labels. Overview has no existing hide-values control; Comparison's masking remains available. No empty or error overview reference was supplied; retain real empty/error behavior.
 
-At phone widths up to 480 px, the three KPI values use two columns with the third value across the full row. This keeps larger local-currency amounts on one line at the source's 12 px type size and 10 px cell padding.
-
 The segmented controls, rank sort buttons, and insight dismiss icon have at least 44px touch boxes. The selected sort pill and dismiss glyph keep the source's visible dimensions within those boxes.
 
 ## Capture and pixel difference
 
-App: `/tmp/fidelity/overview/overview-phone.png`. Source: `/tmp/fidelity/overview/design-overview.png`. The earlier 390px dark viewport comparison differed by **6.30%** at the threshold of 20 in any RGB channel; both captures were 844px high. The two-column KPI layout above postdates that capture. The earlier 2.27% measurement used a prior app capture. The authoritative Chromium HTML render governs both comparisons.
-
-A fresh 8 Nov source-page render at 390 × 844 differs from the same dark app capture by **7.254%** at a 16/255 RGB threshold (**6.969%** at 20/255). The source range remains 306 × 44px with a dark selected fill. The app now inherits that fill in Dark and the `--secondary` fill in Light; the light selected label has about **15.14:1** contrast.
+App: `/tmp/fidelity/overview/overview-phone.png`. Source: `/tmp/fidelity/overview/design-overview.png`. The current 390px dark viewport comparison differs by **6.30%** at the threshold of 20 in any RGB channel; both captures are 844px high. The earlier 2.27% measurement used a prior app capture. The authoritative Chromium HTML render governs both comparisons.
 
 Earlier long capture: `/tmp/fidelity/overview/overview-phone-long.png` vs `/tmp/fidelity/overview/design-overview-long.png`; **7.02%** pixel difference by the same threshold, heights 3299/3299px.
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** overview 10.193% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-The 8 Nov 390 × 844 dark real-data capture differs by **9.738%** from the static phone image at RGB-sum threshold 60. The live fixture's CNY totals, source counts, and chart history differ from the source's illustrative USD portfolio.
-
-- UI42 uses the approved website-style neutral tile for asset and source marks. The older phone Overview page design renders those marks differently.
-
-The latest dark 390 × 844 source and app viewport captures differ by
-**9.14%** at an RGB-channel threshold of 20. Both first cards have
-x=16, y=182, width 358px, height 516px, RGB (19, 18, 23) and 13px
-computed text. The static source assumes configured sync, whereas
-the app shows source status and a live price from its stored fixture.
-The owner-required selected tab tile and offline text rendering add
-visible pixels. Captures and computed bounds are in
-`.local/tag-theme/phone-overview-*`.
-
-The shared tab bar's measured source differences, including its owner-required selected tint and indicator, are recorded in [navigation.md](navigation.md).
-
-- The earlier 8 Nov source-page and dark app first-screen captures at 390 × 844
-  differ by **6.377%** at an RGB-channel threshold of 20. The tag-theme
-  fixture has no configured sync or saved AI observations. Its header
-  controls and insight content must reflect that local state, unlike
-  the source's configured sample. The Pro tag uses the shared accent
-  theme face, with a small border and text-size difference from the
-  static source pill.
 - The refreshed 7 Nov 2026 390px viewport capture differs by **6.30%** from the saved
   source-page render (any RGB channel differs by more than 20). The source
   assumes configured sync; the base app fixture has never configured sync, so
@@ -78,5 +50,5 @@ The shared tab bar's measured source differences, including its owner-required s
   corresponding long-amount state.
 - The earlier 390px full-page comparison was **9.76%** with the same threshold;
   UI27 remeasured the affected viewport.
-- Viewport: chart strokes, tab and header glyphs, and font rasterization differ slightly in the touch webview. The best-day caption and mover links use 44 px tap areas; the chart starts below the caption while keeping its 190 px plot height.
+- Viewport: chart strokes, tab and header glyphs, and font rasterization differ slightly in the touch webview.
 - Full page: the reference invents three AI observations, market-cap ranks, and configured Cloudflare R2 devices. The stored fixture has no saved AI observations, market-cap rank, or sync bucket; the app shows its real empty insight, portfolio ranks, and local sync state. Those data differences also shift later cards.

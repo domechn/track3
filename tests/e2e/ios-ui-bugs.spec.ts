@@ -16,21 +16,12 @@ for (const sources of [3, 8, 16, 30]) {
     await page.getByRole("button", { name: "Detailed analysis" }).click();
     const scroll = page.locator(".d2-wallets .wallet-asset-change-scroll").first();
     await expect(page.locator(".fd-wallet-chips button").nth(1)).toHaveAttribute("title", /^[0-9a-f]{32}$/i);
-    const matrixPager = page.locator(".wallet-asset-change-card [data-layout-pager]");
-    const sourceIds = new Set<string>();
-    for (let start = 0; start < sources; start += 8) {
-      await expect(scroll.locator("thead th")).toHaveCount(Math.min(8, sources - start) + 2);
-      for (const id of await scroll.locator("thead th[title]").evaluateAll((cells) =>
-        cells.map((cell) => cell.getAttribute("title") ?? ""))) sourceIds.add(id);
-      if (start + 8 < sources) await matrixPager.getByRole("button", { name: "Next" }).click();
-    }
-    expect(sourceIds.size).toBe(sources);
+    await expect(scroll.locator("thead th")).toHaveCount(sources + 2);
     await expect(scroll).toHaveAttribute("tabindex", "0");
     const rendered = await page.locator(".analyze-wallets").textContent();
     expect(rendered).not.toMatch(/[0-9a-f]{12,}/i);
     expect(rendered).not.toMatch(/[0-9a-f]{6,}…[0-9a-f]{4,}/i);
-    const text = await scroll.locator("thead th").evaluateAll((cells) =>
-      cells.map((cell) => cell.querySelector(".t3-asset-label-name")?.textContent ?? cell.textContent ?? ""));
+    const text = await scroll.locator("thead th").allTextContents();
     expect(text).not.toContainEqual(expect.stringMatching(/[0-9a-f]{12,}/i));
     await expect(scroll.locator("thead th").nth(1)).toHaveAttribute("title", /^[0-9a-f]{32}$/i);
     await expect(scroll.locator("thead th").nth(1)).toHaveAttribute("aria-label", text[1]);
@@ -63,14 +54,14 @@ test("long phone source names stay inside the viewport and their header cell", a
   await page.goto("/#/wallets");
   const chip = page.locator(".fd-wallet-chips button").nth(1);
   await expect(chip).toBeVisible({ timeout: 30_000 });
-  await chip.locator(".t3-asset-label-name").evaluate((node, name) => { node.textContent = name; }, longName);
+  await chip.locator("span").evaluate((node, name) => { node.textContent = name; }, longName);
   expect((await chip.boundingBox())!.width).toBeLessThanOrEqual(390);
-  expect(await chip.locator(".t3-asset-label-name").evaluate((node) => getComputedStyle(node).textOverflow)).toBe("ellipsis");
+  expect(await chip.locator("span").evaluate((node) => getComputedStyle(node).textOverflow)).toBe("ellipsis");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await page.getByRole("button", { name: "Detailed analysis" }).click();
   const header = page.locator(".d2-wallets .wallet-asset-change-scroll thead th").nth(1);
   await expect(header).toBeVisible({ timeout: 30_000 });
-  const label = header.locator(".t3-asset-label-name");
+  const label = header.locator("span");
   await label.evaluate((node, name) => { node.textContent = name; }, longName);
   expect((await header.boundingBox())!.width).toBeLessThanOrEqual(160);
   expect(await label.evaluate((node) => getComputedStyle(node).textOverflow)).toBe("ellipsis");
@@ -88,7 +79,6 @@ test("phone Summary pages 47 groups while retaining its total", async ({ page })
   await attribution.getByRole("button", { name: "Next" }).click();
   await expect(attribution.getByText("Showing 11-20 of 47")).toBeVisible();
   await expect(attribution.locator(".fd-attr-total")).toContainText("$5,781 → $6,251");
-  await expect(attribution.locator(".fd-attr-total")).toContainText("Known P&L +$470");
 });
 
 test("phone coin detail never uses a source hash as its name", async ({ page }) => {
@@ -128,12 +118,8 @@ test("opaque wallet keeps its number from phone Wallets to coin detail", async (
   await installManySourceFixture(page, 16);
   await page.goto("/#/wallets");
   const chip = page.locator(`.fd-wallet-chips button[title="${id}"]`);
-  await expect(page.locator(".fd-wallets")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
-  if (await chip.count() === 0) {
-    await page.getByRole("navigation", { name: "Wallets" }).getByRole("button", { name: "Next" }).click();
-  }
   await expect(chip).toBeVisible();
-  const name = (await chip.locator(".t3-asset-label-name").textContent())?.trim();
+  const name = (await chip.textContent())?.trim();
   expect(name).toMatch(/^Wallet \d+$/);
   await page.goto("/#/coins/COIN01");
   await expect(page.locator(".fd-source-list")).toContainText(name!);

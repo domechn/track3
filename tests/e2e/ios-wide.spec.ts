@@ -274,7 +274,7 @@ test("iPad portrait attribution shows full contributor names", async ({ browser 
     await page.locator(".d2-summary .analyze-profit-card").getByRole("radio", { name: "Attribution" }).click();
     for (const width of [744, 834]) {
       await page.setViewportSize({ width, height: 1133 });
-      const names = page.locator(".d2-summary .analyze-profit-card .attribution-rank-button .t3-asset-label-name");
+      const names = page.locator(".d2-summary .analyze-profit-card .attribution-rank-button .truncate");
       await expect(names.first()).toBeVisible();
       const clipped = await names.evaluateAll((nodes) => nodes
         .filter((node) => node.scrollWidth > node.clientWidth + 1)
@@ -581,7 +581,7 @@ test("wide detail pages ignore the edge back swipe when they have no back button
   }
 });
 
-test("regular windows keep snapshot detail accessible and scrollable", async ({ browser }) => {
+test("regular windows keep the snapshot sheet rounded and scrollable", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 932, height: 430 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   try {
@@ -591,37 +591,40 @@ test("regular windows keep snapshot detail accessible and scrollable", async ({ 
       await page.goto("/#/history");
       if (height < 500) await expect(page.locator(".app-layout")).toHaveAttribute("data-sidebar-collapsed", "true");
       await page.locator(".history-mobile-snapshot-button").first().click();
-      const detail = page.getByRole("dialog", { name: "Snapshot details" });
-      await expect(detail).toBeVisible();
-      await expect(detail.getByRole("heading", { name: "Assets at that time" })).toBeVisible();
-      const geometry = await detail.evaluate((node) => {
+      const sheet = page.getByRole("dialog", { name: "Snapshot details" });
+      await expect(sheet).toBeVisible();
+      const geometry = await sheet.evaluate((node) => {
         const box = node.getBoundingClientRect();
-        const scroller = document.querySelector<HTMLElement>("#app-main-content")!;
-        return { left: box.left, right: box.right, scrollable: scroller.scrollHeight > scroller.clientHeight };
+        const body = node.querySelector<HTMLElement>(".mobile-sheet-body")!;
+        const style = getComputedStyle(node);
+        return { top: box.top, bottom: box.bottom, radius: style.borderBottomLeftRadius, overflow: style.overflow,
+          scrollable: body.scrollHeight > body.clientHeight };
       });
-      expect(geometry.left).toBeGreaterThanOrEqual(0);
-      expect(geometry.right).toBeLessThanOrEqual(width);
+      expect(geometry.top).toBeGreaterThanOrEqual(height < 500 ? 8 : 0);
+      expect(geometry.bottom).toBeLessThanOrEqual(height - (height < 500 ? 8 : 0));
+      expect(geometry.radius).not.toBe("0px");
+      expect(geometry.overflow).toBe("hidden");
       if (height < 500) expect(geometry.scrollable).toBe(true);
       if (height < 500) {
         mkdirSync("test-results/mobile", { recursive: true });
         await page.screenshot({ path: "test-results/mobile/iphone-landscape-history-sheet.png" });
       }
-      await detail.getByRole("button", { name: "Back" }).click();
+      await sheet.getByRole("button", { name: "Close" }).click();
     }
   } finally {
     await context.close();
   }
 });
 
-test("regular width history rows align with their snapshot list", async ({ browser }) => {
+test("regular width history rows align with their month card", async ({ browser }) => {
   const context = await browser.newContext({ userAgent: iPhoneUserAgent, viewport: { width: 932, height: 430 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   try {
     await installTauriBridge(page, { richPortfolio: true });
     await page.goto("/#/history");
-    await expect(page.locator(".history-mobile-list")).toBeVisible();
+    await expect(page.locator(".history-month-rows")).toBeVisible();
     const edges = await page.evaluate(() => {
-      const card = document.querySelector(".history-mobile-list")!.getBoundingClientRect();
+      const card = document.querySelector(".history-month-rows")!.getBoundingClientRect();
       const row = document.querySelector(".history-mobile-snapshot-button")!.getBoundingClientRect();
       return { cardRight: card.right, rowRight: row.right };
     });
@@ -745,7 +748,7 @@ for (const [name, width, height] of viewports) {
           await page.goto(`/#/${route}`);
           const main = page.locator("#app-main-content");
           await expect(main, `${name} ${theme} ${route}`).toBeVisible({ timeout: 30_000 });
-          await expect(main).toHaveAttribute("data-route", `/${route}`, { timeout: 30_000 });
+          await expect(main).toHaveAttribute("data-route", `/${route.split("?")[0]}`, { timeout: 30_000 });
           if (route === "assistant") await expect(main.locator(".ios-d3-chat")).toBeVisible({ timeout: 30_000 });
           if (route === "history") await expect(main.locator(".history-mobile-list")).toBeVisible();
           if (route === "summary") await expect(main.locator(".d2-summary")).toBeVisible();
@@ -896,7 +899,7 @@ for (const [name, width, height] of viewports) {
             } else {
               const columns = await page.locator(".profit-metrics-mobile").evaluate((node) =>
                 getComputedStyle(node).gridTemplateColumns.split(" ").length);
-              expect(columns).toBe(width >= 700 && width <= 900 ? 2 : 3);
+              expect(columns).toBe(3);
             }
             if (size === "wide") {
               const tiles = await page.locator(".analytics-tile-grid").evaluate((node) =>
@@ -929,10 +932,14 @@ for (const [name, width, height] of viewports) {
               await expect(page.getByRole("region", { name: "Snapshot details" })).toBeVisible();
               await expect(page.locator(".history-mobile-list")).toBeVisible();
               await page.getByRole("region", { name: "Snapshot details" }).getByRole("button", { name: "Close" }).click();
-            } else {
+            } else if (size === "compact") {
               const detail = page.getByRole("dialog", { name: "Snapshot details" });
               await expect(detail).toBeVisible();
               await detail.getByRole("button", { name: "Back" }).click();
+            } else {
+              const sheet = page.getByRole("dialog", { name: "Snapshot details" });
+              await expect(sheet).toBeVisible();
+              await sheet.getByRole("button", { name: "Close" }).click();
             }
           }
           if (route === "settings/appearance?section=theme" && size === "wide") {

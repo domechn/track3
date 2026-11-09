@@ -6,7 +6,7 @@ References viewed: `phone/analyze/comparison-phone.jpg`, `phone-long/analyze/com
 
 1. Title Comparison x16 y14. Three-line subtitle y44: `What changed between two snapshots? +$34,641.48 (+4.75%) from 1 Oct to 31 Oct; BTC and ETH made 68% of it.` Emphasize the money. No visible header actions.
 2. Snapshots card x16 y124 h531. Snapshot A picker button: clock icon, `1 Oct 2026`, `09:41 · $729,168`, chevron. Snapshot B: `31 Oct 2026`, `09:41 · $763,809`. Labels above. `Quick range ending at B` with two-column 44px pills Yesterday, 7 days, **30 days** blue selected, Start of month. Rule and two-column, two-row KPI grid: Value at A · 1 Oct `$729,167.79` / Snapshot 09:41; Value at B · 31 Oct `$763,809.27` / 30 days later; Change `+$34,641.48` / absolute; Change % `+4.75%` / vs 1 Oct.
-3. Per asset starts at x16 below Snapshots and grows with the available assets, sorted by absolute change. The reference eight-asset state keeps its 920px card; shorter and longer lists size to their content. Each compact row shows held quantity, A→B price, change percent, and A→B value. The total row follows the assets; the blue info banner appears when saved amounts are equal.
+3. Per asset starts at x16 below Snapshots and grows with the available assets, sorted by absolute change. Each compact row shows held quantity, A→B price, change percent, and A→B value. The total row follows the assets; the blue info banner appears when saved amounts are equal.
 4. Biggest movers by value and percentage follow Per asset in separate growing cards. Both rank by absolute change magnitude and display the sign in the value column. The 11-asset review fixture begins BTC `−$318,305`, BNB `−$35,571`, USDT `−$4,000` by value and BNB `−6.92%`, PLUME `−6.92%`, ETH `−5.19%` by percentage. Each card initially shows ten 44px rows; `and 1 more` reveals USD. Columns and the zero axis align across each card. At 390px the percentage card hides the absolute-change column. The computed notes say `BTC and BNB made 99% of the total change` and `SCHD rose most in relative terms; USDT moved −2.23%.` Hide-values changes the expansion label to `Show More` without a count.
 
 ## Interactive and data rules
@@ -21,31 +21,6 @@ Fresh 390 px dark full-page renders of the source HTML and app with the source's
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** comparison 8.326% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-At 820 px, the real-scale per-asset cards use their content height and a 7 px bottom inset so the last row reaches the card edge without a blank area. The static phone sample has fewer assets and no iPad-sized reference card grid.
-
-- The 8 Nov 390 × 844 app viewport in `/tmp/fidelity/comparison/comparison-phone.png` differs from the first 844 px of the source HTML render in `/tmp/fidelity/comparison/design-comparison.png` by **7.30%** at RGB-sum threshold 48. The picker viewport differs by **5.60%** against `design-comparison-picker.png`. These captures use the corrected 1 Oct and 31 Oct snapshot dates. The app has a 44 px Back control, a mask control, calculated 67% attribution, and the shared active tab treatment; the static source omits the controls and fixes attribution at 68%. Small picker spacing and text rasterization also remain visible and could be matched but are not worth another round.
-- The one permitted browser run measured the dark 390 × 844 viewport
-  at **10.64%** different from `analyze-comparison.html` with an
-  RGB-channel threshold of 20. Its first card bounds and computed
-  background, text colour and size match exactly: x=16, y=124,
-  358 × 531px, RGB (19, 18, 23), 13px. The capture exposed a
-  padded-versus-unpadded date mismatch that left the fixture at
-  30 Oct versus 31 Oct; desktop and phone now have regression tests
-  and use the assistant's 1 Oct versus 31 Oct selection. The ratio
-  predates that fix because the browser spec is limited to one run.
-  The app also keeps its Back and masking controls, computed mover
-  attribution, and the owner-required active tab style. Captures and
-  bounds are in `.local/tag-theme/phone-comparison-*`.
-
-- The earlier 8 Nov source-page and dark app first-screen captures at 390 × 844
-  differ by **7.996%** at an RGB-channel threshold of 20. The live
-  comparison keeps its 44 px Back and masking controls and computed
-  attribution, while the static source omits or fixes those values.
-  Small picker and text positions remain visible; they could be matched
-  but do not change the required data behavior.
-- At 1133 px split view, the asset comparison cards retain two columns when their amounts fit. The source's 390 px phone render cannot show this iPad layout.
 - The source ranks mover rows by signed change, uses 40–42 px rows and fixed 435/469 px cards, and puts its zero axis and value columns at different positions. The product ranks by absolute size, uses 44 px rows, one diverging scale and shared columns per card, and grows the cards for up to ten rows plus expansion. Matching the source here would break the required behavior.
 - Below 480 px the product hides the percentage card's absolute-change column to keep the plot and signed percentage readable. The source shows that column in its static render.
 - The source's fixed attribution and stablecoin note cannot describe the 11-asset fixture. The product computes both notes from stored assets.
@@ -53,4 +28,3 @@ At 820 px, the real-scale per-asset cards use their content height and a 7 px bo
 - The visible mask control remains in the Snapshots card so users can hide values; the static source omits it.
 - A 44px Back control remains visible at the upper right so the Analytics subpage has an explicit return route; the static reference omits it. It now starts below the device's top safe area.
 - Snapshot value type size, picker borders and day-dot placement, small spacing, and text rasterization remain visibly different. They use the app's shared components and could be matched but are not worth another round.
-- Per-asset and mover labels use the current shared AssetIcon tiles, whose marks differ from the older source page. Their ticker and stock or crypto type remain unchanged.

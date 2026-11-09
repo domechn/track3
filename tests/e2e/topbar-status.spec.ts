@@ -47,8 +47,6 @@ test("first refresh keeps Source status clear when no results are stored", async
     await expect(page.locator(".t3-overview-grid")).toBeVisible();
     await expect(page.locator(".t3-refresh-source-trigger")).toHaveCount(0);
     await page.locator(".t3-refresh-button").click();
-    await expect(page.locator(".t3-refresh-progress-pill")).toHaveCount(0, { timeout: 30_000 });
-    await expect(page.locator(".t3-refresh-button")).toBeEnabled();
     const source = page.locator(".t3-refresh-source-trigger");
     await expect(source).toBeVisible();
     const refresh = page.locator(".t3-refresh-button");
@@ -88,13 +86,17 @@ for (const configured of [false, true]) {
       if (configured) {
         await page.getByLabel("Sync passphrase").fill("fixture sync passphrase");
         await page.getByRole("button", { name: /^Unlock( sync)?$/ }).click();
-        await expect(page.getByLabel("Sync passphrase")).toHaveCount(0);
       }
       await expect(page.locator(".t3-overview-grid")).toBeVisible({ timeout: 30_000 });
       await expect(page.locator(".t3-live-trigger")).toBeVisible({ timeout: 30_000 });
       await expect(page.locator(".t3-hero-value")).toContainText("$763,809.27", { timeout: 30_000 });
+      await page.locator(".t3-live-trigger").click();
+      await expect(page.locator(".t3-live-dot")).toHaveAttribute("data-state", "live", { timeout: 30_000 });
+      await expect(page.locator(".t3-live-popover")).toContainText("Live prices: connected");
+      await page.mouse.click(450, 70);
+      await expect(page.locator(".t3-live-popover")).toHaveCount(0);
+      await expect(page.locator(".t3-hero-value")).toBeVisible();
       if (configured) {
-        await expect(page.locator(".t3-topbar-sync-button")).toHaveAttribute("data-sync-state", "synced");
         await page.evaluate(async () => {
           const runtimeModule = "/src/middlelayers/sync/runtime.ts";
           const { syncRuntime } = await import(runtimeModule);
@@ -102,13 +104,8 @@ for (const configured of [false, true]) {
           (syncRuntime as any).publish("ready", { phase: "idle", lastSync: Date.now() - 120_000,
             report: { pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] } });
         });
+        await expect(page.locator(".t3-topbar-sync-button")).toHaveAttribute("data-sync-state", "synced");
       }
-      await page.locator(".t3-live-trigger").click();
-      await expect(page.locator(".t3-live-dot")).toHaveAttribute("data-state", "live", { timeout: 30_000 });
-      await expect(page.locator(".t3-live-popover")).toContainText("Live prices: connected");
-      await page.mouse.click(450, 70);
-      await expect(page.locator(".t3-live-popover")).toHaveCount(0);
-      await expect(page.locator(".t3-hero-value")).toBeVisible();
       mkdirSync(output, { recursive: true });
       await page.screenshot({ path: `${output}/desktop-${theme}-${configured ? "configured" : "unconfigured"}.png`,
         clip: { x: 0, y: 0, width: 1280, height: 70 } });

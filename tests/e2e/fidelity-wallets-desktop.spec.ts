@@ -62,7 +62,7 @@ test.describe("Wallets desktop fidelity", () => {
       const indicator = page.locator(".t3-wallet-actions .desktop-sync-status-indicator button");
       await expect(indicator).toBeVisible();
       await indicator.click();
-      await expect(page.getByRole("dialog")).toContainText("Backup & sync", { timeout: 60_000 });
+      await expect(page.getByRole("dialog")).toContainText("Backup & sync");
     } finally {
       await context.close();
     }
@@ -97,10 +97,10 @@ test.describe("Wallets desktop fidelity", () => {
           expect(Math.abs(balances!.y - 374)).toBeLessThan(1);
           const headerCells = await page.locator(".t3-wallet-balances thead th").evaluateAll((cells) =>
             cells.map((cell) => cell.getBoundingClientRect().x));
-          expect(headerCells.every((x, index) => Math.abs(x - [105, 603.6, 894.5, 1082.8, 1368][index]) < 1)).toBe(true);
+          expect(headerCells.every((x, index) => Math.abs(x - [105, 430.7, 620.8, 743.8, 930.2][index]) < 1)).toBe(true);
           const matrixCells = await page.locator(".t3-wallet-matrix thead th").evaluateAll((cells) =>
             cells.map((cell) => cell.getBoundingClientRect().x));
-          expect(matrixCells.every((x, index) => Math.abs(x - [105, 215, 458.6, 702.2, 945.8, 1189.4, 1433][index]) < 1)).toBe(true);
+          expect(matrixCells.every((x, index) => Math.abs(x - [105, 156.4, 299.5, 430, 600.9, 731.5, 906.5][index]) < 1)).toBe(true);
           await expect(page.locator(".t3-wallet-status-list")).toContainText(
             "Rate limit exceeded. Showing the last good balances from 09:12.");
           const failedMessage = await page.locator(".t3-wallet-status-list .failed p").boundingBox();
@@ -110,7 +110,7 @@ test.describe("Wallets desktop fidelity", () => {
           const rows = page.locator(".t3-wallet-balances tbody tr");
           const first = await rows.nth(0).boundingBox();
           const second = await rows.nth(1).boundingBox();
-          expect(Math.round(second!.y - first!.y)).toBe(50);
+          expect(Math.round(second!.y - first!.y)).toBe(52);
         } else {
           const allocation = await page.locator(".t3-wallet-allocation").boundingBox();
           expect(allocation!.x + allocation!.width).toBeCloseTo(1572, 0);

@@ -62,12 +62,9 @@ The source depicts the **default** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
-**9 Nov 2026 layout audit:** currency 7.528% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-- The page title, rate timestamp, stablecoin switch, history page size, and unread badge match. Some descriptions wrap at different words, the preview card begins slightly lower, and the refresh and navigation icon strokes differ. The app's touch scroller does not paint the source browser's visible scrollbar. Locally bundled Public Sans rasterizes differently from the reference browser's web font.
-- The light-theme cards, selects, menu options, and update action now follow the page tokens.
+- The page title now matches **Currency & display**. The real stored currency rates determine the preview values and update time; minor refresh icon and text rasterization differences remain.
 
 ## Pixel difference
 
-- Fresh difference ratio: **5.395%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel. The earlier 2.215% used a seeded currency fixture.
-- Fresh design viewport: `/tmp/wui30-design/currency.png` (780×1688); app viewport: `/tmp/fidelity/settings-a/currency-default.png` (780×1688).
+- Difference ratio: **2.215%** at 390 × 844 CSS px, dark theme, threshold 16 in any RGB channel.
+- Design viewport: `/tmp/fidelity/settings-a/design-currency-default.png` (top 780×1688); app viewport: `/tmp/fidelity/settings-a/currency-default.png` (780×1688).

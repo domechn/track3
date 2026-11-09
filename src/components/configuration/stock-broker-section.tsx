@@ -1,4 +1,3 @@
-import AssetLabel from "@/components/common/asset-label";
 import { memo } from "react";
 import {
   Table,
@@ -41,6 +40,7 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
+import { getWalletLogo } from "@/lib/utils";
 import { maskSensitive } from "@/utils/attach-to";
 import type { StockBrokerSectionProps } from "./types";
 import { BackpackIcon } from "@radix-ui/react-icons";
@@ -48,7 +48,7 @@ import EmptyState from "@/components/empty-state";
 import { AliasRename } from "./alias-rename";
 import { sourceAliasFallback } from "@/components/source-display-name";
 
-const CONFIG_LIST_PAGE_SIZE = 8;
+const CONFIG_LIST_PAGE_SIZE = 30;
 
 const StockBrokerSection = memo(function StockBrokerSection({
   stockBrokers,
@@ -137,7 +137,11 @@ const StockBrokerSection = memo(function StockBrokerSection({
                         <SelectLabel>{t("config.broker")}</SelectLabel>
                         {stockBrokerOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            <AssetLabel kind="broker" type={o.value} name={o.label} size={20} />
+                            <img
+                              className="h-4 w-4 text-muted-foreground inline-block mr-2"
+                              src={getWalletLogo(o.value)}
+                            />
+                            {o.label}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -251,7 +255,7 @@ const StockBrokerSection = memo(function StockBrokerSection({
                   <TableHead className="w-[120px]">
                     {t("config.status")}
                   </TableHead>
-                  <TableHead className="w-[140px] text-right">
+                  <TableHead className="w-[84px] touch:w-[120px] text-right">
                     {t("config.actions")}
                   </TableHead>
                 </TableRow>
@@ -263,9 +267,18 @@ const StockBrokerSection = memo(function StockBrokerSection({
                     className="h-[42px] group align-middle"
                   >
                     <TableCell className="w-[170px]">
-                      <AssetLabel kind="broker" type={broker.type} name={stockBrokerOptions.find(
-                        (c) => c.value === broker.type,
-                      )?.label ?? broker.type} size={24} />
+                      <div className="flex items-center gap-2 text-sm">
+                        <img
+                          className="w-[18px] h-[18px] rounded-full"
+                          src={getWalletLogo(broker.type)}
+                          alt={broker.type}
+                        />
+                        <span className="truncate">
+                          {stockBrokerOptions.find(
+                            (c) => c.value === broker.type,
+                          )?.label ?? broker.type}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="w-[170px] text-sm">
                       <span className="block truncate" title={broker.alias || `${broker.type}-${idx + 1}`}>{broker.alias || `${broker.type}-${idx + 1}`}</span>
@@ -291,8 +304,8 @@ const StockBrokerSection = memo(function StockBrokerSection({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="w-[140px] text-right">
-                      <div className="inline-flex items-center justify-end gap-1">
+                    <TableCell className="w-[84px] touch:w-[120px] text-right">
+                      <div className="inline-flex items-center justify-end gap-0">
                         <AliasRename alias={broker.alias} name={broker.alias || `${broker.type}-${idx + 1}`}
                           fallback={sourceAliasFallback("broker", broker.type)} index={renameOffset + stockBrokers.indexOf(broker)}
                           names={renameNames ?? stockBrokers.map((item) => item.alias || sourceAliasFallback("broker", item.type, item.queryId))}
@@ -324,11 +337,10 @@ const StockBrokerSection = memo(function StockBrokerSection({
               </TableBody>
             </Table>
             {visibleStockBrokers.length > CONFIG_LIST_PAGE_SIZE && (
-              <div data-layout-pager className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  aria-label={t("common.prev")}
                   onClick={() =>
                     onStockBrokerPageChange(Math.max(stockBrokerPage - 1, 0))
                   }
@@ -342,7 +354,6 @@ const StockBrokerSection = memo(function StockBrokerSection({
                 <Button
                   variant="outline"
                   size="sm"
-                  aria-label={t("common.next")}
                   onClick={() =>
                     onStockBrokerPageChange(
                       Math.min(stockBrokerPage + 1, stockBrokerPageCount - 1),

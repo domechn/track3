@@ -1,4 +1,3 @@
-import { Profiler } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import SyncStatusIndicator from "./sync-status-indicator";
@@ -27,15 +26,4 @@ it("shows real sync details in the desktop overview card", () => {
   expect(screen.getByText("Devices")).toBeInTheDocument();
   expect(screen.getByText("Waiting to upload")).toBeInTheDocument();
   expect([...screen.getByRole("dialog").querySelectorAll("dt")].map((term) => term.textContent)).toContain("Errors");
-});
-
-it("does not render again when a scroll event leaves the overview scroll rail unchanged", () => {
-  const onRender = vi.fn();
-  render(<Profiler id="sync" onRender={onRender}><SyncStatusIndicator overviewFidelity /></Profiler>);
-  fireEvent.click(screen.getByRole("button", { name: /Synced .* ago$/ }));
-  const body = screen.getByRole("dialog").querySelector(".t3-sync-fidelity-body")!;
-  fireEvent.scroll(body);
-  const commits = onRender.mock.calls.length;
-  fireEvent.scroll(body);
-  expect(onRender).toHaveBeenCalledTimes(commits);
 });

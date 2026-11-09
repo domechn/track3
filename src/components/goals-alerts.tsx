@@ -35,7 +35,6 @@ import {
 } from "./ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import GoalsDesktop from "./goals-desktop";
-import { useChartHitArea } from "./chart-tooltip";
 
 const emptyDraft: AlertDraft = {
   id: 0, kind: "total_value_target", assetType: "crypto", symbol: "",
@@ -56,7 +55,6 @@ const historySeverity = (kind: AlertKind) =>
 
 export default function GoalsAlerts({ currency, isProUser }: { currency?: CurrencyRateDetail; isProUser?: boolean }) {
   const { t, locale } = useTranslation();
-  const chart = useChartHitArea();
   const darkTheme = useDarkTheme();
   const [wideDesktop, setWideDesktop] = useState(() => window.innerWidth >= 1500);
   const [desktopEditorOpen, setDesktopEditorOpen] = useState(false);
@@ -268,7 +266,6 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
       setStatus(t(allowed ? "goals.notificationEnabled" : "goals.notificationFallback"));
     })} />;
 
-  let goalMarkIndex = 0;
   return (
     <div className="t3-manage-goals mx-auto gap-4 pb-8">
       <div className="t3-goals-heading">
@@ -318,7 +315,7 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
       <div className="t3-goals-chart">{loading ? <FinanceChartSkeleton /> : <GoalChart rules={rules} snapshots={snapshots} portfolioValues={portfolioValues} />}</div>
       <Card className="t3-goals-rules">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.rules")}</CardTitle></CardHeader>
-        <CardContent className="space-y-3" data-chart-group="">
+        <CardContent className="space-y-3">
           {loading ? <p className="text-sm text-muted-foreground">{t("goals.loading")}</p>
             : rules.length === 0 ? <EmptyState icon={TargetIcon} title={<><span aria-hidden="true" className="t3-empty-state-kicker">{t("goals.empty")}</span>{t("goals.empty.title")}</>} hint={t("goals.empty.hint")} className="t3-goals-empty"
               action={<Button onClick={(event) => openEditor(emptyDraft, event.currentTarget)}>{t("goals.newRule")}</Button>}>
@@ -331,7 +328,6 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
                  const RuleIcon = ruleIcons[rule.kind] ?? ClockIcon;
                 const measurement = measureRule(rule, snapshots, prices, targets);
                 const isGoal = rule.kind === "total_value_target" || rule.kind === "asset_value_target";
-                const goalIndex = isGoal && measurement.status === "ready" ? goalMarkIndex++ : -1;
                 const progress = isGoal && measurement.value !== undefined
                   ? Math.max(0, Math.min(100, rule.comparator === "gte"
                     ? rule.threshold > 0 ? measurement.value / rule.threshold * 100 : 100
@@ -352,7 +348,7 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="t3-tag" data-tone={rule.enabled ? "positive" : "neutral"}>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] ${rule.enabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
                         {t(rule.enabled ? "goals.enabled" : "finance.paused")}
                       </span>
                       <label className="flex items-center gap-1 text-xs">
@@ -375,12 +371,7 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
                       className="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-muted">
                       <span className="text-xs font-semibold">{progress.toFixed(0)}%</span>
                     </div>
-                    <div className="min-w-0 flex-1" role="button"
-                      {...chart.markProps(goalIndex,
-                        `${t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`))}: ${progress.toFixed(2)}%, ${t("goals.current")}: ${measurement.value?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD, ${t("rebalance.target")}: ${rule.threshold.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`,
-                        <><div>{t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`))}: {progress.toFixed(2)}%</div>
-                          <div>{t("goals.current")}: {measurement.value?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</div>
-                          <div>{t("rebalance.target")}: {rule.threshold.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</div></>)}>
+                    <div className="min-w-0 flex-1">
                       <Progress value={progress} aria-label={t("goals.progress").replace("{kind}", t(`goals.kind.${rule.kind}`))} />
                       <p className="pt-1 text-xs text-muted-foreground">{measurement.value?.toLocaleString()} / {rule.threshold.toLocaleString()} USD · {eta === null
                         ? t("finance.etaUnavailable")
@@ -393,7 +384,6 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
           <AttributionPager count={rules.length} {...rulePaging} t={t} ariaLabel={t("goals.rules")} />
         </CardContent>
       </Card>
-      {chart.tooltip}
       <Card className="t3-goals-history">
         <CardHeader className="pb-3"><CardTitle className="text-base">{t("goals.history")}</CardTitle></CardHeader>
         <CardContent className="space-y-3">

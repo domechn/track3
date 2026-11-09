@@ -16,8 +16,6 @@ The 12 column grid begins at `(84,132)`, width 1328 px, gap 16 px; each column i
 | 2 | AI insights, Daily change, What moved, each 4 columns = 432 px | 413 px |
 | 3 | Top coins, 8 columns = 880 px; Sources, 4 columns = 432 px | 423 px |
 
-Row 2 cards stretch to the same 413 px design height at 1440 px. Their bodies distribute content to the bottom padding: Insights shows three summary lines and pins its actions below them; What moved keeps eight 36 px minimum rows; Daily change flexes its plot between 220 and 300 px instead of making the row taller. The source plot is 326 px tall; the app caps the plot at 300 px and reserves 16 px below it so its date and Down labels stay inside the card. Product data can exceed the source's fixed counts, so Insights adds `Show all`, What moved pages after eight rows, and Holdings pages when more than eight assets exist. Those controls are product additions to the approved sample.
-
 The hero has a four column type based KPI strip: `Total value` `$763,809.27` and `Last snapshot 31 Oct, 09:41`; `Latest` `+0.20%` `+$1,533.16 vs 30 Oct`; `7 days` `+3.53%` `+$26,010.84 vs 24 Oct`; `30 days` `+4.75%` `+$34,641.48 vs 1 Oct`. KPI labels are 12 px, regular; the total is 34 px/38 px, weight 600, with the source HTML money element beginning at y=173 px at 1440 px width; other KPI values are 22 px/28 px, weight 500. Hairline dividers separate them. Beneath is a blue, 2 px, 31 point October line chart with four faint gridlines, `700K` to `780K` ticks, and a `29 Oct: +$9,571, best day (ETH +$3,743)` annotation. The footer is separated by a hairline: `All-time high $763,809.27`, `reached 31 Oct, the latest snapshot`, `Latest is 0.00% below the high`.
 
 Holdings is a right aligned value table with 8 rows, in order BTC, USDT, ETH, SOL, BNB, USDC, AAPL, NVDA. Header `Asset`, `Amount`, `Value`, `7D`; the first row is `BTC 26.9%`, `3.2226`, `$205,737.58`, `+6.4%`; USDT is `182,446.74`, `$182,446.74` and `0.0%`; the last row is `NVDA 4.1%`, `220`, `$31,075.00`, `+1.7%`. Each row is 42 px with subtle top rule. Zero is grey; gain is green; loss is red.
@@ -38,41 +36,6 @@ The type face is Public Sans with tabular numbers. Tokens: `--ground #0d0d0e`, `
 - **Controls:** range and sort choices update stored snapshot selection without changing its format; Refresh retains source progress and retry behavior; Sync opens the existing sync status; the bell links to Goals & alerts; the rail links use existing routes. Hide values masks monetary data. Gain/loss colours follow the quote colour setting. Keyboard focus, names and roles remain available.
 
 ## Remaining differences
-
-**9 Nov 2026 layout audit:** overview 8.077% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
-
-At 1280 px with the expanded rail, the dense 16-source fixture places Insights in its own content-sized row. The next Daily change and What moved cards start after the 16 px grid gap. The source page uses its smaller fixed sample and therefore shows a different row height.
-
-At 1100–1399 px a short saved Insight uses its own content-height row, followed by the paired Daily change and What moved cards. The static source keeps three equal-height cards because its illustrative Insight is longer. The product shows the saved Insight text without padding it with invented analysis. The What moved ticker track fits complete symbols, and the Daily change direction label clears the large CNY axis tick.
-
-What moved keeps one shared zero axis across rows when a CNY value needs more width than another row's value. The remaining card position and content differences below come from the saved Insight and portfolio data.
-
-The 8 Nov dense-data dark capture at 1280 × 800 differed by **8.876%** from `core-overview.html` at RGB-sum threshold 60 before the final saved-insights fixture. At 1181–1399 px the collapsed rail keeps the source's side-by-side Hero and Holdings row. A wider rail stacks those cards so their values fit. Below 1181 px the Hero and Holdings use full rows. Insights uses a content-height row instead of leaving a blank slab, with Daily change and What moved paired beneath it. The source shows eight USD assets and illustrative values; the real-scale audit fixture has eleven CNY assets, sixteen sources and the resulting different chart. Its saved insight content is calculated from those fixture holdings. The source's sync stamp is also illustrative.
-
-UI42 uses the approved website-style neutral tile for asset and source marks. The older Overview page design renders those marks differently.
-
-The current dark 1440 × 900 saved-summary viewport differs from the
-`core-overview.html` source by **6.94%** at RGB-sum threshold 60.
-The source insight area begins at x=105, y=658 and is 390 × 296px;
-the app's saved-text area begins at x=105, y=654 and is 385 × 287px.
-The source has illustrative insight metrics absent from the persisted
-summary text, and it assumes a latest all-time high and configured sync.
-The app shows the actual earlier high and local sync state. The
-owner-required rail tile and offline font rendering remain visible.
-Captures and computed bounds are in `.local/tag-theme/desktop-overview-summary-*`.
-
-The earlier 8 Nov 2026 saved-summary review compares the 1440 × 900 app
-viewport with the matching area of the rendered `core-overview.html` source:
-**7.536%** differs at RGB-sum threshold 60. The app screenshot is
-`.local/tag-theme/desktop-overview-summary-app.png`; the source render is
-`/tmp/fidelity-desktop/design/overview-base-1440.png`. The saved summary
-has one footer Regenerate control beside Ask, where the source places Regenerate in the header. Its lines fill the card. The live
-total, summary metrics unavailable in persisted text, chart rendering,
-portfolio rank and sync data listed below explain the larger screen ratio.
-
-The 8 Nov 2026 Sync-open captures differ by **7.458%** at the RGB-sum threshold of 60 over the shared 1440 × 900 viewport. The source popover is 360 × 336 px at (1010, 55); the app keeps its real sync report and opens a scrollable diagnostics panel when Details is selected. The source page shows only the collapsed Details link, so the expanded phase and request rows and their scroll rail have no matching source pixels. The app's shared definition rows have a 32px pitch under the Details specification, while the source's five summary rows are 40px. The saved product data, chart and controls below also account for the page difference as described here.
-The shared rail's measured source differences, including its owner-required active tile, are recorded in [navigation.md](navigation.md).
-The layout audit gives a short Insights card its own row through 1399 px, with Daily change and What moved sharing the next row. At 1500 px and wider, an eight-row Top coins list also stacks above Sources. Wider card rows align within 1 px. Holdings, What moved, top assets and Sources page when their lists exceed the visible cap. The source image has fewer assets and sources and no paging controls; the older pixel ratios below predate these layouts.
 
 The 7 Nov 2026 UI27 captures compare the saved source page renders
 `/tmp/fidelity-desktop/design/overview-{base,sync}-1440.png` with
@@ -132,7 +95,7 @@ The unchanged product-data regions account for most changed pixels. Excluding th
 - A failed source retains a last-good timestamp and value, but the stored source-status normalizer only retains the generic timeout reason. The stale banner therefore says `Source timed out` rather than `Flex Query timed out`. The failed row's status copy is tighter and the retry chip has less space than the reference.
 - The rail uses the current text-free Track3 two-peak mark, while the reference shows a blue chart tile. Settings uses a cog rather than the reference's sun so it reads as navigation. Top controls use the app's existing icon set. Several pictograms, the active-rail edge and some pill/icon offsets differ from the reference. Small type raster, table text baselines and narrow chart strokes also differ; they are below the acceptance threshold.
 - The product's percentage and base-currency toggles occupy two 32 × 32 px targets at the top right of the Total value card, with 44 × 44 px targets on coarse pointers. The source hero has no equivalent toggles; retaining these working controls adds their visible icons and hover backgrounds.
-- The Sources card now says `Refresh all` and the primary `Refresh` control keeps its own accessible name. With fewer than three sources, the card pins `Manage sources` to its bottom; a single source row sits between the heading and that action so the unused space is balanced. The five-source reference has no extra action.
+- The Sources card now says `Refresh all` and the primary `Refresh` control keeps its own accessible name.
 - The footer includes `Show More`, which exposes the product's existing detailed Overview panels. The reference footer has only the sync stamp. The stamp reflects the real fake-service destination and device count.
 - The source's daily bars use a presentation-only series, while the app derives bars from persisted daily snapshot changes. The largest bars and some positions therefore differ. The app derives What moved from persisted asset changes too; bar lengths and the final dollar rounding differ. These panels keep the source's order and scales.
 - The page heights now match all eight source states. The 1024 and expanded states use the same responsive grid sequence as the source, with some extra text wrapping. The range calendar still uses the product's date-picker controls, while its position and selection band match the source. The hover tooltip and crosshair use the product's Chart.js interaction.

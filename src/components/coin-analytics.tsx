@@ -70,16 +70,15 @@ import {
   CommandList,
 } from "./ui/command";
 import { cn } from "@/lib/utils";
-import { PartialProfitHint } from "./profit-summary-hints";
 import { StaggerContainer, FadeUp } from "./motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import AssetLabel from "./common/asset-label";
-import AssetIcon from "./ui/asset-icon";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
   getAssetLogoKey,
   parseAssetTypeSearchParam,
+  resolveAssetLogoSrc,
   shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import {
@@ -925,7 +924,7 @@ const App = ({
       <div className="analyze-coin relative min-h-[400px]">
         <div className="coin-page-heading">
           <div className="coin-page-identity">
-            <AssetIcon kind={assetType === "stock" ? "stock" : "coin"} symbol={symbol} src={logo} size={32} decorative />
+            <img src={resolveAssetLogoSrc({ symbol, assetType }, logo)} alt="" />
             <div>
               <h1>{formatAssetLabel({ symbol, assetType })}</h1>
               <span>{assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")}</span>
@@ -994,6 +993,11 @@ const App = ({
                 </CardHeader>
                 <CardContent>
                   <div className="flex">
+                    <img
+                      className="inline-block w-[32px] h-[32px] mr-2 rounded-full py-[2px]"
+                      src={resolveAssetLogoSrc({ symbol, assetType }, logo)}
+                      alt={formatAssetLabel({ symbol, assetType })}
+                    />
                     <div className="w-[100%] h-[32px] overflow-hidden">
                       <Popover
                         open={coinSelectOpen}
@@ -1010,8 +1014,6 @@ const App = ({
                             <div className="min-w-0">
                               <AssetLabel
                                 asset={{ symbol, assetType }}
-                                src={logo}
-                                size={32}
                                 className="max-w-full"
                                 labelClassName="truncate"
                               />
@@ -1166,10 +1168,9 @@ const App = ({
                   </svg>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-1">
-                    <div className="min-w-0 text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis">{profitStr}</div>
-                    {partialProfit && <PartialProfitHint names={unknownCoins.map((coin) => coin.symbol)} affected={unknownCoins} period={symbol ?? ""} t={t}
-                      className="inline-flex min-h-11 min-w-11 items-center justify-center text-muted-foreground" />}
+                  <div className="text-xl font-semibold tracking-tight overflow-hidden whitespace-nowrap overflow-ellipsis"
+                    title={partialProfit ? `${t("profitSummary.partial").replace("{n}", String(unknownCoins.length))}: ${unknownCoins.map((coin) => coin.symbol).join(", ")}` : undefined}>
+                    {profitStr}
                   </div>
                   <div className="text-xs text-muted-foreground overflow-hidden whitespace-nowrap overflow-ellipsis flex space-x-1">
                     <div>{t("coin.profitRate")}</div>

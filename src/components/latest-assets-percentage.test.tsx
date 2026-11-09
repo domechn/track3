@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { ChartResizeContext } from "@/App";
 import LatestAssetsPercentage from "@/components/latest-assets-percentage";
@@ -48,24 +48,4 @@ it("shows all holdings as values and amounts in the overview table", async () =>
   await waitFor(() => expect(screen.getByRole("link", { name: /btc/i })).toHaveTextContent("$120.00"));
   expect(screen.getByRole("link", { name: /eth/i })).toHaveTextContent("$80.00");
   expect(screen.queryByRole("img", { name: /asset allocation chart/i })).not.toBeInTheDocument();
-});
-
-it("pages eleven holdings without clipping the last asset", async () => {
-  vi.mocked(queryLatestAssetsPercentage).mockReset().mockResolvedValue(
-    Array.from({ length: 11 }, (_, index) => ({
-      coin: `ASSET${index}`, assetType: "crypto", amount: 1, value: 100 - index,
-      percentage: 10 - index / 10, chartColor: "#000",
-    })),
-  );
-  render(<MemoryRouter><ChartResizeContext.Provider value={{ needResize: 0, setNeedResize: vi.fn() }}>
-    <LatestAssetsPercentage currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }}
-      dateRange={{ start: new Date("2024-01-01"), end: new Date("2024-01-02") }} holdings />
-  </ChartResizeContext.Provider></MemoryRouter>);
-  await waitFor(() => expect(document.querySelectorAll(".t3-holdings-row")).toHaveLength(7));
-  expect(screen.getByText("1–7 of 11")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Next" }));
-  expect(screen.getByText("8–11 of 11")).toBeInTheDocument();
-  expect(document.querySelectorAll(".t3-holdings-row")).toHaveLength(4);
-  expect(screen.queryByRole("link", { name: /asset6/i })).not.toBeInTheDocument();
-  expect(screen.getByRole("link", { name: /asset10/i })).toBeInTheDocument();
 });

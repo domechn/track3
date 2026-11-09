@@ -39,15 +39,13 @@ for (const state of ["full", "empty", "loading"] as const) {
     if (state === "full") {
       await expect(page.locator(".t3-fidelity-topbar .t3-date-trigger")).toHaveAttribute("aria-description", /Jul 1.*Oct 31, 2026/);
       expect((await page.locator(".fidelity-summary-pnl").boundingBox())!.y).toBe(137);
-      const sol = page.locator(".fidelity-attribution-row").filter({ has: page.locator(".t3-asset-label-name:text-is('SOL')") }).first();
+      const sol = page.locator(".fidelity-attribution-row").filter({ has: page.locator("b:text-is('SOL')") }).first();
       const solBars = sol.locator(".fidelity-attribution-track i");
       const zero = await sol.locator(".fidelity-attribution-track b").evaluate((node) => parseFloat((node as HTMLElement).style.left));
       const quantityLeft = await solBars.nth(1).evaluate((node) => parseFloat((node as HTMLElement).style.left));
       expect(quantityLeft).toBeCloseTo(zero, 5);
       await expect(page.locator(".fidelity-attribution-axis")).not.toContainText("−$50");
       await expect(page.locator(".fidelity-summary-pnl strong.big")).toHaveText("+$188,809.27");
-      await expect(page.locator(".fidelity-summary-pnl-kpis")).toContainText("+32.84%");
-      await expect(page.locator(".fidelity-summary-pnl-kpis")).toContainText("$575,000");
       const pnlHint = page.locator(".fidelity-period-card").first()
         .getByRole("button", { name: "How P&L % is calculated" });
       await pnlHint.click();
@@ -95,9 +93,8 @@ for (const state of ["full", "empty", "loading"] as const) {
       await page.locator(".t3-fidelity-ranges").getByRole("button", { name: "7D" }).click();
       await expect(page.locator(".t3-fidelity-ranges").getByRole("button", { name: "7D" })).toHaveAttribute("aria-pressed", "true");
       await expect(page.locator(".t3-fidelity-ranges").getByRole("button", { name: "1D" })).toHaveAttribute("aria-pressed", "false");
-      await expect(page.locator(".fidelity-summary-pnl-kpis > div").first()).toContainText("Net P&L (7D)");
+      await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false");
       await expect(page.locator(".fidelity-summary-chart line[data-direction]").first()).toBeVisible();
-      await expect(page.locator(".fidelity-summary-chart-empty")).toHaveCount(0);
       await page.locator(".t3-fidelity-ranges").getByRole("button", { name: "All" }).click();
       await expect(page.locator(".fidelity-summary-pnl strong.big")).toHaveText("+$188,809.27");
     }
@@ -236,16 +233,16 @@ test("Summary KPI values align with the net value and selected rail has a visibl
     const rule = getComputedStyle(node, "::before");
     const box = node.getBoundingClientRect();
     return { left: Math.round(parseFloat(rule.left) + box.left), width: rule.width };
-  })).toEqual({ left: 0, width: "3px" });
+  })).toEqual({ left: 0, width: "2px" });
 });
 
 test("Summary leaders and attribution footer follow the source spacing", async ({ page }) => {
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".summary-top-heading").first().boundingBox())!.y).toBeCloseTo(1146, 0);
-  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1610, 0);
-  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1628, 0);
+  expect((await page.locator(".summary-top-heading").first().boundingBox())!.y).toBeCloseTo(1145, 0);
+  expect((await page.locator(".fidelity-attribution-axis > span:nth-child(2) > span").last().boundingBox())!.y).toBeCloseTo(1609, 0);
+  expect((await page.locator(".fidelity-attribution-row.total").boundingBox())!.y).toBeCloseTo(1627, 0);
   const totalRange = page.locator(".fidelity-attribution-row.total > span:nth-child(2)");
   await expect(totalRange).toHaveText("$310,000 → $763,809");
   const arrow = await totalRange.evaluate((node) => {
@@ -313,17 +310,14 @@ test("Summary end label, rail separators and Refresh control match the source", 
     const style = getComputedStyle(node);
     return [style.fontWeight, style.fill];
   })).toEqual(["600", "rgb(95, 196, 155)"]);
-  const chart = (await page.locator(".fidelity-summary-chart").boundingBox())!;
-  const labelBox = (await label.boundingBox())!;
-  expect(chart.x + chart.width - labelBox.x - labelBox.width).toBeGreaterThanOrEqual(7);
-  expect(chart.x + chart.width - labelBox.x - labelBox.width).toBeLessThanOrEqual(10);
+  expect((await label.boundingBox())!.x).toBeCloseTo(976.4, 0);
   const separators = await page.locator(".t3-fidelity-nav-group").evaluateAll((nodes) =>
     nodes.map((node) => {
       const box = node.getBoundingClientRect();
-      const style = getComputedStyle(node);
-      return [box.x, box.width, style.borderTopWidth, style.borderTopColor];
+      const style = getComputedStyle(node, "::before");
+      return [box.x + parseFloat(style.left), style.width, style.backgroundColor];
     }));
-  expect(separators).toEqual([[8, 40, "1px", "rgb(34, 34, 36)"], [8, 40, "1px", "rgb(34, 34, 36)"]]);
+  expect(separators).toEqual([[16, "23px", "rgb(34, 34, 36)"], [16, "23px", "rgb(34, 34, 36)"]]);
   const refresh = page.locator(".t3-fidelity-topbar .t3-refresh-button");
   expect(await refresh.evaluate((node) => {
     const button = getComputedStyle(node);
@@ -348,6 +342,7 @@ test("two snapshots in one month draw a profit line", async ({ page }) => {
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
   const profitLine = page.locator(".fidelity-summary-chart line[data-direction]");
   expect(await profitLine.count()).toBeGreaterThan(0);
+  await expect(profitLine.first()).toHaveAttribute("data-direction", "gain");
   await expect(profitLine.first()).toHaveAttribute("stroke", "hsl(var(--gain))");
   expect(await profitLine.evaluateAll((lines) => lines.every((line) =>
     Number(line.getAttribute("x2")) > Number(line.getAttribute("x1")) &&
@@ -376,7 +371,7 @@ test("Summary KPI, ATH rule and chart axes use the source page coordinates", asy
     gridColor: "rgb(38, 38, 41)",
   });
   expect(metrics.gridX).toBeCloseTo(149, 0);
-  expect(metrics.gridY).toBeCloseTo(509, 0);
+  expect(metrics.gridY).toBeCloseTo(499, 0);
 });
 
 test("Summary range starts at the source heading position", async ({ page }) => {
@@ -396,10 +391,10 @@ test("Summary month cards and calculation hint follow the source row spacing", a
   const months = (await page.locator(".fidelity-month-grid").boundingBox())!;
   const hint = (await page.locator(".fidelity-period-card").first()
     .getByRole("button", { name: "How P&L % is calculated" }).boundingBox())!;
-  expect(card.y).toBe(573);
-  expect(months.y).toBe(664);
+  expect(card.y).toBe(572);
+  expect(months.y).toBe(663);
   expect(months.height).toBe(346);
-  expect(hint.y).toBe(622);
+  expect(hint.y).toBe(621);
 });
 
 test("Summary card labels and year amounts use tabular digits", async ({ page }) => {
@@ -421,18 +416,18 @@ test("Goals unread dot follows the source rail geometry", async ({ page }) => {
     const box = node.getBoundingClientRect();
     const style = getComputedStyle(node);
     return { x: box.x, y: box.y, width: box.width, height: box.height, border: style.borderTopWidth, color: style.backgroundColor };
-  })).toEqual({ x: 34, y: 409, width: 7, height: 7, border: "2px", color: "rgb(238, 106, 130)" });
+  })).toEqual({ x: 31, y: 360, width: 7, height: 7, border: "2px", color: "rgb(238, 106, 130)" });
 });
 
 test("Summary attribution header and leaders footnote match source vertical rhythm", async ({ page }) => {
   await installTauriBridge(page, { fidelityDesktop: "summary" });
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
-  expect((await page.locator(".fidelity-attribution-row.head").boundingBox())!.y).toBe(1160);
+  expect((await page.locator(".fidelity-attribution-row.head").boundingBox())!.y).toBe(1159);
   expect(await page.locator(".fidelity-attribution-row.head > span").first().evaluate((node) => {
     const range = document.createRange();
     range.selectNodeContents(node);
     return range.getBoundingClientRect().y;
-  })).toBe(1167);
+  })).toBe(1166);
   expect(await page.locator(".fidelity-leaders .fidelity-caption").evaluate((node) => getComputedStyle(node).lineHeight)).toBe("18px");
 });

@@ -348,7 +348,7 @@ export default function GoalsAlerts() {
                       </div>
                     </div>
                     <div className="ios-d3-goal-rule-actions flex items-center gap-2">
-                      {!isIOS() && <span className="t3-tag" data-tone={rule.enabled ? "positive" : "neutral"}>
+                      {!isIOS() && <span className={`rounded-full px-2 py-0.5 text-[11px] ${rule.enabled ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
                         {t(rule.enabled ? "goals.enabled" : "finance.paused")}
                       </span>}
                       <label className="flex items-center gap-1 text-xs">

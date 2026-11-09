@@ -95,7 +95,7 @@ test("one configured source with no refresh shows the first snapshot state", asy
   expect((await page.locator(".fd-first-run-banner > div").boundingBox())?.x).toBe(61);
   await expect(page.locator(".fd-first-run-banner")).toHaveCSS("border-color", "rgb(31, 58, 92)");
   await expect(page.getByRole("button", { name: "Refresh now" })).toBeVisible();
-  await expect(page.locator(".fd-first-run-source .t3-asset-icon[data-kind='exchange'] img")).toHaveCount(1);
+  await expect(page.locator(".fd-first-run-source small svg")).toHaveCount(1);
   await expect(page.locator(".mobile-tab-bar")).toContainText("2");
   expect((await page.getByRole("heading", { name: "Overview" }).boundingBox())!.y).toBeLessThan(50);
   writeFileSync("/tmp/fidelity/flows/firstrun-one-geometry.json", JSON.stringify(await page.evaluate(() =>
@@ -181,8 +181,7 @@ test("partial snapshot excludes the failed source and keeps changes unknown", as
   await expect(page.locator(".fd-partial-table-head")).toHaveText("AssetValue7D");
   await expect(page.locator(".fd-partial-left-row").first()).toContainText("ETH");
   await expect(page.locator(".fd-partial-left-summary").first()).toContainText("Total excluding OKX");
-  await expect(page.locator(".fd-partial-source").filter({ hasText: "Ledger cold wallet" })
-    .locator(".t3-asset-icon[data-kind='wallet'] img")).toHaveCount(1);
+  await expect(page.locator(".fd-partial-source [aria-label='Ledger cold wallet wallet']")).toHaveText("Lg");
   expect((await page.locator(".fd-partial-banner > div").boundingBox())?.x).toBe(61);
   await expect(page.locator(".fd-partial-banner")).toHaveCSS("border-color", "rgb(74, 60, 24)");
   expect((await page.locator(".fd-partial-head .fd-range").boundingBox())?.width).toBe(260);
@@ -282,7 +281,7 @@ test("phone toast stack shows the stored snapshot and refresh outcomes", async (
   await page.screenshot({ path: "/tmp/fidelity/flows/toasts-ok-phone.png" });
   const okBox = await page.locator(".mobile-toast").boundingBox();
   expect(okBox && [okBox.x, okBox.y, okBox.width, okBox.height].map(Math.round)).toEqual([16, 710, 358, 62]);
-  await expect(page.locator(".mobile-toast")).toHaveCSS("border-left-color", "rgb(95, 196, 155)"); // Shared --positive token RGB.
+  await expect(page.locator(".mobile-toast")).toHaveCSS("border-left-color", "rgb(95, 195, 156)");
   await captureLong(page, "/tmp/fidelity/flows/toasts-ok-phone-long.png");
   await page.evaluate(async () => {
     const reactPath = "/node_modules/.vite/deps/react.js";
@@ -323,7 +322,7 @@ test("phone toast stack shows the stored snapshot and refresh outcomes", async (
   for (const [label, width] of [["Retry", 42], ["Details", 50], ["Undo", 40]] as const) {
     expect((await page.getByRole("button", { name: label }).boundingBox())?.width).toBeGreaterThanOrEqual(width);
   }
-  await expect(page.getByRole("button", { name: "Details" })).toHaveCSS("color", "rgb(180, 182, 187)"); // Shared --muted-foreground token RGB.
+  await expect(page.getByRole("button", { name: "Details" })).toHaveCSS("color", "rgb(180, 182, 188)");
   await captureLong(page, "/tmp/fidelity/flows/toasts-stack-phone-long.png");
   writeFileSync("/tmp/fidelity/flows/toasts-stack-geometry.json", JSON.stringify(await page.evaluate(() =>
     Array.from(document.querySelectorAll(".ios-d3-toast-viewport, .mobile-toast"), (element) => ({
@@ -427,7 +426,7 @@ test("frontend render failure shows a recoverable phone error with copyable deta
     const Throws = () => { throw new TypeError("Cannot read properties of undefined (reading 'value')"); };
     ReactDOM.default.createRoot(host).render(React.default.createElement(AppErrorBoundary, null, React.default.createElement(Throws)));
   });
-  await expect(page.getByRole("heading", { name: "Something went wrong" })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("heading", { name: "Something went wrong" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Copy details" })).toBeVisible();
   await page.screenshot({ path: "/tmp/fidelity/flows/startup-error-phone.png" });
 });
@@ -442,7 +441,6 @@ test("iOS key recovery notice points to existing settings recovery", async ({ pa
 });
 
 test("real Overview exposes idle, pull, and source progress on phone", async ({ page }) => {
-  test.setTimeout(120_000);
   await page.clock.setFixedTime(new Date("2026-10-31T09:42:00Z"));
   await page.addInitScript(() => {
     localStorage.setItem("track3-ui-theme", "dark");
@@ -494,24 +492,19 @@ test("real Overview exposes idle, pull, and source progress on phone", async ({ 
   });
   await page.locator(".fd-overview-refresh, .fd-partial-refresh").click();
   const sourceSheet = page.getByRole("alertdialog", { name: "Source status" });
-  await expect(sourceSheet).toHaveCount(0);
-  await page.getByRole("button", { name: "Source status" }).click();
   await expect(sourceSheet).toBeVisible();
   await expect(sourceSheet).toContainText("Refreshing sources");
-  await expect(sourceSheet.getByRole("progressbar")).toHaveCount(0);
+  await expect(sourceSheet.getByRole("progressbar", { name: "Refreshing portfolio" })).toBeVisible();
   await expect.poll(() => sourceSheet.locator("[data-source-status-row]").count()).toBeGreaterThanOrEqual(5);
   await expect(sourceSheet.locator("[data-source-status-row]")).toHaveCount(5);
   await expect.poll(() => sourceSheet.locator("[data-source-status-row]").evaluateAll((rows) =>
     rows.slice(0, 5).map((row) => row.getAttribute("aria-label"))))
     .toEqual(["Binance", "OKX", "Ledger cold wallet", "0x4f…a91c", "Interactive Brokers"]);
-  await expect(sourceSheet.locator('[data-source-status-row][aria-label="Ledger cold wallet"] .t3-asset-icon[data-kind="wallet"] img')).toHaveCount(1);
-  await expect(sourceSheet.locator('[data-source-status-row][aria-label="0x4f…a91c"] .t3-asset-icon[data-kind="wallet"] img')).toHaveCount(1);
-
-  await expect(sourceSheet.getByRole("group", { name: "Binance" })).toContainText("Refreshing");
-  await expect(sourceSheet.getByRole("group", { name: "OKX" })).toContainText("Refreshing");
+  await expect(sourceSheet.locator('[data-source-status-row][aria-label="Ledger cold wallet"] > span')).toHaveText("Lg");
+  await expect(sourceSheet.locator('[data-source-status-row][aria-label="0x4f…a91c"] > span')).toHaveText("0x");
   await expect(sourceSheet).toContainText("0 of 5 finished · 0 failed");
   await expect(sourceSheet.locator(".fd-refresh-progress-row small")).toHaveText([
-    /Refreshing|Waiting/, /Refreshing|Waiting/, /Refreshing|Waiting/, /Refreshing|Waiting/, /Refreshing|Waiting/,
+    /Reading balances/, /Reading balances/, /Reading balances/, /Reading balances/, /Reading balances/,
   ]);
   await page.screenshot({ path: "/tmp/fidelity/flows/refresh-progress-phone.png" });
   await captureLong(page, "/tmp/fidelity/flows/refresh-progress-phone-long.png");

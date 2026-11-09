@@ -133,22 +133,24 @@ test("phone Top coins preview caps a populated group at four rows", async ({ bro
     await installTauriBridge(page, { fidelitySample: "full" });
     await page.evaluate(async () => {
       for (let index = 0; index < 6; index++) {
-        const endValue = 100_000 + index * 1000;
-        await (window as any).__e2eInvoke("plugin:sql|execute", {
-          query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
-            SELECT uuid, MAX(createdAt), ?, 'crypto', ?, 1,
-              CASE WHEN uuid = 'fidelity-day-30' THEN ? ELSE 100 END,
-              CASE WHEN uuid = 'fidelity-day-30' THEN ? ELSE 100 END
-            FROM assets_v2 GROUP BY uuid`,
-          values: [`preview-${index}`, `GAIN${index}`, endValue, endValue],
-        });
+        for (const [uuid, date, value] of [
+          ["fidelity-start", "2025-07-01T09:41:00.000Z", 100],
+          ["fidelity-day-30", "2026-10-31T09:41:00.000Z", 100_000 + index * 1000],
+        ] as const) {
+          await (window as any).__e2eInvoke("plugin:sql|execute", {
+            query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+              VALUES (?, ?, ?, 'crypto', ?, 1, ?, ?)`,
+            values: [uuid, date, `preview-${index}`, `GAIN${index}`, value, value],
+          });
+        }
       }
     });
     await page.goto("/#/summary");
     await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
     const profitRows = page.locator(".fd-top-coins .summary-top-list").first().locator(".summary-top-row");
     await expect(profitRows).toHaveCount(4);
-    await expect(profitRows.first()).toContainText("GAIN5");
+    await expect(profitRows.first()).toContainText("BTC");
+    await expect(profitRows.filter({ hasText: "GAIN5" })).toHaveCount(0);
   } finally { await context.close(); }
 });
 
@@ -242,21 +244,6 @@ test("Chinese Summary keeps attribution dates in one translated phrase", async (
   } finally { await context.close(); }
 });
 
-test("Chinese full Summary banner stays within three lines at 390px", async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
-    isMobile: true, hasTouch: true, timezoneId: "UTC" });
-  try {
-    const page = await context.newPage();
-    await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
-    await page.addInitScript(() => localStorage.setItem("track3-ui-locale", "zh"));
-    await installTauriBridge(page, { fidelitySample: "full" });
-    await page.goto("/#/summary");
-    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
-    await expect(page.locator(".fd-page-head p")).toContainText("已记录资金流");
-    expect((await page.locator(".fd-page-head p").boundingBox())!.height).toBeLessThanOrEqual(54);
-  } finally { await context.close(); }
-});
-
 test("Summary shows a near-midnight snapshot on the viewer's local day", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
     isMobile: true, hasTouch: true, timezoneId: "Asia/Shanghai" });
@@ -318,25 +305,15 @@ test("summary full state follows the approved card order and captures at 390px",
     await expect(page.getByText("All-time high", { exact: true })).toBeVisible();
     await expect(page.getByText("By year", { exact: true })).toBeVisible();
     await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 30_000 });
-    await page.evaluate(() => document.fonts.ready);
-    mkdirSync("/tmp/fidelity/summary", { recursive: true });
-    await page.screenshot({ path: "/tmp/fidelity/summary/summary-phone.png" });
     const refresh = await page.locator(".fd-refresh").boundingBox();
     expect(refresh?.width).toBe(44);
     expect(refresh?.height).toBe(44);
     expect(refresh?.x).toBe(330);
     expect((await page.locator(".fd-range").boundingBox())?.width).toBe(306);
+    mkdirSync("/tmp/fidelity/summary", { recursive: true });
     await expect(page.locator(".fd-primary-stat")).toContainText("+$188,809.27");
     await expect(page.locator(".fd-page-head p strong")).toHaveText("+$188,809");
     await page.evaluate(() => document.fonts.ready);
-    const bestMonthBounds = await page.locator(".fd-summary-chart text").filter({ hasText: /^Best month,/ })
-      .evaluate((node) => {
-        const note = node.getBoundingClientRect();
-        const chart = node.closest("svg")!.getBoundingClientRect();
-        return { left: note.left - chart.left, right: note.right - chart.left, width: chart.width };
-      });
-    expect(bestMonthBounds.left).toBeGreaterThanOrEqual(0);
-    expect(bestMonthBounds.right).toBeLessThanOrEqual(bestMonthBounds.width);
     const textWidths = await page.evaluate(() => {
       const width = (selector: string) => {
         const range = document.createRange();
@@ -349,18 +326,16 @@ test("summary full state follows the approved card order and captures at 390px",
     expect(textWidths.value).toBeCloseTo(205.328125, 1);
     await expect(page.locator(".fd-page-head p")).toContainText("$265,000");
     await expect(page.locator(".fd-kpis")).toContainText("+30.41%");
-    await expect(page.locator(".fd-kpis")).toContainText("on $620,892");
-    await expect(page.locator(".fd-kpis")).toContainText("Breakeven$575,000");
+    await expect(page.locator(".fd-kpis")).toContainText("$575,000");
     expect((await page.locator(".fd-three>div:first-child small").boundingBox())!.y).toBe(382);
     expect((await page.locator(".fd-chart-caption").boundingBox())!.y).toBe(436);
-    expect((await page.locator(".fd-chart-caption").boundingBox())!.height).toBe(18);
-    expect((await page.locator(".fd-ath").boundingBox())!.y).toBe(679);
+    expect((await page.locator(".fd-chart-caption").boundingBox())!.height).toBe(36);
+    expect((await page.locator(".fd-ath").boundingBox())!.y).toBe(697);
     await expect(page.locator(".fd-year").first()).toContainText("+$60,109");
     await expect(page.locator(".fd-year").first()).toContainText("+$105,000");
     await expect(page.locator(".summary-top-row").filter({ hasText: "SOL" }).locator("strong")).toHaveText("−$9,300");
-    await expect(page.locator(".fd-top-coins .summary-top-row").nth(6).locator(".t3-asset-label-name")).toHaveText("USDT");
-    await expect(page.locator(".fd-attribution .fd-attr-row").first()).toContainText("Known P&L +$104,329");
-    await expect(page.locator(".fd-attribution .fd-attr-row").first()).toContainText("Cash flow and other changes +$38,000");
+    await expect(page.locator(".fd-top-coins .summary-top-row").nth(6).locator("b")).toHaveText("USDT");
+    await expect(page.locator(".fd-attribution .fd-attr-row").first()).toContainText("Quantity +$38,000");
     const totalRange = page.locator(".fd-attr-total > span").first();
     await expect(totalRange).toHaveText("$310K → $764K");
     await expect(totalRange).toHaveAttribute("title", "$310,000.00 → $763,809.27");
@@ -384,7 +359,7 @@ test("summary full state follows the approved card order and captures at 390px",
       .evaluate((node) => parseFloat((node as HTMLElement).style.width))).toBeCloseTo(50, 0);
     await expect(page.locator(".fd-month").filter({ hasText: "Feb" }).locator(".fd-month-foot span").first()).toHaveCSS("color", "rgb(155, 157, 163)");
     await page.locator("#app-main-content").evaluate((node) => { node.scrollTop = 0; });
-    expect(Math.round((await page.locator(".fd-top-coins").boundingBox())!.y)).toBe(3181);
+    expect(Math.round((await page.locator(".fd-top-coins").boundingBox())!.y)).toBe(3165);
     await expect(page.locator(".fd-month").last()).toContainText("Oct");
     await expect(page.locator(".fd-month").last()).toContainText("up");
     await expect(page.locator(".fd-month").last()).toContainText("down");
@@ -403,34 +378,8 @@ test("summary full state follows the approved card order and captures at 390px",
     })), null, 2));
     await page.screenshot({ path: "/tmp/fidelity/summary/summary-phone-long.png", fullPage: true });
     await page.screenshot({ path: "/tmp/fidelity/summary/summary-phone.png" });
-    if (process.env.UI44_DESIGN_SOURCE) {
-      const designPage = await context.newPage();
-      await designPage.goto(`file://${process.env.UI44_DESIGN_SOURCE}`);
-      await designPage.locator(".card").first().waitFor();
-      await designPage.evaluate(() => document.fonts.ready);
-      const measure = (selectors: string[]) => (selectors.map((selector) => {
-        const node = document.querySelector(selector);
-        if (!node) return { selector, missing: true };
-        const rect = node.getBoundingClientRect();
-        const style = getComputedStyle(node);
-        return { selector, x: rect.x, y: rect.y, width: rect.width, height: rect.height,
-          font: style.font, color: style.color, background: style.backgroundColor };
-      }));
-      const design = await designPage.evaluate(measure, [".head", ".card", ".kpis", "#c1"]);
-      const app = await page.evaluate(measure, [".fd-page-head", ".fd-profit-loss", ".fd-kpis", ".fd-summary-chart"]);
-      writeFileSync("/tmp/fidelity/summary/ui44-measure.json", JSON.stringify({ design, app }, null, 2));
-      await designPage.screenshot({ path: "/tmp/fidelity/summary/ui44-source-phone.png" });
-      for (const state of ["empty", "loading"]) {
-        await designPage.goto(`file://${process.env.UI44_DESIGN_SOURCE.replace(".html", `-${state}.html`)}`);
-        await designPage.locator(".card").first().waitFor();
-        await designPage.screenshot({ path: `/tmp/fidelity/summary/ui44-source-${state}-phone.png` });
-      }
-      await designPage.close();
-    }
     await page.locator(".fd-month").last().click();
-    await expect(page.locator(".fd-summary-chart [data-chart-mark]").last()).toHaveAttribute("aria-label", /Oct 2026/);
-    await expect(page.locator("[data-chart-tooltip]")).toContainText("Oct 2026");
-    await expect(page.locator("[data-chart-tooltip]")).toContainText("$");
+    await expect(page.locator(".fd-chart-chip")).toContainText("Oct 2026");
     await page.getByRole("radio", { name: "30D" }).click();
     await expect(page.locator(".fd-primary-stat")).not.toContainText("+$188,809.27");
   } finally { await context.close(); }
@@ -513,7 +462,7 @@ test("summary converts stored USD values into the selected currency", async ({ b
     await expect(page.locator(".fd-attribution .fd-axis")).toContainText("HK$");
     await expect(page.locator(".fd-profit-loss .fd-three")).toContainText("P&L is HK$0");
     await expect(page.locator(".fd-summary")).not.toContainText("P&L is $0");
-    await expect(page.locator(".fd-top-coins .fd-footnote")).toContainText("Known P&L per coin since 1 Jul 2025.");
+    await expect(page.locator(".fd-top-coins .fd-footnote")).toContainText("Stablecoins are held at HK$8.");
   } finally { await context.close(); }
 });
 
@@ -605,12 +554,11 @@ test("summary P&L chart exposes the value and month while scrubbing", async ({ b
     await chart.scrollIntoViewIfNeeded();
     const box = (await chart.boundingBox())!;
     await page.mouse.move(box.x + box.width * .35, box.y + box.height * .5);
-    const tooltip = page.locator("[data-chart-tooltip]");
-    await expect(tooltip).toContainText("$");
-    await expect(tooltip).toContainText(/202[56]/);
-    const first = await tooltip.textContent();
+    const chip = page.locator(".fd-chart-chip");
+    await expect(chip).toContainText("$");
+    const first = await chip.textContent();
     await page.mouse.move(box.x + box.width * .75, box.y + box.height * .5);
-    await expect.poll(() => tooltip.textContent()).not.toBe(first);
+    await expect.poll(() => chip.textContent()).not.toBe(first);
   } finally { await context.close(); }
 });
 

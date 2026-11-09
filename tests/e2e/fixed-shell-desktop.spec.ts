@@ -150,15 +150,12 @@ for (const route of ["summary", "history", "cost-basis"]) {
     const main = page.locator("#app-main-content");
     await expect(main).toBeVisible();
     await expect(page.getByRole("heading", { name: route === "cost-basis" ? "Cost basis" : route === "history" ? "History" : "Summary" }).first()).toBeVisible();
-    const scroll = route === "history" ? page.locator(".fidelity-history-list-scroll") : main;
-    await expect.poll(() => scroll.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
-    if (route === "history") expect(await main.evaluate((node) => node.scrollTop)).toBe(0);
+    await expect.poll(() => main.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
     const railItem = page.locator("aside a[href='#/settings']");
     const beforeRail = await railItem.boundingBox();
     const beforeHeader = await main.evaluate((node) => node.previousElementSibling?.getBoundingClientRect().toJSON());
-    await scroll.evaluate((node) => { node.scrollTop = node.scrollHeight; });
-    expect(await scroll.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
-    if (route === "history") expect(await main.evaluate((node) => node.scrollTop)).toBe(0);
+    await main.evaluate((node) => { node.scrollTop = node.scrollHeight; });
+    expect(await main.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
     expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBeLessThanOrEqual(720);
     expect(await railItem.boundingBox()).toEqual(beforeRail);
     expect(await main.evaluate((node) => node.previousElementSibling?.getBoundingClientRect().toJSON())).toEqual(beforeHeader);

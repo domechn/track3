@@ -66,16 +66,6 @@ it("shows realized totals and data gaps from the loaded report", async () => {
   expect(totals.children[1]).toHaveTextContent("Cost of sold lots$100.00");
 });
 
-it("keeps the asset chart in the Tab order after focusing a holding period", async () => {
-  render(<CostBasisPage />);
-  await screen.findAllByText("BTC");
-  const holdingMarks = document.querySelectorAll<HTMLElement>(".fidelity-cost-holding [data-chart-mark]");
-  const assetMark = document.querySelector<HTMLElement>(".fidelity-cost-chart [data-chart-mark]")!;
-  expect(holdingMarks).toHaveLength(2);
-  holdingMarks[1].focus();
-  expect(assetMark).toHaveAttribute("tabindex", "0");
-});
-
 it("shows a load error instead of a report without current holdings prices", async () => {
   vi.mocked(ASSET_HANDLER.listAssets).mockRejectedValueOnce(new Error("holdings unavailable"));
   render(<><CostBasisPage /><Toaster /></>);
@@ -302,17 +292,6 @@ it("keeps report amounts in USD when another display currency is selected", asyn
   expect(document.querySelector(".fidelity-cost-kpis")).toHaveTextContent("$100.00");
   expect(document.querySelector(".fidelity-cost-kpis")).not.toHaveTextContent("€");
   expect(document.querySelector(".fidelity-cost-chart .fidelity-card-head")).toHaveTextContent("USD");
-});
-
-it("shows the exact realized gain when a cost basis bar is hovered", async () => {
-  vi.mocked(buildCostBasisViewReport).mockResolvedValue({
-    ...report, disposals: [{ ...report.disposals[0], proceeds: 1991.2, gainLoss: 1891.2 }],
-    assets: [{ ...report.assets[0], proceeds: 1991.2, gainLoss: 1891.2 }],
-  } as never);
-  render(<CostBasisPage />);
-  const chart = (await screen.findByRole("heading", { name: "Realized P&L by asset" }, { timeout: 10_000 })).closest("section")!;
-  fireEvent.pointerEnter(chart.querySelector(".fidelity-cost-chart-track")!);
-  expect(screen.getByRole("tooltip")).toHaveTextContent("+$1,891.20");
 });
 
 it("lets holding days be cleared while editing and waits before reloading", async () => {

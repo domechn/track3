@@ -9,6 +9,12 @@ const ids = [
   "552f2f3a1234567890abcdef12c483e",
 ];
 
+it("keeps a unique legacy status joined by label when it has no identity hint", () => {
+  const source = { id: "portfolio-id", label: "OKX" };
+  const status = { sourceId: "legacy-id", label: "OKX", status: "failed" as const };
+  expect(matchSourceStatus(source, {}, [source], [status])).toBe(status);
+});
+
 it("matches an unaliased address by provider and masked hint despite different ids and labels", () => {
   const sources = ids.map((id, index) => ({ id, label: `Wallet ${index + 1}` }));
   const identities = {

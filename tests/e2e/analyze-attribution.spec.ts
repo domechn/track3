@@ -7,8 +7,8 @@ test("Summary presents attribution from existing snapshot data", async ({ page }
   await page.goto("/#/summary");
   await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
   const attribution = page.getByRole("table", { name: "Profit attribution" });
-  await expect(attribution.getByRole("columnheader", { name: "Known P&L", exact: true })).toBeVisible();
-  await expect(attribution.getByRole("columnheader", { name: "Recorded cash flow", exact: true })).toBeVisible();
+  await expect(attribution.getByRole("columnheader", { name: "Market", exact: true })).toBeVisible();
+  await expect(attribution.getByRole("columnheader", { name: "Quantity", exact: true })).toBeVisible();
   await expect(attribution.getByRole("rowheader", { name: "BTC" })).toBeVisible();
   await expect(attribution.getByRole("row", { name: /BTC/ }).getByRole("cell")).toHaveCount(5);
   await expect(attribution.getByRole("rowheader", { name: "Total" })).toBeVisible();

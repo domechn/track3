@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { CostBasisPanels, costBasisDisplayRows } from "./cost-basis-panels";
 import type { CostBasisReport } from "@/middlelayers/cost-basis-report";
 import en from "@/i18n/locales/en.json";
@@ -60,8 +60,6 @@ it("keeps asset identities distinct and colors bars and text for red-up preferen
   expect(rows[0].lastElementChild).toHaveClass("text-gain");
   expect(rows[1].querySelector(".cost-dashboard-bar > span")).toHaveClass("bg-positive");
   expect(rows[1].lastElementChild).toHaveClass("text-loss");
-  fireEvent.pointerEnter(rows[0], { pointerType: "mouse" });
-  expect(screen.getByRole("tooltip")).toHaveTextContent("+$20.00");
 });
 
 it("labels the sold-lot basis separately from bought-side average price", () => {

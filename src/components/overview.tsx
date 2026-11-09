@@ -101,14 +101,14 @@ const App = ({
       <div className="relative min-h-[400px]" aria-busy={pageLoading}>
         <div className="t3-overview-heading">
           <h1>{t("overview.h1")}</h1>
-          <p>{refreshRunning ? t("refresh.fidelity.progressHeadingNoCount")
+          <p>{refreshRunning ? t("refresh.fidelity.progressHeading").replace("{total}", String(statuses.length))
             : weekBased && weekValueAt >= 0 && weekTotal > 0 ? <>
             {summary.slice(0, weekValueAt)}<b>{weekValue}</b>{summary.slice(weekValueAt + weekValue.length)}
           </> : summary}</p>
         </div>
         {partialView && <PartialOverview view={partialView} statuses={statuses} currency={currency} bannerOnly />}
         <Collapsible open={isShowMore} onOpenChange={setIsShowMore}>
-          <StaggerContainer className={`t3-overview-grid${coins.length <= 2 ? " t3-overview-small" : ""}`}>
+          <StaggerContainer className="t3-overview-grid">
               <FadeUp className="t3-grid-hero">
                 <TotalValue
                   currency={currency}

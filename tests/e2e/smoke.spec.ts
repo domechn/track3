@@ -21,20 +21,11 @@ test("connection test uses a fake S3 bucket", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await syncControl.click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toBeVisible();
-  await expect.poll(async () => {
-    const box = await dialog.boundingBox();
-    return box !== null && Math.abs(box.width - 320) <= 1 &&
-      Math.abs(box.y + box.height - 640) <= 1;
-  }).toBe(true);
+  await expect.poll(async () => (await dialog.boundingBox())?.x).toBeGreaterThanOrEqual(8);
   const popover = await dialog.boundingBox();
   expect(popover).not.toBeNull();
-  expect(popover!.x).toBeGreaterThanOrEqual(-1);
-  expect(popover!.x + popover!.width).toBeLessThanOrEqual(321);
-  expect(popover!.y).toBeGreaterThanOrEqual(-1);
-  expect(Math.abs(popover!.x)).toBeLessThanOrEqual(1);
-  expect(Math.abs(popover!.width - 320)).toBeLessThanOrEqual(1);
-  expect(Math.abs(popover!.y + popover!.height - 640)).toBeLessThanOrEqual(1);
+  expect(popover!.x).toBeGreaterThanOrEqual(8);
+  expect(popover!.x + popover!.width).toBeLessThanOrEqual(312);
 });
 
 test("a second device pulls history from the first device", async ({ browser }) => {

@@ -30,7 +30,6 @@ describe("desktop portfolio data labels", () => {
   it("uses the user's currency and keeps small prices visible on axes", () => {
     expect(compactMoney(3000, "€")).toBe("€3K");
     expect(compactMoney(0.00001234, "€")).toBe("€0.0000123");
-    expect(compactMoney(182200, "€", 4)).toBe("€182.2K");
   });
 
   it("uses the whole chart height for prices below one dollar", () => {

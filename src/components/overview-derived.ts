@@ -2,7 +2,7 @@ import type { AssetModel } from "@/middlelayers/types";
 import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
 
 type Point = { timestamp: number; totalValue: number };
-type Change = { timestamp: number; value: number; previousTotal?: number; total?: number };
+type Change = { timestamp: number; value: number };
 type Contribution = Pick<AssetModel, "symbol" | "assetType" | "value">;
 
 export function selectContributionSnapshots(
@@ -70,8 +70,6 @@ export function deriveOverviewSeries(points: readonly Point[], range?: { start: 
   const daily = closes.slice(1).map((point, index) => ({
     timestamp: point.timestamp,
     value: point.totalValue - closes[index].totalValue,
-    previousTotal: closes[index].totalValue,
-    total: point.totalValue,
   }));
   const bestDay = daily.length ? daily.reduce((best, day) => day.value > best.value ? day : best) : undefined;
   const high = points.length ? points.reduce((best, point) => point.totalValue > best.totalValue ? point : best) : undefined;

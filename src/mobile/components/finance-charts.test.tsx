@@ -4,7 +4,6 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { Bar, Doughnut, Line } from "react-chartjs-2";
 import { CostCharts, FinanceChartSkeleton, GoalChart, RebalanceCharts } from "@/mobile/components/finance-charts";
 import type { CostBasisReport } from "@/middlelayers/cost-basis-report";
-import type { RealizedGain } from "@/middlelayers/cost-basis";
 import type { RebalanceResult } from "@/middlelayers/rebalance";
 import type { AlertRule } from "@/middlelayers/alerts";
 
@@ -45,31 +44,6 @@ it("shows zero cost basis gains with a neutral value and no plus sign", () => {
   expect(gain).toHaveTextContent("0 USD");
   expect(gain).not.toHaveTextContent("+0");
   expect(gain).not.toHaveStyle({ color: "#10b981" });
-});
-
-it("places phone tax-year captions above the cumulative plot", () => {
-  const disposal: RealizedGain = {
-    eventId: "sale", lotId: "lot", assetType: "crypto", symbol: "BTC",
-    acquiredAt: "2025-01-01", disposedAt: "2025-12-31", amount: 1, proceeds: 20, costBasis: 10,
-    gainLoss: 10, term: "long", method: "FIFO",
-  };
-  const report: CostBasisReport = {
-    method: "FIFO", totals: { proceeds: 0, costBasis: 0, gainLoss: 0, shortTerm: 0, longTerm: 0 },
-    assets: [], openLots: [], unrealized: [], warnings: [],
-    disposals: [{ ...disposal, disposedAt: "2025-12-31" }, { ...disposal, disposedAt: "2026-01-01", gainLoss: 20 }],
-  };
-  render(<CostCharts report={report} quoteColor="green-up-red-down" />);
-  const line = vi.mocked(Line).mock.calls[0][0];
-  const fillText = vi.fn();
-  line.plugins?.[0]?.afterDraw?.({
-    ctx: { save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {},
-      setLineDash() {}, fillText },
-    chartArea: { left: 50, right: 250, top: 100, bottom: 200 },
-    scales: { x: { getPixelForValue: (index: number) => index ? 220 : 80 } },
-  } as never, {} as never, {} as never);
-  expect(fillText).toHaveBeenCalledTimes(2);
-  for (const [, , y] of fillText.mock.calls) expect(y).toBeLessThan(100);
-  expect(line.options?.layout?.padding).toEqual(expect.objectContaining({ top: expect.any(Number) }));
 });
 
 it("shows USD cost basis totals with a dollar symbol on phones", () => {

@@ -1,31 +1,24 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import Profit from "@/mobile/components/profit";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
-import { I18nProvider } from "@/mobile/i18n";
 
 const {
   calculateTotalProfitMock,
   getImageApiPathMock,
   appCacheDirMock,
   queryAttributionMock,
-  queryLatestAssetsMock,
-  queryTotalValueMock,
 } = vi.hoisted(() => ({
   calculateTotalProfitMock: vi.fn(),
   getImageApiPathMock: vi.fn(),
   appCacheDirMock: vi.fn(),
   queryAttributionMock: vi.fn(),
-  queryLatestAssetsMock: vi.fn(),
-  queryTotalValueMock: vi.fn(),
 }));
 
 vi.mock("@/middlelayers/charts", () => ({
   calculateTotalProfit: calculateTotalProfitMock,
-  queryLatestAssets: queryLatestAssetsMock,
-  queryTotalValue: queryTotalValueMock,
 }));
 
 vi.mock("@/middlelayers/charts-attribution-data", () => ({
@@ -54,49 +47,12 @@ describe("Profit loading", () => {
       ],
     });
     appCacheDirMock.mockResolvedValue("/tmp/track3-cache");
-    queryLatestAssetsMock.mockResolvedValue([{}]);
-    queryTotalValueMock.mockResolvedValue({ totalValue: 240 });
     queryAttributionMock.mockResolvedValue({ attribution: { entries: [], totals: { priceEffect: 0, flowEffect: 0, residual: 0, totalChange: 0 }, startValue: 0, endValue: 0 }, aliases: {} });
     getImageApiPathMock.mockImplementation(
       () => new Promise<string>(() => {
         // keep pending to assert logos do not block the loading signal
       })
     );
-  });
-  afterEach(() => vi.restoreAllMocks());
-
-  it.each([
-    ["en", "since 1 Jan 2024", "1 position ·"],
-    ["zh", "2024年1月1日", "1 个持仓 ·"],
-  ])("shows a localized iPad baseline and one position in %s", async (locale, baseline, count) => {
-    vi.spyOn(navigator, "language", "get").mockReturnValue(locale === "zh" ? "zh-CN" : "en-US");
-    const { container } = render(<MemoryRouter><I18nProvider><Profit
-      currency={usdCurrency}
-      dateRange={{ start: new Date("2024-01-02T12:00:00Z"), end: new Date("2024-01-02T12:00:00Z") }}
-      quoteColor="green-up-red-down"
-      rangeValue="1D"
-      summaryRange={{
-        baseline: new Date("2024-01-01T12:00:00Z"),
-        snapshots: [new Date("2024-01-02T12:00:00Z")],
-        databaseCount: 2,
-      }}
-    /></I18nProvider></MemoryRouter>);
-    await waitFor(() => expect(container.querySelector(".mobile-movers-total")).toHaveTextContent(count));
-    expect(container.querySelector(".mobile-movers-total")).toHaveTextContent(baseline);
-    expect(container.querySelector(".mobile-movers-total .t3-tag")).toHaveAttribute("data-tone", "positive");
-  });
-
-  it("uses a neutral tag for unavailable Summary profit", async () => {
-    const { container } = render(<MemoryRouter><Profit
-      currency={usdCurrency}
-      dateRange={{ start: new Date("2024-01-02T12:00:00Z"), end: new Date("2024-01-02T12:00:00Z") }}
-      quoteColor="green-up-red-down"
-      rangeValue="1D"
-      summaryRange={{ snapshots: [new Date("2024-01-02T12:00:00Z")], databaseCount: 1 }}
-    /></MemoryRouter>);
-    await waitFor(() => expect(container.querySelector(".mobile-movers-total .t3-tag")).toHaveTextContent("–"));
-    expect(container.querySelector(".mobile-movers-total .t3-tag")).toHaveAttribute("data-tone", "neutral");
-    expect(container.querySelector(".mobile-movers-total .t3-tag")).toHaveAttribute("title", "Needs a second snapshot");
   });
 
   it("reports loaded after profit data arrives even if logo lookup is still pending", async () => {
@@ -157,52 +113,6 @@ describe("Profit loading", () => {
     /></MemoryRouter>);
     await waitFor(() => expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3));
     expect(screen.queryByText("+$0.00")).not.toBeInTheDocument();
-  });
-
-  it("keeps a partly known coin in Unknown with an explanation", async () => {
-    calculateTotalProfitMock.mockResolvedValue({
-      total: null, knownTotal: 20, percentage: null,
-      unknownCoins: [{ symbol: "BTC", assetType: "crypto", intervals: ["2024-04-16T00:00:00.000Z"] }],
-      coins: [{ symbol: "BTC", assetType: "crypto", value: 20, isUnknown: true, percentage: null,
-        buyAmount: 1, sellAmount: 0, costAvgPrice: 100, sellAvgPrice: 0 }],
-    });
-    render(<MemoryRouter><Profit
-      currency={usdCurrency}
-      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
-      quoteColor="green-up-red-down"
-    /></MemoryRouter>);
-    expect(await screen.findByText("Unknown")).toBeInTheDocument();
-    expect(screen.getByText("Unknown").parentElement).toHaveTextContent("BTC");
-    expect(screen.getByText("Unknown").parentElement!.querySelector("tr td:last-child .text-sm")).toHaveClass("text-muted-foreground");
-    expect(screen.getAllByRole("button", { name: /Explain partial profit/ }).length).toBeGreaterThan(0);
-  });
-
-  it("marks an unknown phone row without nesting a button in its link", async () => {
-    const oldMatchMedia = window.matchMedia;
-    window.matchMedia = (query: string) => ({
-      matches: query.includes("pointer: coarse"), media: query, onchange: null,
-      addListener: vi.fn(), removeListener: vi.fn(),
-      addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
-    });
-    try {
-      calculateTotalProfitMock.mockResolvedValue({
-        total: null, percentage: null,
-        unknownCoins: [{ symbol: "BTC", assetType: "crypto" }],
-        coins: [{ symbol: "BTC", assetType: "crypto", value: 20, isUnknown: true, percentage: null,
-          buyAmount: 1, sellAmount: 0, costAvgPrice: 100, sellAvgPrice: 0 }],
-      });
-      const { container } = render(<MemoryRouter><Profit
-        currency={usdCurrency}
-        dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
-        quoteColor="green-up-red-down"
-      /></MemoryRouter>);
-      await screen.findByText("Unknown");
-      expect(container.querySelector(".profit-mobile-list a button")).toBeNull();
-      expect(container.querySelector(".profit-mobile-list .mobile-list-value")).toHaveTextContent("?");
-      expect(container.querySelector(".profit-mobile-list .mobile-list-value .ios-money")).toHaveClass("text-muted-foreground");
-    } finally {
-      window.matchMedia = oldMatchMedia;
-    }
   });
 
   it("uses navigable grouped rows for profit leaders on a phone", async () => {

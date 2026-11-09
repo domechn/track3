@@ -87,14 +87,6 @@ State: **expired**. Button actions, input validity, status, overlays, and toasts
 
 ## Remaining differences
 
-The 8 Nov source-page and current dark 390 × 844 app viewports, both at
-DPR 2, differ by **7.252%** at an RGB-channel threshold of 20. The
-Expired label is red again. Its shared theme tag has a border, 11 px
-text, and a token-based tint in place of the source's borderless 12 px
-pill. The unmatched dates and purchase action below occupy the larger
-remaining regions; the subscription API cannot supply those dates or
-an iOS purchase action.
-
 Capture: `/tmp/fidelity/settings-b/pro-expired.png` (full page: `pro-expired-long.png`). Design and app were compared side by side at 390 × 844 CSS px. Remaining differences are listed below.
 
 - Subscription data supplies plan, status, renewal/end date, usage and license devices, but does not supply member-since or period-start dates. The app shows an em dash or “Until” rather than invented dates.

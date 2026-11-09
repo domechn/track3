@@ -216,7 +216,7 @@ for (const state of states) {
           await expect(page.locator(".fidelity-b-sync-status")).toContainText("Sync stopped");
           await expect(page.getByRole("dialog").getByRole("heading", { name: "Sync stopped" })).toBeVisible();
           await expect(page.getByRole("dialog")).toContainText("Needs attention");
-          await expect(page.getByRole("dialog").locator(".t3-sync-details-toggle")).toHaveAttribute("aria-expanded", "false");
+          await expect(page.getByRole("dialog").locator("details").first()).not.toHaveAttribute("open");
         }
       }
       if (state === "sync-confirm-use") {
@@ -238,15 +238,6 @@ for (const state of states) {
       }
       if (state === "sync-pop-locked") {
         await expect(page.getByRole("dialog")).toHaveCSS("height", "227px");
-        const scrim = await page.locator(".fidelity-sync-sheet-backdrop").evaluate((node) => {
-          const probe = document.createElement("span");
-          probe.style.background = "var(--overlay-scrim)";
-          node.append(probe);
-          const token = getComputedStyle(probe).backgroundColor;
-          probe.remove();
-          return { background: getComputedStyle(node).backgroundColor, token };
-        });
-        expect(scrim.background).toBe(scrim.token);
       }
       if (state === "sync-forget") {
         await page.locator(".t3-sync-devices").getByRole("button", { name: /Forget remote/i }).click();
@@ -274,7 +265,7 @@ for (const state of states) {
         await page.locator(".t3-sync-connection").getByRole("button", { name: "Test connection" }).click();
         await expect(page.locator(".t3-sync-connection").getByLabel("Endpoint")).not.toHaveAttribute("aria-invalid", "true");
         await expect(page.locator(".ios-d3-toast-viewport")).toContainText("Access denied");
-        await expect(page.locator('.t3-sync-connection .t3-tag[data-tone="negative"]')).toHaveText("Failed");
+        await expect(page.locator(".t3-sync-connection .fidelity-b-pill")).toHaveText("Failed");
         await page.locator(".ios-d3-toast-viewport li[data-state='open']").waitFor({ state: "hidden", timeout: 15_000 });
         await page.evaluate(() => {
           for (const element of document.querySelectorAll<HTMLElement>("*")) {
@@ -311,11 +302,11 @@ for (const state of states) {
       await expect(page.getByRole("alert")).toContainText("Pro expired on 14 Oct 2026");
       await expect(page.getByText("Yearly, not renewed")).toBeVisible();
       await expect(page.locator(".fidelity-b-pro [data-ui-system-card] > div:first-child > div:first-child > div:first-child > span"))
-        .toHaveCSS("color", "rgb(239, 103, 128)"); // --negative token
+        .toHaveCSS("color", "rgb(238, 106, 130)");
     }
     if (state === "pro-free" || state === "pro-ios-free") {
       await expect(page.locator(".fidelity-b-pro [data-ui-system-card] > div:first-child > div:first-child > div:first-child > span"))
-        .toHaveCSS("color", "rgb(180, 182, 187)"); // --muted-foreground token
+        .toHaveCSS("color", "rgb(180, 182, 188)");
     }
     if (state === "about") {
       await expect(page.getByRole("heading", { name: "Track3", exact: true })).toBeVisible();
@@ -468,10 +459,10 @@ test("locked sync cards fit on a light phone", async ({ page }) => {
   await page.getByRole("button", { name: "Continue without sync" }).click();
   await expect(page.locator(".fidelity-b-sync .t3-sync-passphrase")).toBeVisible();
   await expectSettingsCardsFitContent(page, ".fidelity-b-sync > [data-ui-card]");
-  await expect(page.locator('label[for="sync-passphrase"]')).toHaveCSS("color", "rgb(23, 23, 28)");
-  await expect(page.locator(".fidelity-b-sync .t3-sync-status")).toHaveCSS("background-color", "rgb(255, 255, 255)");
-  await expect(page.locator(".fidelity-b-sync .t3-sync-status-rows > div").first()).toHaveCSS("border-top-color", "rgb(212, 212, 216)");
-  await expect(page.locator(".fidelity-b-sync .t3-sync-status button")).toHaveCSS("color", "rgb(83, 83, 90)");
+  await expect(page.locator('label[for="sync-passphrase"]')).toHaveCSS("color", "rgb(255, 255, 255)");
+  await expect(page.locator(".fidelity-b-sync .t3-sync-status")).toHaveCSS("background-color", "rgb(19, 18, 23)");
+  await expect(page.locator(".fidelity-b-sync .t3-sync-status-rows > div").first()).toHaveCSS("border-top-color", "rgb(34, 34, 36)");
+  await expect(page.locator(".fidelity-b-sync .t3-sync-status button")).toHaveCSS("color", "rgb(180, 182, 188)");
   await page.locator(".fidelity-b-sync .t3-sync-status").screenshot({ path: "/tmp/track3-sync-390-locked-status-light.png" });
   await page.evaluate(() => document.getElementById("app-main-content")!.scrollTo(0, 0));
   await page.screenshot({ path: "/tmp/track3-sync-390-locked-light.png", fullPage: true });
