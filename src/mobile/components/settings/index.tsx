@@ -33,6 +33,9 @@ import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { useTheme } from "@/mobile/components/common/theme";
 import AssistantSettings from "@/mobile/components/settings/assistant";
 import { SettingsMenu } from "@/components/settings/settings-menu";
+import { DisplayCurrencyContext } from "@/contexts/display-currency";
+import CurrencySwitchButton from "@/components/currency-switch-button";
+import { useContext } from "react";
 
 const settingsTabs = [
   {
@@ -112,6 +115,7 @@ function TabLink({
 
 const App = () => {
   const { t, locale } = useTranslation();
+  const displayCurrency = useContext(DisplayCurrencyContext);
   const { theme } = useTheme();
   const haptic = useHaptics();
   const isWide = useSizeClass().width === "wide";
@@ -168,7 +172,12 @@ const App = () => {
         <SplitView selected={!isHub} masterLabel={t("settings.sectionsAriaLabel")}
           detailLabel={t(title ?? "settings.title")}
           master={isHub || isWide ? <>
-            <h1 className="ios-large-title mb-5 pt-2">{t("settings.title")}</h1>
+            <div className="flex items-center justify-between mb-5 pt-2">
+              <h1 className="ios-large-title">{t("settings.title")}</h1>
+              {displayCurrency && <div className="ios-settings-currency-switch"><CurrencySwitchButton
+                preferredCurrency={displayCurrency.preferredCurrency} displayCurrency={displayCurrency.displayCurrency}
+                onToggle={displayCurrency.toggleDisplayCurrency} disabled={displayCurrency.switching} collapsed mobile /></div>}
+            </div>
             <div onClickCapture={() => haptic("selection")}>
               <SettingsMenu pathname={lo.pathname} search={lo.search} values={{
                 currency: getCachedPreferCurrency() ?? "USD",

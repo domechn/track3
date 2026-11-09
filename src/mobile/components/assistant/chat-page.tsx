@@ -31,8 +31,8 @@ import QuickActions, {
 import {
   AIConfigMissingError,
   loadAIConfig,
-  queryPreferCurrency,
 } from "@/middlelayers/configuration";
+import { DISPLAY_CURRENCY_CHANGED_EVENT, queryDisplayCurrency } from "@/middlelayers/display-currency";
 import {
   appendMessages,
   generateTitle,
@@ -68,11 +68,15 @@ export default function ChatPage({ isProUser }: { isProUser: boolean }) {
 
   useEffect(() => {
     const refreshCurrency = () => {
-      void queryPreferCurrency().then((currency) => setState((previous) =>
+      void queryDisplayCurrency().then((currency) => setState((previous) =>
         previous.status === "ready" ? { ...previous, baseCurrency: currency } : previous)).catch(() => {});
     };
     window.addEventListener(ASSISTANT_APP_ACTION_EVENT, refreshCurrency);
-    return () => window.removeEventListener(ASSISTANT_APP_ACTION_EVENT, refreshCurrency);
+    window.addEventListener(DISPLAY_CURRENCY_CHANGED_EVENT, refreshCurrency);
+    return () => {
+      window.removeEventListener(ASSISTANT_APP_ACTION_EVENT, refreshCurrency);
+      window.removeEventListener(DISPLAY_CURRENCY_CHANGED_EVENT, refreshCurrency);
+    };
   }, []);
 
   useEffect(() => {
@@ -81,7 +85,7 @@ export default function ChatPage({ isProUser }: { isProUser: boolean }) {
       try {
         const [config, baseCurrency] = await Promise.all([
           loadAIConfig(),
-          queryPreferCurrency(),
+          queryDisplayCurrency(),
         ]);
         if (cancelled) return;
         setState({ status: "ready", config, baseCurrency });

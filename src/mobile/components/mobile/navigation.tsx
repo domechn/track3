@@ -3,6 +3,9 @@ import { useTranslation } from "@/mobile/i18n";
 import { useHaptics, useSizeClass } from "@/mobile/components/mobile";
 import { MobileIcon } from "@/mobile/components/mobile/icons";
 import { TrackLogo } from "@/components/brand/track-logo";
+import { useContext } from "react";
+import { DisplayCurrencyContext } from "@/contexts/display-currency";
+import CurrencySwitchButton from "@/components/currency-switch-button";
 import {
   ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, DashboardIcon, BarChartIcon,
   BackpackIcon, MixIcon, LayersIcon, ClockIcon, ActivityLogIcon,
@@ -82,6 +85,7 @@ export function MobileNavigation(props: { unread?: number; onTabSwitch?: (rootTa
 
 export function MobileSidebar(props: { unread?: number; onTabSwitch?: (rootTap: boolean) => void; collapsed?: boolean; onCollapse?: () => void }) {
   const { t } = useTranslation();
+  const displayCurrency = useContext(DisplayCurrencyContext);
   const { pathname } = useLocation();
   const { collapsed = false, unread = 0, onCollapse, onTabSwitch } = props;
   const groups = [
@@ -125,6 +129,9 @@ export function MobileSidebar(props: { unread?: number; onTabSwitch?: (rootTap: 
     </div>)}</div>
     <div className="mobile-rail-spacer" />
     <div className="t3-nav-divider mobile-rail-footer">
+      {displayCurrency && <CurrencySwitchButton preferredCurrency={displayCurrency.preferredCurrency}
+        displayCurrency={displayCurrency.displayCurrency} onToggle={displayCurrency.toggleDisplayCurrency}
+        disabled={displayCurrency.switching} collapsed={collapsed} mobile />}
       {renderItem({ to: "/settings", key: "nav.settings", icon: GearIcon })}
       <button type="button" className="mobile-sidebar-collapse" onClick={onCollapse}
         aria-label={t(collapsed ? "sidebar.expand" : "sidebar.collapse")} aria-expanded={!collapsed}>

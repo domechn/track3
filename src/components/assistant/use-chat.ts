@@ -23,7 +23,7 @@ import { executePreparedAction, prepareAction, proposeActionTool } from "@/middl
 import type { PendingAction } from "@/middlelayers/ai/actions/lifecycle";
 import { resolveAction } from "@/middlelayers/ai/actions/lifecycle";
 import { claimSessionAction, finishSessionAction } from "@/middlelayers/ai/sessions";
-import { queryPreferCurrency } from "@/middlelayers/configuration";
+import { queryDisplayCurrency } from "@/middlelayers/display-currency";
 
 import type { AgentActivity, AgentActivityBlock, AssistantBlock, ChatMessage } from "@/middlelayers/ui-state/chat-persist";
 export type { AgentActivity, AgentActivityBlock, AssistantBlock, ChatMessage } from "@/middlelayers/ui-state/chat-persist";
@@ -923,7 +923,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
         abortRef.current = controller;
         try {
           const continuationCurrency = action.name === "set_base_currency" && updated.status === "approved"
-            ? await queryPreferCurrency() : baseCurrency;
+            ? await queryDisplayCurrency() : baseCurrency;
           const actionPrompt = buildSystemPrompt(continuationCurrency, true, false);
           const prepared = await prepareHistory(flattenForProvider(next), summaryRef.current, contextSize,
             async (history, limit) => callLlm({
