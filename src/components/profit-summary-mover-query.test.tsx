@@ -41,7 +41,7 @@ it("shares the full-range mover query between month and year hints", async () =>
   await waitFor(() => expect(screen.getByRole("tooltip")).toHaveTextContent("BTC"));
 });
 
-it("jumps to the page containing the selected year", async () => {
+it("keeps every year in the Summary scroll region as selection and range change", async () => {
   function YearSummary() {
     const [year, setYear] = useState(2026);
     const [start, setStart] = useState(2015);
@@ -56,11 +56,10 @@ it("jumps to the page containing the selected year", async () => {
   }
   const { container } = render(<YearSummary />);
   const years = () => [...container.querySelectorAll(".fidelity-year-head b")].map((node) => node.textContent);
-  expect(years()).toEqual(["2026", "2025", "2024", "2023"]);
-  fireEvent.click(screen.getByRole("button", { name: "Next" }));
-  expect(years()).toEqual(["2022", "2021", "2020", "2019"]);
+  expect(years()).toEqual(Array.from({ length: 12 }, (_, index) => String(2026 - index)));
+  expect(screen.getByRole("region", { name: "By year" })).toBeInTheDocument();
+  expect(screen.queryByRole("navigation", { name: "By year" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Select 2017" }));
-  await waitFor(() => expect(years()).toEqual(["2018", "2017", "2016", "2015"]));
   expect(container.querySelector(".fidelity-year-card.selected")).toHaveTextContent("2017");
   fireEvent.click(screen.getByRole("button", { name: "Start at 2024" }));
   await waitFor(() => expect(years()).toEqual(["2026", "2025", "2024"]));

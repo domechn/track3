@@ -95,6 +95,7 @@ const App = ({
                   quoteColor={quoteColor}
                   clipToRange={rangePreset !== "All"}
                   oneSnapshot={selectedRange.databaseCount < 2}
+                  summaryYearScroll
                 />
               </FadeUp>
               <FadeUp>
