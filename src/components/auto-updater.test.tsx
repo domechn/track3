@@ -9,8 +9,12 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { I18nProvider } from "@/i18n";
 import notes096 from "./release-notes.fixture.md?raw";
 
+const mockCheck = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/plugin-updater", () => ({
-  check: vi.fn(),
+  check: vi.fn(async (...args: unknown[]) => {
+    const update = await mockCheck(...args);
+    return update && { install: vi.fn(async () => {}), close: vi.fn(async () => {}), ...update };
+  }),
 }));
 
 vi.mock("@/components/ui/use-toast", () => ({
@@ -38,16 +42,16 @@ describe("AutoUpdater", () => {
   it("automatically downloads an available update when the prompt is left alone", async () => {
     vi.useFakeTimers();
     try {
-      const downloadAndInstall = vi.fn().mockResolvedValue(undefined);
-      vi.mocked(check).mockResolvedValueOnce({
-        available: true, version: "2.4.0", downloadAndInstall,
+      const download = vi.fn().mockResolvedValue(undefined);
+      mockCheck.mockResolvedValueOnce({
+        available: true, version: "2.4.0", download,
       } as unknown as Awaited<ReturnType<typeof check>>);
       render(<AutoUpdater />);
       await act(async () => {});
       expect(screen.getByRole("button", { name: "Download and install" })).toBeVisible();
-      expect(downloadAndInstall).not.toHaveBeenCalled();
+      expect(download).not.toHaveBeenCalled();
       await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
-      expect(downloadAndInstall).toHaveBeenCalledOnce();
+      expect(download).toHaveBeenCalledOnce();
       expect(screen.getByRole("dialog", { name: "Ready to restart" })).toBeVisible();
     } finally {
       vi.useRealTimers();
@@ -58,12 +62,12 @@ describe("AutoUpdater", () => {
     try {
       const staleDownload = vi.fn().mockResolvedValue(undefined);
       const currentDownload = vi.fn().mockResolvedValue(undefined);
-      vi.mocked(check)
+      mockCheck
         .mockResolvedValueOnce({
-          available: true, version: "2.4.0", downloadAndInstall: staleDownload,
+          available: true, version: "2.4.0", download: staleDownload,
         } as unknown as Awaited<ReturnType<typeof check>>)
         .mockResolvedValueOnce({
-          available: true, version: "2.5.0", downloadAndInstall: currentDownload,
+          available: true, version: "2.5.0", download: currentDownload,
         } as unknown as Awaited<ReturnType<typeof check>>);
       render(<React.StrictMode><AutoUpdater /></React.StrictMode>);
       await act(async () => {});
@@ -79,7 +83,7 @@ describe("AutoUpdater", () => {
     const consoleWarn = vi
       .spyOn(console, "warn")
       .mockImplementation(() => undefined);
-    vi.mocked(check).mockRejectedValueOnce(
+    mockCheck.mockRejectedValueOnce(
       new Error("check failed token=sensitive-check-token"),
     );
 
@@ -100,14 +104,14 @@ describe("AutoUpdater", () => {
     const consoleWarn = vi
       .spyOn(console, "warn")
       .mockImplementation(() => undefined);
-    const downloadAndInstall = vi
+    const download = vi
       .fn()
       .mockRejectedValueOnce(
         new Error("download failed secret=sensitive-download-secret"),
       );
-    vi.mocked(check).mockResolvedValueOnce({
+    mockCheck.mockResolvedValueOnce({
       available: true,
-      downloadAndInstall,
+      download,
     } as unknown as Awaited<ReturnType<typeof check>>);
 
     render(<AutoUpdater />);
@@ -115,7 +119,7 @@ describe("AutoUpdater", () => {
     await screen.findByRole("heading", { name: "Update failed" });
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(downloadAndInstall).toHaveBeenCalledOnce();
+    expect(download).toHaveBeenCalledOnce();
     expect(consoleWarn).not.toHaveBeenCalled();
     expect(toast).not.toHaveBeenCalled();
 
@@ -123,26 +127,27 @@ describe("AutoUpdater", () => {
   });
 
   it("shows download progress and safe error details after a failed download", async () => {
-    const downloadAndInstall = vi.fn(async (onEvent: (event: unknown) => void) => {
+    const download = vi.fn(async (onEvent: (event: unknown) => void) => {
       onEvent({ event: "Started", data: { contentLength: 84_200_000 } });
       onEvent({ event: "Progress", data: { chunkLength: 38_000_000 } });
       throw new Error("connection reset; token=sensitive-download-secret");
     });
-    vi.mocked(check).mockResolvedValueOnce({
-      available: true, version: "2.4.0", currentVersion: "2.3.1", downloadAndInstall,
+    mockCheck.mockResolvedValueOnce({
+      available: true, version: "2.4.0", currentVersion: "2.3.1", download,
     } as unknown as Awaited<ReturnType<typeof check>>);
     render(<AutoUpdater />);
     fireEvent.click(await screen.findByRole("button", { name: "Download and install" }));
     await screen.findByRole("heading", { name: "Update failed" });
     expect(screen.getByText(/stopped at 38.0 of 84.2 MB/i)).toBeVisible();
+    fireEvent.click(screen.getByText("Details"));
     expect(screen.getByRole("button", { name: "Copy details" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Download manually" })).toBeVisible();
     expect(screen.queryByText("sensitive-download-secret")).not.toBeInTheDocument();
   });
 
   it("reports when the manual download link cannot open", async () => {
-    vi.mocked(check).mockResolvedValueOnce({
-      available: true, downloadAndInstall: vi.fn().mockRejectedValue(new Error("download failed")),
+    mockCheck.mockResolvedValueOnce({
+      available: true, download: vi.fn().mockRejectedValue(new Error("download failed")),
     } as unknown as Awaited<ReturnType<typeof check>>);
     vi.mocked(openUrl).mockRejectedValueOnce(new Error("opener unavailable"));
     render(<AutoUpdater />);
@@ -159,7 +164,7 @@ describe("AutoUpdater", () => {
     const consoleWarn = vi
       .spyOn(console, "warn")
       .mockImplementation(() => undefined);
-    vi.mocked(check).mockResolvedValueOnce(null);
+    mockCheck.mockResolvedValueOnce(null);
 
     render(<AutoUpdater />);
 
@@ -173,26 +178,26 @@ describe("AutoUpdater", () => {
   });
 
   it("offers restart after a successful update", async () => {
-    const downloadAndInstall = vi.fn().mockResolvedValueOnce(undefined);
-    vi.mocked(check).mockResolvedValueOnce({
+    const download = vi.fn().mockResolvedValueOnce(undefined);
+    mockCheck.mockResolvedValueOnce({
       available: true,
-      downloadAndInstall,
+      download,
     } as unknown as Awaited<ReturnType<typeof check>>);
 
     render(<AutoUpdater />);
     fireEvent.click(await screen.findByRole("button", { name: "Download and install" }));
     await screen.findByRole("heading", { name: "Ready to restart" });
-    expect(downloadAndInstall).toHaveBeenCalledOnce();
+    expect(download).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
     expect(reloadApp).toHaveBeenCalledOnce();
   });
 
   it("shows a dismissible ready dialog after the existing download completes", async () => {
-    const downloadAndInstall = vi.fn().mockResolvedValueOnce(undefined);
-    vi.mocked(check).mockResolvedValueOnce({
+    const download = vi.fn().mockResolvedValueOnce(undefined);
+    mockCheck.mockResolvedValueOnce({
       available: true,
       version: "0.9.5",
-      downloadAndInstall,
+      download,
     } as unknown as Awaited<ReturnType<typeof check>>);
 
     render(<AutoUpdater />);
@@ -201,21 +206,21 @@ describe("AutoUpdater", () => {
     expect(dialog).toHaveTextContent("0.9.5");
     fireEvent.click(screen.getByRole("button", { name: "Later" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Ready to restart.*Restart now/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Ready to restart" }));
     fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
     expect(reloadApp).toHaveBeenCalledOnce();
     expect(toast).not.toHaveBeenCalled();
   });
 
   it("shows release notes before downloading an update that provides them", async () => {
-    const downloadAndInstall = vi.fn().mockResolvedValueOnce(undefined);
-    vi.mocked(check).mockResolvedValueOnce({
+    const download = vi.fn().mockResolvedValueOnce(undefined);
+    mockCheck.mockResolvedValueOnce({
       available: true,
       version: "2.4.0",
       currentVersion: "2.3.1",
       date: "2026-10-29",
       body: "## New\n- Refresh progress per source.",
-      downloadAndInstall,
+      download,
     } as unknown as Awaited<ReturnType<typeof check>>);
     const previousWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1600 });
@@ -225,18 +230,18 @@ describe("AutoUpdater", () => {
       expect(screen.getByRole("heading", { name: "Track3 2.4.0 is available" })).toBeVisible();
       expect(screen.getByText("Refresh progress per source.")).toBeVisible();
       expect(screen.queryByRole("button", { name: "Skip this version" })).not.toBeInTheDocument();
-      expect(downloadAndInstall).not.toHaveBeenCalled();
+      expect(download).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole("button", { name: "Download and install" }));
-      await waitFor(() => expect(downloadAndInstall).toHaveBeenCalledOnce());
+      await waitFor(() => expect(download).toHaveBeenCalledOnce());
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
     }
   });
 
   it("shows the 0.9.6 Markdown in a scrollable dialog with actions outside the notes", async () => {
-    vi.mocked(check).mockResolvedValueOnce({
+    mockCheck.mockResolvedValueOnce({
       available: true, version: "0.9.6", currentVersion: "0.9.5", body: notes096,
-      downloadAndInstall: vi.fn(),
+      download: vi.fn(),
     } as unknown as Awaited<ReturnType<typeof check>>);
     render(<AutoUpdater />);
     fireEvent.click(await screen.findByRole("button", { name: "See what's new" }));
@@ -249,13 +254,13 @@ describe("AutoUpdater", () => {
   it("formats the release date in the selected Chinese locale", async () => {
     const language = vi.spyOn(navigator, "language", "get").mockReturnValue("zh-CN");
     try {
-      vi.mocked(check).mockResolvedValueOnce({
+      mockCheck.mockResolvedValueOnce({
         available: true,
         version: "2.4.0",
         currentVersion: "2.3.1",
         date: "2026-10-29",
         body: "## New",
-        downloadAndInstall: vi.fn(),
+        download: vi.fn(),
       } as unknown as Awaited<ReturnType<typeof check>>);
       render(<I18nProvider><AutoUpdater /></I18nProvider>);
       fireEvent.click(await screen.findByRole("button", { name: "查看更新内容" }));
@@ -266,19 +271,19 @@ describe("AutoUpdater", () => {
   });
 
   it("uses the same update prompt at narrow widths", async () => {
-    const downloadAndInstall = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(check).mockResolvedValueOnce({
+    const download = vi.fn().mockResolvedValue(undefined);
+    mockCheck.mockResolvedValueOnce({
       available: true,
       version: "2.4.0",
       body: "Release notes",
-      downloadAndInstall,
+      download,
     } as unknown as Awaited<ReturnType<typeof check>>);
     const previousWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
     try {
       render(<AutoUpdater />);
       expect(await screen.findByRole("button", { name: "See what's new" })).toBeVisible();
-      expect(downloadAndInstall).not.toHaveBeenCalled();
+      expect(download).not.toHaveBeenCalled();
     } finally {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
     }

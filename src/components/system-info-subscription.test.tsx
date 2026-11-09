@@ -147,6 +147,7 @@ describe("System Info subscription management", () => {
     const version = await screen.findByText("Track3 0.6.1");
     fireEvent.click(within(version.closest("[data-ui-card]") as HTMLElement).getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(check).toHaveBeenCalledOnce());
+    expect(check).toHaveBeenCalledWith({ timeout: 15_000 });
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
       tone: "success", description: "You are on the latest version, 0.6.1.",
     }));

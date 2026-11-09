@@ -278,7 +278,7 @@ const App = ({
     setCheckingAbout(true);
     setAboutUpdate(undefined);
     try {
-      const update = await check();
+      const update = await check({ timeout: 15_000 });
       if (update) setAboutUpdate(update.version);
       else toast({ title: t("fidelity.settingsB.about.upToDate"),
         description: t("fidelity.settingsB.about.upToDateDetail").replace("{version}", version), tone: "success" });
