@@ -1019,6 +1019,14 @@ body:not(:has(.app-layout)) .t3-grid-moved > .t3-overview-panel { height: 100%; 
 .t3-update-fidelity-progress-label span { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 .t3-update-fidelity-progress { height: 4px; overflow: hidden; border-radius: 2px; background: hsl(var(--raised)); box-shadow: inset 0 0 0 1px hsl(var(--border)); }
 .t3-update-fidelity-progress span { display: block; height: 100%; border-radius: 2px; background: hsl(var(--accent-data)); }
+.t3-update-fidelity-progress span.indeterminate { width: 35%; animation: t3-update-indeterminate 1.5s ease-in-out infinite alternate; }
+@keyframes t3-update-indeterminate { from { transform: translateX(0); } to { transform: translateX(186%); } }
+@media (prefers-reduced-motion: reduce) { .t3-update-fidelity-progress span.indeterminate { animation: none; width: 100%; opacity: .5; } }
+.t3-update-fidelity-rate, .t3-update-fidelity-hint { margin-top: 8px !important; color: hsl(var(--muted-foreground)); }
+.t3-update-fidelity-failure { margin-top: 16px !important; }
+.t3-update-fidelity-error summary { cursor: pointer; }
+.t3-update-fidelity-error p { overflow-wrap: anywhere; }
+.t3-update-fidelity-error button { border: 1px solid hsl(var(--border)); border-radius: var(--radius-pill); color: hsl(var(--foreground)); padding: 4px 10px; }
 .t3-update-fidelity-state-icon { display: block; margin-bottom: 8px; font-size: 24px; line-height: 24px; font-weight: 600; }
 .t3-update-fidelity-state-icon.success { color: hsl(var(--positive)); }
 .t3-update-fidelity-state-icon.error { color: hsl(var(--negative)); }

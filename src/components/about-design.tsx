@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckIcon, DownloadIcon, ExternalLinkIcon, InfoCircledIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { CheckIcon, ExternalLinkIcon, InfoCircledIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { appDataDir } from "@tauri-apps/api/path";
 import { openExternal } from "@/lib/external-links";
@@ -8,10 +8,10 @@ import { toast } from "@/components/ui/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { requestOnboardingReplay } from "@/middlelayers/onboarding";
-import { reloadApp } from "@/utils/app";
 import packageJson from "../../package.json";
 import { TrackLogo } from "@/components/brand/track-logo";
 import ReleaseNotes from "@/components/release-notes";
+import { updateDownloadEvent } from "@/components/auto-updater";
 
 type Props = { version: string };
 
@@ -23,15 +23,12 @@ export function AboutDesign({ version }: Props) {
   const [update, setUpdate] = useState<Update | null>(null);
   const [updateOpen, setUpdateOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
-  const [downloaded, setDownloaded] = useState(0);
-  const [total, setTotal] = useState<number>();
-  const [downloadState, setDownloadState] = useState<"idle" | "downloading" | "ready" | "error">("idle");
   useEffect(() => { void appDataDir().then(setDataFolder).catch(() => setDataFolder(undefined)); }, []);
   const checkForUpdates = async () => {
     if (checking) return;
     setChecking(true);
     try {
-      const result = await check();
+      const result = await check({ timeout: 15_000 });
       setUpdate(result);
       setCheckResult(result ? "available" : "current");
       setUpdateOpen(!!result);
@@ -43,21 +40,12 @@ export function AboutDesign({ version }: Props) {
       setChecking(false);
     }
   };
-  const install = async () => {
-    if (!update || downloadState === "downloading") return;
-    setDownloaded(0);
-    setTotal(undefined);
-    setDownloadState("downloading");
-    try {
-      await update.download((event) => {
-        if (event.event === "Started") setTotal(event.data.contentLength);
-        if (event.event === "Progress") setDownloaded((current) => current + event.data.chunkLength);
-      });
-      await update.install();
-      setDownloadState("ready");
-    } catch {
-      setDownloadState("error");
-    }
+  const install = () => {
+    if (!update) return;
+    setUpdateOpen(false);
+    setCheckResult("none");
+    setUpdate(null);
+    window.dispatchEvent(new CustomEvent(updateDownloadEvent, { detail: update }));
   };
   const platform = navigator.platform || "—";
   const releaseDate = update?.date && Number.isFinite(Date.parse(update.date))
@@ -113,20 +101,14 @@ export function AboutDesign({ version }: Props) {
       <DialogDescription>{t("fidelity.settingsB.about.guideConfirm")}</DialogDescription></DialogHeader>
       <DialogFooter><Button variant="outline" onClick={() => setGuideOpen(false)}>{t("common.cancel")}</Button>
         <Button onClick={() => { setGuideOpen(false); requestOnboardingReplay(); }}>{t("fidelity.settingsB.about.startGuide")}</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={updateOpen} onOpenChange={(open) => { if (downloadState !== "downloading") setUpdateOpen(open); }}>
+    <Dialog open={updateOpen} onOpenChange={setUpdateOpen}>
       <DialogContent className="t3-b-about-update-dialog"><DialogHeader><DialogTitle>{t("fidelity.settingsB.about.updateAvailable").replace("{version}", update?.version ?? "")}</DialogTitle>
         <DialogDescription>{t("fidelity.settingsB.about.youHave").replace("{version}", version)}
           {releaseDate && <> {t("fidelity.settingsB.about.released").replace("{date}", releaseDate)}</>}</DialogDescription></DialogHeader>
         {update?.body && <ReleaseNotes content={update.body} />}
-        {downloadState === "downloading" && <div className="t3-b-update-progress"><b>{t("fidelity.settingsB.about.downloading")}</b>
-          <span>{total ? `${(downloaded / 1_000_000).toFixed(1)} / ${(total / 1_000_000).toFixed(1)} MB` : `${(downloaded / 1_000_000).toFixed(1)} MB`}</span>
-          {total && <progress value={downloaded} max={total} />}</div>}
-        {downloadState === "ready" && <div className="t3-b-banner positive"><CheckIcon /><div><b>{t("fidelity.settingsB.about.ready")}</b></div></div>}
-        {downloadState === "error" && <p role="alert" className="t3-b-negative">{t("fidelity.settingsB.about.downloadError")}</p>}
         <DialogFooter>
-          {downloadState === "ready" ? <Button onClick={reloadApp}>{t("fidelity.settingsB.about.restart")}</Button>
-            : downloadState === "downloading" ? null : <><Button variant="outline" onClick={() => setUpdateOpen(false)}>{t("fidelity.settingsB.about.later")}</Button>
-              <Button onClick={() => { void install(); }}><DownloadIcon aria-hidden="true" />{t("fidelity.settingsB.about.downloadInstall")}</Button></>}
+          <Button variant="outline" onClick={() => setUpdateOpen(false)}>{t("fidelity.settingsB.about.later")}</Button>
+          <Button onClick={install}>{t("fidelity.settingsB.about.downloadInstall")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

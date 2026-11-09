@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { check } from "@tauri-apps/plugin-updater";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "@/components/ui/use-toast";
 import { AboutDesign } from "./about-design";
+import AutoUpdater from "./auto-updater";
 import notes096 from "./release-notes.fixture.md?raw";
 
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: vi.fn(async () => null) }));
@@ -65,4 +66,37 @@ it("keeps the old plain update headings outside list items", async () => {
   }
   expect(dialog.querySelectorAll(".t3-update-fidelity-notes li")).toHaveLength(6);
   expect(Array.from(dialog.querySelectorAll("li")).some((item) => item.textContent?.includes("Improved"))).toBe(false);
+});
+
+it("hands a stalled About download to the guarded updater flow", async () => {
+  vi.mocked(check).mockClear();
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  const pending = {
+    available: true, version: "0.9.6", currentVersion: "0.9.4", date: "", body: "",
+    download: vi.fn(() => new Promise<void>(() => {})),
+    install: vi.fn(async () => {}),
+    close: vi.fn(async () => {}),
+  };
+  vi.mocked(check).mockResolvedValueOnce(null).mockResolvedValueOnce(pending as never);
+  try {
+    render(<><AutoUpdater /><AboutDesign version="0.9.4" /></>);
+    await act(async () => {});
+    fireEvent.click(screen.getByTestId("about-check-updates"));
+    const download = await screen.findByRole("button", { name: "Download and install" });
+    vi.useFakeTimers();
+    fireEvent.click(download);
+    await act(async () => {});
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Hide" })).toBeVisible();
+    expect(screen.queryByText("View update")).not.toBeInTheDocument();
+    expect(pending.download).toHaveBeenCalledWith(expect.any(Function), { timeout: 900_000 });
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(check).toHaveBeenNthCalledWith(2, { timeout: 15_000 });
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+    expect(screen.getByRole("heading", { name: "Update failed" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Download manually" })).toBeVisible();
+  } finally {
+    vi.useRealTimers();
+    log.mockRestore();
+  }
 });

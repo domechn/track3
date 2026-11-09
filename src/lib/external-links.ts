@@ -14,6 +14,7 @@ export const externalLinks = {
   releases: "https://github.com/domechn/track3/releases",
   changelog: "https://github.com/domechn/track3/releases",
   latestRelease: "https://github.com/domechn/track3/releases/latest",
+  download: "https://track3.dev/download.html",
   license: "https://github.com/domechn/track3/blob/master/LICENSE",
   dropsAddress: "https://drops.bot/address/",
   debankProfile: "https://debank.com/profile/",
