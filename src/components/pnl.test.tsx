@@ -61,6 +61,26 @@ it("announces only the visible Overview metric labels", () => {
   expect(screen.getByText("7 days").textContent).toBe("7 days");
 });
 
+it("keeps the full signed amount and baseline available on each Overview metric", async () => {
+  vi.mocked(queryPNLTableValue).mockResolvedValue({
+    latestTotalValue: 10_835_872.39,
+    todayPNL: { value: -125_557.80, timestamp: Date.parse("2026-11-08T08:01:00Z") },
+    sevenTPnl: { value: -494_661.66, timestamp: Date.parse("2026-10-27T08:01:00Z") },
+    thirtyPNL: { value: -1_028_089.59, timestamp: Date.parse("2026-09-21T08:01:00Z") },
+  });
+  render(<ChartResizeContext.Provider value={resize}><PNL currency={{ ...currency, symbol: "¥", currency: "CNY" }}
+    dateRange={dateRange} quoteColor="green-up-red-down" compact overviewFidelity /></ChartResizeContext.Provider>);
+  for (const [label, amount] of [
+    ["Latest", "-¥125,557.80"], ["7 days", "-¥494,661.66"], ["30 days", "-¥1,028,089.59"],
+  ]) {
+    const column = (await screen.findByText(label)).parentElement!;
+    await waitFor(() => expect(column.querySelector("p")).toHaveTextContent(amount));
+    expect(column.children).toHaveLength(3);
+    expect(column.children[1]).toHaveTextContent(/-\d+\.\d{2}%/);
+    expect(column.querySelector("p")?.getAttribute("title")).toBe(column.querySelector("p")?.textContent);
+  }
+});
+
 it.each([
   ["en", "7 refreshes", "30 refreshes"],
   ["zh", "7 次刷新", "30 次刷新"],

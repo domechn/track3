@@ -6,10 +6,10 @@ import { seedSummaryYears } from "./summary-years-scenes";
 
 test.beforeEach(({}, testInfo) => test.skip(testInfo.project.name !== "desktop"));
 
-for (const width of [1100, 1280, 1440, 1920]) {
+for (const [width, height] of [[1100, 720], [1280, 800], [1440, 900], [1920, 1080]]) {
   for (const theme of ["dark", "light"]) {
     test(`2026 month and year cards stay compact at ${width}px in ${theme}`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 1000 });
+      await page.setViewportSize({ width, height });
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
       await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
@@ -50,7 +50,6 @@ for (const width of [1100, 1280, 1440, 1920]) {
         expect(month.height).toBeLessThanOrEqual(200);
         expect(month.blank).toBeLessThan(40);
       }
-      if (width === 1280) expect(layout.months[0].height).toBe(167);
       for (const year of layout.years) {
         expect(year.height).toBeLessThanOrEqual(200);
         expect(year.blank).toBeLessThan(40);
@@ -108,39 +107,68 @@ test("a full twelve months wrap without stretching their rows", async ({ page })
   }
 });
 
-test("twelve years show four recent cards per page", async ({ page }) => {
-  test.setTimeout(180_000);
-  await page.setViewportSize({ width: 1280, height: 1000 });
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
-  await installTauriBridge(page, { fidelityDesktop: "summary" });
-  await seedSummaryYears(page, 2024);
-  await page.goto("/#/summary");
-  await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 50_000 });
-  await expect(page.locator(".fidelity-year-card")).toHaveCount(3);
-  const threeYearHeight = (await page.locator(".fidelity-year-section").boundingBox())!.height;
-  await seedSummaryYears(page, 2015);
-  await page.reload();
-  await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 50_000 });
-  const section = page.locator(".fidelity-year-section");
-  const cards = section.locator(".fidelity-year-card");
-  await expect(cards).toHaveCount(4);
-  expect(Math.abs((await section.boundingBox())!.height - threeYearHeight)).toBeLessThanOrEqual(2);
-  expect((await page.locator(".fidelity-month-card").first().boundingBox())!.height).toBe(167);
-  await expect(cards.first()).toContainText("2026");
-  await expect(section.getByRole("navigation", { name: "By year" })).toContainText("Showing 1-4 of 12");
-  await page.evaluate(() => document.fonts.ready);
-  mkdirSync("/tmp/summary-card-height", { recursive: true });
-  await section.screenshot({ path: "/tmp/summary-card-height/years-1280-twelve.png", animations: "disabled" });
-  await section.getByRole("button", { name: "Next" }).click();
-  await expect(cards.first()).toContainText("2022");
-  await section.getByRole("button", { name: "Previous" }).click();
-  await expect(cards.first()).toContainText("2026");
-  await cards.filter({ hasText: "2024" }).click();
-  await section.getByRole("button", { name: "Next" }).click();
-  await section.getByRole("button", { name: "Previous" }).click();
-  await expect(cards.filter({ hasText: "2024" })).toHaveClass(/selected/);
-});
+for (const [width, height] of [[1100, 720], [1280, 800], [1440, 900], [1920, 1080]]) {
+  for (const theme of ["dark", "light"]) {
+    test(`By year scrolls inside the aligned panels at ${width}x${height} in ${theme}`, async ({ page }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize({ width, height });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
+      await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
+      await installTauriBridge(page, { fidelityDesktop: "summary" });
+      await page.goto("/#/summary");
+      await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 50_000 });
+      const months = page.locator(".fidelity-period-card:has(.fidelity-month-grid)");
+      const years = page.locator(".fidelity-year-section");
+      const region = years.getByRole("region", { name: "By year" });
+      await expect(region.locator(".fidelity-year-card")).toHaveCount(2);
+      await expect.poll(async () => Math.abs((await months.boundingBox())!.height - (await years.boundingBox())!.height)).toBeLessThanOrEqual(1);
+      const twoYearHeight = (await years.boundingBox())!.height;
+      const blank = await region.evaluate((node) =>
+        node.closest(".fidelity-year-section")!.getBoundingClientRect().bottom - node.lastElementChild!.getBoundingClientRect().bottom);
+      expect(blank).toBeLessThan(24);
+
+      await seedSummaryYears(page, 2015);
+      await page.reload();
+      await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 50_000 });
+      await expect(region.locator(".fidelity-year-card")).toHaveCount(12);
+      await expect.poll(async () => Math.abs((await months.boundingBox())!.height - (await years.boundingBox())!.height)).toBeLessThanOrEqual(1);
+      expect(Math.abs((await years.boundingBox())!.height - twoYearHeight)).toBeLessThanOrEqual(1);
+      await years.scrollIntoViewIfNeeded();
+      const before = await years.getByRole("heading", { name: "By year" }).boundingBox();
+      const scroll = await region.evaluate((node) => {
+        node.scrollTop = node.scrollHeight;
+        return { scrollHeight: node.scrollHeight, clientHeight: node.clientHeight };
+      });
+      expect(scroll.scrollHeight).toBeGreaterThan(scroll.clientHeight);
+      await expect(region.locator(".fidelity-year-card").last()).toBeInViewport();
+      expect(Math.abs((await years.getByRole("heading", { name: "By year" }).boundingBox())!.y - before!.y)).toBeLessThanOrEqual(1);
+      await region.locator(".fidelity-year-card").last().click();
+      await expect(region.locator(".fidelity-year-card").last()).toHaveClass(/selected/);
+      const rtl = await region.evaluate((node) => {
+        document.documentElement.dir = "rtl";
+        node.scrollTop = node.scrollHeight;
+        const card = node.lastElementChild!.getBoundingClientRect();
+        const viewport = node.getBoundingClientRect();
+        return { lastVisible: card.bottom <= viewport.bottom + 1, horizontalOverflow: node.scrollWidth > node.clientWidth };
+      });
+      expect(rtl.lastVisible).toBe(true);
+      expect(rtl.horizontalOverflow).toBe(false);
+      await page.evaluate(() => { document.documentElement.dir = "ltr"; });
+      const cardHeights = await page.locator(".fidelity-month-card").evaluateAll((cards) =>
+        cards.map((card) => ({ y: card.getBoundingClientRect().y, height: card.getBoundingClientRect().height })));
+      for (const card of cardHeights) {
+        expect(card.height).toBeGreaterThanOrEqual(140);
+        expect(card.height).toBeLessThanOrEqual(200);
+        expect(new Set(cardHeights.filter((other) => other.y === card.y).map((other) => other.height)).size).toBe(1);
+      }
+      await page.evaluate(() => document.fonts.ready);
+      mkdirSync("/tmp/summary-card-height", { recursive: true });
+      await years.screenshot({ path: `/tmp/summary-card-height/years-scroll-${width}-${theme}.png`, animations: "disabled" });
+      await months.screenshot({ path: `/tmp/summary-card-height/months-scroll-${width}-${theme}.png`, animations: "disabled" });
+    });
+  }
+}
 
 test("Wallet mover cards use their content height with three sources", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });

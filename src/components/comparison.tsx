@@ -4,7 +4,6 @@ import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
 import { ASSISTANT_APP_ACTION_EVENT, validateActionArgs } from "@/middlelayers/ai/actions";
 import { setCurrentComparisonDates, readAssistantComparisonDates, clearAssistantComparisonDates } from "@/middlelayers/ui-state/page-prefs";
-import bluebird from "bluebird";
 import {
   currencyWrapper,
   prettyNumberKeepNDigitsAfterDecimalPoint,
@@ -12,9 +11,6 @@ import {
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
 import { parseDateToTS, timeToDateStr } from "@/utils/date";
-import { getImageApiPath } from "@/utils/app";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import { downloadCoinLogos } from "@/middlelayers/data";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { positiveNegativeTone } from "@/utils/color";
 import { StaggerContainer, FadeUp } from "./motion";
@@ -23,9 +19,7 @@ import { Button } from "./ui/button";
 import PageLoadingOverlay from "./page-loading-overlay";
 import {
   formatAssetLabel,
-  getAssetLogoKey,
-  resolveAssetLogoSrc,
-  shouldDownloadCryptoLogo,
+  getAssetKey,
 } from "@/utils/assets";
 import {
   CalendarIcon,
@@ -130,10 +124,7 @@ const App = ({
 
   const [shouldMaskValue, setShouldMaskValue] = useState<boolean>(false);
   const [noTransactionsBetween, setNoTransactionsBetween] = useState(false);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const dataChangedVersion = useDataChangedVersion();
-  const downloadedLogosRef = useRef<Set<string>>(new Set());
-  const appCacheDirRef = useRef<string>("");
 
   useEffect(() => {
     if (!baseId || !headId) {
@@ -264,12 +255,12 @@ const App = ({
 
   const coinComparisons = useMemo((): CoinComparison[] => {
     const buildMap = (items: typeof baseData) =>
-      new Map(items.map((asset) => [getAssetLogoKey(asset), asset]));
+      new Map(items.map((asset) => [getAssetKey(asset), asset]));
     const baseMap = buildMap(baseData);
     const headMap = buildMap(headData);
     const assetKeys = Array.from(
       new Set(
-        [...baseData, ...headData].map((asset) => getAssetLogoKey(asset)),
+        [...baseData, ...headData].map((asset) => getAssetKey(asset)),
       ),
     );
 
@@ -306,61 +297,6 @@ const App = ({
         : 0,
     };
   }, [baseData, headData]);
-
-  const symbolsForLogos = useMemo(
-    () =>
-      coinComparisons
-        .filter((coin) => shouldDownloadCryptoLogo(coin))
-        .filter(
-          (coin, idx, arr) =>
-            arr.findIndex(
-              (c) => getAssetLogoKey(c) === getAssetLogoKey(coin),
-            ) === idx,
-        ),
-    [coinComparisons],
-  );
-
-  useEffect(() => {
-    if (symbolsForLogos.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-    const missingSymbols = symbolsForLogos.filter(
-      (asset) => !downloadedLogosRef.current.has(getAssetLogoKey(asset)),
-    );
-
-    if (missingSymbols.length > 0) {
-      missingSymbols.forEach((asset) =>
-        downloadedLogosRef.current.add(getAssetLogoKey(asset)),
-      );
-      downloadCoinLogos(
-        missingSymbols.map((asset) => ({ symbol: asset.symbol, price: 0 })),
-      );
-    }
-
-    (async () => {
-      if (!appCacheDirRef.current) {
-        appCacheDirRef.current = await getAppCacheDir();
-      }
-      const kvs = await bluebird.map(symbolsForLogos, async (asset) => {
-        const path = await getImageApiPath(
-          appCacheDirRef.current,
-          asset.symbol,
-        );
-        return { [getAssetLogoKey(asset)]: path };
-      });
-
-      if (cancelled) {
-        return;
-      }
-      setLogoMap((prev) => ({ ...prev, ...Object.assign({}, ...kvs) }));
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [symbolsForLogos]);
 
   useEffect(() => {
     if (!currentQuickCompare || dateOptions.length === 0) {
@@ -758,7 +694,7 @@ const App = ({
                     </tr></thead>
                     <tbody>{[...coinComparisons].sort((a, b) =>
                       Math.abs(b.value.head - b.value.base) - Math.abs(a.value.head - a.value.base),
-                    ).map((coin) => <tr key={getAssetLogoKey(coin)} className="border-b last:border-b-0">
+                    ).map((coin) => <tr key={getAssetKey(coin)} className="border-b last:border-b-0">
                       <td className="py-3 font-semibold">{formatAssetLabel(coin)}</td>
                       <td className="py-3 text-right">{formatVal(coin.amount.base, "amount")}</td>
                       <td className="py-3 text-right">{formatVal(coin.amount.head, "amount")}</td>

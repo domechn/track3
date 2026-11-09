@@ -92,37 +92,55 @@ test("summary keeps the approved layout when history has month gaps", async ({ b
   } finally { await context.close(); }
 });
 
-test("phone By year pages twelve years three at a time", async ({ browser }) => {
-  test.setTimeout(90_000);
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
-    isMobile: true, hasTouch: true, timezoneId: "UTC" });
-  try {
-    const page = await context.newPage();
-    await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
-    await installTauriBridge(page, { fidelitySample: "full" });
-    await page.goto("/#/summary");
-    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
-    const twoYearMonthHeight = (await page.locator(".fd-month").first().boundingBox())!.height;
-    await seedSummaryYears(page, 2024);
-    await page.reload();
-    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
-    await expect(page.locator(".fd-years .fd-year")).toHaveCount(3);
-    const threeYearHeight = (await page.locator(".fd-years").boundingBox())!.height;
-    await seedSummaryYears(page, 2015);
-    await page.reload();
-    const section = page.locator(".fd-years");
-    await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
-    await expect(section.locator(".fd-year")).toHaveCount(3);
-    expect(Math.abs((await section.boundingBox())!.height - threeYearHeight)).toBeLessThanOrEqual(2);
-    expect((await page.locator(".fd-month").first().boundingBox())!.height).toBe(twoYearMonthHeight);
-    await expect(section.locator(".fd-year").first()).toContainText("2026");
-    await expect(section.getByRole("navigation", { name: "By year" })).toContainText("Showing 1-3 of 12");
-    await section.getByRole("button", { name: "Next" }).click();
-    await expect(section.locator(".fd-year").first()).toContainText("2023");
-    await section.getByRole("button", { name: "Previous" }).click();
-    await expect(section.locator(".fd-year").first()).toContainText("2026");
-  } finally { await context.close(); }
-});
+for (const theme of ["dark", "light"]) {
+  test(`phone By year scrolls through twelve years in ${theme}`, async ({ browser }) => {
+    test.setTimeout(120_000);
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
+      isMobile: true, hasTouch: true, timezoneId: "UTC", colorScheme: theme as "dark" | "light" });
+    try {
+      const page = await context.newPage();
+      await page.clock.setFixedTime(new Date("2026-10-31T12:00:00Z"));
+      await page.addInitScript((value) => localStorage.setItem("track3-ui-theme", value), theme);
+      await installTauriBridge(page, { fidelitySample: "full" });
+      await page.goto("/#/summary");
+      await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
+      const section = page.locator(".fd-years");
+      let region = section.getByRole("region", { name: "By year" });
+      await expect(region.locator(".fd-year")).toHaveCount(2);
+      const twoYearBlank = await region.evaluate((node) =>
+        node.getBoundingClientRect().bottom - node.lastElementChild!.getBoundingClientRect().bottom);
+      expect(twoYearBlank).toBeLessThan(24);
+      await seedSummaryYears(page, 2015);
+      await page.reload();
+      await expect(page.locator(".fd-summary")).toHaveAttribute("data-state", "ready", { timeout: 50_000 });
+      region = section.getByRole("region", { name: "By year" });
+      await expect(region.locator(".fd-year")).toHaveCount(12);
+      await section.scrollIntoViewIfNeeded();
+      const headingY = (await section.getByRole("heading", { name: "By year" }).boundingBox())!.y;
+      const dimensions = await region.evaluate((node) => {
+        node.scrollTop = node.scrollHeight;
+        return { scrollHeight: node.scrollHeight, clientHeight: node.clientHeight };
+      });
+      expect((await section.boundingBox())!.height).toBeLessThanOrEqual(844 * 0.6 + 1);
+      expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.clientHeight);
+      await expect(region.locator(".fd-year").last()).toBeInViewport();
+      expect((await section.getByRole("heading", { name: "By year" }).boundingBox())!.y).toBe(headingY);
+      mkdirSync("/tmp/summary-card-height", { recursive: true });
+      await section.scrollIntoViewIfNeeded();
+      await section.screenshot({ path: `/tmp/summary-card-height/phone-years-scroll-${theme}.png`, animations: "disabled" });
+      await page.evaluate(() => { document.documentElement.dir = "rtl"; });
+      const rtl = await region.evaluate((node) => {
+        node.scrollTop = 0;
+        node.scrollTop = node.scrollHeight;
+        const card = node.lastElementChild!.getBoundingClientRect();
+        const viewport = node.getBoundingClientRect();
+        return { lastVisible: card.bottom <= viewport.bottom + 1, horizontalOverflow: node.scrollWidth > node.clientWidth };
+      });
+      expect(rtl.lastVisible).toBe(true);
+      expect(rtl.horizontalOverflow).toBe(false);
+    } finally { await context.close(); }
+  });
+}
 
 test("phone Top coins preview caps a populated group at four rows", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: phone,
@@ -167,14 +185,15 @@ test("iPad year picker reaches the oldest year with the keyboard", async ({ brow
     const summary = page.locator(".profit-summary-card");
     await summary.getByRole("radio", { name: "Y" }).click();
     const yearCards = summary.locator(".profit-period-grid > div");
-    await expect(yearCards).toHaveCount(4);
-    await expect(summary.getByRole("navigation")).toContainText("Showing 1-4 of 12");
+    await expect(yearCards).toHaveCount(12);
+    await expect(summary.getByRole("region", { name: "By year" })).toBeVisible();
+    await expect(summary.getByRole("navigation")).toHaveCount(0);
     const positions = await yearCards.evaluateAll((cards) => cards.map((card) => {
       const { x, y } = card.getBoundingClientRect();
       return { x, y };
     }));
     expect(new Set(positions.map(({ x }) => x)).size).toBe(4);
-    expect(new Set(positions.map(({ y }) => y)).size).toBe(1);
+    expect(new Set(positions.map(({ y }) => y)).size).toBe(3);
     await summary.getByRole("radio", { name: "M" }).click();
     await summary.getByRole("combobox", { name: "Select Year 2026" }).click();
     await expect(page.getByRole("option")).toHaveCount(12);

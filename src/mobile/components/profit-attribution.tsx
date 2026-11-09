@@ -9,7 +9,6 @@ import { directionClass, directionColorVar } from "@/utils/color";
 import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SegmentedControl, useIsMobile } from "@/mobile/components/mobile";
-import { getAssetLogoKey, resolveAssetLogoSrc } from "@/utils/assets";
 import { AttributionPager, useAttributionPage } from "@/components/attribution-pager";
 import { sourceDisplayNames } from "@/components/source-display-name";
 import { useLatestWalletOrdinals } from "@/components/source-name-order";
@@ -19,8 +18,8 @@ import { FittingAttributionAmount } from "@/components/fitting-attribution-amoun
 type Data = Awaited<ReturnType<typeof queryAttribution>>;
 const dimensions: AttributionDimension[] = ["coin", "source", "wallet", "assetType"];
 
-export default function ProfitAttribution({ currency, dateRange, quoteColor, logoMap = {} }: {
-  currency: CurrencyRateDetail; dateRange: TDateRange; quoteColor: QuoteColor; logoMap?: Record<string, string>;
+export default function ProfitAttribution({ currency, dateRange, quoteColor }: {
+  currency: CurrencyRateDetail; dateRange: TDateRange; quoteColor: QuoteColor;
 }) {
   const { t, locale } = useTranslation();
   const isMobile = useIsMobile();
@@ -84,14 +83,9 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
     <ol className="space-y-2">
       {(detail || isMobile ? items : items.slice(0, 5)).map((group) => {
         const key = `${detail ? "detail" : "preview"}:${dimension}:${group.key}`;
-        const asset = dimension === "coin" ? {
-          assetType: group.key.startsWith("stock:") ? "stock" as const : "crypto" as const,
-          symbol: group.key.slice(group.key.indexOf(":") + 1),
-        } : null;
         const content = <>
-          {isMobile && (asset
-            ? <img className="attribution-rank-logo" src={resolveAssetLogoSrc(asset, logoMap[getAssetLogoKey(asset)])} alt="" />
-            : <span className="attribution-rank-logo attribution-rank-mark" aria-hidden="true">{displayGroup(group).slice(0, 1).toUpperCase()}</span>)}
+          {isMobile && (dimension === "source" || dimension === "wallet") &&
+            <span className="attribution-rank-logo attribution-rank-mark" aria-hidden="true">{displayGroup(group).slice(0, 1).toUpperCase()}</span>}
           <span className="truncate font-medium" title={displayGroup(group)}>{displayGroup(group)}</span>
           <span className="h-4 rounded-full bg-muted" aria-hidden="true"><span className="block h-full rounded-full" style={{ width: `${Math.abs(group.priceEffect) / max * 100}%`, background: barTone(group.priceEffect) }} /></span>
           <span className={`min-w-0 whitespace-nowrap text-right tabular-nums ${tone(group.priceEffect)}`} title={exact(group.priceEffect)}>{isMobile
@@ -99,7 +93,7 @@ export default function ProfitAttribution({ currency, dateRange, quoteColor, log
             : format(group.priceEffect)}</span>
         </>;
         return <li key={group.key} className={isMobile ? "attribution-rank" : "grid grid-cols-[minmax(5rem,1fr)_minmax(4rem,2fr)_auto] items-center gap-2 text-xs sm:text-sm"}>
-          {isMobile ? <button type="button" className="attribution-rank-button" aria-expanded={expandedKey === key}
+          {isMobile ? <button type="button" className={`attribution-rank-button ${dimension === "source" || dimension === "wallet" ? "" : "without-mark"}`} aria-expanded={expandedKey === key}
             onClick={() => setExpandedKey(expandedKey === key ? null : key)}>{content}</button> : content}
           {isMobile && expandedKey === key && <dl className="attribution-rank-details">
             {(["priceEffect", "flowEffect", "residual", "totalChange"] as const).map((field) =>

@@ -101,7 +101,6 @@ vi.mock("@/middlelayers/charts", () => ({
   queryPNLChartValue: vi.fn(),
 }));
 
-import { getImageApiPath } from "@/utils/app";
 import {
   calculateTotalProfit,
   listAllowedSymbols,
@@ -452,65 +451,6 @@ describe("Range-sensitive component queries", () => {
     });
     expect(screen.getByText("ETH")).toBeInTheDocument();
     expect(screen.queryByText("BTC")).not.toBeInTheDocument();
-  });
-
-  it("does not let an older logo lookup replace the latest logo map", async () => {
-    const logoA = deferred<string>();
-    const logoB = deferred<string>();
-    vi.mocked(getImageApiPath).mockImplementation((_dir, symbol) =>
-      symbol === "BTC" ? logoA.promise : logoB.promise,
-    );
-
-    const view = renderWithOverviewProviders(
-      <LatestAssetsPercentage currency={usdCurrency} dateRange={rangeA} />,
-    );
-    await waitFor(() => {
-      expect(getImageApiPath).toHaveBeenCalledWith(
-        "/tmp/track3-cache",
-        "BTC",
-      );
-    });
-
-    view.rerender(
-      <MemoryRouter>
-        <ChartResizeContext.Provider
-          value={{
-            needResize: 0,
-            setNeedResize: vi.fn() as React.Dispatch<
-              React.SetStateAction<number>
-            >,
-          }}
-        >
-          <OverviewLoadingContext.Provider value={{ reportLoaded }}>
-            <LatestAssetsPercentage currency={usdCurrency} dateRange={rangeB} />
-          </OverviewLoadingContext.Provider>
-        </ChartResizeContext.Provider>
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(getImageApiPath).toHaveBeenCalledWith(
-        "/tmp/track3-cache",
-        "ETH",
-      );
-    });
-
-    await act(async () => {
-      logoB.resolve("/logos/ETH.png");
-      await logoB.promise;
-    });
-    expect(screen.getByRole("link", { name: /open eth details/i }).querySelector("img")).toHaveAttribute(
-      "src",
-      "/logos/ETH.png",
-    );
-
-    await act(async () => {
-      logoA.resolve("/logos/BTC.png");
-      await logoA.promise;
-    });
-    expect(screen.getByRole("link", { name: /open eth details/i }).querySelector("img")).toHaveAttribute(
-      "src",
-      "/logos/ETH.png",
-    );
   });
 
   it("passes the selected range to total value queries when the overview range changes", async () => {

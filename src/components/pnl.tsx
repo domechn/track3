@@ -103,6 +103,11 @@ const App = ({
     return ts ? new Date(ts).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-GB", { day: "numeric", month: "short" }) : "";
   }
 
+  function comparisonTitle(value?: number, ts?: number) {
+    const date = comparisonDate(ts);
+    return `${formatPNLValue(value)}${date ? ` ${t("overview.fidelity.versus").replace("{date}", date)}` : ""}`;
+  }
+
   function getPNLTextColor(val?: number): string {
     return positiveNegativeTextClass(val ?? 0, quoteColor, 600);
   }
@@ -133,6 +138,7 @@ const App = ({
                 className={`text-xs tabular-nums ${getPNLTextColor(
                   pnlTableData.todayPNL?.value,
                 )}`}
+                title={overviewFidelity ? comparisonTitle(pnlTableData.todayPNL?.value, pnlTableData.todayPNL?.timestamp) : undefined}
               >
                 {formatPNLValue(pnlTableData.todayPNL?.value)}{overviewFidelity && comparisonDate(pnlTableData.todayPNL?.timestamp) && <span> {t("overview.fidelity.versus").replace("{date}", comparisonDate(pnlTableData.todayPNL?.timestamp))}</span>}
               </p>
@@ -153,6 +159,7 @@ const App = ({
                 className={`text-xs tabular-nums ${getPNLTextColor(
                   pnlTableData.sevenTPnl?.value,
                 )}`}
+                title={overviewFidelity ? comparisonTitle(pnlTableData.sevenTPnl?.value, pnlTableData.sevenTPnl?.timestamp) : undefined}
               >
                 {formatPNLValue(pnlTableData.sevenTPnl?.value)}{overviewFidelity && comparisonDate(pnlTableData.sevenTPnl?.timestamp) && <span> {t("overview.fidelity.versus").replace("{date}", comparisonDate(pnlTableData.sevenTPnl?.timestamp))}</span>}
               </p>
@@ -173,6 +180,7 @@ const App = ({
                 className={`text-xs tabular-nums ${getPNLTextColor(
                   pnlTableData.thirtyPNL?.value,
                 )}`}
+                title={overviewFidelity ? comparisonTitle(pnlTableData.thirtyPNL?.value, pnlTableData.thirtyPNL?.timestamp) : undefined}
               >
                 {formatPNLValue(pnlTableData.thirtyPNL?.value)}{overviewFidelity && comparisonDate(pnlTableData.thirtyPNL?.timestamp) && <span> {t("overview.fidelity.versus").replace("{date}", comparisonDate(pnlTableData.thirtyPNL?.timestamp))}</span>}
               </p>

@@ -226,7 +226,6 @@ export interface QuickLookDialogProps {
   title: string;
   loading: boolean;
   data: QuickLookItem[];
-  logoMap: { [x: string]: string };
 }
 
 // --- Attach modal props ---
