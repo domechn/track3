@@ -140,7 +140,7 @@ describe("System Info subscription management", () => {
     render(<SystemInfo onProStatusChange={() => {}} />);
     const guide = await screen.findByText("Getting started");
     fireEvent.click(within(guide.closest("[data-ui-card]") as HTMLElement).getByRole("button", { name: "Documentation" }));
-    expect(mocks.openUrl).toHaveBeenCalledWith("https://docs.track3.dev");
+    expect(mocks.openUrl).toHaveBeenCalledWith("https://track3.dev/docs/");
   });
   it("checks updates from the regular About version card", async () => {
     render(<SystemInfo onProStatusChange={() => {}} />);

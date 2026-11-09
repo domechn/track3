@@ -16,11 +16,7 @@ import BybitLogo from "@/assets/icons/bybit-logo.svg";
 import HtxLogo from "@/assets/icons/htx-logo.svg";
 import MexcLogo from "@/assets/icons/mexc-logo.svg";
 import BackpackLogo from "@/assets/icons/backpack-logo.svg";
-
-const dropsBotUrl = "https://drops.bot/address/";
-const debankUrl = "https://debank.com/profile/";
-const blockchainUrl = "https://www.blockchain.com/explorer/addresses/btc/";
-const jupUrl = "https://portfolio.jup.ag/portfolio/";
+import { externalLinks } from "@/lib/external-links";
 
 export const SUPPORT_CONS = [
   "btc",
@@ -139,17 +135,17 @@ export const WALLET_OPTIONS = [
 export const WALLET_AIRDROP_URLS: {
   [walletType: string]: (wallet: string) => string;
 } = {
-  ERC20: (wallet: string) => `${dropsBotUrl}${wallet}`,
-  BTC: (wallet: string) => `${dropsBotUrl}${wallet}`,
-  SOL: (wallet: string) => `${dropsBotUrl}${wallet}`,
-  SUI: (wallet: string) => `${dropsBotUrl}${wallet}`,
-  TON: (wallet: string) => `${dropsBotUrl}${wallet}`,
+  ERC20: (wallet: string) => `${externalLinks.dropsAddress}${wallet}`,
+  BTC: (wallet: string) => `${externalLinks.dropsAddress}${wallet}`,
+  SOL: (wallet: string) => `${externalLinks.dropsAddress}${wallet}`,
+  SUI: (wallet: string) => `${externalLinks.dropsAddress}${wallet}`,
+  TON: (wallet: string) => `${externalLinks.dropsAddress}${wallet}`,
 };
 
 export const WALLET_DETAIL_URLS: {
   [walletType: string]: (wallet: string) => string;
 } = {
-  ERC20: (wallet: string) => `${debankUrl}${wallet}`,
-  BTC: (wallet: string) => `${blockchainUrl}${wallet}`,
-  SOL: (wallet: string) => `${jupUrl}${wallet}`,
+  ERC20: (wallet: string) => `${externalLinks.debankProfile}${wallet}`,
+  BTC: (wallet: string) => `${externalLinks.bitcoinAddress}${wallet}`,
+  SOL: (wallet: string) => `${externalLinks.jupiterPortfolio}${wallet}`,
 };

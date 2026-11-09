@@ -126,6 +126,7 @@
   "common.showLess": "Show Less",
   "common.refresh": "Refresh",
   "common.cancel": "Cancel",
+  "externalLinks.openFailed": "Could not open the link",
   "common.close": "Close",
   "common.submit": "Submit",
   "common.save": "Save",

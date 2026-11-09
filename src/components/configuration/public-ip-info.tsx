@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternal } from "@/lib/external-links";
 import { CheckIcon, ClipboardCopyIcon, ExclamationTriangleIcon, OpenInNewWindowIcon, ReloadIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { detectPublicIp, type PublicIp } from "@/middlelayers/public-ip";
@@ -72,7 +72,7 @@ export function PublicIpInfo({ t, mobile = false, design = false, fidelity = fal
       </div>
     </div>
     <div className="t3-fidelity-public-ip-guide">{t("fidelity.editor.ipGuide")}<br />
-      <button type="button" onClick={() => { void openUrl("https://track3.dev/docs/").catch(() => {}); }}>
+      <button type="button" onClick={() => { void openExternal("docs"); }}>
         {t("fidelity.editor.apiHelp")} <OpenInNewWindowIcon />
       </button> <span>track3.dev/docs</span>
     </div>
@@ -99,7 +99,7 @@ export function PublicIpInfo({ t, mobile = false, design = false, fidelity = fal
       <button type="button" onClick={() => void refresh()}><UpdateIcon aria-hidden="true" />{t("config.publicIpRetry")}</button>
     </div>}
     <div className="fidelity-ip-guide">{t("fidelity.settings.add.ipGuide")}<br />
-      <button type="button" onClick={() => { void openUrl("https://track3.dev/docs/").catch(() => {}); }}>
+      <button type="button" onClick={() => { void openExternal("docs"); }}>
         {t("fidelity.settings.add.ipDocs")} <OpenInNewWindowIcon aria-hidden="true" />
       </button> <span>track3.dev/docs</span>
     </div>
@@ -137,7 +137,7 @@ export function PublicIpInfo({ t, mobile = false, design = false, fidelity = fal
       {ip?.version === 6 && status === "value" && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("config.publicIpIpv6")}</p>}
       {status === "value" && <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t("config.publicIpHint")}</p>}
       <button type="button" className={`mt-2 inline-flex ${mobile ? "min-h-11" : "min-h-9"} items-center gap-1.5 text-left text-xs font-medium text-primary underline underline-offset-2 hover:opacity-80 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
-        onClick={() => { void openUrl("https://track3.dev/docs/").catch(() => {}); }}>
+        onClick={() => { void openExternal("docs"); }}>
         {t("config.publicIpDocs")} <OpenInNewWindowIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
       </button>
       {mobile && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("config.publicIpMobileHint")}</p>}

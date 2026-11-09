@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { check } from "@tauri-apps/plugin-updater";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "@/components/ui/use-toast";
 import { AboutDesign } from "./about-design";
 import notes096 from "./release-notes.fixture.md?raw";
@@ -9,6 +10,12 @@ vi.mock("@tauri-apps/plugin-updater", () => ({ check: vi.fn(async () => null) })
 vi.mock("@tauri-apps/api/path", () => ({ appDataDir: vi.fn(async () => "/sample/data") }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
 vi.mock("@/components/ui/use-toast", () => ({ toast: vi.fn() }));
+
+it("opens the published documentation from the About links", () => {
+  render(<AboutDesign version="0.9.4" />);
+  fireEvent.click(screen.getByRole("button", { name: /Documentation/ }));
+  expect(openUrl).toHaveBeenCalledWith("https://track3.dev/docs/");
+});
 
 it("checks for updates and reports when the installed version is current", async () => {
   render(<AboutDesign version="0.9.4" />);

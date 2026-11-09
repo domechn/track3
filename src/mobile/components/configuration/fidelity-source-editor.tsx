@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternal } from "@/lib/external-links";
 import { CheckIcon, ChevronLeftIcon, Cross2Icon, ExternalLinkIcon, EyeOpenIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import { useTranslation } from "@/mobile/i18n";
 import { ModalPage } from "@/mobile/components/mobile/overlays";
@@ -109,7 +109,7 @@ export function FidelitySourceEditor({
           <div className="fidelity-editor-banner is-info"><ShieldIcon /><div><strong>{t("fidelity.settings.add.readOnlyKeys")}</strong>
             <span>{t("fidelity.settings.add.readOnlyKeysHint")}</span></div></div>
           <p className="fidelity-editor-help">{t("fidelity.settings.add.notListedIntro")}{" "}
-            <button type="button" onClick={() => { void openUrl("https://track3.dev/docs/").catch(() => {}); }}>
+            <button type="button" onClick={() => { void openExternal("docs"); }}>
               {t("fidelity.settings.add.ipDocs")} <ExternalLinkIcon aria-hidden="true" />
             </button>
           </p>
@@ -175,7 +175,7 @@ export function FidelitySourceEditor({
             value={draft.alias ?? ""} placeholder={t("fidelity.settings.add.interactiveBrokers")}
             disabled={saving} onChange={(alias) => onUpdate({ alias })} />
           <p className="fidelity-editor-help">{t("fidelity.settings.add.flexGuide")}<br />
-            <button type="button" onClick={() => { void openUrl("https://track3.dev/docs/").catch(() => {}); }}>
+            <button type="button" onClick={() => { void openExternal("docs"); }}>
               {t("fidelity.settings.add.flexGuideLink")} ↗
             </button></p>
           <div className="fidelity-editor-banner is-info"><ShieldIcon /><div><strong>{t("fidelity.settings.add.staysOnDevice")}</strong>

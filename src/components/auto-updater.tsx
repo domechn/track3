@@ -4,7 +4,7 @@ import { check } from "@tauri-apps/plugin-updater";
 import { reloadApp } from "@/utils/app";
 import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternal } from "@/lib/external-links";
 import { CopyIcon, ExternalLinkIcon } from "@radix-ui/react-icons";
 import ReleaseNotes from "@/components/release-notes";
 
@@ -141,8 +141,7 @@ const App = () => {
               <button type="button" onClick={() => void navigator.clipboard?.writeText(
                 `Track3 ${currentVersion} → ${version}: ${mb(received)} of ${mb(contentLength)} MB; ${downloadError}`,
               )}><CopyIcon aria-hidden="true" />{t("startup.fidelity.copyDetails")}</button>
-              <button type="button" onClick={() => void openUrl("https://github.com/domechn/track3/releases/latest")
-                .catch(() => setManualOpenError(true))}
+              <button type="button" onClick={() => void openExternal("latestRelease", () => setManualOpenError(true))}
               ><ExternalLinkIcon aria-hidden="true" />{t("update.fidelity.downloadManually")}</button>
               <button type="button" className="primary" onClick={() => void download()}>{t("update.fidelity.tryAgain")}</button>
             </div>

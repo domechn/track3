@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AutoUpdater from "./auto-updater";
 import { check } from "@tauri-apps/plugin-updater";
-import { useToast } from "@/components/ui/use-toast";
+import { toast as linkToast, useToast } from "@/components/ui/use-toast";
 import { reloadApp } from "@/utils/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { I18nProvider } from "@/i18n";
@@ -15,6 +15,7 @@ vi.mock("@tauri-apps/plugin-updater", () => ({
 
 vi.mock("@/components/ui/use-toast", () => ({
   useToast: vi.fn(),
+  toast: vi.fn(),
 }));
 
 vi.mock("@/utils/app", () => ({
@@ -149,6 +150,9 @@ describe("AutoUpdater", () => {
     await screen.findByRole("heading", { name: "Update failed" });
     fireEvent.click(screen.getByRole("button", { name: "Download manually" }));
     expect(await screen.findByText(/Could not open the download page/)).toBeVisible();
+    await waitFor(() => expect(linkToast).toHaveBeenCalledWith(expect.objectContaining({
+      description: "Could not open the link",
+    })));
   });
 
   it("does nothing when no update is available", async () => {

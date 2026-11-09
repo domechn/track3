@@ -28,6 +28,7 @@ import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { getVersion } from "@/utils/app";
 import { trackCheckoutCompleted, trackCheckoutPhase, trackSubscribeClicked, trackCheckoutCancelled, trackOpenClicked } from "@/middlelayers/ui-state/telemetry";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternal } from "@/lib/external-links";
 import { check } from "@tauri-apps/plugin-updater";
 import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
@@ -269,7 +270,7 @@ const App = ({
   }
 
   async function onViewBenefits() {
-    await openUrl("https://track3.dev/#pro");
+    await openExternal("pro");
   }
 
   async function checkAboutUpdates() {
@@ -490,7 +491,7 @@ const App = ({
             <Button type="button" size="sm" variant="outline" disabled={checkingAbout} onClick={() => { void checkAboutUpdates(); }}>
               {t(checkingAbout ? "fidelity.settingsB.about.checking" : "fidelity.settingsB.about.check")}
             </Button>
-            {aboutUpdate && <Button type="button" size="sm" variant="outline" onClick={() => { void openUrl("https://github.com/domechn/track3/releases/latest"); }}>
+            {aboutUpdate && <Button type="button" size="sm" variant="outline" onClick={() => { void openExternal("latestRelease"); }}>
               {t("fidelity.settingsB.about.viewUpdate")}
             </Button>}
           </div>
@@ -498,7 +499,7 @@ const App = ({
             {t("fidelity.settingsB.about.updateAvailable").replace("{version}", aboutUpdate)}
           </p>}
           <button type="button" className="mt-2 inline-flex min-h-11 w-fit items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
-            onClick={() => { void openUrl("https://github.com/domechn/track3/releases"); }}>
+            onClick={() => { void openExternal("releases"); }}>
             {t("fidelity.settingsB.about.fullNotes")} <ExternalLinkIcon aria-hidden="true" />
           </button>
         </CardContent>
@@ -510,7 +511,7 @@ const App = ({
         <CardContent className="space-y-2">
           <p className="text-xs text-muted-foreground">{t("onboarding.replay.description")}</p>
           <button type="button" className="inline-flex min-h-11 w-fit items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
-            onClick={() => { void openUrl("https://docs.track3.dev"); }}>
+            onClick={() => { void openExternal("docs"); }}>
             {t("fidelity.settingsB.about.docs")} <ExternalLinkIcon aria-hidden="true" />
           </button>
           <Button type="button" variant="outline" size="sm" data-testid="onboarding-replay" onClick={requestOnboardingReplay}>{t("onboarding.replay.action")}</Button>
