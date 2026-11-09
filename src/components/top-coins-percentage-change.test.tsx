@@ -4,29 +4,11 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import TopCoinsPercentageChange from "@/components/top-coins-percentage-change";
 import { ChartResizeContext } from "@/App";
 import { queryTopCoinsPercentageChangeData } from "@/middlelayers/charts";
-import { downloadCoinLogos } from "@/middlelayers/data";
-import { getImageApiPath } from "@/utils/app";
 
 vi.mock("@/middlelayers/charts", () => ({
   queryTopCoinsPercentageChangeData: vi.fn(),
 }));
 
-vi.mock("@/middlelayers/data", () => ({
-  downloadCoinLogos: vi.fn(),
-}));
-
-vi.mock("@/utils/app", () => ({
-  getImageApiPath: vi.fn(),
-}));
-
-vi.mock("@tauri-apps/api/path", () => ({
-  appCacheDir: vi.fn().mockResolvedValue("/tmp/track3-cache"),
-}));
-
-// Each call to getImageApiPath returns a deterministic fake file URL per symbol.
-vi.mocked(getImageApiPath).mockImplementation(async (_cacheDir, symbol) =>
-  `asset://localhost/cache/assets/coins/${symbol.toLowerCase()}.png`,
-);
 
 function renderChart() {
   return render(
@@ -48,10 +30,6 @@ function renderChart() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Re-apply the default getImageApiPath mock after clearAllMocks.
-  vi.mocked(getImageApiPath).mockImplementation(async (_cacheDir, symbol) =>
-    `asset://localhost/cache/assets/coins/${symbol.toLowerCase()}.png`,
-  );
 });
 
 describe("TopCoinsPercentageChange", () => {
@@ -260,7 +238,7 @@ describe("TopCoinsPercentageChange", () => {
     expect(loserClasses).toContain("text-loss");
   });
 
-  it("renders a real logo image per row sourced from the local cache", async () => {
+  it("renders asset rows without logo images", async () => {
     vi.mocked(queryTopCoinsPercentageChangeData).mockResolvedValue({
       timestamps: [1713158400000, 1713244800000],
       coins: [
@@ -291,29 +269,8 @@ describe("TopCoinsPercentageChange", () => {
       expect(getAllByTestId("tcpc-row")).toHaveLength(2);
     });
 
-    // Wait for the logo fetch effect to resolve and re-render.
-    await waitFor(() => {
-      const logos = getAllByTestId("tcpc-logo");
-      expect(logos.every((l) => l.getAttribute("src"))).toBe(true);
-    });
-
-    const logos = getAllByTestId("tcpc-logo");
-    logos.forEach((logo) => {
-      const src = logo.getAttribute("src") ?? "";
-      // Either the cached asset path, or the default fallback bundled SVG
-      // (asset URL starts with `asset://localhost` or the inline SVGs shipped
-      // by Vite resolve to `/src/assets/icons/...`).
-      expect(
-        src.startsWith("asset://localhost/cache/assets/coins/") ||
-          src.includes("/assets/icons/"),
-      ).toBe(true);
-    });
-
-    // The downloader should be called with crypto-eligible coins.
-    expect(vi.mocked(downloadCoinLogos)).toHaveBeenCalled();
-    const callArg = vi.mocked(downloadCoinLogos).mock.calls[0]?.[0] ?? [];
-    const symbols = callArg.map((c) => c.symbol);
-    expect(symbols).toEqual(expect.arrayContaining(["PEPE", "BTC"]));
+    expect(getAllByTestId("tcpc-row")[0].querySelector("img")).toBeNull();
+    expect(getAllByTestId("tcpc-row")[0]).toHaveTextContent("PEPE");
   });
 
   it("renders max and min in a two-column subgrid so labels and values line up across rows", async () => {

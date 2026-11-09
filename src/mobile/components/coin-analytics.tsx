@@ -21,7 +21,6 @@ import {
 import { AssetType } from "@/middlelayers/datafetch/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   currencyWrapper,
@@ -39,7 +38,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getImageApiPath } from "@/utils/app";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { timeToDateStr } from "@/utils/date";
 import {
@@ -75,10 +73,8 @@ import AssetLabel from "@/components/common/asset-label";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
-  getAssetLogoKey,
+  getAssetKey,
   parseAssetTypeSearchParam,
-  resolveAssetLogoSrc,
-  shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import {
   Select,
@@ -360,7 +356,6 @@ const App = ({
     [k: string]: string | undefined;
   }>({});
 
-  const [logo, setLogo] = useState("");
 
   const [allowSymbols, setAllowSymbols] = useState<AssetReference[]>([]);
   const [coinKeyword, setCoinKeyword] = useState("");
@@ -399,14 +394,6 @@ const App = ({
       setCoinListLimit(200);
     }
   }, [coinSelectOpen]);
-
-  async function getLogoPath(symbol: string, selectedAssetType: AssetType) {
-    if (!shouldDownloadCryptoLogo({ assetType: selectedAssetType })) {
-      return "";
-    }
-    const acd = await getAppCacheDir();
-    return getImageApiPath(acd, symbol);
-  }
 
   useEffect(() => {
     if (transactions.length === 0) {
@@ -476,14 +463,14 @@ const App = ({
   const allowSymbolRankMap = useMemo(() => {
     const rankMap = new Map<string, number>();
     allowSymbols.forEach((item, idx) => {
-      rankMap.set(getAssetLogoKey(item), idx + 1);
+      rankMap.set(getAssetKey(item), idx + 1);
     });
     return rankMap;
   }, [allowSymbols]);
 
   const rank = useMemo(() => {
     const rankNum =
-      allowSymbolRankMap.get(getAssetLogoKey({ symbol, assetType })) ?? 0;
+      allowSymbolRankMap.get(getAssetKey({ symbol, assetType })) ?? 0;
     if (rankNum === 0) {
       return "-";
     }
@@ -552,7 +539,7 @@ const App = ({
     const gen = loadGenRef.current;
 
     // fetch all data before setting any state to avoid multiple re-renders
-    const [txns, tp, la, ama, lp, snapshotDates] = await Promise.all([
+    const [txns, tp, la, ama, snapshotDates] = await Promise.all([
       queryTransactionsBySymbolAndDateRange(
         s,
         selectedRange,
@@ -561,7 +548,6 @@ const App = ({
       calculateTotalProfit(selectedRange, s, selectedAssetType),
       queryLastAssetsBySymbol(s, selectedRange, selectedAssetType),
       queryAssetMaxAmountBySymbol(s, selectedRange, selectedAssetType),
-      getLogoPath(s, selectedAssetType),
       queryAllDataDates(),
     ]);
     const latestSnapshotTime = snapshotDates.reduce((latest, item) => {
@@ -590,7 +576,6 @@ const App = ({
     setLastAsset(la);
     setPreviousPrice(previous?.price);
     setMaxPosition(ama);
-    setLogo(lp);
 
     const detail = tp.coins.find(
       (c) => c.symbol === s && c.assetType === selectedAssetType,
@@ -859,7 +844,6 @@ const App = ({
       <div className="d2-coin analyze-coin relative min-h-[400px]">
         {isMobile && <div className="coin-detail-hero">
           <div className="coin-detail-identity">
-            <img src={resolveAssetLogoSrc({ symbol, assetType }, logo)} alt="" />
             <button type="button" role="combobox" aria-label={`${t("coin.symbol")} ${formatAssetLabel({ symbol, assetType })}`}
               aria-expanded={coinSelectOpen} onClick={() => setCoinSelectOpen(true)}>
               {symbol}<CaretSortIcon aria-hidden="true" />
@@ -869,7 +853,7 @@ const App = ({
             <Input value={coinKeyword} onChange={(event) => { setCoinKeyword(event.target.value); setCoinListLimit(200); }}
               placeholder={t("coin.searchPlaceholder")} className="mb-3 min-h-11" />
             <div className="mobile-coin-options">
-              {visibleAllowSymbols.map((item) => <button type="button" key={getAssetLogoKey(item)}
+              {visibleAllowSymbols.map((item) => <button type="button" key={getAssetKey(item)}
                 className="mobile-coin-option" onClick={() => {
                   setCoinSelectOpen(false);
                   navigate(buildAssetDetailsPath(item));
@@ -945,11 +929,6 @@ const App = ({
                 </CardHeader>
                 <CardContent>
                   <div className="flex">
-                    <img
-                      className="inline-block w-[32px] h-[32px] mr-2 rounded-full py-[2px]"
-                      src={resolveAssetLogoSrc({ symbol, assetType }, logo)}
-                      alt={formatAssetLabel({ symbol, assetType })}
-                    />
                     <div className="w-[100%] min-w-0 h-[32px] mobile-coin-selector">
                       <Popover
                         open={coinSelectOpen}
@@ -989,7 +968,7 @@ const App = ({
                               <CommandGroup>
                                 {visibleAllowSymbols.map((s) => (
                                   <CommandItem
-                                    key={getAssetLogoKey(s)}
+                                    key={getAssetKey(s)}
                                     value={formatAssetLabel(s)}
                                     onSelect={() => {
                                       setCoinSelectOpen(false);
@@ -1000,8 +979,8 @@ const App = ({
                                     <CheckIcon
                                       className={cn(
                                         "ml-auto h-4 w-4",
-                                        getAssetLogoKey(s) ===
-                                          getAssetLogoKey({ symbol, assetType })
+                                        getAssetKey(s) ===
+                                          getAssetKey({ symbol, assetType })
                                           ? "opacity-100"
                                           : "opacity-0",
                                       )}

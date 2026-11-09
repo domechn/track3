@@ -21,7 +21,6 @@ import { AssetType } from "@/middlelayers/datafetch/types";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { SummaryFidelityRangeContext } from "./summary-fidelity-range-context";
 import { useDataChangedVersion } from "@/contexts/data-changed";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   currencyWrapper,
@@ -38,7 +37,6 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { getImageApiPath } from "@/utils/app";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
 import { timeToDateStr } from "@/utils/date";
 import {
@@ -76,10 +74,8 @@ import AssetLabel from "./common/asset-label";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
-  getAssetLogoKey,
+  getAssetKey,
   parseAssetTypeSearchParam,
-  resolveAssetLogoSrc,
-  shouldDownloadCryptoLogo,
 } from "@/utils/assets";
 import {
   Select,
@@ -357,7 +353,6 @@ const App = ({
     [k: string]: string | undefined;
   }>({});
 
-  const [logo, setLogo] = useState("");
 
   const [allowSymbols, setAllowSymbols] = useState<AssetReference[]>([]);
   const [coinKeyword, setCoinKeyword] = useState("");
@@ -398,14 +393,6 @@ const App = ({
       setCoinListLimit(200);
     }
   }, [coinSelectOpen]);
-
-  async function getLogoPath(symbol: string, selectedAssetType: AssetType) {
-    if (!shouldDownloadCryptoLogo({ assetType: selectedAssetType })) {
-      return "";
-    }
-    const acd = await getAppCacheDir();
-    return getImageApiPath(acd, symbol);
-  }
 
   useEffect(() => {
     if (transactions.length === 0) {
@@ -473,14 +460,14 @@ const App = ({
   const allowSymbolRankMap = useMemo(() => {
     const rankMap = new Map<string, number>();
     allowSymbols.forEach((item, idx) => {
-      rankMap.set(getAssetLogoKey(item), idx + 1);
+      rankMap.set(getAssetKey(item), idx + 1);
     });
     return rankMap;
   }, [allowSymbols]);
 
   const rank = useMemo(() => {
     const rankNum =
-      allowSymbolRankMap.get(getAssetLogoKey({ symbol, assetType })) ?? 0;
+      allowSymbolRankMap.get(getAssetKey({ symbol, assetType })) ?? 0;
     if (rankNum === 0) {
       return "-";
     }
@@ -550,7 +537,7 @@ const App = ({
     const transactionRange = fidelity && !fidelityRange ? { start: new Date(0), end: selectedRange.end } : selectedRange;
 
     // fetch all data before setting any state to avoid multiple re-renders
-    const [txns, tp, la, ama, lp] = await Promise.all([
+    const [txns, tp, la, ama] = await Promise.all([
       queryTransactionsBySymbolAndDateRange(
         s,
         transactionRange,
@@ -559,7 +546,6 @@ const App = ({
       calculateTotalProfit(transactionRange, s, selectedAssetType),
       queryLastAssetsBySymbol(s, selectedRange, selectedAssetType),
       queryAssetMaxAmountBySymbol(s, selectedRange, selectedAssetType),
-      getLogoPath(s, selectedAssetType),
     ]);
 
     // ignore stale results if symbol/dateRange changed while loading
@@ -569,7 +555,6 @@ const App = ({
     setTransactionsLoading(false);
     setLastAsset(la);
     setMaxPosition(ama);
-    setLogo(lp);
 
     const detail = tp.coins.find(
       (c) => c.symbol === s && c.assetType === selectedAssetType,
@@ -924,7 +909,6 @@ const App = ({
       <div className="analyze-coin relative min-h-[400px]">
         <div className="coin-page-heading">
           <div className="coin-page-identity">
-            <img src={resolveAssetLogoSrc({ symbol, assetType }, logo)} alt="" />
             <div>
               <h1>{formatAssetLabel({ symbol, assetType })}</h1>
               <span>{assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")}</span>
@@ -993,11 +977,6 @@ const App = ({
                 </CardHeader>
                 <CardContent>
                   <div className="flex">
-                    <img
-                      className="inline-block w-[32px] h-[32px] mr-2 rounded-full py-[2px]"
-                      src={resolveAssetLogoSrc({ symbol, assetType }, logo)}
-                      alt={formatAssetLabel({ symbol, assetType })}
-                    />
                     <div className="w-[100%] h-[32px] overflow-hidden">
                       <Popover
                         open={coinSelectOpen}
@@ -1037,7 +1016,7 @@ const App = ({
                               <CommandGroup>
                                 {visibleAllowSymbols.map((s) => (
                                   <CommandItem
-                                    key={getAssetLogoKey(s)}
+                                    key={getAssetKey(s)}
                                     value={formatAssetLabel(s)}
                                     onSelect={() => {
                                       setCoinSelectOpen(false);
@@ -1048,8 +1027,8 @@ const App = ({
                                     <CheckIcon
                                       className={cn(
                                         "ml-auto h-4 w-4",
-                                        getAssetLogoKey(s) ===
-                                          getAssetLogoKey({ symbol, assetType })
+                                        getAssetKey(s) ===
+                                          getAssetKey({ symbol, assetType })
                                           ? "opacity-100"
                                           : "opacity-0",
                                       )}

@@ -30,11 +30,7 @@ import {
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
-import { downloadCoinLogos } from "@/middlelayers/data";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import ImageStack from "@/components/common/image-stack";
 import AssetLabel from "@/components/common/asset-label";
-import { getImageApiPath } from "@/utils/app";
 import { Button } from "@/components/ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import {
@@ -62,7 +58,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { resolveAssetLogoSrc } from "@/utils/assets";
 import { positiveNegativeColor } from "@/utils/color";
 import { directionPhysicalTone } from "@/utils/color";
 import ConfirmDeleteDialog from "@/mobile/components/common/confirm-delete-dialog";
@@ -161,7 +156,6 @@ const App = ({
   const [detailScrollTop, setDetailScrollTop] = useState(0);
   const [measuredDetailHeights, setMeasuredDetailHeights] = useState<Map<number, number>>(() => new Map());
   const [pageLoading, setPageLoading] = useState(true);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [deleteCandidate, setDeleteCandidate] = useState<string | null>(null);
   const [deleteAssetCandidate, setDeleteAssetCandidate] = useState<{ id: number; symbol: string } | null>(null);
   const phoneBackRef = useRef<HTMLButtonElement>(null);
@@ -235,68 +229,6 @@ const App = ({
     }
     setPageLoading(true);
   }, [rangeKey, dataChangedVersion, dataPage, pageSize, historyFilter]);
-
-  const symbolPricePairs = useMemo(() => {
-    const latestBySymbol = new Map<string, number>();
-    for (const item of data) {
-      for (const asset of item.topAssets) {
-        if (!latestBySymbol.has(asset.symbol)) {
-          latestBySymbol.set(asset.symbol, asset.price);
-        }
-      }
-    }
-    for (const asset of selectedData?.assets ?? []) {
-      if (!latestBySymbol.has(asset.symbol)) latestBySymbol.set(asset.symbol, asset.price);
-    }
-
-    return Array.from(latestBySymbol.entries()).map(([symbol, price]) => ({
-      symbol,
-      price,
-    }));
-  }, [data, selectedData]);
-
-  const uniqueSymbols = useMemo(() => {
-    return symbolPricePairs.map((item) => item.symbol);
-  }, [symbolPricePairs]);
-
-  useEffect(() => {
-    if (!symbolPricePairs.length) {
-      return;
-    }
-
-    downloadCoinLogos(symbolPricePairs);
-  }, [symbolPricePairs]);
-
-  useEffect(() => {
-    async function loadMissingLogos() {
-      if (!uniqueSymbols.length) {
-        return;
-      }
-
-      const missing = uniqueSymbols.filter((symbol) => !logoMap[symbol]);
-      if (!missing.length) {
-        return;
-      }
-
-      const acd = await getAppCacheDir();
-      const kvs = await Promise.all(
-        missing.map(async (symbol) => ({
-          symbol,
-          path: await getImageApiPath(acd, symbol),
-        })),
-      );
-
-      setLogoMap((prev) => {
-        const next = { ...prev };
-        kvs.forEach(({ symbol, path }) => {
-          next[symbol] = path;
-        });
-        return next;
-      });
-    }
-
-    loadMissingLogos();
-  }, [uniqueSymbols, logoMap]);
 
   const loadPage = useCallback(async () => {
     const currentGen = ++loadGenRef.current;
@@ -943,7 +875,6 @@ const App = ({
                 <div className="flex min-w-0 items-center justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-2 font-medium">
                     <span className="history-mobile-rank">{item.rank}</span>
-                    <img className="h-7 w-7 shrink-0 rounded-full" src={resolveAssetLogoSrc(item, logoMap[item.symbol])} alt="" />
                     <span className="min-w-0 break-words">{item.symbol}</span>
                   </span>
                   <span className="history-asset-value font-mono text-sm">{currency.symbol}{prettyNumberToLocaleString(currencyWrapper(currency)(item.value))}</span>
@@ -1020,10 +951,6 @@ const App = ({
                     <TableRow aria-hidden="true"><TableCell colSpan={6} style={{ height: detailOffsets[detailStart], padding: 0 }} /></TableRow>
                   ) : null}
                   {virtualRankData.map((item, virtualIndex) => {
-                    const apiPath = resolveAssetLogoSrc(
-                      item,
-                      logoMap[item.symbol],
-                    );
                     return (
                       <TableRow
                         key={"historical-data-detail-row-" + item.assetId}
@@ -1036,12 +963,7 @@ const App = ({
                           # {item.rank}
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <div className="flex items-center gap-1 text-sm">
-                            <img
-                              className="inline-block w-[18px] h-[18px] rounded-full"
-                              src={apiPath}
-                              alt={item.symbol}
-                            />
+                          <div className="flex items-center text-sm">
                             <AssetLabel asset={item} />
                           </div>
                         </TableCell>
@@ -1183,8 +1105,7 @@ const App = ({
                 {row.sourcesTotal !== undefined && <> · <span className="fidelity-history-source-count">{t("fidelity.history.sources")
                   .replace("{ready}", String(row.sourcesTotal - (row.missingCount ?? 0)))
                   .replace("{total}", String(row.sourcesTotal))}</span></>}
-                <span className="fidelity-history-hidden-logos"><ImageStack imageSrcs={row.topAssets.slice(0, 3).map((asset) =>
-                  resolveAssetLogoSrc(asset, logoMap[asset.symbol]))} imageWidth={18} imageHeight={18} /></span>
+
               </span>
               <span className="history-mobile-snapshot-delta ios-money" data-tone={directionPhysicalTone(row.change, quoteColor)}>
                 {phoneChange(row.change, row.total)}
@@ -1363,9 +1284,6 @@ const App = ({
                         </span>
                         <span className="history-mobile-snapshot-secondary">
                           <span className="flex items-center gap-2">
-                            <ImageStack imageSrcs={row.topAssets.slice(0, 3).map((asset) =>
-                              resolveAssetLogoSrc(asset, logoMap[asset.symbol]))}
-                              imageWidth={18} imageHeight={18} />
                             {t("history.assetCount").replace("{n}", String(row.assetCount))}
                           </span>
                           <span className="history-mobile-snapshot-delta ios-money" data-tone={directionPhysicalTone(row.change, quoteColor)}>
@@ -1396,7 +1314,6 @@ const App = ({
                     <TableBody>
                       {data.map((row) => {
                         const isLatest = latestRow?.id === row.id;
-                        const topAssets = row.topAssets;
                         const displayDate = snapshotDateFormatter.format(new Date(row.createdAt));
 
                         return (
@@ -1442,17 +1359,7 @@ const App = ({
                                   )}`}
                             </TableCell>
                             <TableCell className="py-1.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <ImageStack
-                                  imageSrcs={topAssets.map((asset) =>
-                                    resolveAssetLogoSrc(
-                                      asset,
-                                      logoMap[asset.symbol],
-                                    ),
-                                  )}
-                                  imageWidth={18}
-                                  imageHeight={18}
-                                />
+                              <div className="flex items-center">
                                 <span className="text-xs text-muted-foreground">
                                   {t("history.assetCount").replace("{n}", String(row.assetCount))}
                                 </span>

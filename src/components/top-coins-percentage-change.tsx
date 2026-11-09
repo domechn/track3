@@ -1,6 +1,4 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import bluebird from "bluebird";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { ButtonGroup, ButtonGroupItem } from "./ui/button-group";
 import { TDateRange, TopCoinsPercentageChangeData } from "@/middlelayers/types";
@@ -9,13 +7,8 @@ import { queryTopCoinsPercentageChangeData } from "@/middlelayers/charts";
 import { ChartResizeContext } from "@/App";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useTranslation } from "@/i18n";
-import { downloadCoinLogos } from "@/middlelayers/data";
-import { getImageApiPath } from "@/utils/app";
 import {
-  formatAssetLabel,
-  getAssetLogoKey,
-  resolveAssetLogoSrc,
-  shouldDownloadCryptoLogo,
+  getAssetKey,
 } from "@/utils/assets";
 import { directionClass, directionColorVar } from "@/utils/color";
 
@@ -117,7 +110,6 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     timestamps: [],
     coins: [],
   });
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [sortBy, setSortBy] = useState<SortBy>("value");
 
   const rangeKey = useMemo(
@@ -138,34 +130,6 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       return;
     }
     setData(tcpcd);
-  }
-
-  useEffect(() => {
-    if (data.coins.length === 0) return;
-    downloadCoinLogos(
-      data.coins
-        .filter((coin) => shouldDownloadCryptoLogo(coin))
-        .map((c) => ({ symbol: c.coin, price: 0 })),
-    );
-    getLogoMap(data.coins).then((m) => setLogoMap(m));
-  }, [data]);
-
-  async function getLogoMap(
-    coins: { coin: string; assetType: "crypto" | "stock" }[],
-  ) {
-    const acd = await getAppCacheDir();
-    const kvs = await bluebird.map(coins, async (c) => {
-      if (!shouldDownloadCryptoLogo(c)) {
-        return {
-          [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: "",
-        };
-      }
-      const path = await getImageApiPath(acd, c.coin);
-      return {
-        [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: path,
-      };
-    });
-    return Object.assign({}, ...kvs);
   }
 
   const rows = useMemo<RowData[]>(() => {
@@ -239,7 +203,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
             {/* Column header — labels track the active sort. */}
             <div
               data-testid="tcpc-header"
-              className="grid grid-cols-[20px_minmax(0,1fr)_72px_64px_80px_96px] items-center gap-2 px-2 pb-1"
+              className="grid grid-cols-[minmax(0,1fr)_72px_64px_80px_96px] items-center gap-2 px-2 pb-1"
             >
               <div></div>
               <div></div>
@@ -283,34 +247,22 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
               const sparkColor = directionColorVar(activeEnd);
               const valueClass = directionClass(row.valueEnd);
               const priceClass = directionClass(row.priceEnd);
-              const logoKey = getAssetLogoKey({
+              const assetKey = getAssetKey({
                 symbol: row.coin,
                 assetType: row.assetType,
               });
               return (
                 <div
-                  key={logoKey}
+                  key={assetKey}
                   data-testid="tcpc-row"
                   className={[
-                    "grid grid-cols-[20px_minmax(0,1fr)_72px_64px_80px_96px] items-center gap-2 rounded-md px-2 py-1.5",
+                    "grid grid-cols-[minmax(0,1fr)_72px_64px_80px_96px] items-center gap-2 rounded-md px-2 py-1.5",
                     isTop && showBadges ? "bg-muted/40" : "",
                     isBot && showBadges ? "bg-muted/40" : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
                 >
-                  <img
-                    data-testid="tcpc-logo"
-                    className="h-5 w-5 shrink-0 rounded-full bg-muted"
-                    src={resolveAssetLogoSrc(
-                      { symbol: row.coin, assetType: row.assetType },
-                      logoMap[logoKey],
-                    )}
-                    alt={formatAssetLabel({
-                      symbol: row.coin,
-                      assetType: row.assetType,
-                    })}
-                  />
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span

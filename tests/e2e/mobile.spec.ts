@@ -577,9 +577,7 @@ for (const size of sizes) {
           await expect(page.locator("#app-top-bar .mobile-header-total")).toBeHidden();
         }
         if (route === "history") {
-          await expect.poll(() => page.locator(".history-mobile-snapshot .image-stack img").evaluateAll((images) =>
-            images.length > 0 && images.every((image) => image instanceof HTMLImageElement &&
-              image.src.startsWith("data:image/svg+xml") && image.complete && image.naturalWidth > 0))).toBe(true);
+          await expect(page.locator(".history-mobile-snapshot img")).toHaveCount(0);
         }
         const routeHeading: Record<string, string> = {
           overview: "Overview", history: "History", summary: "Summary", wallets: "Wallets",
@@ -691,9 +689,7 @@ for (const size of sizes) {
             await expect(page.locator(".fd-coin")).toHaveAttribute("data-state", "ready");
           }
           if (route === "history") {
-            await expect.poll(() => page.locator(".history-mobile-snapshot .image-stack img").evaluateAll((images) =>
-              images.length > 0 && images.every((image) => image instanceof HTMLImageElement &&
-                image.src.startsWith("data:image/svg+xml") && image.complete && image.naturalWidth > 0))).toBe(true);
+            await expect(page.locator(".history-mobile-snapshot img")).toHaveCount(0);
           }
           if (route === "comparison") await expect(page.locator(".fd-comparison-total")).toBeVisible();
           if (route === "cost-basis") await expect(page.locator(".fidelity-cost-kpis .fidelity-kpi-metric").first()).toContainText("Realized P&L");
@@ -758,7 +754,7 @@ test("history snapshots use touch rows and a full-page detail", async ({ browser
     await page.goto("/#/history");
     const row = page.getByTestId("history-mobile-row").first();
     await expect(row).toBeVisible();
-    await expect(row.locator(".image-stack img")).not.toHaveCount(0);
+    await expect(row.locator("img")).toHaveCount(0);
     await row.click();
     const detail = page.getByRole("dialog", { name: /snapshot details/i });
     await expect(detail).toBeVisible();

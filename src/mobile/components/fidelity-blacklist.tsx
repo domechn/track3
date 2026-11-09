@@ -52,7 +52,6 @@ export function FidelityBlacklist({
       {symbols.length ? <div className="fidelity-blacklist-rows">
         {symbols.map((symbol) => <div key={symbol} className="fidelity-blacklist-row">
           <div className="fidelity-blacklist-identity">
-            <span data-label={symbol.slice(0, 3)} aria-hidden="true" />
             <div><strong>{symbol}</strong><small>{t("fidelity.settings.blacklist.allSources")}</small></div>
           </div>
           <button type="button" aria-label={t("fidelity.settings.blacklist.removeSymbol").replace("{symbol}", symbol)}

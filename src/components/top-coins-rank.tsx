@@ -3,20 +3,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableRow } from "./ui/table";
 import { queryTopCoinsRank } from "@/middlelayers/charts";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import { getImageApiPath } from "@/utils/app";
-import { downloadCoinLogos } from "@/middlelayers/data";
-import bluebird from "bluebird";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import AssetLabel from "./common/asset-label";
 import {
   buildAssetDetailsPath,
-  formatAssetLabel,
-  getAssetLogoKey,
-  resolveAssetLogoSrc,
-  shouldDownloadCryptoLogo,
+  getAssetKey,
 } from "@/utils/assets";
 import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
@@ -30,7 +23,6 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     timestamps: [],
     coins: [],
   } as TopCoinsRankData);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [page, setPage] = useState(0);
   const navigate = useNavigate();
 
@@ -52,35 +44,6 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
       return;
     }
     setTopCoinsRankData(tcr);
-  }
-
-  useEffect(() => {
-    if (topCoinsRankData.coins.length === 0) return;
-    downloadCoinLogos(
-      topCoinsRankData.coins
-        .filter((coin) => shouldDownloadCryptoLogo(coin))
-        .map((c) => ({ symbol: c.coin, price: 0 })),
-    );
-    getLogoMap(topCoinsRankData.coins).then((m) => setLogoMap(m));
-  }, [topCoinsRankData]);
-
-  async function getLogoMap(
-    coins: { coin: string; assetType: "crypto" | "stock" }[],
-  ) {
-    const acd = await getAppCacheDir();
-    const kvs = await bluebird.map(coins, async (c) => {
-      if (!shouldDownloadCryptoLogo(c)) {
-        return {
-          [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: "",
-        };
-      }
-
-      const path = await getImageApiPath(acd, c.coin);
-      return {
-        [getAssetLogoKey({ symbol: c.coin, assetType: c.assetType })]: path,
-      };
-    });
-    return Object.assign({}, ...kvs);
   }
 
   const rankRows = useMemo(() => {
@@ -162,7 +125,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
             <TableBody>
               {pagedRows.map((row) => (
                 <TableRow
-                  key={getAssetLogoKey({
+                  key={getAssetKey({
                     symbol: row.coin,
                     assetType: row.assetType,
                   })}
@@ -180,23 +143,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                     #{row.rank}
                   </TableCell>
                   <TableCell className="py-1.5">
-                    <div className="flex items-center gap-2">
-                      <img
-                        className="w-[18px] h-[18px] rounded-full"
-                        src={resolveAssetLogoSrc(
-                          { symbol: row.coin, assetType: row.assetType },
-                          logoMap[
-                            getAssetLogoKey({
-                              symbol: row.coin,
-                              assetType: row.assetType,
-                            })
-                          ],
-                        )}
-                        alt={formatAssetLabel({
-                          symbol: row.coin,
-                          assetType: row.assetType,
-                        })}
-                      />
+                    <div className="flex items-center">
                       <AssetLabel
                         asset={{
                           symbol: row.coin,

@@ -63,12 +63,14 @@ const App = ({
   quoteColor,
   clipToRange = false,
   oneSnapshot = false,
+  summaryYearScroll = false,
 }: {
   dateRange: TDateRange;
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
   clipToRange?: boolean;
   oneSnapshot?: boolean;
+  summaryYearScroll?: boolean;
 }) => {
   const [monthlyProfits, setMonthlyProfits] = useState<
     {
@@ -103,6 +105,7 @@ const App = ({
   const phoneWidth = usePhoneWidth();
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
+  const yearScrollRef = useRef<HTMLDivElement>(null);
   const monthlyCacheRef = useRef<
     Map<
       string,
@@ -390,6 +393,17 @@ const App = ({
     if (yearPaging.pageSize !== yearPageSize) yearPaging.setPageSize(yearPageSize);
   }, [yearPageSize, yearPaging.pageSize]);
   useEffect(() => {
+    if (summaryYearScroll && summaryType === "year") {
+      const region = yearScrollRef.current;
+      const selected = region?.querySelector(".selected");
+      if (region && selected) {
+        const viewport = region.getBoundingClientRect();
+        const card = selected.getBoundingClientRect();
+        if (card.top < viewport.top) region.scrollTop += card.top - viewport.top;
+        else if (card.bottom > viewport.bottom) region.scrollTop += card.bottom - viewport.bottom;
+      }
+      return;
+    }
     const index = yearCards.findIndex((item) => item.year === selectedYear);
     if (index >= 0) yearPaging.goTo(Math.floor(index / yearPaging.pageSize) + 1);
   }, [selectedYear, rangeKey, summaryType, yearPaging.pageSize]);
@@ -509,8 +523,11 @@ const App = ({
     if (oneSnapshot) return <div className="py-6 text-center text-muted-foreground">{t("fidelity.summary.yearsNeedSecond")}</div>;
     return (
       <div className="space-y-3">
-      <div className="profit-period-grid profit-year-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
-        {yearPaging.rows.map((item) => {
+      <div ref={summaryYearScroll ? yearScrollRef : undefined}
+        className={cn("profit-period-grid profit-year-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2", summaryYearScroll && "profit-year-scroll")}
+        role={summaryYearScroll ? "region" : undefined} aria-label={summaryYearScroll ? t("fidelity.summary.byYear") : undefined}
+        tabIndex={summaryYearScroll ? 0 : undefined}>
+        {(summaryYearScroll ? yearCards : yearPaging.rows).map((item) => {
           const partial = item.hasData && item.total === null && item.unknownCoins.length > 0;
           const value = item.hasData ? item.total ?? (partial ? item.knownTotal : null) : null;
           return (
@@ -518,7 +535,7 @@ const App = ({
             key={`y-profit-summary-${item.year}`}
             data-partial={partial}
             className={cn(
-              "relative rounded-lg border p-2 text-left",
+              "relative rounded-lg border p-2 text-left", item.year === selectedYear && summaryYearScroll && "selected",
               value === null ? "bg-muted/40 border-border/40" : getToneSurfaceClass(value, quoteColor)
             )}
           >
@@ -536,8 +553,9 @@ const App = ({
           );
         })}
       </div>
-      <Pager count={yearCards.length} {...yearPaging} t={t}
+      {!summaryYearScroll && <Pager count={yearCards.length} {...yearPaging} t={t}
         ariaLabel={t("profitSummary.years")} />
+      }
       </div>
     );
   }
