@@ -47,7 +47,7 @@ test("desktop Settings keeps backup, blacklist, security, appearance, and About 
   expect(Math.abs((await versionCard.boundingBox())!.y - (await guideCard.boundingBox())!.y)).toBeLessThan(4);
 });
 
-test("desktop Sync and AI use the approved two column card layout", async ({ page }) => {
+test("desktop Sync aligns its columns and AI stacks its short cards", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await installTauriBridge(page);
   await page.goto("/#/settings/sync");
@@ -57,15 +57,21 @@ test("desktop Sync and AI use the approved two column card layout", async ({ pag
   const passphrase = page.locator(".t3-sync-passphrase");
   await expect(connection).toBeVisible();
   await expect(passphrase).toBeVisible();
-  await expect.poll(async () =>
-    Math.abs((await connection.boundingBox())!.y - (await passphrase.boundingBox())!.y)).toBeLessThan(4);
+  await expect.poll(async () => {
+    const left = (await connection.boundingBox())!;
+    const right = (await passphrase.boundingBox())!;
+    const gap = right.y - left.y - left.height;
+    return Math.abs(left.x - right.x) < 4 && gap >= 15 && gap <= 17;
+  }).toBe(true);
 
   await page.goto("/#/settings/assistant");
   const endpoint = page.locator("[data-ui-card]").filter({ has: page.locator("#assistant-endpoint") });
   const key = page.locator("[data-ui-card]").filter({ has: page.locator("#assistant-api-key") });
   await expect(endpoint).toBeVisible();
-  await expect.poll(async () =>
-    Math.abs((await endpoint.boundingBox())!.y - (await key.boundingBox())!.y)).toBeLessThan(4);
+  const endpointBox = (await endpoint.boundingBox())!;
+  const keyBox = (await key.boundingBox())!;
+  expect(Math.abs(endpointBox.x - keyBox.x)).toBeLessThan(4);
+  expect(keyBox.y).toBeGreaterThanOrEqual(endpointBox.y + endpointBox.height - 1);
 });
 
 test("desktop Sync uses the available width when no toast is open", async ({ page }) => {

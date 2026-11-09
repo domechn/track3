@@ -21,6 +21,7 @@ import { currentSourceStatusLabels, sourceStatusMatches } from "@/middlelayers/s
 import { configurationFromForm } from "@/middlelayers/ui-state/config-form";
 import AssetLabel from "@/components/common/asset-label";
 import { Tag } from "@/components/ui/tag";
+import { Pager, usePager } from "@/components/ui/pager";
 
 type Tab = "exchanges" | "wallets" | "brokers" | "custom";
 type Holding = { wallet: string; symbol: string; amount: number; value: number; price: number };
@@ -166,6 +167,8 @@ export function SourceDesign({
       ? matchSourceStatus(statusPeers[index], statusIdentities, statusPeers,
         displayStatuses.filter((status) => !status.hint)) : undefined;
   });
+  const sourcePage = usePager(rows, tab, 8);
+  const customPage = usePager(others, tab, 8);
   const names: Record<Tab, string> = {
     exchanges: t("fidelity.source.exchanges"), wallets: t("fidelity.source.wallets"),
     brokers: t("fidelity.source.brokers"), custom: t("fidelity.source.custom"),
@@ -224,7 +227,8 @@ export function SourceDesign({
       </> : rows.length ? <>
         <div className="t3-fidelity-source-head"><span>{t("fidelity.source.source")}</span><span>{t("fidelity.source.status")}</span>
           <span>{t("fidelity.source.lastRefresh")}</span><span>{t("fidelity.source.value")}</span><span>{t("fidelity.source.active")}</span><span /></div>
-        {rows.map((entry, rowIndex) => {
+        {sourcePage.rows.map((entry, pageIndex) => {
+          const rowIndex = (sourcePage.page - 1) * sourcePage.pageSize + pageIndex;
           const { kind, row, name, identity, active } = entry;
           const value = sourceValue(identity);
           const sourceStatus = rowStatuses[rowIndex];
@@ -269,23 +273,25 @@ export function SourceDesign({
           </div>;
         })}
         <div className="t3-fidelity-source-foot"><span>{activeCount} {t("fidelity.source.activeLower")}{rows.length - activeCount ? `, ${rows.length - activeCount} ${t("fidelity.source.pausedLower")}` : ""}{rowStatuses.flatMap((status, index) => status?.status === "stale" && rows[index].active ? [` · ${t("fidelity.source.staleNote").replace("{name}", rows[index].name).replace("{time}", status.lastSuccessAt ? new Date(status.lastSuccessAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : "—")}`] : []).join("")}</span><b>{usd(total)}</b></div>
+        <Pager count={rows.length} {...sourcePage} t={t} ariaLabel={names[tab]} />
       </> : emptySource : !others.length ? emptySource : <>
         <div className="t3-fidelity-source-head custom"><span>{t("fidelity.source.asset")}</span><span>{t("fidelity.source.price")}</span><span>{t("fidelity.source.attachedTo")}</span><span>{t("fidelity.source.value")}</span><span>{t("fidelity.source.active")}</span><span /></div>
-        {others.map((row, index) => <div className="t3-fidelity-source-row custom" key={`${row.symbol}:${index}`}>
+        {customPage.rows.map((row, index) => <div className="t3-fidelity-source-row custom" key={`${row.symbol}:${index}`}>
           <div className="t3-fidelity-source-id"><button type="button" className="t3-fidelity-source-name" aria-label={`${t("fidelity.source.edit")} ${row.symbol}`} onClick={() => setEditor(tab)}><AssetLabel kind="custom" symbol={row.symbol} size={24}
             secondary={`${row.alias || row.symbol} · ${amount(row.amount)}`} /></button></div>
           <div className="t3-fidelity-source-custom-price">{row.price?.kind === "manual" ? `${t("fidelity.source.manual")} · ${usd(row.price.usd)}` : row.price?.kind === "follow" ? `${t("fidelity.source.follows")} ${row.price.symbol} · ${Number.isFinite(otherPrice(row)) ? usd(otherPrice(row)) : "—"}` : "—"}<small>{t("fidelity.source.attachedTo")} {row.attachTo ? row.attachTo.identity : t("fidelity.source.standalone")}</small></div>
           <div className="t3-fidelity-source-value">{Number.isFinite(otherPrice(row)) ? usd(otherPrice(row) * row.amount) : "—"}</div>
           <div className="t3-fidelity-source-switch"><span className="t3-fidelity-source-switch-static"><i /></span></div>
           <div className="t3-fidelity-source-actions">
-            <button className="t3-fidelity-source-quick" type="button" data-testid={`source-attach-${row.symbol}`} onClick={() => { setSelectedAttachment(row.attachTo); setOverlay({ kind: "attach", index }); }}><Link2Icon />{t("fidelity.source.attach")}</button>
+            <button className="t3-fidelity-source-quick" type="button" data-testid={`source-attach-${row.symbol}`} onClick={() => { setSelectedAttachment(row.attachTo); setOverlay({ kind: "attach", index: others.indexOf(row) }); }}><Link2Icon />{t("fidelity.source.attach")}</button>
             <AliasRename alias={row.alias} name={row.alias || row.symbol} fallback={sourceAliasFallback("custom", row.symbol)}
-              names={renameNames} index={renameOffset + index}
-              onRename={(alias) => onOtherRename?.(index, alias)} />
-            <button type="button" aria-label={`${t("fidelity.source.remove")} ${row.symbol}`} onClick={() => setOverlay({ kind: "remove", name: row.symbol, sourceKind: "custom", apply: () => onOtherRemove(index) })}><TrashIcon /></button>
+              names={renameNames} index={renameOffset + others.indexOf(row)}
+              onRename={(alias) => onOtherRename?.(others.indexOf(row), alias)} />
+            <button type="button" aria-label={`${t("fidelity.source.remove")} ${row.symbol}`} onClick={() => setOverlay({ kind: "remove", name: row.symbol, sourceKind: "custom", apply: () => onOtherRemove(others.indexOf(row)) })}><TrashIcon /></button>
           </div>
         </div>)}
-        <div className="t3-fidelity-source-foot"><span>{others.length} {t("fidelity.source.customLower")}</span><b>{usd(others.reduce((sum, row) => sum + (Number.isFinite(otherPrice(row)) ? otherPrice(row) * row.amount : 0), 0))}</b></div>
+        <div className="t3-fidelity-source-foot"><span>{others.length} {t(others.length === 1 ? "fidelity.source.customLowerOne" : "fidelity.source.customLower")}</span><b>{usd(others.reduce((sum, row) => sum + (Number.isFinite(otherPrice(row)) ? otherPrice(row) * row.amount : 0), 0))}</b></div>
+        <Pager count={others.length} {...customPage} t={t} ariaLabel={names[tab]} />
       </>}
     </div>
     <div className="t3-fidelity-source-banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" /></svg><div><b>{t(tab === "custom" ? "fidelity.source.customInfo" : "fidelity.source.readOnly")}</b><span>{note}</span></div></div>

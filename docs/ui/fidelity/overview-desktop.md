@@ -39,6 +39,16 @@ The type face is Public Sans with tabular numbers. Tokens: `--ground #0d0d0e`, `
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** overview 8.077% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
+At 1280 px with the expanded rail, the dense 16-source fixture places Insights in its own content-sized row. The next Daily change and What moved cards start after the 16 px grid gap. The source page uses its smaller fixed sample and therefore shows a different row height.
+
+At 1100–1399 px a short saved Insight uses its own content-height row, followed by the paired Daily change and What moved cards. The static source keeps three equal-height cards because its illustrative Insight is longer. The product shows the saved Insight text without padding it with invented analysis. The What moved ticker track fits complete symbols, and the Daily change direction label clears the large CNY axis tick.
+
+What moved keeps one shared zero axis across rows when a CNY value needs more width than another row's value. The remaining card position and content differences below come from the saved Insight and portfolio data.
+
+The 8 Nov dense-data dark capture at 1280 × 800 differed by **8.876%** from `core-overview.html` at RGB-sum threshold 60 before the final saved-insights fixture. At 1181–1399 px the collapsed rail keeps the source's side-by-side Hero and Holdings row. A wider rail stacks those cards so their values fit. Below 1181 px the Hero and Holdings use full rows. Insights uses a content-height row instead of leaving a blank slab, with Daily change and What moved paired beneath it. The source shows eight USD assets and illustrative values; the real-scale audit fixture has eleven CNY assets, sixteen sources and the resulting different chart. Its saved insight content is calculated from those fixture holdings. The source's sync stamp is also illustrative.
+
 UI42 uses the approved website-style neutral tile for asset and source marks. The older Overview page design renders those marks differently.
 
 The current dark 1440 × 900 saved-summary viewport differs from the
@@ -56,12 +66,13 @@ viewport with the matching area of the rendered `core-overview.html` source:
 **7.536%** differs at RGB-sum threshold 60. The app screenshot is
 `.local/tag-theme/desktop-overview-summary-app.png`; the source render is
 `/tmp/fidelity-desktop/design/overview-base-1440.png`. The saved summary
-has one footer Regenerate control, and its lines fill the card. The live
+has one footer Regenerate control beside Ask, where the source places Regenerate in the header. Its lines fill the card. The live
 total, summary metrics unavailable in persisted text, chart rendering,
 portfolio rank and sync data listed below explain the larger screen ratio.
 
 The 8 Nov 2026 Sync-open captures differ by **7.458%** at the RGB-sum threshold of 60 over the shared 1440 × 900 viewport. The source popover is 360 × 336 px at (1010, 55); the app keeps its real sync report and opens a scrollable diagnostics panel when Details is selected. The source page shows only the collapsed Details link, so the expanded phase and request rows and their scroll rail have no matching source pixels. The app's shared definition rows have a 32px pitch under the Details specification, while the source's five summary rows are 40px. The saved product data, chart and controls below also account for the page difference as described here.
 The shared rail's measured source differences, including its owner-required active tile, are recorded in [navigation.md](navigation.md).
+The layout audit gives a short Insights card its own row through 1399 px, with Daily change and What moved sharing the next row. At 1500 px and wider, an eight-row Top coins list also stacks above Sources. Wider card rows align within 1 px. Holdings, What moved, top assets and Sources page when their lists exceed the visible cap. The source image has fewer assets and sources and no paging controls; the older pixel ratios below predate these layouts.
 
 The 7 Nov 2026 UI27 captures compare the saved source page renders
 `/tmp/fidelity-desktop/design/overview-{base,sync}-1440.png` with

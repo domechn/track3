@@ -108,7 +108,7 @@ const App = ({
         </div>
         {partialView && <PartialOverview view={partialView} statuses={statuses} currency={currency} bannerOnly />}
         <Collapsible open={isShowMore} onOpenChange={setIsShowMore}>
-          <StaggerContainer className="t3-overview-grid">
+          <StaggerContainer className={`t3-overview-grid${coins.length <= 2 ? " t3-overview-small" : ""}`}>
               <FadeUp className="t3-grid-hero">
                 <TotalValue
                   currency={currency}

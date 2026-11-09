@@ -83,6 +83,8 @@ State: **default**. Button actions, input validity, status, overlays, and toasts
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** license 11.243% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 Capture: `/tmp/fidelity/settings-b/pro.png` (full page: `pro-long.png`). Design and app were compared side by side at 390 × 844 CSS px. Remaining differences are listed below.
 
 - Subscription data supplies plan, status, renewal/end date, usage and license devices, but does not supply member-since or period-start dates. The app shows an em dash or “Until” rather than invented dates.

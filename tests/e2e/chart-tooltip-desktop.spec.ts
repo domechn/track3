@@ -15,7 +15,7 @@ for (const theme of ["light", "dark"] as const) {
       const marks = page.locator(".t3-daily-chart [data-chart-mark]");
       await expect(marks).toHaveCount(9, { timeout: 30_000 });
       for (let index = 0; index < 9; index++) {
-        await marks.nth(index).hover({ position: { x: 2, y: 10 } });
+        await marks.nth(index).hover({ position: { x: 2, y: 10 }, timeout: 10_000 });
         const tip = page.locator("[data-chart-tooltip]");
         await expect(tip).toBeVisible();
         await expect(tip).toContainText(new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(changes[index])));

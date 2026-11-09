@@ -38,6 +38,8 @@ At 1600 px in dark mode, target inputs update the actual validated profile; `+ S
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** rebalance 10.430% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 UI42 uses the approved website-style neutral tile for asset marks. The older Rebalance page design renders those marks differently.
 
 The zero-target trade area uses the shared centred icon and explanation; the source's empty panel predates this UI18 requirement. Target inputs, reserve calculation, and CSV content are unchanged.

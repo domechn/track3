@@ -40,7 +40,10 @@ At 1600 px in dark mode, the current stored `AlertRule` and `AlertHistory` shape
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** goals 9.895% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 The wide dark page places Refresh, sync and the Pro live-value control in the unified rail without taking a 50 px strip above the content. Its regular TopBar remains visible in light mode and below 1500 px; those layouts have no matching 1600 px dark source capture. The 10/30/50/100/All presets and date picker are hidden only in the wide dark plan because rules use the latest snapshot. The shared rail's tile, logo and control differences from the illustrative source are detailed in [navigation.md](../navigation.md).
+The layout audit stacks Rules and Alert history at 901–1499 px so a short history does not stretch beside a long rule list. The wide Fidelity view also stacks the cards when history has fewer than five entries; longer lists retain the 12-column grid. The older pixel ratios below refer to the prior narrow layout.
 
 The UI18 zero-rule requirement replaces the source page's bare dashed copy with a centred icon, a visible “No rules yet” label, “Create your first rule,” and four templates. Empty Rules and Alert history now stretch to the same height. The source HTML depicts the previous empty state, so its empty-screen pixel difference includes this required product change.
 

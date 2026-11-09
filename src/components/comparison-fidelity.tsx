@@ -10,6 +10,7 @@ import { Tag } from "./ui/tag";
 import { barGeometry, comparisonMoverFacts, divergingScale } from "./comparison-fidelity-movers";
 import { boundedPercentText } from "./profit-percentage";
 import { useChartHitArea } from "./chart-tooltip";
+import { Pager, usePager } from "./ui/pager";
 
 export type FidelityComparisonRow = {
   symbol: string;
@@ -74,6 +75,7 @@ export default function ComparisonFidelity({
   const facts = comparisonMoverFacts(rows);
   const { byValue, byPercent, topShare } = facts;
   const sorted = byValue;
+  const assetPage = usePager(sorted, `${baseOption?.createdAt ?? ""}:${headOption?.createdAt ?? ""}`, 10);
   const sameAmounts = rows.length > 0 && rows.every((row) => Math.abs(row.amount.base - row.amount.head) < 1e-8);
   const days = baseOption?.createdAt && headOption?.createdAt
     ? Math.round((new Date(headOption.createdAt).getTime() - new Date(baseOption.createdAt).getTime()) / 86400000) : 0;
@@ -199,7 +201,7 @@ export default function ComparisonFidelity({
               <th colSpan={2}>{t("comparison.fidelity.change")}</th>
             </tr><tr>{["A", "B", "A", "B", "A", "B"].map((name, i) => <th key={i}>{name}</th>)}
               <th>{t("comparison.fidelity.absolute")}</th><th>{t("comparison.fidelity.relative")}</th></tr></thead>
-            <tbody>{sorted.map((row, index) => {
+            <tbody>{assetPage.rows.map((row, index) => {
               const delta = row.value.head - row.value.base;
               return <tr key={`${row.assetType}:${row.symbol}`} className={index < 2 ? "top" : ""}>
                 <th><span className="t3-cmp-asset-label"><AssetLabel asset={row} size={20} quiet />
@@ -216,6 +218,7 @@ export default function ComparisonFidelity({
               <td className={tone(diff)}>{signedMoney(diff)}</td><td className={tone(diffPct)}>{pct(diffPct)}</td></tr></tfoot>
           </table>
         </div>
+        <Pager count={sorted.length} {...assetPage} t={t} ariaLabel={t("comparison.perAsset")} />
         {sameAmounts && noTransactions && <div className="t3-cmp-info"><InfoCircledIcon aria-hidden="true" />
           <div><strong>{t("comparison.fidelity.sameAmounts")}</strong>
             <p>{t("comparison.fidelity.sameAmountsDetail").replace("{change}", signedMoney(diff))}</p></div></div>}

@@ -110,7 +110,8 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await page.setViewportSize({ width: phone.width, height: phone.height });
     await page.emulateMedia({ colorScheme: theme });
     await page.addInitScript(() => localStorage.setItem("track3-ui-theme", "system"));
-    await installTauriBridge(page, { seedRebalanceProfile: true, richPortfolio: true, freshReviewData: true, slowAssistant: true });
+    await installTauriBridge(page, { seedRebalanceProfile: true, richPortfolio: true, freshReviewData: true,
+      slowAssistant: true });
     mkdirSync("test-results/mobile", { recursive: true });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -209,8 +210,8 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await expect(buy.locator("strong")).toHaveText(/^\$[0-9]/);
     await expect(sell.locator("strong")).toHaveAttribute("aria-label", /^−\$[0-9]/);
     await expect(buy.locator("strong")).toHaveAttribute("aria-label", /^\+\$[0-9]/);
-    expect(await sell.locator(".t3-tag").evaluate((element) => getComputedStyle(element).color))
-      .not.toBe(await buy.locator(".t3-tag").evaluate((element) => getComputedStyle(element).color));
+    expect(await sell.locator(".t3-tag").filter({ hasText: "Sell" }).evaluate((element) => getComputedStyle(element).color))
+      .not.toBe(await buy.locator(".t3-tag").filter({ hasText: "Buy" }).evaluate((element) => getComputedStyle(element).color));
     const tradeSymbol = page.locator(".pf-trade b").first();
     const symbolBounds = await tradeSymbol.boundingBox();
     const tradeBounds = await page.locator(".pf-trade").first().boundingBox();
@@ -290,6 +291,7 @@ for (const phone of phones) for (const theme of ["light", "dark"] as const) {
     await page.screenshot({ path: `test-results/mobile/d3-${phone.name}-${theme}-refresh.png` });
     await expect(page.getByRole("progressbar", { name: "Refresh progress" })).toHaveCount(0, { timeout: 90_000 });
     await expect(page.locator(".ios-d3-refresh-sheet [role='progressbar']")).toHaveCount(0);
+    await expect(page.locator(".ios-d3-refresh-sheet.fd-refresh-progress-sheet")).toHaveCount(0, { timeout: 30_000 });
     if (!await page.getByRole("alertdialog", { name: "Source status" }).isVisible()) {
       await page.getByRole("button", { name: "Source status" }).click();
     }

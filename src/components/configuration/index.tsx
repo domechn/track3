@@ -228,7 +228,7 @@ const App = ({
     [wallets, hideInactive],
   );
 
-  const CONFIG_LIST_PAGE_SIZE = 30;
+  const CONFIG_LIST_PAGE_SIZE = 8;
 
   const exchangePageCount = useMemo(
     () =>

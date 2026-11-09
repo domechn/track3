@@ -15,6 +15,8 @@ The title is `About`; subtitle: `Version, updates and links.` At x 320/y 110, th
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** about 6.995% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 At 1100px the live App Version and Getting started cards share an equal-height row, with Replay guide at the bottom. The regular guide card now includes the real Documentation link. The source has fuller app metadata, Website, and GitHub links in that row; the compact regular card leaves those links to the wide About design.
 
 The live Refresh and date-range controls remain visible in wide Settings; the static reference omits them. This keeps both actions available while viewing Settings.

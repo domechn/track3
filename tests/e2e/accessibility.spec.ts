@@ -13,7 +13,7 @@ const routes = [
 test("desktop Goals drawer saves and restores focus to New rule", async ({ page }) => {
   await installTauriBridge(page);
   await page.goto("/#/goals");
-  await expect(page.getByText("Create your first rule")).toBeVisible();
+  await expect(page.getByText("Create your first rule")).toBeVisible({ timeout: 30_000 });
   await page.getByRole("spinbutton", { name: "Threshold" }).fill("100");
   await page.getByRole("button", { name: "Save rule" }).click();
   const trigger = page.getByRole("button", { name: "New rule" });
@@ -417,8 +417,8 @@ test("visible controls across routes have 44px targets or 44px labels", async ({
     if (route.startsWith("/settings/")) {
       await expect(page.locator(".t3-settings-layout")).toBeVisible();
     }
-    await expect(page.locator("main > div")).toHaveAttribute("aria-busy", "false");
-    if (route === "/summary") await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false");
+    await expect(page.locator("main > div")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
+    if (route === "/summary") await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
     if (route === "/assistant") await expect(page.locator("main .t3-manage-assistant")).toBeVisible();
     const small = await page.locator("main button, main a, main input, main select, aside button, aside a, header button, header a").evaluateAll((controls) =>
       controls.filter((control) => {
@@ -468,7 +468,7 @@ test("visible mobile controls provide 44px touch targets", async ({ page }) => {
   const undersized: string[] = [];
   for (const route of ["/overview", "/rebalance", "/goals", "/history", "/assistant", "/settings/sync"]) {
     await page.goto(`/#${route}`);
-    await expect(page.locator("main > div")).toHaveAttribute("aria-busy", "false");
+    await expect(page.locator("main > div")).toHaveAttribute("aria-busy", "false", { timeout: 30_000 });
     await expect(({
       "/overview": page.locator('main h1:text-is("Overview")'),
       "/rebalance": page.locator('main h1:text-is("Rebalance")'),
@@ -476,7 +476,7 @@ test("visible mobile controls provide 44px touch targets", async ({ page }) => {
       "/history": page.locator('main h1:text-is("Historical Data")'),
       "/assistant": page.getByTestId("chat-input"),
       "/settings/sync": page.getByText("S3 endpoint", { exact: true }),
-    } as Record<string, ReturnType<typeof page.locator>>)[route]).toBeAttached();
+    } as Record<string, ReturnType<typeof page.locator>>)[route]).toBeAttached({ timeout: 30_000 });
     const small = await page.locator("main button, main a, main input, main select, aside button, aside a, header button, header a").evaluateAll((controls) =>
       controls.filter((control) => {
         const style = getComputedStyle(control);

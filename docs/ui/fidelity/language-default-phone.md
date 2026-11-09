@@ -53,6 +53,8 @@ The source depicts the **default** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** language 4.435% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 - The page structure, option order, and unread badge match. Navigation icon strokes and locally bundled Public Sans glyph rasterization differ from the reference browser's web font.
 - Both theme modes now render language cards and option text from foreground, card, muted, and accent tokens.
 - The language icon chips use the shared `--raised` surface, which is slightly darker than the source's fixed `#26262c` in dark mode.

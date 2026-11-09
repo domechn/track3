@@ -124,6 +124,12 @@ State: **default**. Button actions, input validity, status, overlays, and toasts
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** sync 11.709% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
+The 8 Nov 390 × 844 dark real-data capture differs by **11.709%** from the static phone image at RGB-sum threshold 60. The product shows current local sync and device fields where the source image uses illustrative remote metadata.
+
+- The 8 Nov layout audit trims the bottom padding of the device, status and category cards; the older pixel capture below does not include that spacing correction.
+
 Capture: `/tmp/fidelity/settings-b/sync.png` (full page: `sync-long.png`). Design and app were compared side by side at 390 × 844 CSS px. Remaining differences are listed below.
 
 - The owner requested a separate Sync status card with real runtime values. The source places its sample sync values and Sync now action in Devices, so the two card sections differ in order and height.

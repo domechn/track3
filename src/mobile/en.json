@@ -2816,6 +2816,7 @@
   "fidelity.assistant.promptPlanRebalance": "Plan a rebalance",
   "fidelity.settings.sources.summary": "Everything Track3 reads: {exchanges} exchanges, {wallets} wallets, {brokers} broker and {custom} custom assets.",
   "fidelity.settings.sources.summaryRich": "Everything Track3 reads: <b>{exchanges} exchanges</b>, <b>{wallets} wallets</b>, <b>{brokers} broker</b> and {custom} custom assets.",
+  "fidelity.settings.sources.summaryRichOne": "Everything Track3 reads: <b>{exchanges} exchanges</b>, <b>{wallets} wallets</b>, <b>{brokers} broker</b> and {custom} custom asset.",
   "fidelity.settings.sources.summaryEmpty": "Nothing connected in {kind} yet.",
   "fidelity.settings.sources.emptySummaryExchange": "Nothing connected in exchanges yet.",
   "fidelity.settings.sources.addExchange": "Add exchange",

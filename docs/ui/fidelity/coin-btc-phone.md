@@ -246,6 +246,10 @@ The phone reads existing SQLite snapshots, transactions, snapshot edit logs, con
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** coin-btc 13.178% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
+The 8 Nov 390 × 844 dark dense-data capture differs by **13.057%** from the static phone image at RGB-sum threshold 60. The product shows CNY holdings and more actual sources and lots than the USD design sample.
+
 - The final 8 Nov DPR 2 first-screen capture `/tmp/history-kpi-overflow/coin-btc-phone-viewport-final.png` differs from `/tmp/wui18-source/coin-btc-phone-viewport.png` by **5.30%** at RGB-sum threshold 48. The live Coin page's active Overview tab and shared AssetIcon mark differ from the source. The ordinary BTC grid retains the source geometry. The earlier tooltip test had scrolled its screenshot; the new viewport capture starts at scroll position zero.
 - The reference value-chart stat row is 324 px wide at 390 px, but its third 17 px value extends to about x=380, beyond the card's x=374 right edge. The product keeps the full values and divider clearance within the card's 16 px content inset by placing the third stat on a second row. This makes the live value card taller than the reference. The shorter Price-chart values keep one row.
 - The first-screen 5.282% difference includes the owner's shared active Overview tile; the older Coin source highlights only the tab text.

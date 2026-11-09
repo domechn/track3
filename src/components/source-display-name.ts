@@ -54,6 +54,10 @@ export function previewSourceNames(names: readonly string[]) {
   };
 }
 
+export function compactSourceName(name: string) {
+  return name.length > 25 ? `${name.slice(0, 10)}…${name.slice(-6)}` : name;
+}
+
 export function sourceAliasFallback(kind: "exchange" | "wallet" | "broker" | "custom", type: string, identifier = ""): string {
   if (kind === "wallet") return sourceDisplayNames([{ alias: identifier, wallet: identifier }])[0];
   if (kind === "broker") return type === "ibkr" ? "IBKR" : type;

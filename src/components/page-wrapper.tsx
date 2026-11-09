@@ -28,7 +28,7 @@ const App = ({
       <>
       {firstRunOverview && <div className="t3-first-run-desktop"><FirstRunOverview /></div>}
       <div className={firstRunOverview ? "t3-first-run-legacy" : ""}>
-      <div className="flex items-center justify-center h-[400px]">
+      <div className="page-wrapper-empty flex items-center justify-center h-[400px]">
         <EmptyState icon={BackpackIcon} className="max-w-md w-full"
           title={t("pageWrapper.noData")} hint={t("pageWrapper.noDataHint")}
           action={<Button variant="outline" onClick={() => navigate("/settings")}>

@@ -306,7 +306,7 @@ const App = ({
                 </TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <TableBody data-layout-page-size={parsedPageSize} data-layout-rendered={pageRows.length} data-layout-total={sortedRows.length}>
               {pageRows.map((row) => {
                 const detailUrl = getWalletDetailUrl(
                   row.wallet,
@@ -384,7 +384,7 @@ const App = ({
         )}
 
         {sortedRows.length > 0 && (!isMobile || pageCount > 1) && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div data-layout-pager className="flex items-center justify-between text-xs text-muted-foreground">
             {!isMobile && <div>
               {t("walletValueChanges.showing")
                 .replace("{start}", String(loadedRangeStart))

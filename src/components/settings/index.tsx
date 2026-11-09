@@ -99,7 +99,8 @@ const App = () => {
     : active === "sources" && sourceCounts
     ? sourceCounts.exchanges === 0
       ? t("fidelity.settings.subtitle.sourcesEmpty")
-      : t("fidelity.settings.subtitle.sources")
+      : t(sourceCounts.custom === 1 ? "fidelity.settings.subtitle.sourcesOneCustom"
+        : "fidelity.settings.subtitle.sources")
       .replace("{exchanges}", String(sourceCounts.exchanges))
       .replace("{wallets}", String(sourceCounts.wallets))
       .replace("{brokers}", String(sourceCounts.brokers))

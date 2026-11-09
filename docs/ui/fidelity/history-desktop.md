@@ -48,6 +48,14 @@ Chromium briefly sets a 1 × 1 viewport during some full page screenshots. The d
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** history 10.773% at 1280 × 800, dark, against the rendered source HTML (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
+At 1280 px, the real-scale CNY fixture keeps the four visible History detail columns and full values within the card. With the expanded rail, the detail table uses a 10 px numeric font to keep seven-digit values readable while preserving the adjacent list pane. The source uses shorter USD amounts.
+
+At 1100–1499 px the merged fixed-height two-pane layout keeps large CNY values readable. The list places asset and source counts below the date and shows Date, Total and Change columns; the detail places Share below each asset and shows Asset, Quantity, Price and Value columns. The same values remain visible without a horizontally cut amount. The reference fits its shorter USD values in five columns. At 1100–1179 px the merged History grid uses eleven tracks to keep both panes usable, so its edges differ from the general twelve-track rule. With only two saved assets, the fixed-height detail pane retains unused scroll area; no asset rows are invented.
+
+The compact list uses complete English and Chinese source-status sentences. Partial snapshots retain the warning dot, and asset names remain clear of the detail row's Delete button. The reference has shorter values and no row Delete action, which explains the remaining compact column widths.
+
 On 8 Nov 2026 the source HTML was rendered again in Chromium with scrollbars hidden at 1600 × 1024. `getBoundingClientRect()` puts its filter at (84, 88), its list at (84, 164) with width 861.33 px, and its detail at (961.33, 164) with width 610.67 px; `getComputedStyle()` reports 13/18 px body text and `rgb(19, 18, 23)` card backgrounds. The branch captures before this merge are preserved in `/tmp/ui43-captures-desktop/` and the source renders and measurements are in `/tmp/ui43-source/`. A pixel differs when the summed absolute RGB difference exceeds 60, with black padding to the larger canvas.
 
 | State at 1600 × 1024 | Current source versus app difference |

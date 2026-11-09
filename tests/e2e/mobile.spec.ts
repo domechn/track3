@@ -1032,7 +1032,7 @@ test("expanded overview rankings fit the phone card", async ({ browser }) => {
       expect((await button.boundingBox())!.width).toBeGreaterThanOrEqual(43.9);
     }
     expect((await ranking.locator(":scope > span:first-child").boundingBox())!.width).toBeGreaterThanOrEqual(40);
-    const symbol = ranking.locator(":scope > span:first-child em");
+    const symbol = ranking.locator(":scope > span:first-child .t3-asset-label-name");
     const symbolBounds = await symbol.evaluate((node) => {
       const range = document.createRange();
       range.selectNodeContents(node);

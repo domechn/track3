@@ -30,3 +30,4 @@ Authoritative source render: `/tmp/fidelity/flows/design-refresh-states.png`. No
 ## Remaining differences
 
 - This reference juxtaposes multiple mutually exclusive refresh states in one catalogue. The product displays one live state at a time, so no single real app capture matches it.
+- On narrow phones, full source names may use two lines. Duration and Retry move below the name so the new source icon does not force an ellipsis.

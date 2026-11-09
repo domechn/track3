@@ -156,7 +156,7 @@ export default function ComparisonFidelity({ currency, quoteColor, busy, dateOpt
             <div><span>{t("fidelity.comparison.changePercent")}</span><strong data-tone={tone(change)}>{percentText(changeFraction, 2, true, masked)}</strong><small>{t("fidelity.comparison.vsDate").replace("{date}", aDate)}</small></div>
           </div>
         </section>
-        <section className="fd-card fd-comparison-assets"><div className="fd-card-heading"><h3>{t("fidelity.comparison.perAsset")}</h3><span>{t("fidelity.comparison.assetSubtitle").replace("{from}", aDate).replace("{to}", bDate)}</span></div>
+        <section className="fd-card fd-comparison-assets" data-layout-size={sorted.length === 8 ? "source" : "variable"}><div className="fd-card-heading"><h3>{t("fidelity.comparison.perAsset")}</h3><span>{t("fidelity.comparison.assetSubtitle").replace("{from}", aDate).replace("{to}", bDate)}</span></div>
           {sorted.map(({ coin, change: value }, index) => <div key={`${coin.assetType}:${coin.symbol}`} className={`fd-comparison-asset${index < 2 ? " top" : ""}`}>
             <b><AssetLabel asset={coin} size={20} quiet /> <em>{numberText(coin.amount.head, coin.symbol === "USDT" || coin.symbol === "USDC" ? 2 : 0, 4, masked)}</em></b>
             <strong data-tone={tone(value)}>{currencyValue(value, 2, true)}</strong>

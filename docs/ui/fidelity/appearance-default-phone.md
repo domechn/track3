@@ -60,6 +60,8 @@ The source depicts the **default** state. Inputs and buttons retain their existi
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** appearance 6.555% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 - Theme preview artwork and the spacing below the preview choices still differ from the approved render.
 
 ## Pixel difference

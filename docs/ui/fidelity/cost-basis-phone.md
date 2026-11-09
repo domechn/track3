@@ -25,6 +25,8 @@ The selected-range average buy and sell prices and quantities use the existing t
 
 ## Remaining differences
 
+**9 Nov 2026 layout audit:** cost-basis 7.673% at 390 × 844, dark, against the approved phone JPEG (RGB channel difference sum > 60). The dense CNY fixture and working product state differ from the static reference; the page-specific visible differences are listed below.
+
 The shared no-sales state occupies more vertical space than the source's 184px dashed box because UI18 requires a substantial centred state. The source page predates the icon and explanatory copy. This is visible below the first screen in the empty tax year; the no-sales actions still use their existing handlers.
 
 The HTML source pages are present at `/home/ubuntu/.hermes/projects/track3-design/source/ds/pages/`. The table compares Chromium renders in `/tmp/fidelity/source-review/` with 6 Nov app captures in `/tmp/fidelity/cost-basis/` at 390 × 844. A pixel differs when its summed absolute RGB difference exceeds 48. Long captures expand the product scroll container and hide the fixed tab bar. Both images use the page's `#0d0d0e` ground colour outside their content. The shared-height column compares the entire common height; the full-height column also counts rows where only one page has content.

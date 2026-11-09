@@ -48,7 +48,7 @@ import EmptyState from "@/components/empty-state";
 import { AliasRename } from "./alias-rename";
 import { sourceAliasFallback } from "@/components/source-display-name";
 
-const CONFIG_LIST_PAGE_SIZE = 30;
+const CONFIG_LIST_PAGE_SIZE = 8;
 
 const StockBrokerSection = memo(function StockBrokerSection({
   stockBrokers,
@@ -324,10 +324,11 @@ const StockBrokerSection = memo(function StockBrokerSection({
               </TableBody>
             </Table>
             {visibleStockBrokers.length > CONFIG_LIST_PAGE_SIZE && (
-              <div className="flex items-center justify-end gap-2">
+              <div data-layout-pager className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label={t("common.prev")}
                   onClick={() =>
                     onStockBrokerPageChange(Math.max(stockBrokerPage - 1, 0))
                   }
@@ -341,6 +342,7 @@ const StockBrokerSection = memo(function StockBrokerSection({
                 <Button
                   variant="outline"
                   size="sm"
+                  aria-label={t("common.next")}
                   onClick={() =>
                     onStockBrokerPageChange(
                       Math.min(stockBrokerPage + 1, stockBrokerPageCount - 1),
