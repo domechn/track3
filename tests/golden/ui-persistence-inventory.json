@@ -115,6 +115,10 @@
     "function updateField(name: typeof fields[number], value: string) {",
     "onChange={(event) => updateField(field, event.target.value)}"
   ],
+  "src/components/sync-details.tsx": [
+    "const [expanded, setExpanded] = useState(() => defaultExpanded || sessionStorage.getItem(\"track3-sync-details-expanded\") === \"true\");",
+    "sessionStorage.setItem(\"track3-sync-details-expanded\", String(!expanded));"
+  ],
   "src/components/wallet-assets-percentage.tsx": [
     "OTHERS_AGGREGATED_KEY,",
     "item.wallet.wallet === OTHERS_AGGREGATED_KEY && aggregatedWallets;",

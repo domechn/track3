@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ExclamationTriangleIcon, EyeClosedIcon, EyeOpenIcon, InfoCircledIcon, LockClosedIcon, ReloadIcon, CopyIcon } from "@radix-ui/react-icons";
+import { ChevronDownIcon, ExclamationTriangleIcon, EyeClosedIcon, EyeOpenIcon, InfoCircledIcon, LockClosedIcon, ReloadIcon, CopyIcon } from "@radix-ui/react-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,10 +43,10 @@ function SyncWideDiagnostics({ diagnostics, stopped, t }: {
       {errorGroups.filter(([, count]) => count > 0).map(([label, count]) =>
         <div key={label}><span aria-hidden="true">⚠</span><span>{label}</span><b>{count}</b></div>)}
     </div>
-    <details className="t3-b-sync-pop-diagnostics" open={expanded}
-      onToggle={(event) => setExpanded(event.currentTarget.open)}>
-      <summary>{t("sync.details.title")}</summary>
-      <div>
+    <div className="t3-b-sync-pop-diagnostics">
+      <button type="button" className="t3-sync-details-toggle" aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}><ChevronDownIcon aria-hidden="true" />{t("sync.details.title")}</button>
+      {expanded && <div>
         <h3>{t("sync.details.timings")}</h3>
         <div className="t3-b-sync-pop-measures">{phaseRows.map(([label, ms]) =>
           <div key={label}><span>{label}</span><b>{seconds(ms)}</b></div>)}</div>
@@ -63,9 +63,44 @@ function SyncWideDiagnostics({ diagnostics, stopped, t }: {
           {diagnostics.slowest.slice(0, 3).map((item, index) =>
             <div key={index}><span>{item.verb} {t(`sync.details.phase.${item.phase}`)}</span><b>{seconds(item.ms)}</b></div>)}
         </div>
-      </div>
-    </details>
+      </div>}
+    </div>
   </>;
+}
+
+function SyncPopoverScroll({ children }: { children: ReactNode }) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [scroll, setScroll] = useState({ more: false, has: false, top: 0, height: 0 });
+  const measure = () => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const has = body.scrollHeight > body.clientHeight + 1;
+    const height = has ? Math.max(24, body.clientHeight ** 2 / body.scrollHeight) : 0;
+    const next = {
+      has, height,
+      more: body.scrollTop + body.clientHeight < body.scrollHeight - 1,
+      top: has ? body.scrollTop / (body.scrollHeight - body.clientHeight) * (body.clientHeight - height) : 0,
+    };
+    setScroll((current) => current.has === next.has && current.height === next.height &&
+      current.more === next.more && current.top === next.top ? current : next);
+  };
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(body);
+    if (body.firstElementChild) observer.observe(body.firstElementChild);
+    measure();
+    return () => observer.disconnect();
+  }, []);
+  return <div className="t3-sync-scroll-frame" data-more-below={scroll.more}>
+    <div ref={bodyRef} className="t3-sync-popover-body" onScroll={measure}>
+      <div className="space-y-3">{children}</div>
+    </div>
+    {scroll.has && <div className="t3-sync-scroll-rail" aria-hidden="true">
+      <span style={{ top: scroll.top, height: scroll.height }} />
+    </div>}
+  </div>;
 }
 
 
@@ -163,6 +198,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
   const fidelityLocked = locked && overviewFidelity && !mobile && window.innerWidth >= 1400;
   const fidelityReady = overviewFidelity && status.mode === "ready" && status.sync.phase === "idle" &&
     !!report && !report.conflicts.length && !report.errors.length && status.sync.lastSync !== undefined;
+  const hasDetails = !!(report || status.sync.diagnostics);
   const settings = fidelityReady ? syncRuntime.getSettings() : undefined;
   const destination = settings?.endpoint.includes("r2.cloudflarestorage.com")
     ? t("overview.fidelity.cloudflareDestination") : t("overview.fidelity.s3Destination");
@@ -309,7 +345,8 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
             if (fidelityLocked || document.querySelector('[role="alertdialog"]')) event.preventDefault();
           }}
           data-locked={mobile && locked && !compactLocked}
-          className={`t3-sync-popover max-h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-[520px] overflow-y-auto space-y-3 text-sm ${mobile ? `ios-d3-sync-popover${fidelitySheet ? " is-fidelity-sheet" : ""}${compactLocked ? " is-locked" : status.sync.retryStopped && fidelitySheet ? " is-stopped" : status.sync.phase === "error" && fidelitySheet ? " is-error" : ""}` : ""} ${fidelityLocked ? "t3-sync-lock-dialog" : ""} ${wide && !fidelityReady ? "t3-b-sync-popover" : ""}`}>
+          className={`t3-sync-popover max-h-[min(85vh,760px)] w-[calc(100vw-2rem)] max-w-[520px] overflow-y-auto space-y-3 text-sm ${hasDetails ? "t3-sync-has-details" : ""} ${mobile ? `ios-d3-sync-popover${fidelitySheet ? " is-fidelity-sheet" : ""}${compactLocked ? " is-locked" : status.sync.retryStopped && fidelitySheet ? " is-stopped" : status.sync.phase === "error" && fidelitySheet ? " is-error" : ""}` : ""} ${fidelityLocked ? "t3-sync-lock-dialog" : ""} ${wide && !fidelityReady ? "t3-b-sync-popover" : ""}`}>
+          <SyncPopoverScroll>
           {mobile && !locked && <p className="text-xs text-muted-foreground">{controlLabel}</p>}
           {fidelityReady ? <div className="t3-sync-fidelity">
             <header><h2>{t("overview.fidelity.backupSync")}</h2>
@@ -591,6 +628,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
                   ? t(status.sync.error === "sync" ? "sync.status.errorsPresent" : `sync.connection.${status.sync.error}`) : undefined} />}
           </>}
           </>}
+          </SyncPopoverScroll>
         </PopoverContent>
       </Popover>
     </div>

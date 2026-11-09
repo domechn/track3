@@ -47,13 +47,11 @@ export async function captureSyncDetails(page: Page, platform: "desktop" | "mobi
   await sync.click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  const details = dialog.locator("details").first();
-  if (!(await details.evaluate((element) => (element as HTMLDetailsElement).open))) {
-    await details.locator("summary").first().click();
-  }
+  const toggle = dialog.locator(".t3-sync-details-toggle").first();
+  if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
   await expect(dialog).toContainText(locale === "en" ? "Phase timings" : "阶段耗时");
   await page.screenshot({ path: `${output}/${platform}-${width}-${theme}-${locale}-top.png`, animations: "disabled" });
-  await dialog.locator("table").first().scrollIntoViewIfNeeded();
+  await dialog.locator(".t3-sync-definition-row").first().scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${output}/${platform}-${width}-${theme}-${locale}-timings.png`, animations: "disabled" });
   await dialog.getByRole("button", { name: locale === "en" ? "Copy diagnostics" : "复制诊断信息" }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${output}/${platform}-${width}-${theme}-${locale}-requests.png`, animations: "disabled" });
