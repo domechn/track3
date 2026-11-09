@@ -20,7 +20,7 @@ async function chartStatsStayInsideCard(page: import("@playwright/test").Page) {
 }
 
 for (const currency of ["USD", "HKD", "CNY"] as const) {
-  test(`owner BTC chart stat dividers clear values in ${currency} at 390px`, async ({ browser }) => {
+  test(`owner BTC chart stats fit and dividers clear values in ${currency} at 390px`, async ({ browser }) => {
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, userAgent: "Track3 iPhone",
     });
@@ -44,6 +44,14 @@ for (const currency of ["USD", "HKD", "CNY"] as const) {
       const bounds = await chartStatsStayInsideCard(page);
       expect(bounds.ruleRight, JSON.stringify(bounds)).toBeLessThanOrEqual(bounds.contentRight + 1);
       expect(Math.max(...bounds.valueRights), JSON.stringify(bounds)).toBeLessThanOrEqual(bounds.contentRight + 1);
+      const labelStarts = await page.locator(".fd-coin-stats").evaluate((stats) => {
+        const metrics = [...stats.querySelectorAll(".fd-coin-metric")];
+        return metrics.filter((metric, index) =>
+          index === 0 || metric.getBoundingClientRect().top > metrics[index - 1].getBoundingClientRect().top + 1)
+          .map((metric) => metric.querySelector(".fd-label")!.getBoundingClientRect().left -
+            stats.getBoundingClientRect().left);
+      });
+      expect(labelStarts.every((left) => Math.abs(left) <= 1), JSON.stringify(labelStarts)).toBe(true);
       mkdirSync("/tmp/ui39-stat-final", { recursive: true });
       await page.locator(".fd-coin-trend").screenshot({ path: `/tmp/ui39-stat-final/owner-btc-${currency}.png` });
     } finally {

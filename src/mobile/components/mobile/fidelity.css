@@ -27,13 +27,14 @@ body:has(.fd-page), .app-layout:has(.fd-page) { background:hsl(var(--background)
 .fd-sub, .fd-card small { color:var(--fd-muted); font-size:12px; line-height:18px; }
 .fd-primary-stat { display:grid; gap:2px; min-height:70px; }
 .fd-primary-stat strong,.fd-big-value { display:block; font:600 32px/36px "Public Sans Variable","Public Sans",sans-serif; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
-.fd-primary-stat strong { white-space:nowrap; }
+.fd-primary-stat strong { font-variant-numeric:normal; white-space:nowrap; }
 .fd-primary-stat small { display:block; }
 .fd-kpis { display:grid; gap:0; }
 .fd-three { grid-template-columns:repeat(3,minmax(0,1fr)); margin:14px 0 18px; padding-top:14px; border-top:1px solid var(--fd-border); }
 .fd-summary .fd-three { grid-template-columns:minmax(max-content,1fr) repeat(2,minmax(0,1fr)); }
 .fd-three>div { min-width:0; padding:0 10px; border-left:1px solid var(--fd-border); }
 .fd-three>div:first-child { padding-left:0; border-left:0; }
+.fd-summary .fd-three>div:nth-child(2) { padding-right:8px; }
 .fd-three strong { display:block; margin-top:10px; font:500 17px/22px "Public Sans Variable","Public Sans",sans-serif; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .fd-three small { display:block; }
 .fd-chart-caption { margin:0 0 6px; color:var(--fd-faint); font-size:12px; }
@@ -141,7 +142,7 @@ body:has(.fd-page), .app-layout:has(.fd-page) { background:hsl(var(--background)
 .fd-coin-changes.manual>.fd-coin-metric { min-height:90px; }
 .fd-coin-changes.manual>.fd-coin-metric:nth-child(3) { padding-left:0; border-left:0; border-top:1px solid var(--fd-border); }
 .fd-coin-changes.manual>.fd-coin-metric:nth-child(4) { border-left:1px solid var(--fd-border); border-top:1px solid var(--fd-border); }
-.fd-coin-metric strong { display:block; margin:2px 0 0; color:var(--fd-text); font:500 17px/22px "Public Sans Variable","Public Sans",sans-serif; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.fd-coin-metric strong { display:block; margin:2px 0 0; color:var(--fd-text); font:500 17px/22px "Public Sans Variable","Public Sans",sans-serif; font-variant-numeric:normal; white-space:nowrap; }
 .fd-coin-metric small { display:block; margin-top:0; color:var(--fd-muted); font-size:12px; line-height:18px; }
 .fd-position { margin-top:20px; padding-top:18px; border-top:1px solid var(--fd-border); }
 .fd-position .fd-card-heading { align-items:baseline; margin-bottom:12px; }
@@ -660,7 +661,7 @@ body:has(.fd-page), .app-layout:has(.fd-page) { background:hsl(var(--background)
 .fd-overview-mover>button::before { position:absolute; top:0; bottom:0; left:var(--fd-zero); width:1px; background:var(--fd-control); content:""; }
 .fd-overview-mover i { position:absolute; top:18px; display:block; height:8px; background:var(--fd-gain); }
 .fd-overview-mover i[data-tone="loss"] { background:var(--fd-loss); }
-.fd-overview-mover>a:last-child { justify-content:flex-end; }
+.fd-overview-mover>a:last-child { justify-content:flex-end; min-width:44px; }
 .fd-overview-mover strong { text-align:right; white-space:nowrap; font-weight:500; }
 .fd-overview-mover strong[data-tone="gain"] { color:var(--fd-gain); }
 .fd-overview-mover strong[data-tone="loss"] { color:var(--fd-loss); }
@@ -1428,7 +1429,6 @@ body:has(.fd-overview, .fd-partial-overview) .ios-d3-toast-viewport [toast-close
 .fd-app-error-copy { margin-top: 10px; border: 1px solid #3a3a3e; }
 .fd-app-error small { display: block; margin-top: 16px; color: #b4b6bc; font-size: 12px; line-height: 18px; }
 @media (max-width: 559px) {
-  .fd-coin-stats .fd-coin-metric strong { font-size: 14px; }
   .fd-coin :is(.fd-coin-changes, .fd-position-grid, .fd-coin-stats).long-amount { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; }
   .fd-coin .fd-coin-changes.long-amount:not(.manual) > .fd-coin-metric:nth-child(n) { grid-column: auto; }
   .fd-coin :is(.fd-coin-changes, .fd-position-grid, .fd-coin-stats).long-amount > .fd-coin-metric:nth-child(n) {
@@ -1450,6 +1450,9 @@ body:has(.fd-overview, .fd-partial-overview) .ios-d3-toast-viewport [toast-close
 @media (max-width: 480px) {
   .fd-wallet-legend span { flex: 0 0 calc(50% - 10px); max-width: calc(50% - 10px); overflow: hidden; }
   .fd-wallet-legend em { flex: 1 1 auto; }
+}
+@media (max-width: 340px) {
+  .fd-wallet-legend span { flex-basis: 100%; max-width: 100%; }
 }
 @media (max-width: 480px) {
   .fd-overview-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }

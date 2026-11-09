@@ -41,7 +41,7 @@ for (const [device, width, height] of [["phone", 390, 844], ["ipad", 820, 1112]]
             await expect(selected).toBeVisible();
             const { selectedColor, token } = await selected.evaluate((node) => {
               const probe = document.createElement("span");
-              probe.style.background = "hsl(var(--secondary))";
+              probe.style.background = "var(--nav-selected-background)";
               node.append(probe);
               const token = getComputedStyle(probe).backgroundColor;
               probe.remove();

@@ -4915,7 +4915,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
     grid-column: 1;
   }
 }
-@media (min-width: 1301px) and (max-width: 1499px) {
+@media (min-width: 901px) and (max-width: 1499px) {
   .t3-settings[data-design-section="sync"] .sync-settings-page > .t3-sync-top-right {
     display: grid;
     grid-row: 2;

@@ -259,7 +259,6 @@ The 8 Nov 390 × 844 dark dense-data capture differs by **13.057%** from the sta
 - The app now uses the shared tinted Overview tab and indicator. The static coin source uses an untinted active icon; this contributes to newer same-base captures.
 - A fresh DPR 2 source render in `/tmp/history-kpi-overflow/coin-btc-phone-design-dpr2.png` differs by 5.42% from the saved DPR 2 source render at the same 48-point threshold: its fallback font wraps the last Position note. The saved render matches the approved reference, so that fresh render is not a comparable typography baseline.
 - A fresh DPR 1 source render inside the mobile test context differed by 8.02%; its font raster and lower card position differ from the approved DPR 2 source capture. The matching DPR 2 pair above is the fidelity comparison.
-- At 390 px, chart-stat amounts use 14 px text to keep all three values inside their columns. The source uses larger text in that row.
 - With amounts scaled 10,000 times beyond the design fixture, the chart omits intermediate dates that collide and keeps its endpoints. Open lots keeps an 8 px gap between cost and gain and scrolls horizontally to reveal the full values.
 - The Open lots header scrolls sideways with its rows. The collapsed list has no vertical scroll strip; an expanded list keeps the header visible while its rows scroll.
 - The product's scroll container preserves route scroll position; Chromium antialiases small text in that layer differently from the standalone source page.
