@@ -1,7 +1,5 @@
 import * as api from "@tauri-apps/api";
 import { getClientIDConfiguration } from "../middlelayers/configuration";
-import { exists } from "@tauri-apps/plugin-fs";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { fetch } from "@tauri-apps/plugin-http";
 import { isIOSReadyProbeBuild } from "@/utils/ios-ready";
@@ -84,19 +82,6 @@ export async function trackEventWithClientID(
   } catch (e) {
     console.debug("track event failed");
   }
-}
-
-export async function getImageApiPath(cacheDir: string, symbol: string) {
-  const filePath = `${cacheDir}/assets/coins/${symbol.toLowerCase()}.png`;
-
-  // check if file exists
-  return exists(filePath).then((res) => {
-    if (!res) {
-      // return `https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/32/color/${symbol.toLowerCase()}.png`
-      return "";
-    }
-    return convertFileSrc(filePath);
-  });
 }
 
 export function reloadApp() {

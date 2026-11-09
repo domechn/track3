@@ -27,11 +27,7 @@ import {
   prettyNumberToLocaleString,
   prettyPriceNumberToLocaleString,
 } from "@/utils/currency";
-import { downloadCoinLogos } from "@/middlelayers/data";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
-import ImageStack from "./common/image-stack";
 import AssetLabel from "./common/asset-label";
-import { getImageApiPath } from "@/utils/app";
 import { Button } from "./ui/button";
 import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import {
@@ -59,7 +55,6 @@ import {
   TableHeader,
   TableRow,
 } from "./ui/table";
-import { resolveAssetLogoSrc } from "@/utils/assets";
 import { positiveNegativeColor } from "@/utils/color";
 import ConfirmDeleteDialog from "./common/confirm-delete-dialog";
 import { useOptimisticDelete } from "./common/use-optimistic-delete";
@@ -121,7 +116,6 @@ const App = ({
   const [detailScrollTop, setDetailScrollTop] = useState(0);
   const [measuredDetailHeights, setMeasuredDetailHeights] = useState<Map<number, number>>(() => new Map());
   const [pageLoading, setPageLoading] = useState(true);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
 
   const { run: runDelete, isDeleting: deleting } = useOptimisticDelete(setData);
   const { run: runDetailDelete, isDeleting: deletingDetail } = useOptimisticDelete(setSelectedData);
@@ -152,68 +146,6 @@ const App = ({
     }
     setPageLoading(true);
   }, [rangeKey, dataChangedVersion, dataPage, pageSize, historyFilter]);
-
-  const symbolPricePairs = useMemo(() => {
-    const latestBySymbol = new Map<string, number>();
-    for (const item of data) {
-      for (const asset of item.topAssets) {
-        if (!latestBySymbol.has(asset.symbol)) {
-          latestBySymbol.set(asset.symbol, asset.price);
-        }
-      }
-    }
-    for (const asset of selectedData?.assets ?? []) {
-      if (!latestBySymbol.has(asset.symbol)) latestBySymbol.set(asset.symbol, asset.price);
-    }
-
-    return Array.from(latestBySymbol.entries()).map(([symbol, price]) => ({
-      symbol,
-      price,
-    }));
-  }, [data, selectedData]);
-
-  const uniqueSymbols = useMemo(() => {
-    return symbolPricePairs.map((item) => item.symbol);
-  }, [symbolPricePairs]);
-
-  useEffect(() => {
-    if (!symbolPricePairs.length) {
-      return;
-    }
-
-    downloadCoinLogos(symbolPricePairs);
-  }, [symbolPricePairs]);
-
-  useEffect(() => {
-    async function loadMissingLogos() {
-      if (!uniqueSymbols.length) {
-        return;
-      }
-
-      const missing = uniqueSymbols.filter((symbol) => !logoMap[symbol]);
-      if (!missing.length) {
-        return;
-      }
-
-      const acd = await getAppCacheDir();
-      const kvs = await Promise.all(
-        missing.map(async (symbol) => ({
-          symbol,
-          path: await getImageApiPath(acd, symbol),
-        })),
-      );
-
-      setLogoMap((prev) => {
-        const next = { ...prev };
-        kvs.forEach(({ symbol, path }) => {
-          next[symbol] = path;
-        });
-        return next;
-      });
-    }
-
-    loadMissingLogos();
-  }, [uniqueSymbols, logoMap]);
 
   const loadPage = useCallback(async () => {
     const currentGen = ++loadGenRef.current;
@@ -688,10 +620,6 @@ const App = ({
                     <TableRow aria-hidden="true"><TableCell colSpan={6} style={{ height: detailOffsets[detailStart], padding: 0 }} /></TableRow>
                   ) : null}
                   {virtualRankData.map((item, virtualIndex) => {
-                    const apiPath = resolveAssetLogoSrc(
-                      item,
-                      logoMap[item.symbol],
-                    );
                     return (
                       <TableRow
                         key={"historical-data-detail-row-" + item.assetId}
@@ -704,12 +632,7 @@ const App = ({
                           # {item.rank}
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <div className="flex items-center gap-1 text-sm">
-                            <img
-                              className="inline-block w-[18px] h-[18px] rounded-full"
-                              src={apiPath}
-                              alt={item.symbol}
-                            />
+                          <div className="flex items-center text-sm">
                             <AssetLabel asset={item} />
                           </div>
                         </TableCell>
@@ -992,7 +915,6 @@ const App = ({
                     <TableBody>
                       {data.map((row) => {
                         const isLatest = latestRow?.id === row.id;
-                        const topAssets = row.topAssets;
                         const displayDate = snapshotDateFormatter.format(new Date(row.createdAt));
 
                         return (
@@ -1038,17 +960,7 @@ const App = ({
                                   )}`}
                             </TableCell>
                             <TableCell className="py-1.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <ImageStack
-                                  imageSrcs={topAssets.map((asset) =>
-                                    resolveAssetLogoSrc(
-                                      asset,
-                                      logoMap[asset.symbol],
-                                    ),
-                                  )}
-                                  imageWidth={18}
-                                  imageHeight={18}
-                                />
+                              <div className="flex items-center">
                                 <span className="text-xs text-muted-foreground">
                                   {t("history.assetCount").replace("{n}", String(row.assetCount))}
                                 </span>

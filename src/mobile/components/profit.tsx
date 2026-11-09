@@ -13,10 +13,7 @@ import {
 import { calculateTotalProfit, queryTotalValue } from "@/middlelayers/charts";
 import type { SummaryPreset, SummaryRange } from "@/middlelayers/summary-range";
 import { summaryProfitPercentage } from "@/middlelayers/summary-breakdown";
-import { appCacheDir as getAppCacheDir } from "@tauri-apps/api/path";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
-import bluebird from "bluebird";
-import { getImageApiPath } from "@/utils/app";
 import { positiveNegativeTone, positiveNegativeTextClass } from "@/utils/color";
 import { Link } from "react-router-dom";
 import { OpenInNewWindowIcon } from "@radix-ui/react-icons";
@@ -26,9 +23,7 @@ import AssetLabel from "@/components/common/asset-label";
 import {
   buildAssetDetailsPath,
   formatAssetLabel,
-  getAssetLogoKey,
-  resolveAssetLogoSrc,
-  shouldDownloadCryptoLogo,
+  getAssetKey,
 } from "@/utils/assets";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { ButtonGroup, ButtonGroupItem } from "@/components/ui/button-group";
@@ -82,7 +77,6 @@ const App = ({
       isUnknown?: true;
     }[]
   >([]);
-  const [logoMap, setLogoMap] = useState<{ [x: string]: string }>({});
   const [view, setView] = useState<"summary" | "attribution">("summary");
   const [localProfitRange, setLocalProfitRange] = useState<"7D" | "1M" | "1Y" | "ALL">("ALL");
   const profitRange = rangeValue ?? localProfitRange;
@@ -91,7 +85,6 @@ const App = ({
   const [loadError, setLoadError] = useState(false);
   const { reportLoaded } = useContext(OverviewLoadingContext);
   const loadGenRef = useRef(0);
-  const logoPathCacheRef = useRef<Map<string, string>>(new Map());
 
   const selectedDateRange = useMemo(() => {
     if (rangeValue) return dateRange;
@@ -127,28 +120,6 @@ const App = ({
         }
       });
   }, [rangeKey, dataChangedVersion]);
-
-  useEffect(() => {
-    const gen = loadGenRef.current;
-    const seen = new Set();
-    const assets = [...coinsProfit.slice(0, 5), ...coinsProfit.slice(-5)].filter((coin) => {
-      const key = getAssetLogoKey(coin);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    if (assets.length === 0) {
-      return;
-    }
-
-    void getLogoMap(assets).then((m) => {
-      if (gen !== loadGenRef.current) {
-        return;
-      }
-      setLogoMap((prev) => ({ ...prev, ...m }));
-    });
-  }, [coinsProfit]);
 
   const { gainers: topProfitData, decliners: topLossData } = useMemo(
     () => profitRanks(coinsProfit),
@@ -192,55 +163,6 @@ const App = ({
     [coinsProfit],
   );
 
-  async function getLogoMap(
-    assets: { symbol: string; assetType: "crypto" | "stock" }[],
-  ) {
-    const acd = await getAppCacheDir();
-    const assetsNeedLoad = assets.filter(
-      (asset) =>
-        shouldDownloadCryptoLogo(asset) &&
-        !logoPathCacheRef.current.has(getAssetLogoKey(asset)),
-    );
-
-    if (assetsNeedLoad.length === 0) {
-      return assets.reduce(
-        (acc, asset) => {
-          const key = getAssetLogoKey(asset);
-          const path = logoPathCacheRef.current.get(key);
-          if (path) {
-            acc[key] = path;
-          }
-          return acc;
-        },
-        {} as { [x: string]: string },
-      );
-    }
-
-    const kvs = await bluebird.map(
-      assetsNeedLoad,
-      async (asset) => {
-        const path = await getImageApiPath(acd, asset.symbol);
-        const key = getAssetLogoKey(asset);
-        logoPathCacheRef.current.set(key, path);
-        return { [key]: path };
-      },
-      { concurrency: 6 },
-    );
-
-    const cachedMap = assets.reduce(
-      (acc, asset) => {
-        const key = getAssetLogoKey(asset);
-        const path = logoPathCacheRef.current.get(key);
-        if (path) {
-          acc[key] = path;
-        }
-        return acc;
-      },
-      {} as { [x: string]: string },
-    );
-
-    return Object.assign({}, ...kvs, cachedMap);
-  }
 
   const renderRows = (
     rows: {
@@ -253,7 +175,7 @@ const App = ({
     rankStart = 1,
   ) =>
     rows.map((d, idx) => (
-      <TableRow key={getAssetLogoKey(d)} className="h-[42px]">
+      <TableRow key={getAssetKey(d)} className="h-[42px]">
         <TableCell className="w-[36px] py-1.5 text-xs text-muted-foreground font-mono">
           #{rankStart + idx}
         </TableCell>
@@ -266,11 +188,6 @@ const App = ({
               "{asset}",
               formatAssetLabel(d),
             )}</span>
-            <img
-              className="inline-block w-[18px] h-[18px] mr-2 rounded-full"
-              src={resolveAssetLogoSrc(d, logoMap[getAssetLogoKey(d)])}
-              alt=""
-            />
             <AssetLabel
               asset={d}
               className="min-w-0"
@@ -305,8 +222,8 @@ const App = ({
     rows: typeof coinsProfit,
   ) => <div className="profit-mobile-list mobile-record-list">
     {rows.map((row, index) => {
-      const key = getAssetLogoKey(row);
-      return <ListRow key={key} href={`#${buildAssetDetailsPath(row)}`}
+      const assetKey = getAssetKey(row);
+      return <ListRow key={assetKey} href={`#${buildAssetDetailsPath(row)}`}
         value={<span className="text-right">
           <span title={row.isUnknown ? t("common.unknown") : undefined} className={`block text-sm ios-money ${row.value === null ? "text-muted-foreground" : positiveNegativeTextClass(row.value, quoteColor, 500)}`}>
             {row.value === null ? "—" : `${row.value < 0 ? "-" : "+"}${currency.symbol}${prettyNumberToLocaleString(currencyWrapper(currency)(Math.abs(row.value)))}`}
@@ -318,10 +235,7 @@ const App = ({
         </span>}>
         <span className="flex min-w-0 items-center gap-2">
           <span className="w-5 shrink-0 font-mono text-xs text-muted-foreground mobile-mover-rank">#{index + 1}</span>
-          <img className="h-6 w-6 shrink-0 rounded-full"
-            src={resolveAssetLogoSrc(row, logoMap[key])} alt="" />
-          <AssetLabel asset={row} labelClassName="truncate text-sm font-medium"
-            badgeClassName="hidden" />
+          <AssetLabel asset={row} labelClassName="truncate text-sm font-medium" />
         </span>
       </ListRow>;
     })}
@@ -383,7 +297,7 @@ const App = ({
       </CardHeader>
       <CardContent className="space-y-2">
         {view === "attribution" ? (
-          <ProfitAttribution currency={currency} dateRange={selectedDateRange} quoteColor={quoteColor} logoMap={logoMap} />
+          <ProfitAttribution currency={currency} dateRange={selectedDateRange} quoteColor={quoteColor} />
         ) : <>
         <div className="profit-movers-grid grid grid-cols-1 md:grid-cols-2 gap-4">
           {topProfitData.length > 0 && <div className="space-y-1">
