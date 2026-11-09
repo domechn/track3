@@ -67,6 +67,7 @@ it("shows failed exchange and broker statuses on mobile Wallets with real source
     expect(rows[2]).toHaveTextContent("Brokerage");
     expect(rows[2]).toHaveTextContent("Retry");
   });
+  expect(screen.getByRole("region", { name: "Source status" })).toHaveAttribute("tabindex", "0");
   fireEvent.click(await screen.findByRole("button", { name: "Trading" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Trading");
 });

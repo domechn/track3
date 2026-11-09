@@ -555,7 +555,8 @@ test("wide cost basis tables keep their first column visible while scrolling", a
   await page.goto("/#/cost-basis");
   const table = page.locator(".fidelity-cost-averages table");
   await expect(table).toBeVisible();
-  const wrapper = page.locator(".fidelity-cost-averages");
+  const wrapper = page.locator(".fidelity-cost-averages .fidelity-card-scroll");
+  await expect(wrapper).toHaveCSS("overflow-x", "auto");
   const widths = await wrapper.evaluate((node) => ({ scroll: node.scrollWidth, visible: node.clientWidth }));
   expect(widths.scroll).toBeGreaterThan(widths.visible);
   const first = table.locator("th").first();
@@ -565,6 +566,8 @@ test("wide cost basis tables keep their first column visible while scrolling", a
   expect(before).not.toBeNull();
   expect(after).not.toBeNull();
   expect(Math.abs(after!.x - before!.x)).toBeLessThan(2);
+  const dispositions = page.locator(".fidelity-cost-table .fidelity-table-scroll");
+  await expect(dispositions).toHaveAttribute("tabindex", "0");
 });
 });
 

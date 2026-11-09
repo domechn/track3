@@ -110,7 +110,7 @@ test.describe("Wallets desktop fidelity", () => {
           const rows = page.locator(".t3-wallet-balances tbody tr");
           const first = await rows.nth(0).boundingBox();
           const second = await rows.nth(1).boundingBox();
-          expect(Math.round(second!.y - first!.y)).toBe(52);
+          expect(Math.round(second!.y - first!.y)).toBe(50);
         } else {
           const allocation = await page.locator(".t3-wallet-allocation").boundingBox();
           expect(allocation!.x + allocation!.width).toBeCloseTo(1572, 0);

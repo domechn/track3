@@ -283,7 +283,7 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
           {chosen ? <>{renderMovers(movers)}<div className="t3-wallet-facts"><div><span>{t("wallets.fidelity.sourceChange")}</span><b className={tone(chosen.change)}>{signedMoney(chosen.change)}</b></div>
             <div><span>{t("wallets.fidelity.portfolioShareChange")}</span><b>{change ? `${(chosen.change / change * 100).toFixed(1)}%` : "—"}</b></div></div>
             <p>{t("wallets.fidelity.priceFootSelected")}</p></>
-            : <div className="t3-wallet-status-list">{sources.map((source) => {
+            : <div className="t3-wallet-status-list" role="region" aria-label={t("wallets.fidelity.sourceStatus")} tabIndex={0}>{sources.map((source) => {
               const status = statusFor(source);
               const bad = status?.status === "failed" || status?.status === "stale";
               return <div key={source.id} className={bad ? "failed" : ""}><div><i className={bad ? "err" : ""} /><strong>{source.label}</strong>

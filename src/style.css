@@ -3996,6 +3996,54 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-gaps .fidelity-gap-group td { height: 30px; background: var(--f-hover); color: var(--f-muted); font-size: 12px; font-weight: 600; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-gaps th:nth-child(3), :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-gaps tbody tr:not(.fidelity-gap-group) td:nth-child(3) { text-align: right; }
 
+/* Cost basis lists keep their headings and pagers in place as records grow. */
+:where(body:has(.t3-records-fidelity-shell)) :is(.fidelity-cost-chart, .fidelity-cost-averages) {
+  display: flex; flex-direction: column; height: clamp(320px, 42vh, 460px); min-height: 0; overflow: hidden;
+}
+:where(body:has(.t3-records-fidelity-shell)) :is(.fidelity-cost-table, .fidelity-cost-gaps):has(> .fidelity-pager) {
+  display: flex; flex-direction: column; height: clamp(500px, 65vh, 620px); overflow: hidden;
+}
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-gaps:has(> .fidelity-pager) {
+  height: clamp(320px, 42vh, 460px);
+}
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-card-scroll {
+  min-width: 0; min-height: 0; flex: 1; overflow-x: hidden; overflow-y: auto;
+  overscroll-behavior: contain; scrollbar-gutter: stable;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 12px), transparent);
+}
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-card-scroll:focus-visible {
+  outline: 2px solid hsl(var(--ring)); outline-offset: -2px;
+}
+:where(body:has(.t3-records-fidelity-shell)) :is(.fidelity-cost-averages, .fidelity-cost-gaps) .fidelity-card-scroll thead th {
+  position: sticky; top: 0; z-index: 2; background: var(--f-surface);
+}
+:where(body:has(.t3-records-fidelity-shell)) :is(.fidelity-cost-chart, .fidelity-cost-averages) .fidelity-card-scroll {
+  display: flex; flex-direction: column;
+}
+:where(body:has(.t3-records-fidelity-shell)) :is(.fidelity-cost-chart, .fidelity-cost-averages) .fidelity-card-scroll .fidelity-empty {
+  margin: auto 0;
+}
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-chart li > span:last-child,
+:where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-averages td:not(:first-child) {
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+:where(body:has(.t3-records-fidelity-shell)) :is(.fidelity-cost-table, .fidelity-cost-gaps) > .fidelity-pager { flex: none; }
+
+@media (min-width: 1400px) {
+  .t3-wallet-grid:has(.t3-wallet-matrix) :is(.t3-wallet-balances, .t3-wallet-side) {
+    height: clamp(320px, 42vh, 460px); min-height: 0;
+  }
+  .t3-wallet-grid:has(.t3-wallet-matrix) .t3-wallet-side { align-self: stretch; }
+  .t3-wallet-side .t3-wallet-status-list {
+    min-height: 0; flex: 1; overflow-x: hidden; overflow-y: auto;
+    overscroll-behavior: contain; scrollbar-gutter: stable;
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 12px), transparent);
+  }
+  .t3-wallet-side .t3-wallet-status-list:focus-visible {
+    outline: 2px solid hsl(var(--ring)); outline-offset: -2px;
+  }
+}
+
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 28px; min-height: 64px; padding: 14px 20px; box-shadow: none; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-filters .fidelity-date-input { width: 150px; color: #9b9da3; }
 :where(body:has(.t3-records-fidelity-shell)) .fidelity-history-filters .fidelity-filter-group:first-child .fidelity-segment button { letter-spacing: .12px; }
@@ -4162,6 +4210,7 @@ body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has
   :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-kpi-row { grid-template-columns: minmax(0,1fr); gap: 12px; }
   :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-chart li { grid-template-columns: 40px minmax(0,1fr) 80px; }
   :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-chart, :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-averages { overflow-x: auto; }
+  :where(body:has(.t3-records-fidelity-shell)) :is(.fidelity-cost-averages, .fidelity-cost-gaps) .fidelity-card-scroll { overflow-x: auto; }
   :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-averages table { min-width: 500px; }
   :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-averages th:first-child, :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-averages td:first-child, :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-table th:first-child, :where(body:has(.t3-records-fidelity-shell)) .fidelity-cost-table td:first-child {
     position: sticky; left: 0; z-index: 1; background: var(--f-surface);
