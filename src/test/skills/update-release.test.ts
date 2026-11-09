@@ -537,5 +537,7 @@ describe("release configuration", () => {
   it("orders a two-digit patch after the previous release", () => {
     expect(updateModule.compareVersions("0.9.10", "0.9.9")).toBe(1);
     expect(updateModule.compareVersions("0.9.9", "0.9.10")).toBe(-1);
+    expect(updateModule.compareVersions("0.9.11", "0.9.10")).toBe(1);
+    expect(updateModule.compareVersions("0.9.10", "0.9.11")).toBe(-1);
   });
 });
