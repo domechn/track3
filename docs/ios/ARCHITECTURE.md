@@ -25,8 +25,10 @@ records each file from master that the port changed.
 
 Tauri resolves `app_data_dir`, `app_config_dir`, `app_cache_dir`, and
 `resource_dir` inside the iOS app sandbox. SQLite and assistant session files
-live under application data, coin logos under cache, and bundled migration SQL
-under resources. Startup still resolves any legacy configuration database
+live under application data, and bundled migration SQL lives under resources.
+The unused Rust coin logo downloader is removed; startup makes a best-effort
+attempt to remove its old cache directory without touching other cache data.
+Startup still resolves any legacy configuration database
 before creating a new database. Frontend SQL uses the Rust-selected absolute
 database URL, so it opens the same database as migrations and refresh.
 

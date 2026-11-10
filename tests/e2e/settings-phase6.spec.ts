@@ -8,6 +8,9 @@ test("desktop Settings menu opens focused source and currency sections", async (
   await expect(page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "About 0.9.12" })).toBeVisible();
   await expect(page.locator(".t3-settings-source-tabs")).toBeVisible();
   await expect(page.getByRole("heading", { name: "General", exact: true })).toHaveCount(0);
+  await expect(page.evaluate(() =>
+    (window as any).__e2eInvoke(["download", "coins", "logos"].join("_"), { coins: [] })))
+    .rejects.toThrow("Unhandled Tauri command");
 
   await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "Currency & display" }).click();
   await expect(page.getByRole("heading", { name: "General", exact: true })).toBeVisible();
