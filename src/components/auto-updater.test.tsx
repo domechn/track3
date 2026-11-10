@@ -1,7 +1,7 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import AutoUpdater from "./auto-updater";
+import AutoUpdater, { updateDownloadEvent } from "./auto-updater";
 import { check } from "@tauri-apps/plugin-updater";
 import { useToast } from "@/components/ui/use-toast";
 import { reloadApp } from "@/utils/app";
@@ -206,6 +206,25 @@ describe("AutoUpdater", () => {
     fireEvent.click(screen.getByRole("button", { name: "Restart now" }));
     expect(reloadApp).toHaveBeenCalledOnce();
     expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("reopens a ready update instead of downloading it again", async () => {
+    const download = vi.fn().mockResolvedValue(undefined);
+    mockCheck.mockResolvedValueOnce({
+      available: true, version: "0.9.5", download,
+    } as unknown as Awaited<ReturnType<typeof check>>);
+    render(<AutoUpdater />);
+    fireEvent.click(await screen.findByRole("button", { name: "Download and install" }));
+    await screen.findByRole("dialog", { name: "Ready to restart" });
+    fireEvent.click(screen.getByRole("button", { name: "Later" }));
+    const anotherUpdate = {
+      available: true, version: "0.9.5", download: vi.fn().mockResolvedValue(undefined),
+      install: vi.fn().mockResolvedValue(undefined), close: vi.fn().mockResolvedValue(undefined),
+    };
+    act(() => window.dispatchEvent(new CustomEvent(updateDownloadEvent, { detail: anotherUpdate })));
+    expect(screen.getByRole("dialog", { name: "Ready to restart" })).toBeVisible();
+    expect(download).toHaveBeenCalledOnce();
+    expect(anotherUpdate.download).not.toHaveBeenCalled();
   });
 
   it("shows release notes before downloading an update that provides them", async () => {

@@ -148,18 +148,47 @@ describe("System Info subscription management", () => {
     fireEvent.click(within(version.closest("[data-ui-card]") as HTMLElement).getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(check).toHaveBeenCalledOnce());
     expect(check).toHaveBeenCalledWith({ timeout: 15_000 });
+    expect(screen.queryByRole("button", { name: "Update now" })).not.toBeInTheDocument();
     expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
       tone: "success", description: "You are on the latest version, 0.6.1.",
     }));
   });
-  it("offers the real release when an update is available", async () => {
+  it("keeps release notes when only the version is available", async () => {
     vi.mocked(check).mockResolvedValueOnce({ version: "0.7.0" } as Awaited<ReturnType<typeof check>>);
     render(<SystemInfo onProStatusChange={() => {}} />);
     const version = await screen.findByText("Track3 0.6.1");
     const card = within(version.closest("[data-ui-card]") as HTMLElement);
     fireEvent.click(card.getByRole("button", { name: "Check for updates" }));
-    fireEvent.click(await card.findByRole("button", { name: "View update" }));
+    fireEvent.click(await card.findByRole("button", { name: "Release notes" }));
+    expect(card.queryByRole("button", { name: "Update now" })).not.toBeInTheDocument();
     expect(mocks.openUrl).toHaveBeenCalledWith("https://github.com/domechn/track3/releases/latest");
+  });
+  it("hands the checked update to the updater from the first About action", async () => {
+    const update = {
+      available: true, version: "0.7.0", currentVersion: "0.6.1", date: "", body: "",
+      download: vi.fn(), install: vi.fn(), close: vi.fn(),
+    } as unknown as NonNullable<Awaited<ReturnType<typeof check>>>;
+    vi.mocked(check).mockResolvedValueOnce(update);
+    const onDownload = vi.fn();
+    window.addEventListener("track3:update-download", onDownload);
+    try {
+      render(<SystemInfo onProStatusChange={() => {}} />);
+      const version = await screen.findByText("Track3 0.6.1");
+      const card = within(version.closest("[data-ui-card]") as HTMLElement);
+      fireEvent.click(card.getByRole("button", { name: "Check for updates" }));
+      const install = await card.findByRole("button", { name: "Update now" });
+      const actions = install.parentElement!;
+      expect(Array.from(actions.querySelectorAll("button"), (button) => button.textContent)).toEqual([
+        "Update now", "Check for updates", "Release notes",
+      ]);
+      expect(card.getByRole("status")).toHaveTextContent("Track3 0.7.0 is available");
+      fireEvent.click(install);
+      expect((onDownload.mock.calls[0][0] as CustomEvent).detail).toBe(update);
+      expect(onDownload).toHaveBeenCalledOnce();
+      expect(card.getByRole("button", { name: "Downloading..." })).toBeDisabled();
+    } finally {
+      window.removeEventListener("track3:update-download", onDownload);
+    }
   });
   it("shows license devices only when the server supports the devices action", async () => {
     mocks.getLicenseIfIsPro.mockResolvedValue("stored-license");
