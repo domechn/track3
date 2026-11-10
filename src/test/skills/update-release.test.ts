@@ -541,5 +541,7 @@ describe("release configuration", () => {
     expect(updateModule.compareVersions("0.9.10", "0.9.11")).toBe(-1);
     expect(updateModule.compareVersions("0.9.12", "0.9.11")).toBe(1);
     expect(updateModule.compareVersions("0.9.11", "0.9.12")).toBe(-1);
+    expect(updateModule.compareVersions("0.9.13", "0.9.12")).toBe(1);
+    expect(updateModule.compareVersions("0.9.12", "0.9.13")).toBe(-1);
   });
 });

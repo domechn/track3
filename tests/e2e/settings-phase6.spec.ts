@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
 
 test("desktop Settings menu opens focused source and currency sections without changing the legacy page", async ({ page }) => {
-  await installTauriBridge(page, { appVersion: "0.9.12" });
+  await installTauriBridge(page, { appVersion: "0.9.13" });
   await page.goto("/#/settings/configuration");
-  await expect(page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "About 0.9.12" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "About 0.9.13" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Exchanges", exact: true }).last()).toBeVisible();
   await expect(page.getByRole("heading", { name: "General", exact: true })).toBeVisible();
 
@@ -67,7 +67,7 @@ test("About offers an in-app update beside the release link in light and dark", 
       (window as any).__updateDownloads = 0;
       (window as any).__e2eInvoke = (command: string, args: unknown, options: unknown) => {
         if (command === "plugin:updater|check") return Promise.resolve({
-          rid: 44, currentVersion: "0.9.11", version: "0.9.12", date: "", body: "", rawJson: {},
+          rid: 44, currentVersion: "0.9.12", version: "0.9.13", date: "", body: "", rawJson: {},
         });
         if (command === "plugin:updater|download") {
           (window as any).__updateDownloads++;
@@ -91,7 +91,7 @@ test("About offers an in-app update beside the release link in light and dark", 
     expect(bounds[2].right).toBeLessThanOrEqual((await card.boundingBox())!.x + (await card.boundingBox())!.width);
     await page.screenshot({ path: `/tmp/track3-about-update-now-${theme}.png`, animations: "disabled" });
     await update.click();
-    await expect(page.getByRole("dialog", { name: "Downloading Track3 0.9.12" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Downloading Track3 0.9.13" })).toBeVisible();
     await expect(card.getByRole("button", { name: "Downloading...", includeHidden: true })).toBeDisabled();
     expect(await page.evaluate(() => (window as any).__updateDownloads)).toBe(1);
   }
