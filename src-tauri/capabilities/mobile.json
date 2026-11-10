@@ -40,7 +40,7 @@
     "sql:allow-execute",
     {
       "identifier": "opener:allow-open-url",
-      "allow": [{ "url": "https://**/" }]
+      "allow": [{ "url": "https://**/" }, { "url": "http://**/" }]
     }
   ]
 }
