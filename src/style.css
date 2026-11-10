@@ -1220,7 +1220,6 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .t3-fidelity-topbar { z-index: 15; padding: 0; background: transparent; border: 0; font-family: "Fidelity Public Sans", sans-serif; }
   .t3-fidelity-topbar > div:first-child { padding: 0; }
   .t3-fidelity-topbar-controls { gap: 10px; }
-  .t3-fidelity-topbar-summary .t3-fidelity-live-control { order: -2; }
   .t3-fidelity-topbar-summary .t3-fidelity-date-control { order: -1; }
   .t3-fidelity-ranges { display: inline-flex; gap: 0; width: 260px; padding: 2px; border-radius: 999px; background: #1a1a1e; }
   .t3-fidelity-ranges button { display: grid; place-items: center; min-width: 40px; height: 28px; padding: 0 12px; border-radius: 999px; color: #9b9da3; font-size: 12px; font-weight: 500; }

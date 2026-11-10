@@ -178,7 +178,7 @@ function TopBar({
         className={recordsPage ? "t3-records-toolbar-panel flex h-12 items-center px-4" : railFidelityPage ? "t3-fidelity-rail-refresh-inner" : "flex h-12 items-center px-4"}>
         {!fidelityPage && liveTotal && <div className={railFidelityPage ? "t3-fidelity-rail-live" : "mr-4"}>{liveTotal}</div>}
         <div className={fidelityPage ? "t3-fidelity-topbar-controls ml-auto flex items-center" : "t3-topbar-controls ml-auto flex items-center gap-3"}>
-          {fidelityPage && liveTotal && <div className="t3-fidelity-live-control">{liveTotal}</div>}
+          {fidelityPage === "coin" && liveTotal && <div className="t3-fidelity-live-control">{liveTotal}</div>}
           {fidelityPage === "summary" && <div className="t3-fidelity-ranges" role="group" aria-label={t("datePicker.predefined")}>
             {(["1D", "7D", "30D", "90D", "1Y", "All"] as const).map((label) => {
               const chosen = summaryPresetRange(availableDates, label);
