@@ -12,8 +12,7 @@ import { FidelityIcon } from "@/mobile/components/fidelity-icon";
 import { ActionSheet, useHaptics } from "@/mobile/components/mobile";
 import { ConfirmSheet, ModalPage } from "@/mobile/components/mobile/overlays";
 import { Switch } from "@/mobile/components/ui/switch";
-import { getWalletLogo } from "@/lib/utils";
-import UnknownLogo from "@/assets/icons/unknown-logo.svg";
+import { SourceLogo } from "@/components/configuration/source-logo";
 import type { ExchangeRow, StockBrokerRow, WalletRow, SelectOption } from "@/components/configuration/types";
 import { PublicIpInfo } from "@/components/configuration/public-ip-info";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
@@ -477,9 +476,9 @@ export function MobileSources(props: MobileSourcesProps) {
             <Button variant="ghost" className="min-h-11" onClick={close}>{t("common.cancel")}</Button>
           </div>
           <div className="ios-d3-editor-intro">
-            {editor.step === 2 && <span className="ios-d3-source-avatar ios-d3-source-avatar-large" aria-hidden="true">
-              {getWalletLogo(editor.draft.type) !== UnknownLogo && <img src={getWalletLogo(editor.draft.type)} alt="" />}{getWalletLogo(editor.draft.type) === UnknownLogo && editor.draft.type.slice(0, 2).toUpperCase()}
-            </span>}
+            {editor.step === 2 && <SourceLogo type={editor.draft.type}
+              className="ios-d3-source-avatar ios-d3-source-avatar-large"
+              fallback={editor.draft.type.slice(0, 2).toUpperCase()} />}
             <div><h2 className="text-3xl font-bold">{editor.step === 2 ? providerOptions.find((option) => option.value === editor.draft.type)?.label ?? editor.draft.type : editor.original ? t("mobile.sources.edit") : sections.find((section) => section.kind === editor.kind)?.add}</h2>
             {editor.step === 2 && <p className="text-sm text-muted-foreground">{editor.original ? t("mobile.sources.edit") : sections.find((section) => section.kind === editor.kind)?.add}</p>}</div>
           </div>
@@ -541,8 +540,8 @@ export function MobileSources(props: MobileSourcesProps) {
 }
 
 function SourceAvatar({ type, label }: { type: string; label?: string }) {
-  const logo = getWalletLogo(type);
-  return <span className="ios-d3-source-avatar" aria-hidden="true">{logo === UnknownLogo ? label ?? type.slice(0, 2).toUpperCase() : <img src={logo} alt="" />}</span>;
+  return <SourceLogo type={type} className="ios-d3-source-avatar"
+    fallback={label ?? type.slice(0, 2).toUpperCase()} />;
 }
 
 function Field({ id, label, value, onChange, secret = false, onPaste, readOnly = false, invalid = false, error }: {
