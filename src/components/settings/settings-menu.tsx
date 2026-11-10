@@ -33,11 +33,11 @@ const sections = [
   ] },
 ] as const;
 
-const defaultSections: Record<string, string> = {
-  "/settings/configuration": "sources",
-  "/settings/data": "backup",
-  "/settings/appearance": "appearance",
-  "/settings/systemInfo": "pro",
+export const defaultSettingsRoutes: Record<string, string> = {
+  "/settings/configuration": "/settings/configuration?section=sources",
+  "/settings/data": "/settings/data?section=backup",
+  "/settings/appearance": "/settings/appearance?section=theme",
+  "/settings/systemInfo": "/settings/systemInfo?section=pro",
 };
 
 const designIconPaths: Record<string, ReactNode> = {
@@ -75,6 +75,8 @@ function PhoneIcon({ name }: { name: string }) {
 
 export function SettingsMenu({ pathname, search, values, mobileFidelity = false }: { pathname: string; search: string; values?: Record<string, string>; mobileFidelity?: boolean }) {
   const { t } = useTranslation();
+  const selectedSection = new URLSearchParams(search).get("section")
+    ?? new URLSearchParams(defaultSettingsRoutes[pathname]?.split("?")[1]).get("section");
   const [version, setVersion] = useState("");
   useEffect(() => {
     void getVersion().then(setVersion).catch(() => {});
@@ -86,7 +88,9 @@ export function SettingsMenu({ pathname, search, values, mobileFidelity = false 
       <div className="t3-settings-menu-links">
         {group.items.map((item) => {
           const href = item.href;
-          const active = `${pathname}${search}` === href || (!search && defaultSections[pathname] === item.key);
+          const [itemPath, itemSearch] = href.split("?");
+          const active = pathname === itemPath
+            && selectedSection === new URLSearchParams(itemSearch).get("section");
           const Icon = item.icon;
           return <Link key={item.key} to={href} aria-label={values?.[item.key] ? t(item.title) : undefined}
             aria-describedby={values?.[item.key] ? `settings-menu-value-${item.key}` : undefined}

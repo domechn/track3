@@ -150,7 +150,7 @@ vi.mock("@/middlelayers/configuration", () => ({
 }));
 
 beforeEach(() => {
-  window.location.hash = "#/settings/configuration";
+  window.location.hash = "#/settings/configuration?section=currency";
 
   vi.mocked(getDefaultCurrencyRate).mockReturnValue({
     currency: "USD",
@@ -203,7 +203,7 @@ describe("Settings configuration route base currency warm start", () => {
       </ChartResizeContext.Provider>,
     );
 
-    expect(await screen.findByText("EUR")).toBeInTheDocument();
-    expect(screen.queryByText(/^USD$/)).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Base Currency/i })).toHaveTextContent("EUR");
+    expect(screen.getByRole("button", { name: /Base Currency/i })).not.toHaveTextContent("USD");
   });
 });

@@ -268,7 +268,7 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
         <span className={`t3-source-condition ${source.status}`}>{t(`refresh.status.${source.status}`)}</span>
       </div>)}
     </div> : <p className="t3-panel-empty">{t("overview.design.sourceEmpty")}</p>}
-    <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration">{t("overview.design.manageSources")}</a>
+    <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration?section=sources">{t("overview.design.manageSources")}</a>
   </Card>;
   if (variant === "card") return <Card className="t3-overview-panel t3-sources-panel">
     <header className="t3-overview-panel-heading"><h2>{t("overview.design.sources")}</h2>
@@ -319,7 +319,7 @@ export function SourceStatusCard({ statuses, sources = [], currency, variant = "
         </div>;
       })}
     </div> : <p className="t3-panel-empty">{t("overview.design.sourceEmpty")}</p>}
-    {!sources.length && <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration">{t("overview.design.manageSources")}</a>}
+    {!sources.length && <a className="t3-panel-footnote t3-source-link" href="#/settings/configuration?section=sources">{t("overview.design.manageSources")}</a>}
   </Card>;
   return <section className="t3-overview-source-status" aria-label={t("overview.design.sources")}>
     {failed.length > 0 && <div role="alert" className="t3-source-banner">

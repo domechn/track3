@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { render, screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createContext } from "react";
-import { HashRouter } from "react-router-dom";
+import { HashRouter, MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GlobalConfig } from "@/middlelayers/datafetch/types";
 import type { PersistedChatMessage } from "@/middlelayers/ai";
@@ -200,11 +200,19 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); window.location.hash = ""; });
 
+function renderDesktopCurrency() {
+  render(<MemoryRouter initialEntries={["/settings/configuration?section=currency"]}>
+    <Routes><Route element={<Outlet context="currency" />}>
+      <Route path="/settings/configuration" element={<DesktopConfiguration />} />
+    </Route></Routes>
+  </MemoryRouter>);
+}
+
 describe("0.9.4 UI persistence shapes", () => {
   it("desktop Settings saves every loaded source field after a no-op edit", async () => {
-    render(<DesktopConfiguration />);
-    const toggle = await screen.findByRole("checkbox", { name: /group stable coins/i });
-    await waitFor(() => expect(screen.getByText("Alias binance")).toBeInTheDocument());
+    renderDesktopCurrency();
+    const toggle = await screen.findByRole("switch", { name: "Group USD stablecoins" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "History results per page" })).toHaveTextContent("10"));
     fireEvent.click(toggle);
     await waitFor(() => expect(saveConfiguration).toHaveBeenCalledTimes(1));
     fireEvent.click(toggle);
@@ -234,10 +242,12 @@ describe("0.9.4 UI persistence shapes", () => {
         window.location.hash = "#/settings/configuration?section=sources";
         render(<HashRouter><MobileConfiguration /></HashRouter>);
       } else {
-        render(<DesktopConfiguration />);
+        renderDesktopCurrency();
       }
-      const toggle = await screen.findByRole(tree === "mobile" ? "switch" : "checkbox",
-        { name: tree === "mobile" ? "Toggle Alias binance" : /group stable coins/i });
+      const toggle = await screen.findByRole("switch",
+        { name: tree === "mobile" ? "Toggle Alias binance" : "Group USD stablecoins" });
+      if (tree === "desktop") await waitFor(() =>
+        expect(screen.getByRole("button", { name: "History results per page" })).toHaveTextContent("10"));
       fireEvent.click(toggle);
       await waitFor(() => expect(saveConfiguration).toHaveBeenCalledTimes(1));
       fireEvent.click(toggle);
@@ -262,10 +272,12 @@ describe("0.9.4 UI persistence shapes", () => {
         window.location.hash = "#/settings/configuration?section=sources";
         render(<HashRouter><MobileConfiguration /></HashRouter>);
       } else {
-        render(<DesktopConfiguration />);
+        renderDesktopCurrency();
       }
-      const toggle = await screen.findByRole(tree === "mobile" ? "switch" : "checkbox",
-        { name: tree === "mobile" ? "Toggle Alias binance" : /group stable coins/i });
+      const toggle = await screen.findByRole("switch",
+        { name: tree === "mobile" ? "Toggle Alias binance" : "Group USD stablecoins" });
+      if (tree === "desktop") await waitFor(() =>
+        expect(screen.getByRole("button", { name: "History results per page" })).toHaveTextContent("10"));
       fireEvent.click(toggle);
       await waitFor(() => expect(saveConfiguration).toHaveBeenCalledTimes(1));
       fireEvent.click(toggle);
