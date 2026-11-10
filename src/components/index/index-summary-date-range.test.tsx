@@ -60,7 +60,7 @@ vi.mock("../date-picker", () => ({
 }));
 
 vi.mock("../realtime-total-value", () => ({
-  default: () => null,
+  default: () => <button type="button" aria-label="Live total" />,
 }));
 
 vi.mock("../sidebar", () => ({
@@ -255,5 +255,34 @@ describe("Summary route date range", () => {
     await waitFor(() => expect(screen.getByTestId("selected-range")).toHaveTextContent(
       `${new Date(2024, 3, 1).toISOString()}|${new Date(2024, 3, 4).toISOString()}`));
     expect(localStorage.getItem(DATE_RANGE_KEY)).toBeNull();
+  });
+});
+
+describe("Summary live control", () => {
+  it("omits the Pro live control on Summary while keeping the range group", async () => {
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("pro");
+    const { container } = render(
+      <ChartResizeContext.Provider value={{ needResize: 0, setNeedResize: vi.fn() }}>
+        <App />
+      </ChartResizeContext.Provider>,
+    );
+
+    await screen.findByTestId("summary-range");
+    await waitFor(() => expect(container.querySelector("#app-main-content > div")).toHaveAttribute("aria-busy", "false"));
+    await waitFor(() => expect(container.querySelector(".t3-fidelity-topbar-summary .t3-fidelity-ranges")).toBeInTheDocument());
+    expect(container.querySelector(".t3-fidelity-topbar-summary .t3-fidelity-live-control")).toBeNull();
+  });
+
+  it("keeps the Pro live control on the coin page", async () => {
+    window.location.hash = "#/coins/BTC";
+    vi.mocked(getLicenseIfIsPro).mockResolvedValue("pro");
+    const { container } = render(
+      <ChartResizeContext.Provider value={{ needResize: 0, setNeedResize: vi.fn() }}>
+        <App />
+      </ChartResizeContext.Provider>,
+    );
+
+    await waitFor(() => expect(container.querySelector(".t3-fidelity-topbar-coin .t3-fidelity-live-control")).toBeInTheDocument());
+    expect(container.querySelector(".t3-fidelity-topbar-coin .t3-fidelity-live-control button")).toHaveAttribute("aria-label", "Live total");
   });
 });

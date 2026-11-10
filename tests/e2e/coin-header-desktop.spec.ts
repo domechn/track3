@@ -11,6 +11,8 @@ test("long source aliases keep their full name for text and tooltip while fittin
     });
   });
   await page.goto("/#/coins/BTC");
+  await expect(page.locator(".t3-fidelity-topbar-coin .t3-fidelity-live-control .t3-live-trigger svg"))
+    .toBeVisible();
   const name = page.locator('.coin-fidelity-heading .coin-source-name[title="A very long wallet alias"]');
   await expect(name).toBeVisible();
   await expect(name).toHaveText("A very long wallet alias");
