@@ -1,19 +1,23 @@
 import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
 
-test("desktop Settings menu opens focused source and currency sections without changing the legacy page", async ({ page }) => {
+test("desktop Settings menu opens focused source and currency sections", async ({ page }) => {
   await installTauriBridge(page, { appVersion: "0.9.12" });
   await page.goto("/#/settings/configuration");
+  await expect(page).toHaveURL(/#\/settings\/configuration\?section=sources$/);
   await expect(page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "About 0.9.12" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Exchanges", exact: true }).last()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "General", exact: true })).toBeVisible();
+  await expect(page.locator(".t3-settings-source-tabs")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "General", exact: true })).toHaveCount(0);
+  await expect(page.evaluate(() =>
+    (window as any).__e2eInvoke(["download", "coins", "logos"].join("_"), { coins: [] })))
+    .rejects.toThrow("Unhandled Tauri command");
 
   await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "Currency & display" }).click();
   await expect(page.getByRole("heading", { name: "General", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Exchanges", exact: true })).toHaveCount(0);
 
   await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "Data sources" }).click();
-  await expect(page.getByRole("group", { name: "Data sources" }).getByRole("button", { name: /^Exchanges \d+$/ })).toBeVisible();
+  await expect(page.locator(".t3-settings-source-tabs").getByRole("button", { name: /^Exchanges \d+$/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "General", exact: true })).toHaveCount(0);
 });
 

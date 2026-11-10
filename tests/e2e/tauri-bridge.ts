@@ -614,7 +614,6 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     if (cmd === "plugin:updater|check") return null;
     if (cmd === "plugin:event|listen") return nextRid++;
     if (cmd === "plugin:event|unlisten") return null;
-    if (cmd === "download_coins_logos") return null;
     if (cmd === "encrypt") return `!ent:e2e:${args.data}`;
     if (cmd === "decrypt") {
       if (args.data === "!ent:e2e:license") return "e2e-license";

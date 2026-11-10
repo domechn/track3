@@ -51,7 +51,6 @@ Exposes Tauri commands to frontend via `invoke()`:
 
 - `query_coins_prices` — CoinGecko price queries
 - `encrypt` / `decrypt` — Config encryption via magic-crypt
-- `download_coins_logos` — Coin logo caching
 
 Key files: `main.rs` (desktop entry), `app.rs` (shared commands and setup), `info.rs` (CoinGecko), `migration.rs` (DB versioning), `ent.rs` (encryption), `lib.rs` (module declarations), `types.rs` (shared Rust structs)
 

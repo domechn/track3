@@ -20,6 +20,11 @@ for (const [route, heading, actions] of [
     await page.goto(`/#/${route}`);
     const header = page.locator(heading).first();
     await expect(header).toBeVisible();
+    if (route === "summary") {
+      await expect(page.locator(".t3-fidelity-topbar-summary .t3-fidelity-live-control")).toHaveCount(0);
+      await expect(page.locator(".t3-fidelity-topbar-summary .t3-fidelity-ranges button"))
+        .toHaveText(["1D", "7D", "30D", "90D", "1Y", "All"]);
+    }
     await page.evaluate(() => { document.documentElement.style.setProperty("zoom", "2"); });
     const text = await header.locator("p").first().boundingBox();
     const controls = await page.locator(actions).first().boundingBox();

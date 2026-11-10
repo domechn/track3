@@ -91,7 +91,7 @@ export default function FirstRunOnboarding({ variant, ready }: { variant: "deskt
     }
     replayFocus.current = null
     if (reason === "completed") {
-      navigate(variant === "ios" ? "/settings/configuration?section=sources" : "/settings/configuration",
+      navigate("/settings/configuration?section=sources",
         { state: variant === "ios" ? { fromOnboarding: true } : undefined })
     }
   }

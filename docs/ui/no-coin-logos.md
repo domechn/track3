@@ -29,4 +29,6 @@ Inventory of TS/TSX renderers and CSS image or initials tiles. Coin and stock sy
 | `src/components/wallet-assets-change.tsx`, `src/mobile/components/wallet-assets-change.tsx` | Wallet type image in Wallets | Kept because wallet outside configuration |
 | `src/components/overview-panels.tsx`, `src/mobile/components/overview-fidelity.tsx`, `src/mobile/components/partial-overview-fidelity.tsx`, `src/mobile/components/refresh-data.tsx`, `src/mobile/components/source-mark.tsx` | Source identity and status marks | Kept because exchange or wallet outside configuration |
 
-The frontend coin image lookup, download call, fallback stock asset, and unused image stack were deleted. Exchange and wallet images under `src/assets/icons/` remain referenced by the configuration. The Rust logo command and any stored fields or sync formats remain unchanged; no app renderer calls that command.
+The frontend coin image lookup, download call, fallback stock asset, and unused image stack were deleted. Exchange and wallet images under `src/assets/icons/` remain referenced by the configuration. The unused Rust coin logo command and downloader were also removed. On startup, the app makes a best-effort attempt to remove old cached coin icons from `app_cache_dir/assets/coins`, including the obsolete blacklist file, without touching other cache entries. Stored database and sync formats remain unchanged.
+
+Release note for the next release: Removed unused coin icon downloads and cleaned up previously cached coin icons at startup.

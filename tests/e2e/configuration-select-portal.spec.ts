@@ -7,7 +7,8 @@ for (const height of [560, 720]) {
   test(`Wallet Type shows every option after editing inside the ${height}px dialog`, async ({ page }) => {
     await page.setViewportSize({ width: 1280, height });
     await installTauriBridge(page);
-    await page.goto("/#/settings/configuration");
+    await page.goto("/#/settings/configuration?section=sources");
+    await page.locator(".t3-settings-source-tabs").getByRole("button", { name: /^Wallets \d+$/ }).click();
     await page.getByRole("button", { name: "Add Wallet Configuration" }).click();
     const dialog = page.getByRole("dialog", { name: "Add Wallet Configuration" });
     await dialog.getByRole("textbox", { name: "Alias" }).fill("Cold wallet");

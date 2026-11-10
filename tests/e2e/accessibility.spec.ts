@@ -383,7 +383,12 @@ test("remaining configuration editors have named controls", async ({ page }) => 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installTauriBridge(page);
   await page.goto("/#/settings/configuration");
-  for (const name of ["Add Stock Broker", "Add Wallet Configuration", "Add Symbol"]) {
+  for (const [tab, name] of [
+    ["Brokers", "Add Stock Broker"],
+    ["Wallets", "Add Wallet Configuration"],
+    ["Custom assets", "Add Symbol"],
+  ] as const) {
+    await page.locator(".t3-settings-source-tabs").getByRole("button", { name: new RegExp(`^${tab} \\d+$`) }).click();
     const trigger = page.getByRole("button", { name, exact: true });
     await trigger.click();
     const dialog = page.getByRole("dialog");

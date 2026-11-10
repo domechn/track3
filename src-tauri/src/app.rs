@@ -5,7 +5,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
 };
-use std::{collections::HashMap, io};
+use std::{collections::HashMap, io, path::Path};
 
 use crate::{
     database_path::{
@@ -30,7 +30,7 @@ use crate::{
         restore_local_snapshot as restore_local_snapshot_atomically,
         save_sync_state as save_sync_state_atomically, SnapshotStateRow,
     },
-    types::{CoinWithPrice, RefreshAssetInput, RefreshTransactionInput},
+    types::{RefreshAssetInput, RefreshTransactionInput},
 };
 use tauri::Manager;
 #[cfg(target_os = "ios")]
@@ -234,32 +234,6 @@ async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>
 
     match res {
         Ok(prices) => validate_coin_prices(prices),
-        Err(e) => Err(sanitize_upstream_error(&e.to_string())),
-    }
-}
-
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
-#[tauri::command]
-async fn download_coins_logos(
-    handle: tauri::AppHandle,
-    coins: Vec<CoinWithPrice>,
-) -> Result<(), String> {
-    let resource_dir = handle
-        .path()
-        .app_cache_dir()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
-    let client = get_coin_info_provider();
-
-    let res = client.download_coins_logos(coins, resource_dir).await;
-
-    match res {
-        Ok(_) => Ok(()),
         Err(e) => Err(sanitize_upstream_error(&e.to_string())),
     }
 }
@@ -608,6 +582,20 @@ fn record_frontend_error(handle: tauri::AppHandle, message: String) -> Result<()
     writeln!(file, "{}", message.chars().take(4000).collect::<String>()).map_err(|e| e.to_string())
 }
 
+fn cleanup_cached_coin_logos(cache_dir: &Path) -> io::Result<()> {
+    let assets = cache_dir.join("assets");
+    let coins = assets.join("coins");
+    for path in [&assets, &coins] {
+        match std::fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {}
+            Ok(_) => return Ok(()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error),
+        }
+    }
+    std::fs::remove_dir_all(coins)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default();
@@ -626,6 +614,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init());
     let builder = builder.setup(|app| {
+        match app.path().app_cache_dir() {
+            Ok(cache_dir) => {
+                tauri::async_runtime::spawn_blocking(move || {
+                    match cleanup_cached_coin_logos(&cache_dir) {
+                        Ok(()) => log::debug!("Coin icon cache cleanup finished"),
+                        Err(error) => log::debug!("Coin icon cache cleanup failed: {error}"),
+                    }
+                });
+            }
+            Err(error) => log::debug!("Coin icon cache path unavailable: {error}"),
+        }
         let result: Result<(), Box<dyn std::error::Error>> = (|| {
             let app_version = app.package_info().version.to_string();
             let resource_path = app.path();
@@ -737,7 +736,6 @@ pub fn run() {
         query_coins_prices,
         encrypt,
         decrypt,
-        download_coins_logos,
         decrypt_with_key,
         rotate_encryption_key,
         persist_refresh,
@@ -777,7 +775,6 @@ pub fn run() {
         query_coins_prices,
         encrypt,
         decrypt,
-        download_coins_logos,
         decrypt_with_key,
         rotate_encryption_key,
         persist_refresh,
@@ -815,7 +812,6 @@ pub fn run() {
         query_coins_prices,
         encrypt,
         decrypt,
-        download_coins_logos,
         decrypt_with_key,
         rotate_encryption_key,
         persist_refresh,
@@ -839,7 +835,6 @@ pub fn run() {
         query_coins_prices,
         encrypt,
         decrypt,
-        download_coins_logos,
         decrypt_with_key,
         rotate_encryption_key,
         persist_refresh,
@@ -859,4 +854,49 @@ pub fn run() {
     builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod coin_logo_cache_tests {
+    use super::*;
+
+    #[test]
+    fn cleanup_removes_only_cached_coins_and_skips_symlinks() {
+        let cache =
+            std::env::temp_dir().join(format!("track3-logo-cache-{}", uuid::Uuid::new_v4()));
+        let coins = cache.join("assets/coins");
+        std::fs::create_dir_all(&coins).unwrap();
+        std::fs::write(coins.join("btc.png"), "old icon").unwrap();
+        std::fs::write(cache.join("assets/keep.txt"), "keep").unwrap();
+        std::fs::create_dir(cache.join("other")).unwrap();
+        std::fs::write(cache.join("other/keep.txt"), "keep").unwrap();
+
+        cleanup_cached_coin_logos(&cache).unwrap();
+        assert!(!coins.exists());
+        assert!(cache.join("assets/keep.txt").exists());
+        assert!(cache.join("other/keep.txt").exists());
+        cleanup_cached_coin_logos(&cache).unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            let external = cache.join("other");
+            symlink(&external, &coins).unwrap();
+            cleanup_cached_coin_logos(&cache).unwrap();
+            assert!(std::fs::symlink_metadata(&coins)
+                .unwrap()
+                .file_type()
+                .is_symlink());
+            assert!(external.join("keep.txt").exists());
+            std::fs::remove_file(&coins).unwrap();
+
+            std::fs::remove_file(cache.join("assets/keep.txt")).unwrap();
+            std::fs::remove_dir(cache.join("assets")).unwrap();
+            symlink(&external, cache.join("assets")).unwrap();
+            cleanup_cached_coin_logos(&cache).unwrap();
+            assert!(external.join("keep.txt").exists());
+        }
+
+        std::fs::remove_dir_all(cache).unwrap();
+    }
 }
