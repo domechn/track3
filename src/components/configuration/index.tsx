@@ -45,7 +45,6 @@ import { classifySourceError } from "@/middlelayers/datafetch/utils/source-failu
 import { configurationFromForm, configurationToForm, initialConfiguration } from "@/middlelayers/ui-state/config-form";
 
 import { AutoRetrySetting } from "@/components/configuration/auto-retry-setting";
-import { SummaryCards } from "./summary-cards";
 import { GeneralSettings } from "./general-settings";
 import { CurrencyDesign } from "./currency-design";
 import { ExchangeSection } from "./exchange-section";
@@ -278,19 +277,6 @@ const App = ({
             label,
           };
         }),
-    [wallets],
-  );
-
-  const activeExchangeCount = useMemo(
-    () => exchanges.filter((e) => e.active).length,
-    [exchanges],
-  );
-  const activeStockBrokerCount = useMemo(
-    () => stockBrokers.filter((broker) => broker.active).length,
-    [stockBrokers],
-  );
-  const activeWalletCount = useMemo(
-    () => wallets.filter((w) => w.active).length,
     [wallets],
   );
 
@@ -1137,8 +1123,6 @@ const App = ({
     attachModalTargetIdx >= 0
       ? others[attachModalTargetIdx]?.attachTo
       : undefined;
-  const showCurrency = !section || section === "currency";
-  const showSources = !section || section === "sources";
   const renameNames = [
     ...exchanges.map((row) => row.alias || sourceAliasFallback("exchange", row.type, row.apiKey)),
     ...wallets.map((row) => row.alias || sourceAliasFallback("wallet", row.type, row.address)),
@@ -1169,23 +1153,11 @@ const App = ({
       />
 
       <div>
-        <h3 className="text-lg font-medium tracking-tight">{t(section === "sources" ? "settings.phase6.sources" : section === "currency" ? "settings.phase6.currency" : "config.title")}</h3>
+        <h3 className="text-lg font-medium tracking-tight">{t(section === "currency" ? "settings.phase6.currency" : "settings.phase6.sources")}</h3>
         <p className="text-sm text-muted-foreground">{t("config.subtitle")}</p>
       </div>
 
-      {!section && <SummaryCards
-        exchangeCount={exchanges.length}
-        activeExchangeCount={activeExchangeCount}
-        stockBrokerCount={stockBrokers.length}
-        activeStockBrokerCount={activeStockBrokerCount}
-        walletCount={wallets.length}
-        activeWalletCount={activeWalletCount}
-        othersCount={others.length}
-        preferCurrency={preferCurrency}
-        preferCurrencyLoading={preferCurrencyLoading}
-      />}
-
-      {showCurrency && <div className="t3-settings-legacy-currency"><GeneralSettings
+      {section === "currency" && <div className="t3-settings-legacy-currency"><GeneralSettings
         groupUSD={groupUSD}
         onGroupUSDChange={onGroupUSDSelectChange}
         hideInactive={hideInactive}
@@ -1229,7 +1201,7 @@ const App = ({
           </button>)}
       </div></>}
 
-      {showSources && (!section || sourceTab === "brokers") && <StockBrokerSection
+      {section === "sources" && sourceTab === "brokers" && <StockBrokerSection
         stockBrokers={stockBrokers}
         renameNames={renameNames}
         renameOffset={exchanges.length + wallets.length}
@@ -1251,7 +1223,7 @@ const App = ({
         onRename={renameBroker}
       />}
 
-      {showSources && (!section || sourceTab === "exchanges") && <ExchangeSection
+      {section === "sources" && sourceTab === "exchanges" && <ExchangeSection
         exchanges={exchanges}
         renameNames={renameNames}
         visibleExchanges={visibleExchanges}
@@ -1272,7 +1244,7 @@ const App = ({
         onRename={renameExchange}
       />}
 
-      {showSources && (!section || sourceTab === "wallets") && <WalletSection
+      {section === "sources" && sourceTab === "wallets" && <WalletSection
         wallets={wallets}
         renameNames={renameNames}
         renameOffset={exchanges.length}
@@ -1294,7 +1266,7 @@ const App = ({
         onRename={renameWallet}
       />}
 
-      {showSources && (!section || sourceTab === "custom") && <OthersSection
+      {section === "sources" && sourceTab === "custom" && <OthersSection
         others={others}
         renameNames={renameNames}
         renameOffset={exchanges.length + wallets.length + stockBrokers.length}

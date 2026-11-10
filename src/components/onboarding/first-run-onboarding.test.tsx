@@ -45,7 +45,7 @@ it("writes completion before navigating to source setup", async () => {
   for (let i = 0; i < 4; i++) fireEvent.keyDown(dialog, { key: "ArrowRight" })
   fireEvent.click(screen.getByTestId("onboarding-cta-add-source"))
   await waitFor(() => expect(localStorage.getItem(ONBOARDING_STORAGE_KEY)).toBe("completed"))
-  await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/settings/configuration"))
+  await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/settings/configuration?section=sources"))
 })
 it("replays even when the flag is already set", async () => {
   localStorage.setItem(ONBOARDING_STORAGE_KEY, "existing")
