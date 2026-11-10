@@ -60,12 +60,17 @@
     "sql:default",
     "sql:allow-execute",
     "updater:allow-check",
+    "updater:allow-download",
+    "updater:allow-install",
     "updater:allow-download-and-install",
     {
       "identifier": "opener:allow-open-url",
       "allow": [
         {
           "url": "https://**/"
+        },
+        {
+          "url": "http://**/"
         }
       ]
     }
