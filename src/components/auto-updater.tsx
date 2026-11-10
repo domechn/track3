@@ -31,6 +31,8 @@ const failureReason = (error: unknown): FailureReason => {
 const AutoUpdater = () => {
   const { t, locale } = useTranslation();
   const [state, dispatch] = useReducer(updateReducer, initialUpdateState);
+  const phase = useRef(state.phase);
+  phase.current = state.phase;
   const [metadata, setMetadata] = useState<Update | null>(null);
   const [manualOpenError, setManualOpenError] = useState(false);
   const [retryDelay, setRetryDelay] = useState<number | null>(null);
@@ -79,7 +81,7 @@ const AutoUpdater = () => {
   useEffect(() => {
     const onDownload = (event: Event) => {
       const update = (event as CustomEvent<Update>).detail;
-      if (ownedUpdate.current) {
+      if (ownedUpdate.current || ["connecting", "downloading", "verifying", "installing", "restart-required"].includes(phase.current)) {
         close(update);
         dispatch({ type: "show" });
         return;

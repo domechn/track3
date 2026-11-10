@@ -29,13 +29,14 @@ import { getVersion } from "@/utils/app";
 import { trackCheckoutCompleted, trackCheckoutPhase, trackSubscribeClicked, trackCheckoutCancelled, trackOpenClicked } from "@/middlelayers/ui-state/telemetry";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { openExternal } from "@/lib/external-links";
-import { check } from "@tauri-apps/plugin-updater";
+import { check, type Update } from "@tauri-apps/plugin-updater";
 import { useTranslation } from "@/i18n";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { requestOnboardingReplay } from "@/middlelayers/onboarding";
 import { useOutletContext } from "react-router-dom";
 import { ProDesign } from "./pro-design";
 import { AboutDesign } from "./about-design";
+import { updateDownloadEvent } from "@/components/auto-updater";
 import { useWideDesktop } from "./use-wide-desktop";
 
 const App = ({
@@ -62,6 +63,8 @@ const App = ({
   const [showLegacyInput, setShowLegacyInput] = useState(false);
   const [checkingAbout, setCheckingAbout] = useState(false);
   const [aboutUpdate, setAboutUpdate] = useState<string>();
+  const [aboutUpdateObject, setAboutUpdateObject] = useState<Update>();
+  const [aboutDownloadStarted, setAboutDownloadStarted] = useState(false);
 
   // subscription states
   const [subscriptionInfo, setSubscriptionInfo] =
@@ -277,9 +280,14 @@ const App = ({
     if (checkingAbout) return;
     setCheckingAbout(true);
     setAboutUpdate(undefined);
+    setAboutUpdateObject(undefined);
+    setAboutDownloadStarted(false);
     try {
       const update = await check({ timeout: 15_000 });
-      if (update) setAboutUpdate(update.version);
+      if (update) {
+        setAboutUpdate(update.version);
+        if (typeof update.download === "function") setAboutUpdateObject(update);
+      }
       else toast({ title: t("fidelity.settingsB.about.upToDate"),
         description: t("fidelity.settingsB.about.upToDateDetail").replace("{version}", version), tone: "success" });
     } catch {
@@ -488,11 +496,15 @@ const App = ({
         <CardContent className="flex flex-1 flex-col">
           <p className="text-xl font-semibold tabular-nums">Track3 {version}</p>
           <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
+            {aboutUpdateObject && <Button type="button" size="sm" disabled={aboutDownloadStarted} onClick={() => {
+              setAboutDownloadStarted(true);
+              window.dispatchEvent(new CustomEvent(updateDownloadEvent, { detail: aboutUpdateObject }));
+            }}>{t(aboutDownloadStarted ? "fidelity.settingsB.about.downloadingNow" : "fidelity.settingsB.about.updateNow")}</Button>}
             <Button type="button" size="sm" variant="outline" disabled={checkingAbout} onClick={() => { void checkAboutUpdates(); }}>
               {t(checkingAbout ? "fidelity.settingsB.about.checking" : "fidelity.settingsB.about.check")}
             </Button>
             {aboutUpdate && <Button type="button" size="sm" variant="outline" onClick={() => { void openExternal("latestRelease"); }}>
-              {t("fidelity.settingsB.about.viewUpdate")}
+              {t("fidelity.settingsB.about.releaseNotes")}
             </Button>}
           </div>
           {aboutUpdate && <p role="status" className="pt-2 text-xs text-muted-foreground">

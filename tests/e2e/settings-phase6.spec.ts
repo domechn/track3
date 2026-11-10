@@ -47,6 +47,56 @@ test("desktop Settings keeps backup, blacklist, security, appearance, and About 
   expect(Math.abs((await versionCard.boundingBox())!.y - (await guideCard.boundingBox())!.y)).toBeLessThan(4);
 });
 
+test("About offers an in-app update beside the release link in light and dark", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => {
+    if (!localStorage.getItem("track3-ui-theme")) localStorage.setItem("track3-ui-theme", "light");
+  });
+  await installTauriBridge(page, { appVersion: "0.9.11" });
+  for (const theme of ["light", "dark"] as const) {
+    if (theme === "dark") {
+      await page.evaluate(() => localStorage.setItem("track3-ui-theme", "dark"));
+      await page.reload();
+    } else {
+      await page.goto("/#/settings/systemInfo?section=about");
+    }
+    await expect(page.locator(".t3-about-version")).toBeVisible();
+    await page.evaluate(() => {
+      const original = (window as any).__e2eInvoke;
+      (window as any).__updateDownloads = 0;
+      (window as any).__e2eInvoke = (command: string, args: unknown, options: unknown) => {
+        if (command === "plugin:updater|check") return Promise.resolve({
+          rid: 44, currentVersion: "0.9.11", version: "0.9.12", date: "", body: "", rawJson: {},
+        });
+        if (command === "plugin:updater|download") {
+          (window as any).__updateDownloads++;
+          return new Promise(() => {});
+        }
+        return original(command, args, options);
+      };
+    });
+    const card = page.locator(".t3-about-version");
+    await card.getByRole("button", { name: "Check for updates" }).click();
+    const update = card.getByRole("button", { name: "Update now" });
+    await expect(update).toBeVisible();
+    const row = update.locator("..");
+    await expect(row.getByRole("button")).toHaveText(["Update now", "Check for updates", "Release notes"]);
+    const bounds = await row.getByRole("button").evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const rect = button.getBoundingClientRect();
+        return { left: rect.left, top: rect.top, right: rect.right };
+      }));
+    expect(bounds.every((button) => Math.abs(button.top - bounds[0].top) < 2)).toBe(true);
+    expect(bounds[2].right).toBeLessThanOrEqual((await card.boundingBox())!.x + (await card.boundingBox())!.width);
+    await page.screenshot({ path: `/tmp/track3-about-update-now-${theme}.png`, animations: "disabled" });
+    await update.click();
+    await expect(page.getByRole("dialog", { name: "Downloading Track3 0.9.12" })).toBeVisible();
+    await expect(card.getByRole("button", { name: "Downloading...", includeHidden: true })).toBeDisabled();
+    expect(await page.evaluate(() => (window as any).__updateDownloads)).toBe(1);
+  }
+});
+
 test("desktop Sync and AI use the approved two column card layout", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await installTauriBridge(page);
