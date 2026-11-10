@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::FromRow;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -38,12 +38,6 @@ pub struct TokenConfig {
 pub struct Coin {
     pub symbol: String,
     pub amount: f64,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CoinWithPrice {
-    pub symbol: String,
-    pub price: f64,
 }
 
 #[derive(FromRow)]

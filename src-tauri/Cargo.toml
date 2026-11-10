@@ -29,6 +29,7 @@ cbc = "=0.1.2"
 coingecko = {git = "https://github.com/domechn/coingecko-rs.git", rev = "41e819e"}
 fs2 = "=0.4.3"
 lazy_static = "^1.4"
+log = "0.4"
 md-5 = "=0.10.6"
 percent-encoding = "=2.3.2"
 serde = {version = "1.0", features = ["derive"] }
@@ -38,6 +39,7 @@ sqlx = {version = "=0.8.5", default-features = false, features = ["runtime-tokio
 tauri = {version = "=2.12.5", features = [ "protocol-asset"] }
 tokio = {version = "=1.44.2", features = ["sync"] }
 uuid = {version = "=1.20.0", features = ["v4"] }
+# Keep native TLS enabled for tauri-plugin-http so HTTP uses the OS trust store.
 reqwest = "=0.12.28"
 indexmap = "=2.11.4"
 tauri-plugin-dialog = "=2.8.3"
