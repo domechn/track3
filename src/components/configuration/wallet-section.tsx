@@ -40,7 +40,7 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
-import { getWalletLogo } from "@/lib/utils";
+import { SourceLogo } from "./source-logo";
 import type { WalletSectionProps } from "./types";
 import { BackpackIcon } from "@radix-ui/react-icons";
 import EmptyState from "@/components/empty-state";
@@ -134,11 +134,9 @@ const WalletSection = memo(function WalletSection({
                       <SelectGroup>
                         <SelectLabel>{t("config.walletType")}</SelectLabel>
                         {walletOptions.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            <img
-                              className="h-4 w-4 text-muted-foreground inline-block mr-2"
-                              src={getWalletLogo(o.value)}
-                            />
+                          <SelectItem key={o.value} value={o.value} className="py-0">
+                            <SourceLogo type={o.value} fallback={o.value.slice(0, 2).toUpperCase()}
+                              className="t3-config-source-logo mr-2" />
                             {o.label}
                           </SelectItem>
                         ))}
@@ -239,11 +237,8 @@ const WalletSection = memo(function WalletSection({
                   >
                     <TableCell className="w-[140px]">
                       <div className="flex items-center gap-2 text-sm">
-                        <img
-                          src={getWalletLogo(w.type)}
-                          className="w-[18px] h-[18px] rounded-full"
-                          alt={w.type}
-                        />
+                        <SourceLogo type={w.type} fallback={w.type.slice(0, 2).toUpperCase()}
+                          className="t3-config-source-logo" />
                         <span>{w.type.toUpperCase()}</span>
                       </div>
                     </TableCell>

@@ -54,6 +54,12 @@ const baseProps = {
 };
 
 describe("ExchangeSection", () => {
+  it("keeps the OKX mark visible on the shared logo tile in the compact source table", () => {
+    render(<ExchangeSection {...baseProps} />);
+    const row = screen.getByText("OKX").closest("tr");
+    expect(row?.querySelector(".t3-config-source-logo[data-logo-tile] img")).toBeInTheDocument();
+  });
+
   it("looks up the IP only while the exchange form is open and permits saving during loading", async () => {
     let resolve!: (value: { address: string; version: 4 }) => void;
     vi.mocked(detectPublicIp).mockReturnValue(new Promise((done) => { resolve = done; }));

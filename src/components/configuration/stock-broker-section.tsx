@@ -40,7 +40,7 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
-import { getWalletLogo } from "@/lib/utils";
+import { SourceLogo } from "./source-logo";
 import { maskSensitive } from "@/utils/attach-to";
 import type { StockBrokerSectionProps } from "./types";
 import { BackpackIcon } from "@radix-ui/react-icons";
@@ -136,11 +136,9 @@ const StockBrokerSection = memo(function StockBrokerSection({
                       <SelectGroup>
                         <SelectLabel>{t("config.broker")}</SelectLabel>
                         {stockBrokerOptions.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            <img
-                              className="h-4 w-4 text-muted-foreground inline-block mr-2"
-                              src={getWalletLogo(o.value)}
-                            />
+                          <SelectItem key={o.value} value={o.value} className="py-0">
+                            <SourceLogo type={o.value} fallback={o.value.slice(0, 2).toUpperCase()}
+                              className="t3-config-source-logo mr-2" />
                             {o.label}
                           </SelectItem>
                         ))}
@@ -268,11 +266,8 @@ const StockBrokerSection = memo(function StockBrokerSection({
                   >
                     <TableCell className="w-[170px]">
                       <div className="flex items-center gap-2 text-sm">
-                        <img
-                          className="w-[18px] h-[18px] rounded-full"
-                          src={getWalletLogo(broker.type)}
-                          alt={broker.type}
-                        />
+                        <SourceLogo type={broker.type} fallback={broker.type.slice(0, 2).toUpperCase()}
+                          className="t3-config-source-logo" />
                         <span className="truncate">
                           {stockBrokerOptions.find(
                             (c) => c.value === broker.type,

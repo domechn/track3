@@ -23,6 +23,13 @@ for (const height of [560, 720]) {
       return rect.top >= 0 && rect.bottom <= innerHeight && node.contains(hit);
     }))).toEqual([true, true, true, true, true, true, true]);
     await options.last().click();
-    await expect(dialog.getByRole("combobox", { name: "Type" })).toContainText("SUI");
+    const trigger = dialog.getByRole("combobox", { name: "Type" });
+    await expect(trigger).toContainText("SUI");
+    await expect(trigger).toHaveCSS("height", "36px");
+    expect(await trigger.evaluate((node) => {
+      const triggerBounds = node.getBoundingClientRect();
+      const logoBounds = node.querySelector(".t3-config-source-logo")?.getBoundingClientRect();
+      return logoBounds && logoBounds.top >= triggerBounds.top && logoBounds.bottom <= triggerBounds.bottom;
+    })).toBe(true);
   });
 }

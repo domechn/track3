@@ -40,7 +40,7 @@ import {
   TrashIcon,
 } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
-import { getWalletLogo } from "@/lib/utils";
+import { SourceLogo } from "./source-logo";
 import { maskSensitive } from "@/utils/attach-to";
 import type { ExchangeSectionProps } from "./types";
 import { PublicIpInfo } from "./public-ip-info";
@@ -139,11 +139,9 @@ const ExchangeSection = memo(function ExchangeSection({
                       <SelectGroup>
                         <SelectLabel>{t("config.cex")}</SelectLabel>
                         {cexOptions.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            <img
-                              className="h-4 w-4 text-muted-foreground inline-block mr-2"
-                              src={getWalletLogo(o.value)}
-                            />
+                          <SelectItem key={o.value} value={o.value} className="py-0">
+                            <SourceLogo type={o.value} fallback={o.value.slice(0, 2).toUpperCase()}
+                              className="t3-config-source-logo mr-2" />
                             {o.label}
                           </SelectItem>
                         ))}
@@ -307,11 +305,8 @@ const ExchangeSection = memo(function ExchangeSection({
                   >
                     <TableCell className="w-[170px]">
                       <div className="flex items-center gap-2 text-sm">
-                        <img
-                          className="w-[18px] h-[18px] rounded-full"
-                          src={getWalletLogo(ex.type)}
-                          alt={ex.type}
-                        />
+                        <SourceLogo type={ex.type} fallback={ex.type.slice(0, 2).toUpperCase()}
+                          className="t3-config-source-logo" />
                         <span className="truncate">
                           {cexOptions.find((c) => c.value === ex.type)?.label ??
                             ex.type}

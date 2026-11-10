@@ -361,6 +361,7 @@
   .ios-d3-source-row:not(:last-child)::after { position: absolute; right: 0; bottom: 0; left: 72px; border-bottom: .5px solid var(--ios-separator); content: ""; }
   .ios-d3-source-avatar { display: inline-grid; flex: none; width: 40px; height: 40px; place-items: center; border-radius: 12px; background: color-mix(in srgb, hsl(var(--primary)) 14%, hsl(var(--card))); color: hsl(var(--primary)); font-size: 15px; font-weight: 700; letter-spacing: -.04em; }
   .ios-d3-source-avatar:has(img) { font-size: 0; }
+  .dark .ios-d3-source-avatar[data-logo-tile] { background: hsl(var(--t3-source-logo-background)); }
   .ios-d3-source-avatar img { width: 30px; height: 30px; object-fit: contain; }
   .ios-d3-source-avatar-large img { width: 44px; height: 44px; }
   .ios-d3-source-avatar-large { width: 58px; height: 58px; border-radius: 16px; font-size: 22px; }
@@ -3040,6 +3041,10 @@ body:has(.fidelity-history, .fidelity-history-detail) {
     border: 0; border-radius: 7px; background: #26262c; color: #cfd0d4; font-size: 10px; font-weight: 700;
   }
   .fidelity-source-identity .ios-d3-source-avatar img { width: 22px; height: 22px; }
+  .fidelity-source-identity .ios-d3-source-avatar[data-logo-tile] {
+    border-radius: 6px; background: hsl(var(--t3-source-logo-background));
+  }
+  .dark .fidelity-source-identity .ios-d3-source-avatar[data-logo-tile] { border: 1px solid hsl(var(--input)); }
   .fidelity-source-row > [role="switch"] { grid-area: sw; justify-self: end; width: 44px; height: 44px; min-height: 44px; margin: -10px -6px -10px 0; }
   .fidelity-source-row > [role="switch"]::before { top: 0; left: 10px; }
   .fidelity-source-row > [role="switch"] span { position: relative; top: -12px; width: 16px; height: 16px; margin-left: 5px; }

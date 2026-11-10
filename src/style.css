@@ -1759,6 +1759,10 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   .t3-settings:not(.ios-d3-settings) .t3-settings-content { margin-top: 12px; }
 }
 .t3-settings-source-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid hsl(var(--border)); }
+.t3-config-source-logo { display: inline-grid; flex: none; width: 28px; height: 28px; place-items: center; border-radius: 6px; color: hsl(var(--foreground)); font-size: 10px; font-weight: 700; }
+.t3-config-source-logo[data-logo-tile] { background: hsl(var(--t3-source-logo-background)); }
+.t3-config-source-logo img { width: 22px; height: 22px; object-fit: contain; }
+.dark .t3-config-source-logo[data-logo-tile] { border: 1px solid hsl(var(--input)); }
 @media (pointer: coarse) {
   .t3-settings-menu-link { min-height: 44px; }
   .t3-settings-content label[for="exportConfigurationCheckbox"] {
@@ -2128,6 +2132,9 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
 }
 
 .t3-fidelity-source-page { display: none; }
+:is(.t3-fidelity-source-logo, .ios-d3-source-avatar, .t3-config-source-logo)[data-logo-tile] { --t3-source-logo-background: var(--raised); }
+.dark :is(.t3-fidelity-source-logo, .ios-d3-source-avatar, .t3-config-source-logo)[data-logo-tone="light"] { --t3-source-logo-background: var(--foreground); }
+.dark :is(.t3-fidelity-source-logo, .ios-d3-source-avatar, .t3-config-source-logo)[data-logo-tone="dark"] { --t3-source-logo-background: var(--primary-foreground); }
 @media (min-width: 1500px) {
   .t3-fidelity-source-page { display: block; color: hsl(var(--foreground)); font: 400 13px/18px "Public Sans Variable", "Public Sans", sans-serif; font-variant-numeric: tabular-nums; }
   .t3-fidelity-source-page button { cursor: pointer; }
@@ -2166,6 +2173,8 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
   .t3-fidelity-source-id small { color: hsl(var(--faint)); font-size: 12px; line-height: 16px; }
   .t3-fidelity-source-pro { display: inline-flex; align-items: center; height: 18px; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: hsl(var(--accent-data) / .16); color: hsl(var(--accent-data)); font-size: 11px; font-weight: 600; }
   .t3-fidelity-source-logo { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border-radius: 7px; background: hsl(var(--raised)); color: hsl(var(--foreground) / .82); font-size: 10px; font-weight: 700; }
+  .t3-fidelity-source-logo[data-logo-tile] { border-radius: 6px; background: hsl(var(--t3-source-logo-background)); }
+  .dark .t3-fidelity-source-logo[data-logo-tile] { border: 1px solid hsl(var(--input)); }
   .t3-fidelity-source-pill { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px; border-radius: 999px; background: hsl(var(--secondary)); color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 500; }
   .t3-fidelity-source-pill.on { background: hsl(var(--positive) / .14); color: hsl(var(--positive)); }
   .t3-fidelity-source-pill.error { background: hsl(var(--negative) / .14); color: hsl(var(--negative)); }

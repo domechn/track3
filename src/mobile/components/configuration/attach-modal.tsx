@@ -8,7 +8,7 @@ import {
 } from "@/mobile/components/ui/dialog";
 import { LinkBreak2Icon } from "@radix-ui/react-icons";
 import { useTranslation } from "@/mobile/i18n";
-import { getWalletLogo } from "@/lib/utils";
+import { SourceLogo } from "@/components/configuration/source-logo";
 import type { AttachModalProps } from "@/components/configuration/types";
 import { isIOS } from "@/utils/platform";
 
@@ -114,11 +114,8 @@ const AttachModal = memo(function AttachModal({
                     }
                     onClick={() => selectOption(opt.value)}
                   >
-                    <img
-                      className="w-[20px] h-[20px] rounded-full shrink-0"
-                      src={getWalletLogo(exType)}
-                      alt=""
-                    />
+                    <SourceLogo type={exType} fallback={exType.slice(0, 2).toUpperCase()}
+                      className="t3-config-source-logo" />
                     <span className="text-sm truncate">{opt.label}</span>
                   </button>
                 );
@@ -147,11 +144,8 @@ const AttachModal = memo(function AttachModal({
                     }
                     onClick={() => selectOption(opt.value)}
                   >
-                    <img
-                      className="w-[20px] h-[20px] rounded-full shrink-0"
-                      src={getWalletLogo(wType)}
-                      alt=""
-                    />
+                    <SourceLogo type={wType} fallback={wType.slice(0, 2).toUpperCase()}
+                      className="t3-config-source-logo" />
                     <span className="text-sm truncate">{opt.label}</span>
                   </button>
                 );
