@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Configuration from "@/components/configuration";
 import {
@@ -97,11 +98,19 @@ beforeEach(() => {
   vi.mocked(getCachedPreferCurrency).mockReturnValue(undefined);
 });
 
+function renderCurrency(initialPreferCurrency?: string) {
+  render(<MemoryRouter initialEntries={["/settings/configuration?section=currency"]}>
+    <Routes><Route element={<Outlet context="currency" />}>
+      <Route path="/settings/configuration" element={<Configuration initialPreferCurrency={initialPreferCurrency} />} />
+    </Route></Routes>
+  </MemoryRouter>);
+}
+
 describe("Configuration base currency initialization", () => {
   it("uses initialPreferCurrency immediately and skips extra prefer-currency query", async () => {
-    render(<Configuration initialPreferCurrency="EUR" />);
+    renderCurrency("EUR");
 
-    expect(screen.getByText("EUR")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Base Currency/i })).toHaveTextContent("EUR");
 
     await waitFor(() => {
       expect(getConfiguration).toHaveBeenCalledTimes(1);
@@ -111,19 +120,19 @@ describe("Configuration base currency initialization", () => {
   });
 
   it("still resolves persisted prefer currency when initialPreferCurrency is default USD", async () => {
-    render(<Configuration initialPreferCurrency="USD" />);
+    renderCurrency("USD");
 
     await waitFor(() => {
       expect(queryPreferCurrency).toHaveBeenCalledTimes(1);
     });
 
     await waitFor(() => {
-      expect(screen.getByText("JPY")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Base Currency/i })).toHaveTextContent("JPY");
     });
   });
 
   it("queries prefer currency when no initialPreferCurrency is provided", async () => {
-    render(<Configuration />);
+    renderCurrency();
 
     await waitFor(() => {
       expect(queryPreferCurrency).toHaveBeenCalledTimes(1);
@@ -133,9 +142,9 @@ describe("Configuration base currency initialization", () => {
   it("uses cached prefer currency immediately when no initial prop is provided", async () => {
     vi.mocked(getCachedPreferCurrency).mockReturnValue("EUR");
 
-    render(<Configuration />);
+    renderCurrency();
 
-    expect(screen.getByText("EUR")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Base Currency/i })).toHaveTextContent("EUR");
 
     await waitFor(() => {
       expect(queryPreferCurrency).toHaveBeenCalledTimes(1);

@@ -51,13 +51,13 @@ test("desktop guide completes, captures every frame, and makes no HTTP calls", a
   }
   expect(bridge.httpRequests()).toBe(before)
   await page.getByTestId("onboarding-cta-add-source").click()
-  await expect(page).toHaveURL(/#\/settings\/configuration$/)
+  await expect(page).toHaveURL(/#\/settings\/configuration\?section=sources$/)
   expect(await page.evaluate(() => localStorage.getItem("track3-onboarding-v1"))).toBe("completed")
 })
 
 test("existing desktop user can replay from System and focus returns", async ({ page }) => {
   await installTauriBridge(page, { onboarding: true })
-  await page.goto("/#/settings/systemInfo")
+  await page.goto("/#/settings/systemInfo?section=about")
   await expect(page.getByTestId("onboarding-dialog")).toHaveCount(0)
   await expect.poll(() => page.evaluate(() => localStorage.getItem("track3-onboarding-v1"))).toBe("existing")
   const replay = page.getByTestId("onboarding-replay")

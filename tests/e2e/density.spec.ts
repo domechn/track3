@@ -16,7 +16,7 @@ test("mouse layout stays compact at narrow and wide desktop widths", async ({ pa
     const sidebar = page.locator("aside").getByRole("link", { name: "Overview" });
     expect((await sidebar.boundingBox())!.height).toBe(40);
     expect((await page.locator("aside").boundingBox())!.width).toBe(56);
-    await page.goto("/#/settings/configuration");
+    await page.goto("/#/settings/configuration?section=currency");
     const labels = page.locator('label[for="groupUSD"], label[for="hideInactive"]');
     await expect(labels).toHaveCount(2);
     const switchRowPitch = await labels.evaluateAll(
@@ -146,7 +146,7 @@ test("mouse settings labels keep their original native layout", async ({ page })
   await installTauriBridge(page);
   for (const [route, id] of [
     ["/settings/appearance", "green-up-red-down"],
-    ["/settings/configuration", "groupUSD"],
+    ["/settings/configuration?section=currency", "groupUSD"],
     ["/settings/data", "exportConfigurationCheckbox"],
   ]) {
     await page.goto(`/#${route}`);

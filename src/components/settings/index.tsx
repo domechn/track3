@@ -15,7 +15,7 @@ import {
 import { useTranslation } from "@/i18n";
 import { getConfiguration } from "@/middlelayers/configuration";
 import AssistantSettings from "./assistant";
-import { SettingsMenu } from "./settings-menu";
+import { defaultSettingsRoutes, SettingsMenu } from "./settings-menu";
 
 const settingsTabs = [
   {
@@ -54,6 +54,8 @@ const App = () => {
   const { t } = useTranslation();
   const lo = useLocation();
   const section = new URLSearchParams(lo.search).get("section");
+  const redirectPath = lo.pathname === "/settings" ? "/settings/configuration" : lo.pathname;
+  const defaultRoute = defaultSettingsRoutes[redirectPath];
   const active = lo.pathname === "/settings/configuration" ? (section === "currency" ? "currency" : "sources")
     : lo.pathname === "/settings/appearance" ? (section === "language" ? "language" : "appearance")
     : lo.pathname === "/settings/data" ? (section === "blacklist" ? "blacklist" : section === "security" ? "security" : "backup")
@@ -110,6 +112,12 @@ const App = () => {
     : t(["pro", "ai", "backup", "security", "sync", "about"].includes(active)
       ? `fidelity.settingsB.subtitle.${active}` : `fidelity.settings.subtitle.${active}`);
 
+  if (!section && defaultRoute) {
+    const params = new URLSearchParams(lo.search);
+    params.set("section", new URLSearchParams(defaultRoute.split("?")[1]).get("section")!);
+    return <Navigate to={`${redirectPath}?${params}`} replace />;
+  }
+
   return (
     <div className="t3-settings" data-design-section={active}>
       <h1 className="sr-only">{t("settings.title")}</h1>
@@ -129,9 +137,6 @@ const App = () => {
         <SettingsMenu pathname={lo.pathname} search={lo.search} />
         <div className="t3-settings-content">
         <Outlet context={section} />
-        {lo.pathname === "/settings" && (
-          <Navigate to="/settings/configuration" />
-        )}
         </div>
       </div>
     </div>
