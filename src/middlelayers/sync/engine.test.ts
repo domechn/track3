@@ -12,6 +12,7 @@ import {
 } from "./engine";
 import { SyncRuntime } from "./runtime";
 import { defaultSyncSettings, type SyncSettings } from "./settings";
+import { serializeSyncDiagnostics } from "./diagnostics";
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -85,6 +86,26 @@ async function devices(count: number, pageSize = 1000) {
     engine.syncOnce = (options = {}) => sync({ manual: true, ...options });
   }
   return { s3, repos, engines };
+}
+
+async function addRemoteEntries(s3: FakeS3, owner: string, additions: Array<{ kind: "edit" | "snapshot"; id: string; value: unknown }>) {
+  const key = await unlockSyncHeader((await readSyncHeader(s3))!, "passphrase");
+  const manifestPath = `devices/${owner}/manifest`;
+  const stored = await s3.getObject(manifestPath);
+  if (!stored) throw new Error("Missing fixture manifest");
+  const manifest = JSON.parse(new TextDecoder().decode(await decryptObject(
+    key, manifestPath, JSON.parse(new TextDecoder().decode(stored.body)),
+  )));
+  for (const { kind, id, value } of additions) {
+    const path = `devices/${owner}/${await objectName(key, `${kind}/${owner}/${id}/1`)}`;
+    const body = new TextEncoder().encode(JSON.stringify(await encryptObject(key, path, new TextEncoder().encode(JSON.stringify(value)))));
+    await s3.putObject(path, body);
+    const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", body)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    manifest.entries.push({ kind, id, version: "1", bytes: body.length, sha256 });
+  }
+  await s3.putObject(manifestPath, new TextEncoder().encode(JSON.stringify(await encryptObject(
+    key, manifestPath, new TextEncoder().encode(JSON.stringify(manifest)),
+  ))));
 }
 
 describe("SyncEngine", () => {
@@ -1863,10 +1884,91 @@ describe("SyncEngine", () => {
     await engines[0].syncOnce();
     const keys = (await s3.listObjectsV2({ prefix: "devices/" })).objects.map((item) => item.key);
     const object = keys.find((key) => !key.endsWith("/manifest"))!;
-    await s3.putObject(object, new TextEncoder().encode("bad"));
+    const stored = await s3.getObject(object);
+    if (!stored) throw new Error("Missing fixture object");
+    const damaged = stored.body.slice();
+    damaged[0] ^= 1;
+    await s3.putObject(object, damaged);
     const report = await engines[1].syncOnce();
     expect(report.errors).toContain("Failed to pull snapshot object");
+    expect(report.diagnostics?.failures).toEqual([
+      { phase: "pull", kind: "snapshot", reason: "read-failed:hash", count: 1 },
+    ]);
     expect(repos[1].snapshots.size).toBe(0);
+  });
+
+  it("groups invalid remote edits and snapshots by kind, field, and device", async () => {
+    const { s3, repos, engines } = await devices(2);
+    repos[0].snapshots.set("base", snapshot("base"));
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    const owner = repos[0].state.deviceId!;
+    const clock = { ms: Date.parse("2026-01-02T00:00:00.000Z"), counter: 0, deviceId: owner };
+    await addRemoteEntries(s3, owner, [
+      ...Array.from({ length: 3 }, (_, i) => ({
+        kind: "edit" as const, id: `edit-${i}`, value: { clock, snapshot: snapshot("wrong") },
+      })),
+      ...Array.from({ length: 2 }, (_, i) => ({
+        kind: "snapshot" as const, id: `snap-${i}`, value: snapshot("wrong"),
+      })),
+    ]);
+    const report = await engines[1].syncOnce();
+    expect(report.errors).toEqual([
+      "Failed to pull edit object", "Failed to pull edit object", "Failed to pull edit object",
+      "Failed to pull snapshot object", "Failed to pull snapshot object",
+    ]);
+    expect(report.diagnostics?.failures).toEqual([
+      { phase: "pull", kind: "edit", reason: "invalid-remote-entry:uuid", count: 3 },
+      { phase: "pull", kind: "snapshot", reason: "invalid-remote-entry:uuid", count: 2 },
+    ]);
+    expect(report.diagnostics?.perDevice?.[owner.slice(0, 8)]).toEqual({
+      failed: 5, succeeded: 0, manifestVersion: 1, appVersion: "unknown",
+    });
+    expect(report.diagnostics?.failedPulls).toEqual({
+      count: 5, earliestRetryAt: "2026-01-03T00:00:00.100Z",
+    });
+  });
+
+  it("reports a sanitized snapshot import failure without quarantining it", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    repos[1].importSnapshot = async () => {
+      throw new Error("UNIQUE constraint failed: assets_v2.uuid; value 'private-name' 123456789 https://s3.example.com");
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const report = await engines[1].syncOnce();
+      expect(report.errors).toEqual(["Failed to pull snapshot object"]);
+      expect(report.diagnostics?.failures).toEqual([{
+        phase: "pull", kind: "snapshot",
+        reason: "import-failed: Error: UNIQUE constraint failed: assets_v2.<redacted>", count: 1,
+      }]);
+      expect(report.diagnostics?.failedPulls?.count).toBe(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0].join(" ")).not.toContain("private-name");
+      expect(serializeSyncDiagnostics(report.diagnostics!)).not.toContain("s3.example.com");
+      expect((await engines[1].syncOnce()).errors).toEqual(["Failed to pull snapshot object"]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("shows the safe category returned by the native snapshot importer", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    repos[1].importSnapshot = async () => { throw "Failed to insert sync asset"; };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const report = await engines[1].syncOnce();
+      expect(report.errors).toEqual(["Failed to pull snapshot object"]);
+      expect(report.diagnostics?.failures).toEqual([{
+        phase: "pull", kind: "snapshot", reason: "import-failed: Error: Failed to insert sync asset", count: 1,
+      }]);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("rejects malformed manifest entries before trusting their object paths", async () => {
@@ -2094,6 +2196,10 @@ describe("SyncEngine", () => {
     await fast.syncOnce();
     const report = await slow.syncOnce();
     expect(report.errors).toContain("Failed to pull config object");
+    expect(report.diagnostics?.failures).toContainEqual({
+      phase: "pull", kind: "config", reason: "invalid-remote-entry:clock", count: 1,
+    });
+    expect(report.diagnostics?.failedPulls?.count).toBe(0);
     expect(repos[1].state.clock?.ms ?? 0).toBeLessThan(86_400_000);
   });
 

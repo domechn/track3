@@ -25,10 +25,48 @@ export type SyncDiagnostics = {
   entries: number;
   knownTokens: number;
   slowest: Array<{ verb: SyncVerb; phase: SyncPhase; ms: number }>;
+  failures?: Array<{ phase: SyncPhase; kind: string; reason: string; count: number }>;
+  failedPulls?: { count: number; earliestRetryAt?: string };
+  conflicts?: Record<"snapshot" | "edit" | "config" | "session" | "tombstone", number>;
+  perDevice?: Record<string, { failed: number; succeeded: number; manifestVersion: number | "unknown"; appVersion: string }>;
+  appVersion?: string;
+  syncFormatVersion?: number;
 };
 
 export const serializeSyncDiagnostics = (diagnostics: SyncDiagnostics): string =>
   JSON.stringify(diagnostics, null, 2);
+
+export function countSyncConflicts(conflicts: string[]): NonNullable<SyncDiagnostics["conflicts"]> {
+  const counts = { snapshot: 0, edit: 0, config: 0, session: 0, tombstone: 0 };
+  for (const conflict of new Set(conflicts)) {
+    const type = conflict.split(":", 1)[0];
+    if (type === "snapshot" || type === "edit" || type === "session" || type === "tombstone") counts[type]++;
+    else counts.config++;
+  }
+  return counts;
+}
+
+export function summarizeFailedPulls(failedPulls: Record<string, number> | undefined): NonNullable<SyncDiagnostics["failedPulls"]> {
+  const times = Object.values(failedPulls ?? {});
+  const earliest = times.reduce((min, time) => Number.isFinite(time) && Math.abs(time) <= 8.64e15 && time < min ? time : min, Infinity);
+  return { count: times.length, ...(earliest !== Infinity ? { earliestRetryAt: new Date(earliest).toISOString() } : {}) };
+}
+
+export function sanitizeImportError(error: unknown): string {
+  const name = error instanceof Error && ["Error", "TypeError", "RangeError", "SqliteError"].includes(error.name)
+    ? error.name : "Error";
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const text = message.slice(0, 120)
+    .replace(/["'`][^"'`]*["'`]/g, "<redacted>")
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "<redacted>")
+    .replace(/\d{7,}/g, "<redacted>");
+  if (/^(Failed to (open sync database|begin sync import|inspect sync snapshot|read local cost prices|insert sync (asset|price|transaction)|record sync snapshot|commit sync snapshot|roll back sync snapshot)|Invalid sync (snapshot|transaction asset)|Duplicate sync asset id)$/.test(text)) return `${name}: ${text}`;
+  const constraint = /^(UNIQUE|NOT NULL|CHECK) constraint failed: (assets_v2|asset_prices|transactions|history_snapshots|snapshot_partial)(?:\.[A-Za-z_][A-Za-z_0-9]*)?/i.exec(text);
+  if (constraint) return `${name}: ${constraint[1].toUpperCase()} constraint failed: ${constraint[2]}.<redacted>`;
+  if (/^FOREIGN KEY constraint failed/i.test(text)) return `${name}: FOREIGN KEY constraint failed`;
+  if (/^database is (locked|busy)/i.test(text)) return `${name}: database is ${/^database is locked/i.test(text) ? "locked" : "busy"}`;
+  return `${name}: <redacted>`;
+}
 
 const verbs: SyncVerb[] = ["GET", "PUT", "LIST", "DELETE", "HEAD"];
 const outcomes: SyncOutcome[] = ["ok", "notModified", "notFound", "preconditionFailed", "conflict", "rateLimited", "serverError", "timeout", "retry", "otherError"];
@@ -62,6 +100,8 @@ export function createSyncDiagnostics(inner: S3Store) {
       }])),
     }])) as SyncDiagnostics["requests"],
     retries: 0, retryWaitMs: 0, timeouts: 0, syncStateBytes: 0, snapshots: 0, entries: 0, knownTokens: 0, slowest: [],
+    failures: [], failedPulls: { count: 0 }, conflicts: { snapshot: 0, edit: 0, config: 0, session: 0, tombstone: 0 },
+    perDevice: {}, appVersion: "unknown", syncFormatVersion: 1,
   };
   const unsubscribe = inner.observeRetries?.((retry: StoreRetry) => {
     recordSyncRetry(diagnostics, retry.verb, retry.status, retry.bytesSent, retry.bytesReceived, retry.waitMs, retry.resumed);

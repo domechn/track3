@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SyncActionButton } from "@/components/settings/sync-action-button";
 import { ReloadIcon } from "@radix-ui/react-icons";
+import { SyncDetails } from "@/components/sync-details";
 import type { Locale } from "@/i18n";
 import type { RuntimeStatus } from "@/middlelayers/sync/runtime";
 
@@ -36,6 +37,7 @@ export function SyncStatusCard({ status, busy, onSyncNow, t, locale }: Props) {
       </dl>
       <SyncActionButton disabled={!!busy || status.mode !== "ready"} pending={busy === "now"}
         pendingLabel={t("sync.pending.now")} onClick={onSyncNow}><ReloadIcon aria-hidden="true" />{t("sync.now")}</SyncActionButton>
+      {sync.report && sync.diagnostics && <SyncDetails report={sync.report} diagnostics={sync.diagnostics} t={t} />}
     </CardContent>
   </Card>;
 }

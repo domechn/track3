@@ -91,6 +91,8 @@ export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialo
   const received = diagnostics ? verbs.reduce((sum, verb) => sum + diagnostics.requests[verb].bytesReceived, 0) : 0;
   const errors = new Map<string, number>();
   for (const error of report?.errors ?? []) {
+    if (diagnostics?.failures?.some((failure) => failure.phase === "pull" &&
+      error === `Failed to pull ${failure.kind} object`)) continue;
     const safe = fixedErrors[error] || objectError.test(error) ? error : "Sync operation failed";
     errors.set(safe, (errors.get(safe) ?? 0) + 1);
   }
@@ -103,6 +105,33 @@ export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialo
       : { label: t("sync.details.conflict.other"), id: undefined };
   });
   const issueCount = report ? report.errors.length + conflicts.length : 0;
+  const pullFailures = diagnostics?.failures?.filter((failure) => failure.phase === "pull") ?? [];
+  const pullCount = pullFailures.reduce((sum, failure) => sum + failure.count, 0);
+  const groupedKinds = (items: Array<{ kind: string; count: number }>) => {
+    const counts = new Map<string, number>();
+    for (const item of items) counts.set(item.kind, (counts.get(item.kind) ?? 0) + item.count);
+    return [...counts].map(([kind, count]) => `${t(kind === "config" ? "sync.details.conflicts.configKind" : `sync.details.kind.${kind}`)} ×${number(count)}`).join(", ");
+  };
+  const groupedConflicts = diagnostics?.conflicts;
+  const conflictKinds = groupedConflicts ? (["config", "snapshot", "edit", "session", "tombstone"] as const)
+    .filter((kind) => groupedConflicts[kind] > 0).map((kind) => ({ kind, count: groupedConflicts[kind] }))
+    : [
+      { kind: "config", count: config.length },
+      ...(["snapshot", "edit", "session", "tombstone"] as const).map((kind) => ({
+        kind, count: conflicts.filter((conflict) => conflict.startsWith(`${kind}:`)).length,
+      })),
+    ].filter(({ count }) => count > 0);
+  const reasonText = (reason: string) => {
+    if (reason.startsWith("read-failed:")) return t("sync.details.failures.readFailed")
+      .replace("{reason}", reason).replace("{detail}", t(`sync.details.failures.read.${reason.slice("read-failed:".length)}`));
+    if (reason.startsWith("invalid-remote-entry:")) return t("sync.details.failures.invalidRemoteEntry")
+      .replace("{reason}", reason).replace("{field}", t(`sync.details.failures.field.${reason.slice("invalid-remote-entry:".length)}`));
+    if (reason.startsWith("import-failed:")) return t("sync.details.failures.importFailed")
+      .replace("{reason}", reason);
+    if (reason === "immutable-changed") return t("sync.details.failures.immutableChanged");
+    if (reason.startsWith("manifest-")) return t("sync.details.failures.manifest").replace("{reason}", reason);
+    return t("sync.details.failures.applyFailed");
+  };
   async function resolve(id: string, choice: "local" | "remote") {
     if (busy) return;
     setBusy({ id, choice });
@@ -139,12 +168,25 @@ export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialo
       <section className="t3-sync-details-section">
         <h3>{t("sync.details.errors")}</h3>
         {errorLabel && <p className="t3-sync-details-error">{errorLabel}</p>}
+        {pullCount > 0 && <p className="t3-sync-details-item">
+          {t("sync.details.failures.summary").replace("{count}", number(pullCount))
+            .replace("{kinds}", groupedKinds(pullFailures.map(({ kind, count }) => ({ kind, count }))))}
+        </p>}
+        {pullFailures.length > 0 && <ul className="t3-sync-details-list">
+          {pullFailures.map((failure) => <li key={`${failure.phase}-${failure.kind}-${failure.reason}`}>
+            {t("sync.details.failures.item").replace("{count}", number(failure.count))
+              .replace("{kind}", t(`sync.details.kind${failure.count === 1 ? "" : "Plural"}.${failure.kind}`))
+              .replace("{reason}", reasonText(failure.reason))}
+          </li>)}
+        </ul>}
         {errors.size ? <ul className="t3-sync-details-list">
           {[...errors].map(([text, count]) => <li key={text}>{safeError(text, t)} × {number(count)}</li>)}
-        </ul> : !errorLabel && <p className="t3-sync-details-empty">{t("sync.details.none")}</p>}
+        </ul> : !errorLabel && !pullCount && <p className="t3-sync-details-empty">{t("sync.details.none")}</p>}
       </section>
       {showConflicts && <section className="t3-sync-details-section">
         <h3>{t("sync.details.conflicts")}</h3>
+        {!!conflicts.length && <p className="t3-sync-details-item">{t("sync.details.conflicts.summary")
+          .replace("{count}", number(conflicts.length)).replace("{types}", groupedKinds(conflictKinds))}</p>}
         {!conflicts.length && <p className="t3-sync-details-empty">{t("sync.details.none")}</p>}
         {config.filter((id) => available?.includes(id)).map((id) => <ConfigConflictChoices key={id} id={id} t={t} resolve={(key, choice) => void resolve(key, choice)}
           disabled={!!busy} pending={busy?.id === id ? busy.choice : undefined} ConfirmDialog={ConfirmDialog} />)}
@@ -189,6 +231,11 @@ export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialo
           </dl></>}
           <h3>{t("sync.details.otherMeasures")}</h3>
           <dl>
+            <SyncDefinitionRow label={t("sync.details.appVersion")} value={diagnostics.appVersion ?? t("sync.details.unknown")} />
+            <SyncDefinitionRow label={t("sync.details.formatVersion")} value={diagnostics.syncFormatVersion ?? t("sync.details.unknown")} />
+            <SyncDefinitionRow label={t("sync.details.failures.failedPulls")} value={number(diagnostics.failedPulls?.count ?? 0)} />
+            {diagnostics.failedPulls?.earliestRetryAt && <SyncDefinitionRow label={t("sync.details.failures.retryAt")}
+              value={new Date(diagnostics.failedPulls.earliestRetryAt).toLocaleString(locale)} />}
             <SyncDefinitionRow label={t("sync.details.retryWait")} value={duration(diagnostics.retryWaitMs)} />
             <SyncDefinitionRow label={t("sync.details.timeouts")} value={number(diagnostics.timeouts)} />
             <SyncDefinitionRow label={t("sync.details.state")} value={bytes(diagnostics.syncStateBytes)} />
@@ -196,6 +243,12 @@ export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialo
             <SyncDefinitionRow label={t("sync.details.entries")} value={number(diagnostics.entries)} />
             <SyncDefinitionRow label={t("sync.details.known")} value={number(diagnostics.knownTokens)} />
           </dl>
+          {!!Object.keys(diagnostics.perDevice ?? {}).length && <>
+            <h3>{t("sync.details.perDevice")}</h3>
+            <dl>{Object.entries(diagnostics.perDevice ?? {}).map(([id, device]) =>
+              <SyncDefinitionRow key={id} label={id} value={`${t("sync.details.perDeviceSucceeded")} ${number(device.succeeded)} · ${t("sync.details.perDeviceFailed")} ${number(device.failed)} · ${t("sync.details.formatVersion")} ${device.manifestVersion} · ${t("sync.details.appVersion")} ${device.appVersion}`} />)}
+            </dl>
+          </>}
           <h3>{t("sync.details.slowest")}</h3>
           {diagnostics.slowest.length ? <dl>{diagnostics.slowest.map((item, index) =>
             <SyncDefinitionRow key={index} label={`${item.verb} ${t(`sync.details.phase.${item.phase}`)}`}
