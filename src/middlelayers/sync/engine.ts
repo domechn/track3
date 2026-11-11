@@ -2,10 +2,13 @@ import { decryptObject, encryptObject, objectName, unlockSyncHeader, unlockSyncH
 import { isS3Conflict, readSyncHeader, S3Error, type S3Store } from "./object-store";
 import { compareClock, MAX_REMOTE_SKEW_MS, nextClock, validRemoteClock, type Hlc } from "./clock";
 import { syncCategory, type SyncCategory } from "./config-keys";
-import { createSyncDiagnostics, type SyncDiagnostics } from "./diagnostics";
+import { countSyncConflicts, createSyncDiagnostics, sanitizeImportError, summarizeFailedPulls, type SyncDiagnostics } from "./diagnostics";
+import { getVersion } from "@/utils/app";
 import type { PartialSnapshot } from "../snapshot-partial";
 
-class InvalidRemoteEntry extends Error {}
+class InvalidRemoteEntry extends Error {
+  constructor(readonly reason = "invalid-remote-entry:json") { super(); }
+}
 class FutureRemoteEntry extends Error {}
 
 export type Snapshot = {
@@ -390,14 +393,34 @@ export class SyncEngine {
       this.roundDiagnostics = metrics;
       this.store = metrics.store;
       try {
+        metrics.diagnostics.appVersion = await getVersion().catch(() => "unknown");
         const report = await this.syncRound(options);
+        metrics.diagnostics.conflicts = countSyncConflicts(report.conflicts);
+        for (const message of report.errors) {
+          if (/^Failed to pull (snapshot|config|session|tombstone|session-delete|edit) object$/.test(message)) continue;
+          const reason = message === "Failed to read sync manifest" ? "manifest-read"
+            : message === "Sync manifest is too large" ? "manifest-size"
+              : message === "Failed to write sync manifest" ? "manifest-write"
+                : message === "Immutable sync object changed" ? "immutable-changed" : "apply-failed";
+          const kind = /snapshot|config|session|tombstone|edit|manifest/.exec(message.toLowerCase())?.[0] ?? "sync";
+          const phase = reason === "manifest-read" ? "manifestsDownload"
+            : reason.startsWith("manifest-") ? "manifestWrite"
+              : reason === "immutable-changed" || /^Failed to (push|verify) /.test(message) ? "push"
+                : message === "Failed to prune old sync object" ? "prune" : "localScan";
+          const failure = metrics.diagnostics.failures!.find((item) =>
+            item.phase === phase && item.kind === kind && item.reason === reason);
+          if (failure) failure.count++;
+          else metrics.diagnostics.failures!.push({ phase, kind, reason, count: 1 });
+        }
         return { ...report, diagnostics: metrics.diagnostics };
       } finally {
         const state = this.activeState;
         if (state) {
           metrics.diagnostics.snapshots = Object.keys(state.snapshotHashes ?? {}).length;
           metrics.diagnostics.knownTokens = state.known?.length ?? 0;
+          metrics.diagnostics.failedPulls = summarizeFailedPulls(state.failedPulls);
         }
+        if (metrics.diagnostics.failures?.length) console.warn("Sync diagnostics failures", metrics.diagnostics.failures);
         metrics.finish();
         try { options.onDiagnostics?.(metrics.diagnostics); } catch { /* Diagnostics must not change sync results. */ }
         this.store = original;
@@ -457,7 +480,7 @@ export class SyncEngine {
       if (value && Number.isSafeInteger(value.ms) && value.ms > this.now() + MAX_REMOTE_SKEW_MS) {
         throw new FutureRemoteEntry();
       }
-      throw new InvalidRemoteEntry();
+      throw new InvalidRemoteEntry("invalid-remote-entry:clock");
     };
     this.roundDiagnostics?.phase("localScan");
     await this.device(state, !options.dryRun);
@@ -513,15 +536,16 @@ export class SyncEngine {
     };
     const readBytes = async (path: string, bytes: number, sha256: string): Promise<Uint8Array> => {
       const object = await this.store.getObject(path, options.signal);
-      if (!object || !("body" in object) || object.body.length !== bytes || object.body.length > MAX_OBJECT_BYTES ||
-          await digest(object.body) !== sha256) throw new InvalidRemoteEntry();
+      if (!object || !("body" in object)) throw new InvalidRemoteEntry("read-failed:http");
+      if (object.body.length !== bytes || object.body.length > MAX_OBJECT_BYTES) throw new InvalidRemoteEntry("read-failed:size");
+      if (await digest(object.body) !== sha256) throw new InvalidRemoteEntry("read-failed:hash");
       try { return await decryptObject(key, path, JSON.parse(decoder.decode(object.body))); }
-      catch { throw new InvalidRemoteEntry(); }
+      catch { throw new InvalidRemoteEntry("read-failed:decrypt"); }
     };
     const readRoot = async (owner: string, entry: Entry): Promise<unknown> => {
       try { return JSON.parse(decoder.decode(await readBytes(await pathFor(owner, entry), entry.bytes, entry.sha256))); }
       catch (error) {
-        if (error instanceof SyntaxError) throw new InvalidRemoteEntry();
+        if (error instanceof SyntaxError) throw new InvalidRemoteEntry("invalid-remote-entry:json");
         throw error;
       }
     };
@@ -529,20 +553,20 @@ export class SyncEngine {
       const root = await readRoot(owner, entry);
       if (!root || typeof root !== "object" || !("multipart" in root)) return { value: root as T };
       const descriptor = root as ObjectParts;
-      if (!validObjectParts(descriptor)) throw new InvalidRemoteEntry();
+      if (!validObjectParts(descriptor)) throw new InvalidRemoteEntry("invalid-remote-entry:multipart");
       return { load: async () => {
         const result = new Uint8Array(descriptor.total);
         const rootPath = await pathFor(owner, entry);
         let offset = 0;
         for (const [index, part] of descriptor.parts.entries()) {
           const bytes = await readBytes(`${rootPath}/part/${index}`, part.bytes, part.sha256);
-          if (offset + bytes.length > result.length) throw new InvalidRemoteEntry();
+          if (offset + bytes.length > result.length) throw new InvalidRemoteEntry("invalid-remote-entry:multipart");
           result.set(bytes, offset);
           offset += bytes.length;
         }
-        if (offset !== result.length) throw new InvalidRemoteEntry();
+        if (offset !== result.length) throw new InvalidRemoteEntry("invalid-remote-entry:multipart");
         try { return JSON.parse(decoder.decode(result)) as T; }
-        catch { throw new InvalidRemoteEntry(); }
+        catch { throw new InvalidRemoteEntry("invalid-remote-entry:json"); }
       } };
     };
     let currentPullIndex = -1;
@@ -610,6 +634,9 @@ export class SyncEngine {
       this.discovered = true;
     }
     for (const owner of state.deviceIds ?? []) {
+      if (owner !== state.deviceId && UUID_PATTERN.test(owner)) this.roundDiagnostics!.diagnostics.perDevice![owner.slice(0, 8)] = {
+        failed: 0, succeeded: 0, manifestVersion: "unknown", appVersion: "unknown",
+      };
       aborted();
       const path = `devices/${owner}/manifest`;
       try {
@@ -652,6 +679,9 @@ export class SyncEngine {
       }
     }
     const own = manifests.find((item) => item.owner === state.deviceId);
+    for (const { owner, manifest } of manifests) {
+      if (owner !== state.deviceId && UUID_PATTERN.test(owner)) this.roundDiagnostics!.diagnostics.perDevice![owner.slice(0, 8)].manifestVersion = manifest.version;
+    }
     const entries = manifests.flatMap(({ owner, manifest }) => manifest.entries.map((entry) => ({ owner, entry })));
     const prePullChanges = enabled("history") ? await this.repo.listChangedSnapshotIds?.(state.snapshotRevision) : undefined;
     if (enabled("history")) await this.repo.loadSnapshotDetails?.(state, new Set([
@@ -730,17 +760,20 @@ export class SyncEngine {
       }
       if (known.has(token) && !(entry.kind === "config" && state.configConflicts[entry.id])) continue;
       if (!enabled("history") && ["snapshot", "edit", "tombstone"].includes(entry.kind)) continue;
+      let pullStage: "read" | "import" | "apply" = "read";
       try {
         if ((entry.kind === "session" || entry.kind === "session-delete") && !enabled("chat")) continue;
         if (entry.kind === "config") {
           if (!syncCategory(entry.id) || !enabled(syncCategory(entry.id)!) || blockedConfig.has(entry.id)) continue;
           const value = await read<ConfigVersion>(owner, entry);
-          if (!validClock(value.clock, owner) || typeof value.value !== "string" && value.value !== null) throw new InvalidRemoteEntry();
+          pullStage = "apply";
+          if (!validClock(value.clock, owner) || typeof value.value !== "string" && value.value !== null) throw new InvalidRemoteEntry("invalid-remote-entry:clock");
           const old = remoteConfig.get(entry.id);
           if (!old || compareClock(value.clock, old.value.clock) > 0) remoteConfig.set(entry.id, { value, owner, entry });
         } else if (entry.kind === "tombstone") {
           const value = await read<Tombstone>(owner, entry);
-          if (!validClock(value.clock, owner) || typeof value.deleted !== "boolean") throw new InvalidRemoteEntry();
+          pullStage = "apply";
+          if (!validClock(value.clock, owner) || typeof value.deleted !== "boolean") throw new InvalidRemoteEntry("invalid-remote-entry:clock");
           const old = remoteTombstones.get(entry.id);
           if (!old || compareClock(value.clock, old.clock) > 0) remoteTombstones.set(entry.id, value);
         } else if (entry.kind === "snapshot") {
@@ -750,10 +783,15 @@ export class SyncEngine {
             ? remoteTombstone.deleted : tombstone?.deleted;
           if (!deleted) {
             const value = await read<Snapshot>(owner, entry);
-            if (value.uuid !== entry.id || !Array.isArray(value.assets) || !Array.isArray(value.prices) || !Array.isArray(value.transactions)) throw new InvalidRemoteEntry();
+            pullStage = "apply";
+            if (value.uuid !== entry.id) throw new InvalidRemoteEntry("invalid-remote-entry:uuid");
+            if (!Array.isArray(value.assets)) throw new InvalidRemoteEntry("invalid-remote-entry:assets");
+            if (!Array.isArray(value.prices)) throw new InvalidRemoteEntry("invalid-remote-entry:prices");
+            if (!Array.isArray(value.transactions)) throw new InvalidRemoteEntry("invalid-remote-entry:transactions");
             if (options.dryRun) {
               if (!localIdsBeforePull.has(entry.id)) report.pulled++;
             } else {
+              pullStage = "import";
               const imported = await this.repo.importSnapshot(value);
               if (imported) {
                 report.pulled++;
@@ -771,18 +809,21 @@ export class SyncEngine {
           }
         } else if (entry.kind === "edit") {
           const value = await read<SnapshotEdit>(owner, entry);
-          if (!validClock(value.clock, owner) || value.snapshot?.uuid !== entry.id ||
-              !Array.isArray(value.snapshot.assets) || !Array.isArray(value.snapshot.prices) ||
-              !Array.isArray(value.snapshot.transactions)) throw new InvalidRemoteEntry();
+          pullStage = "apply";
+          if (!validClock(value.clock, owner)) throw new InvalidRemoteEntry("invalid-remote-entry:clock");
+          if (value.snapshot?.uuid !== entry.id) throw new InvalidRemoteEntry("invalid-remote-entry:uuid");
+          if (!Array.isArray(value.snapshot.assets)) throw new InvalidRemoteEntry("invalid-remote-entry:assets");
+          if (!Array.isArray(value.snapshot.prices)) throw new InvalidRemoteEntry("invalid-remote-entry:prices");
+          if (!Array.isArray(value.snapshot.transactions)) throw new InvalidRemoteEntry("invalid-remote-entry:transactions");
           for (const [rowKey, event] of Object.entries(value.rowEvents ?? {})) {
             if (!/^[a-f0-9]{64}$/.test(rowKey) || !validClock(event.clock, event.clock?.deviceId) ||
-                !UUID_PATTERN.test(event.clock.deviceId) || typeof event.deleted !== "boolean") throw new InvalidRemoteEntry();
+                !UUID_PATTERN.test(event.clock.deviceId) || typeof event.deleted !== "boolean") throw new InvalidRemoteEntry("invalid-remote-entry:clock");
             const events = remoteRowEvents.get(entry.id) ?? {};
             if (!events[rowKey] || compareClock(event.clock, events[rowKey].clock) > 0) events[rowKey] = event;
             remoteRowEvents.set(entry.id, events);
           }
           for (const [rowKey, event] of Object.entries(value.txnEvents ?? {})) {
-            if (!/^[a-f0-9]{64}$/.test(rowKey) || !event || typeof event !== "object") throw new InvalidRemoteEntry();
+            if (!/^[a-f0-9]{64}$/.test(rowKey) || !event || typeof event !== "object") throw new InvalidRemoteEntry("invalid-remote-entry:json");
             const events = remoteTransactionEvents.get(entry.id) ?? {};
             const fields = events[rowKey] ?? {};
             for (const name of ["price", "txnType"] as const) {
@@ -790,7 +831,7 @@ export class SyncEngine {
               if (!field) continue;
               if (!validClock(field.clock, field.clock?.deviceId) || !UUID_PATTERN.test(field.clock.deviceId) ||
                   name === "price" && (typeof field.value !== "number" || !Number.isFinite(field.value)) ||
-                  name === "txnType" && typeof field.value !== "string") throw new InvalidRemoteEntry();
+                  name === "txnType" && typeof field.value !== "string") throw new InvalidRemoteEntry("invalid-remote-entry:clock");
               const previous = fields[name];
               if (!previous || compareClock(field.clock, previous.clock) > 0) {
                 fields[name] = field as never;
@@ -803,19 +844,32 @@ export class SyncEngine {
           if (!old || compareClock(value.clock, old.clock) > 0) remoteEdits.set(entry.id, value);
         } else if (entry.kind === "session" && enabled("chat")) {
           const value = await read<SyncSession>(owner, entry);
-          if (value.id !== entry.id || !Array.isArray(value.messages)) throw new InvalidRemoteEntry();
+          pullStage = "apply";
+          if (value.id !== entry.id) throw new InvalidRemoteEntry("invalid-remote-entry:uuid");
+          if (!Array.isArray(value.messages)) throw new InvalidRemoteEntry("invalid-remote-entry:messages");
           remoteSessions.set(value.id, mergeSessions(remoteSessions.get(value.id), value));
         } else if (entry.kind === "session-delete" && enabled("chat")) {
           const value = await read<{ clock: Hlc }>(owner, entry);
-          if (!validClock(value.clock, owner)) throw new InvalidRemoteEntry();
+          pullStage = "apply";
+          if (!validClock(value.clock, owner)) throw new InvalidRemoteEntry("invalid-remote-entry:clock");
           const old = remoteSessionDeletions.get(entry.id);
           if (!old || compareClock(value.clock, old) > 0) remoteSessionDeletions.set(entry.id, value.clock);
         }
         if (!options.dryRun) known.add(token);
         delete state.failedPulls?.[token];
+        if (owner !== state.deviceId && UUID_PATTERN.test(owner)) this.roundDiagnostics!.diagnostics.perDevice![owner.slice(0, 8)].succeeded++;
         options.onProgress?.({ phase: "pull", completed: known.size, total: entries.length });
       } catch (error) {
         report.errors.push(`Failed to pull ${entry.kind} object`);
+        const reason = error instanceof InvalidRemoteEntry ? error.reason
+          : error instanceof FutureRemoteEntry ? "invalid-remote-entry:clock"
+          : pullStage === "read" ? "read-failed:http"
+            : pullStage === "import" ? `import-failed: ${sanitizeImportError(error)}` : "apply-failed";
+        const failures = this.roundDiagnostics!.diagnostics.failures!;
+        const grouped = failures.find((item) => item.phase === "pull" && item.kind === entry.kind && item.reason === reason);
+        if (grouped) grouped.count++;
+        else failures.push({ phase: "pull", kind: entry.kind, reason, count: 1 });
+        if (owner !== state.deviceId && UUID_PATTERN.test(owner)) this.roundDiagnostics!.diagnostics.perDevice![owner.slice(0, 8)].failed++;
         if (!options.dryRun && error instanceof InvalidRemoteEntry) {
           (state.failedPulls ??= {})[token] = this.now() + 24 * 60 * 60_000;
         }

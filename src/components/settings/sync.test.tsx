@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import SyncSettingsPage from "./sync";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { S3Error } from "@/middlelayers/sync/object-store";
 import { I18nProvider, useTranslation } from "@/i18n";
 import { useEffect, type ReactNode } from "react";
+import { createSyncDiagnostics } from "@/middlelayers/sync/diagnostics";
+import { FakeS3 } from "@/middlelayers/sync/object-store";
+import type { SyncReport } from "@/middlelayers/sync/engine";
 
 function ChineseSyncSettingsPage() {
   const { setLocale } = useTranslation();
@@ -62,6 +65,7 @@ afterEach(() => {
   status.sync.error = undefined;
   status.sync.lastSync = undefined;
   status.sync.report = undefined;
+  Reflect.deleteProperty(status.sync, "diagnostics");
   vi.mocked(syncRuntime.devices).mockResolvedValue([]);
   vi.mocked(syncRuntime.configConflicts).mockResolvedValue([]);
   vi.mocked(syncRuntime.configure).mockClear();
@@ -139,6 +143,24 @@ describe("Sync settings page", () => {
     const card = screen.getByText("Sync status").closest("[data-ui-card]")!;
     expect(card).toHaveTextContent("Sync error");
     expect(card).toHaveTextContent("2026");
+  });
+
+  it("shows classified failures in the settings sync status Details", () => {
+    status.mode = "ready";
+    status.sync.phase = "error";
+    status.sync.report = {
+      pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0,
+      errors: ["Failed to pull snapshot object"], conflicts: [],
+    } as SyncReport;
+    const diagnostics = createSyncDiagnostics(new FakeS3()).diagnostics;
+    diagnostics.failures = [{ phase: "pull", kind: "snapshot", reason: "read-failed:hash", count: 1 }];
+    Object.assign(status.sync, { diagnostics });
+    render(<SyncSettingsPage />);
+    const card = screen.getByText("Sync status").closest("[data-ui-card]")!;
+    fireEvent.click(within(card as HTMLElement).getByRole("button", { name: "Details, 1 issue" }));
+    expect(within(card as HTMLElement).getByText("Could not read or validate 1 remote objects (snapshot ×1)")).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByText(/read-failed:hash/)).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole("button", { name: "Copy diagnostics" })).toBeInTheDocument();
   });
 
   it("keeps category focus and loaded devices through a report refresh", async () => {

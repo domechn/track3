@@ -3,6 +3,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { SyncDetails } from "./sync-details";
 import en from "@/i18n/locales/en.json";
 import type { SyncReport } from "@/middlelayers/sync/engine";
+import { I18nProvider, useTranslation } from "@/i18n";
+import { createSyncDiagnostics } from "@/middlelayers/sync/diagnostics";
+import { FakeS3 } from "@/middlelayers/sync/object-store";
 
 const { resolve, configConflicts } = vi.hoisted(() => ({
   resolve: vi.fn(async () => {}),
@@ -147,4 +150,49 @@ it("formats large diagnostics for reading", async () => {
   expect(screen.getByText("Received bytes").closest(".t3-sync-definition-row")).toHaveTextContent("1.2 MB");
   expect(screen.getByText("Sync state size").closest(".t3-sync-definition-row")).toHaveTextContent("18.4 MB");
   expect(screen.getByText("Cached snapshots").closest(".t3-sync-definition-row")).toHaveTextContent("5,000");
+});
+
+it("groups remote failures and conflicts while keeping config resolution and copy available", async () => {
+  const writeText = vi.fn(async (_value: string) => {});
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+  const diagnostics = createSyncDiagnostics(new FakeS3()).diagnostics;
+  diagnostics.failures = [
+    { phase: "pull", kind: "edit", reason: "invalid-remote-entry:uuid", count: 3 },
+    { phase: "pull", kind: "snapshot", reason: "import-failed: Error: UNIQUE constraint failed: assets_v2.<redacted>", count: 2 },
+  ];
+  diagnostics.conflicts = { snapshot: 2, edit: 0, config: 1, session: 0, tombstone: 0 };
+  diagnostics.failedPulls = { count: 3, earliestRetryAt: "2026-01-03T00:00:00.000Z" };
+  diagnostics.perDevice = { abcdef12: { failed: 5, succeeded: 2, manifestVersion: 1, appVersion: "unknown" } };
+  diagnostics.appVersion = "0.9.13";
+  diagnostics.syncFormatVersion = 1;
+  const report: SyncReport = {
+    pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0,
+    errors: Array(3).fill("Failed to pull edit object").concat(Array(2).fill("Failed to pull snapshot object")),
+    conflicts: ["10", "snapshot:one", "snapshot:two"],
+  };
+  render(<SyncDetails report={report} diagnostics={diagnostics} t={t} defaultExpanded />);
+  expect(screen.getByText("Could not read or validate 5 remote objects (edit ×3, snapshot ×2)")).toBeInTheDocument();
+  expect(screen.getByText(/2 snapshots could not be imported: import-failed: Error: UNIQUE constraint failed: assets_v2\.<redacted>/)).toBeInTheDocument();
+  expect(screen.getByText("Needs review 3 (config ×1, snapshot ×2)")).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "Use this device's value" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Use the other device's value" })).toBeInTheDocument();
+  expect(screen.getByText("Local app version").closest(".t3-sync-definition-row")).toHaveTextContent("0.9.13");
+  expect(screen.getByText("Sync format version").closest(".t3-sync-definition-row")).toHaveTextContent("1");
+  fireEvent.click(screen.getByRole("button", { name: "Copy diagnostics" }));
+  await waitFor(() => expect(JSON.parse(writeText.mock.calls[0][0]).failures).toHaveLength(2));
+});
+
+it("renders grouped failure reasons in Chinese", () => {
+  localStorage.setItem("track3-ui-locale", "zh");
+  const diagnostics = createSyncDiagnostics(new FakeS3()).diagnostics;
+  diagnostics.failures = [{ phase: "pull", kind: "snapshot", reason: "read-failed:hash", count: 2 }];
+  diagnostics.conflicts = { snapshot: 0, edit: 0, config: 0, session: 0, tombstone: 0 };
+  function LocalizedDetails() {
+    const { t } = useTranslation();
+    return <SyncDetails diagnostics={diagnostics} t={t} defaultExpanded />;
+  }
+  render(<I18nProvider><LocalizedDetails /></I18nProvider>);
+  expect(screen.getByText("无法读取或验证 2 个远程对象（快照 ×2）")).toBeInTheDocument();
+  expect(screen.getByText(/读取失败：哈希不匹配/)).toBeInTheDocument();
+  localStorage.removeItem("track3-ui-locale");
 });
