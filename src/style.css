@@ -1772,6 +1772,9 @@ button.analyze-source-list-name { height: 44px; line-height: 44px; }
   }
 }
 .t3-settings-source-tabs button { position: relative; min-height: 42px; flex: none; padding: 0 12px; color: hsl(var(--muted-foreground)); font-size: 13px; }
+@media (pointer: coarse) {
+  .t3-settings-source-tabs button { min-height: 44px; }
+}
 .t3-settings-source-tabs button[aria-pressed="true"] { color: hsl(var(--foreground)); }
 .t3-settings-source-tabs button[aria-pressed="true"]::after { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; background: hsl(var(--primary)); content: ""; }
 .sync-settings-page { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
