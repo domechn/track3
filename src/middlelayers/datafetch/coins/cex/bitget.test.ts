@@ -7,6 +7,36 @@ vi.mock("../../utils/http", () => ({
   sendHttpRequest: vi.fn(),
 }));
 
+const bgusd = {
+  productId: "bgusd-1",
+  productCoin: "BGUSD",
+  holdingAmount: "3.23436056",
+  usdtHoldingAmount: "3.23553532",
+  exchangeRate: "1",
+  subscriptionCoin: "USDC",
+  exchangeAmount: "3.23436056",
+  interestCoin: "BGUSD",
+  totalProfit: "0.01",
+};
+
+function emptyBalanceResponse(url: string) {
+  const path = new URL(url).pathname;
+  if (path === "/api/v2/earn/elite/assets" || path === "/api/v3/earn/elite-assets") {
+    return { code: "00000", data: { resultList: [] } } as never;
+  }
+  return { code: "00000", data: [] } as never;
+}
+
+function mockBalanceResponses(responses: Record<string, unknown>) {
+  vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+    const path = new URL(url).pathname;
+    const response = responses[path];
+    if (response instanceof Error) throw response;
+    if (response !== undefined) return response as never;
+    return emptyBalanceResponse(url);
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
@@ -61,7 +91,7 @@ describe("BitgetExchange", () => {
       if (url.includes("productType=USDC-FUTURES")) return { code: "00000", data: [
         { marginCoin: "USDC", accountEquity: "5", usdtEquity: "5", available: "4", locked: "0", unrealizedPL: "1" },
       ] } as never;
-      return { code: "00000", data: [] } as never;
+      return emptyBalanceResponse(url);
     });
     const exchange = new BitgetExchange("test-key", "test-secret", "test-passphrase");
     expect(await exchange.fetchTotalBalance()).toEqual({ USDT: 9, USDC: 4, BTC: 0.25 });
@@ -83,7 +113,7 @@ describe("BitgetExchange", () => {
   });
 
   it("accepts empty futures account lists", async () => {
-    vi.mocked(sendHttpRequest).mockResolvedValue({ code: "00000", data: [] });
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => emptyBalanceResponse(url));
     const exchange = new BitgetExchange("key", "secret", "pass");
     expect(await exchange.fetchTotalBalance()).toEqual({});
     expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
@@ -100,7 +130,7 @@ describe("BitgetExchange", () => {
       if (url.includes("/margin/crossed/account/assets")) return { code: "00000", data: [
         { coin: "USDT", totalAmount: "7", available: "7", frozen: "0", borrow: "4", interest: "0", net: "3" },
       ] } as never;
-      return { code: "00000", data: [] } as never;
+      return emptyBalanceResponse(url);
     });
     const exchange = new BitgetExchange("key", "secret", "pass");
     expect(await exchange.fetchTotalBalance()).toEqual({ BTC: 3, USDT: 3 });
@@ -113,7 +143,7 @@ describe("BitgetExchange", () => {
       if (url.includes("productType=USDC-FUTURES")) return { code: "00000", data: [
         { marginCoin: "USDC", accountEquity: "3", usdtEquity: "3", available: "2", locked: "0", unrealizedPL: "1" },
       ] } as never;
-      return { code: "00000", data: [] } as never;
+      return emptyBalanceResponse(url);
     });
     const exchange = new BitgetExchange("key", "secret", "pass");
     expect(await exchange.fetchTotalBalance()).toEqual({ USDC: 3 });
@@ -125,7 +155,7 @@ describe("BitgetExchange", () => {
       if (url.includes("productType=USDT-FUTURES")) return { code: "00000", data: [
         { marginCoin: "USDT", accountEquity: "10", assetList: [{}] },
       ] } as never;
-      return { code: "00000", data: [] } as never;
+      return emptyBalanceResponse(url);
     });
     const exchange = new BitgetExchange("key", "secret", "pass");
     expect(await exchange.fetchTotalBalance()).toEqual({});
@@ -136,7 +166,7 @@ describe("BitgetExchange", () => {
     vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) =>
       url.includes("productType=COIN-FUTURES")
         ? { code: "00000", data: [{ marginCoin: "BTC", available: "1", locked: "0", unrealizedPL: "1" }] } as never
-        : { code: "00000", data: [] } as never);
+        : emptyBalanceResponse(url));
     const exchange = new BitgetExchange("key", "secret", "pass");
     expect(await exchange.fetchTotalBalance()).toEqual({});
     expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["COIN-FUTURES"] });
@@ -146,7 +176,7 @@ describe("BitgetExchange", () => {
     vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) =>
       url.includes("productType=COIN-FUTURES")
         ? { code: "00000", data: [{ marginCoin: "BTC", accountEquity: "", available: "0", unrealizedPL: "0" }] } as never
-        : { code: "00000", data: [] } as never);
+        : emptyBalanceResponse(url));
     const exchange = new BitgetExchange("key", "secret", "pass");
     expect(await exchange.fetchTotalBalance()).toEqual({});
     expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["COIN-FUTURES"] });
@@ -159,7 +189,7 @@ describe("BitgetExchange", () => {
       if (url.includes("productType=USDT-FUTURES")) return { code: "00000", data: [
         { marginCoin: "USDT", accountEquity: "3", usdtEquity: "3", available: "2", locked: "0", unrealizedPL: "1" },
       ] } as never;
-      return { code: "00000", data: [] } as never;
+      return emptyBalanceResponse(url);
     });
     const exchange = new BitgetExchange("key", "secret", "pass");
     expect(await exchange.fetchTotalBalance()).toEqual({ USDT: 3 });
@@ -172,7 +202,7 @@ describe("BitgetExchange", () => {
         ? { code: "00000", data: [
           { marginCoin: "USDC", accountEquity: "-2", usdtEquity: "-2", available: "0", locked: "0", unrealizedPL: "-2" },
         ] } as never
-        : { code: "00000", data: [] } as never);
+        : emptyBalanceResponse(url));
     const exchange = new BitgetExchange("key", "secret", "pass");
     expect(await exchange.fetchTotalBalance()).toEqual({ USDC: -2 });
     expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["Some assets"] });
@@ -189,11 +219,151 @@ describe("BitgetExchange", () => {
       if (url.includes("/margin/crossed/account/assets")) return { code: "00000", data: [
         { coin: "USDT", net: "-0.2" },
       ] } as never;
-      return { code: "00000", data: [] } as never;
+      return emptyBalanceResponse(url);
     });
     const exchange = new BitgetExchange("key", "secret", "pass");
     expect((await exchange.fetchTotalBalance()).USDT).toBeCloseTo(0, 12);
     expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+  });
+
+  it("reads documented BGUSD holdings as subscription USDC from classic elite assets", async () => {
+    mockBalanceResponses({
+      "/api/v2/earn/elite/assets": { code: "00000", data: { resultList: [bgusd] } },
+      "/api/v3/earn/elite-assets": { code: "700011", data: null },
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDC: 3.23436056 });
+    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+    expect(vi.mocked(sendHttpRequest).mock.calls.map((call) => new URL(call[1]).pathname))
+      .toContain("/api/v2/earn/elite/assets");
+    expect(vi.mocked(sendHttpRequest).mock.calls.map((call) => new URL(call[1]).pathname))
+      .toContain("/api/v3/earn/elite-assets");
+  });
+
+  it("reads BGBTC from UTA elite assets using its non-unit exchange rate", async () => {
+    mockBalanceResponses({
+      "/api/v2/earn/elite/assets": { code: "700011", data: null },
+      "/api/v3/earn/elite-assets": { code: "00000", data: { resultList: [{
+        productId: "bgbtc-1",
+        productCoin: "BGBTC",
+        holdingAmount: "0.2",
+        exchangeRate: "0.5",
+        subscriptionCoin: "BTC",
+        exchangeAmount: "0.1",
+        usdtHoldingAmount: "10000",
+        projectList: [{ projectId: "staking-1" }],
+        unsettledBGPoints: "1",
+      }] } },
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+
+    expect(await exchange.fetchTotalBalance()).toEqual({ BTC: 0.1 });
+    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["zero", "0"],
+    ["NaN", "NaN"],
+    ["infinite", "Infinity"],
+    ["inconsistent", "3.3"],
+  ])("skips an elite item with %s exchangeAmount and reports partial holdings", async (_name, exchangeAmount) => {
+    mockBalanceResponses({
+      "/api/v2/earn/elite/assets": { code: "00000", data: { resultList: [
+        { ...bgusd, exchangeAmount },
+        { ...bgusd, productId: "valid", holdingAmount: "2", exchangeAmount: "2" },
+      ] } },
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDC: 2 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "unsupported", endpoints: ["On-chain Earn"] });
+  });
+
+  it("skips a malformed elite row and keeps valid rows", async () => {
+    mockBalanceResponses({
+      "/api/v2/earn/elite/assets": { code: "00000", data: { resultList: [
+        null,
+        bgusd,
+      ] } },
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDC: 3.23436056 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "unsupported", endpoints: ["On-chain Earn"] });
+  });
+
+  it("keeps other account balances when both elite endpoints fail authorization or API checks", async () => {
+    mockBalanceResponses({
+      "/api/v2/spot/account/assets": { code: "00000", data: [
+        { coin: "ETH", available: "1", locked: "0", frozen: "0" },
+      ] },
+      "/api/v2/earn/account/assets": { code: "00000", data: [{ coin: "BTC", amount: "2" }] },
+      "/api/v2/margin/crossed/account/assets": { code: "00000", data: [
+        { coin: "SOL", net: "3" },
+      ] },
+      "/api/v2/earn/elite/assets": Object.assign(new Error("permission denied"), { status: 403 }),
+      "/api/v3/earn/elite-assets": { code: "700011", data: null },
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+
+    expect(await exchange.fetchTotalBalance()).toEqual({ ETH: 1, BTC: 2, SOL: 3 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "auth", endpoints: ["On-chain Earn"] });
+  });
+
+  it("does not retain a partially parsed Earn response when an Earn row is malformed", async () => {
+    mockBalanceResponses({
+      "/api/v2/earn/account/assets": { code: "00000", data: [
+        { coin: "BTC", amount: "1" },
+        { coin: null, amount: "2" },
+      ] },
+      "/api/v2/earn/elite/assets": { code: "00000", data: { resultList: [bgusd] } },
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDC: 3.23436056 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["Earn"] });
+  });
+
+  it("reports an API code failure when neither elite endpoint is readable", async () => {
+    mockBalanceResponses({
+      "/api/v2/earn/elite/assets": { code: "700011", data: null },
+      "/api/v3/earn/elite-assets": { code: "700011", data: null },
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+
+    expect(await exchange.fetchTotalBalance()).toEqual({});
+    expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "other", endpoints: ["On-chain Earn"] });
+  });
+
+  it("counts the same elite item only once when both APIs return it", async () => {
+    mockBalanceResponses({
+      "/api/v2/earn/elite/assets": { code: "00000", data: { resultList: [bgusd] } },
+      "/api/v3/earn/elite-assets": { code: "00000", data: { resultList: [bgusd] } },
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+
+    expect(await exchange.fetchTotalBalance()).toEqual({ USDC: 3.23436056 });
+    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+  });
+
+  it.each([
+    ["within", "3.245", 3.245],
+    ["outside", "3.26", 6.49436056],
+  ])("%s 0.5% of Earn's amount controls whether elite is counted again", async (_name, earned, expected) => {
+    mockBalanceResponses({
+      "/api/v2/earn/account/assets": { code: "00000", data: [{ coin: "USDC", amount: earned }] },
+      "/api/v2/earn/elite/assets": { code: "00000", data: { resultList: [bgusd] } },
+    });
+    const exchange = new BitgetExchange("key", "secret", "pass");
+    const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
+
+    expect((await exchange.fetchTotalBalance()).USDC).toBeCloseTo(expected, 8);
+    expect(takeOptionalSourceFailures(exchange)).toBeUndefined();
+    if (_name === "within") expect(debug).toHaveBeenCalledWith(expect.stringContaining("Bitget On-chain Earn"));
+    else expect(debug).not.toHaveBeenCalled();
+    debug.mockRestore();
   });
 
   it("maps only positive USDT ticker prices", async () => {
