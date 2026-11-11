@@ -29,6 +29,15 @@ type EarnAccountResp = {
 	coin: string
 }[]
 
+type EliteAsset = {
+	productId?: string
+	productCoin?: string
+	holdingAmount?: string
+	exchangeRate?: string
+	subscriptionCoin?: string
+	exchangeAmount?: string
+}
+
 type CrossMarginAssetResp = {
 	coin: string
 	totalAmount: string
@@ -168,18 +177,80 @@ export class BitgetExchange implements Exchanger {
 
 	private async fetchEarnBalance(): Promise<{ [k: string]: number }> {
 		const path = "/api/v2/earn/account/assets"
+		const elitePaths = ["/api/v2/earn/elite/assets", "/api/v3/earn/elite-assets"]
+		const eliteRequests = Promise.allSettled(elitePaths.map(async (elitePath) => {
+			const resp = await this.fetch<{ code: string; data?: { resultList: EliteAsset[] } }>("GET", elitePath)
+			const resultList = resp.data?.resultList
+			if (resp.code !== "00000" || !Array.isArray(resultList)) {
+				throw new Error(`Bitget API error: ${resp.code}`)
+			}
+			return resultList
+		}))
+		let assets: EarnAccountResp = []
+		const balances: { [k: string]: number } = {}
 		try {
-			const assets = await this.fetchBalanceData<EarnAccountResp>(path)
-			const balances: { [k: string]: number } = {}
-			assets.forEach((v) => {
-				addToBalanceMap(balances, v.coin, this.parseFloat(v.amount))
+			const earnedAssets = await this.fetchBalanceData<EarnAccountResp>(path)
+			const earnedBalances: { [k: string]: number } = {}
+			earnedAssets.forEach((v) => {
+				addToBalanceMap(earnedBalances, v.coin, this.parseFloat(v.amount))
 			})
-			return balances
+			assets = earnedAssets
+			Object.assign(balances, earnedBalances)
 		} catch (e) {
 			console.error("Fetch earn balance failed")
 			recordOptionalSourceFailure(this, e, "Earn", true, true)
-			return {}
 		}
+
+		const eliteResults = await eliteRequests
+		if (eliteResults.every((result) => result.status === "rejected")) {
+			eliteResults.forEach((result) => {
+				if (result.status === "rejected") {
+					recordOptionalSourceFailure(this, result.reason, "On-chain Earn", true, true)
+				}
+			})
+		}
+
+		const remainingEarn = [...assets]
+		const classicElite: { productId?: string; productCoin?: string; coin: string; amount: number }[] = []
+		eliteResults.forEach((result, endpointIndex) => {
+			if (result.status !== "fulfilled") return
+			result.value.forEach((asset) => {
+				const amount = Number(asset?.exchangeAmount)
+				const holding = Number(asset?.holdingAmount)
+				const rate = Number(asset?.exchangeRate)
+				const expected = holding * rate
+				const coin = typeof asset?.subscriptionCoin === "string" ? asset.subscriptionCoin.trim().toUpperCase() : ""
+				if (!coin || !Number.isFinite(amount) || amount <= 0 ||
+					!Number.isFinite(holding) || holding <= 0 ||
+					!Number.isFinite(rate) || rate <= 0 ||
+					!Number.isFinite(expected) || expected <= 0 ||
+					Math.abs(amount - expected) > expected * 0.01) {
+					recordOptionalSourceFailure(this, new Error("Unsupported Bitget elite asset quantity"), "On-chain Earn", true, true)
+					return
+				}
+
+				if (endpointIndex === 0) {
+					classicElite.push({ productId: asset.productId, productCoin: asset.productCoin, coin, amount })
+				} else if (classicElite.some((classic) =>
+					(classic.productId && asset.productId && classic.productId === asset.productId &&
+						classic.productCoin === asset.productCoin && classic.coin === coin) ||
+					((!classic.productId || !asset.productId) && classic.productCoin === asset.productCoin &&
+						classic.coin === coin && Math.abs(classic.amount - amount) <= amount * 0.005))) {
+					return
+				}
+
+				const earnIndex = remainingEarn.findIndex((earned) =>
+					earned.coin?.trim().toUpperCase() === coin &&
+					Math.abs(Number(earned.amount) - amount) <= amount * 0.005)
+				if (earnIndex >= 0) {
+					remainingEarn.splice(earnIndex, 1)
+					console.debug("Bitget On-chain Earn holding also listed in Earn; counted once")
+					return
+				}
+				addToBalanceMap(balances, coin, amount)
+			})
+		})
+		return balances
 	}
 
 	private async fetchCrossMarginBalance(): Promise<{ [k: string]: number }> {

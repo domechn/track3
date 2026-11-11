@@ -100,7 +100,7 @@ it("keeps Bitget spot holdings and reports optional permission errors", async ()
     expect(await exchange.fetchTotalBalance()).toEqual({ BTC: 2 });
     expect(takeSourceFailure(exchange)).toBeUndefined();
     expect(takeOptionalSourceFailures(exchange)).toEqual({ category: "auth", endpoints: [
-      "USDT-FUTURES", "COIN-FUTURES", "USDC-FUTURES", "Earn", "Margin",
+      "USDT-FUTURES", "COIN-FUTURES", "USDC-FUTURES", "Earn", "Margin", "On-chain Earn",
     ] });
   } finally { errors.mockRestore(); }
 });
@@ -115,7 +115,7 @@ it("labels Bitget optional server errors without discarding spot holdings", asyn
     const exchange = new BitgetExchange("key", "secret", "passphrase");
     expect(await exchange.fetchTotalBalance()).toEqual({ BTC: 2 });
     expect(takeOptionalSourceFailures(exchange)).toMatchObject({ category: "network", endpoints: expect.arrayContaining([
-      "Earn", "Margin", "USDT-FUTURES", "COIN-FUTURES", "USDC-FUTURES",
+      "Earn", "Margin", "USDT-FUTURES", "COIN-FUTURES", "USDC-FUTURES", "On-chain Earn",
     ]) });
   } finally { errors.mockRestore(); }
 });
@@ -126,6 +126,7 @@ it("keeps Bitget futures when spot returns an API error and marks Spot unreadabl
     if (url.includes("productType=USDT-FUTURES")) return { code: "00000", data: [
       { marginCoin: "USDT", accountEquity: "5", usdtEquity: "5", available: "4", locked: "0", unrealizedPL: "1" },
     ] } as never;
+    if (url.includes("/earn/elite")) return { code: "00000", data: { resultList: [] } } as never;
     return { code: "00000", data: [] } as never;
   });
   const analyzer = new CexAnalyzer({ exchanges: [{ name: "bitget",
