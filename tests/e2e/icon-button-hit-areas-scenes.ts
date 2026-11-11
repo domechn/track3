@@ -238,10 +238,11 @@ test("icon-only controls on every main page have unobstructed hit areas", async 
       await expect(page.locator('#app-main-content [role="status"].absolute.inset-0')).toHaveCount(0, { timeout: 30_000 });
       if (route === "goals")
         await expect(page.getByText("Loading goals...")).toHaveCount(0, { timeout: 30_000 });
-      if (route === "history" && !mobile)
+      // The History list can finish before its selected snapshot detail loads.
+      if (route === "history" && !mobile) {
+        await expect(page.getByTestId("history-desktop-detail"), `${route} selected snapshot detail`).toBeVisible();
         await expect(page.locator(".fidelity-history-detail td:first-child button.t3-icon-button")).toHaveCount(8);
-      if (route === "settings/configuration")
-        await expect.poll(countIconControls, { timeout: 30_000 }).toBeGreaterThanOrEqual(mobile ? 8 : 30);
+      }
       let previousCount = -1;
       let steadySince = Date.now();
       await expect.poll(async () => {
@@ -335,10 +336,14 @@ test("icon-only controls on every main page have unobstructed hit areas", async 
     }
     mkdirSync(output, { recursive: true });
     writeFileSync(`${output}/audit-${capture}-${info.project.name}.json`, JSON.stringify(report, null, 2));
+    const inventory = report.map(({ route, controls }) =>
+      `${route} (${controls.length}): ${controls.map(({ label, className }) => label || className).join(", ")}`).join("\n");
     if (!mobile)
       expect(report.find(({ route }) => route === "history")?.controls.filter(({ label }) => label.startsWith("Delete ")).length).toBe(8);
-    expect(report.find(({ route }) => route === "settings/configuration")?.controls.length)
-      .toBeGreaterThanOrEqual(mobile ? 8 : 30);
+    // Summary's Live control was removed; source logos are decorative tiles, not buttons.
+    // Settings now lands on Sources: 12 shell icons and Rename, Quick look, Delete for two exchanges.
+    expect(report.find(({ route }) => route === "settings/configuration")?.controls.length, inventory)
+      .toBeGreaterThanOrEqual(mobile ? 8 : 18);
     expect(report.find(({ route }) => route === "assistant")?.controls.some(({ disabled }) => disabled)).toBe(true);
     const failures = report.flatMap(({ route, controls }) => controls.flatMap((control) => [
       ...(control.box.width < (mobile ? 44 : 28) || control.box.height < (mobile ? 44 : 28)
@@ -347,7 +352,7 @@ test("icon-only controls on every main page have unobstructed hit areas", async 
         .map((point) => `${route}: ${control.label || control.className} hit ${point.hit}.${point.hitClass}`),
       ...control.overlaps.map((other) => `${route}: ${control.label || control.className} intersects ${other}`),
     ]));
-    expect([...failures, ...layoutFailures]).toEqual([]);
+    expect([...failures, ...layoutFailures], inventory).toEqual([]);
   } finally {
     await context.close();
   }
