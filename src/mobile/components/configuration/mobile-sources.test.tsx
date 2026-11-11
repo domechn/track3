@@ -32,6 +32,11 @@ const props = {
 };
 
 describe("mobile data sources", () => {
+  it("explains IBKR token expiry and replacement in the phone editor", async () => {
+    render(<MobileSources {...props} fidelityLayout selectedKind="broker" addRequest={1} />);
+    expect(await screen.findByText(/choose the longest expiry/i)).toBeVisible();
+    expect(screen.getByText(/invalidates the old token/i)).toBeVisible();
+  });
   it("renames a saved exchange from its phone row without editing credentials", () => {
     const rename = vi.fn();
     render(<MobileSources {...props} onRenameExchange={rename} />);

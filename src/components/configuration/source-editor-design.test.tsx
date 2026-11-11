@@ -28,3 +28,12 @@ it("shows the approved exchange marks and read-only guidance", () => {
   expect(document.querySelector(".t3-fidelity-editor-banner svg")).toHaveAttribute("viewBox", "0 0 24 24");
   expect(screen.getByRole("link", { name: /How to create a read-only API key/ }).querySelector("svg")).not.toBeNull();
 });
+
+it("explains IBKR token expiry and replacement in the broker editor", () => {
+  render(<SourceEditorDesign tab="brokers" onClose={vi.fn()}
+    onSaveExchange={async () => true} onSaveWallet={async () => true}
+    onSaveBroker={async () => true} onSaveCustom={() => true}
+    exchanges={[]} wallets={[]} brokers={[]} />);
+  expect(screen.getByText(/choose the longest expiry/i)).toBeVisible();
+  expect(screen.getByText(/invalidates the old token/i)).toBeVisible();
+});

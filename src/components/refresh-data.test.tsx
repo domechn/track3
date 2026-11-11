@@ -766,6 +766,36 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(6);
   });
 
+  it("shows actionable IBKR token expiry and rate limit details", async () => {
+    writeStoredStatuses([
+      { sourceId: "stock:0", label: "IBKR 1", kind: "broker", provider: "IBKR",
+        status: "stale", category: "auth", detail: "IBKR token expired" },
+      { sourceId: "stock:1", label: "IBKR 2", kind: "broker", provider: "IBKR",
+        status: "stale", category: "rateLimit", detail: "IBKR rate limited" },
+    ]);
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("Needs attention: token expired");
+    expect(dialog).toHaveTextContent("Client Portal");
+    expect(dialog).toHaveTextContent("rate limiting, try again in a minute");
+    expect(dialog).not.toHaveTextContent("refresh.detail.");
+  });
+
+  it("shows IBKR missing cash and excluded categories in a partial source", async () => {
+    writeStoredStatuses([
+      { sourceId: "stock:0", label: "IBKR 1", kind: "broker", provider: "IBKR",
+        status: "partial", partial: { category: "other",
+          endpoints: ["IBKR cash", "IBKR positions: OPT x2, BOND x1"] } },
+    ]);
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("IBKR cash not included: enable Account Information or Currency Breakout");
+    expect(dialog).toHaveTextContent("IBKR: 3 positions not included (OPT x2, BOND x1)");
+    expect(dialog).not.toHaveTextContent("refresh.endpoint.");
+  });
+
   it("carries the last successful time into a full refresh that fails without saved holdings", async () => {
     localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([
       { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "#1",

@@ -758,6 +758,38 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(dialog.querySelectorAll("[data-source-status-row] svg").length).toBeGreaterThanOrEqual(6);
   });
 
+  it("shows localized IBKR token expiry and rate limit details", async () => {
+    localStorage.setItem(localeLocalStorageKey, "zh");
+    writeStoredStatuses([
+      { sourceId: "stock:0", label: "IBKR 1", kind: "broker", provider: "IBKR",
+        status: "stale", category: "auth", detail: "IBKR token expired" },
+      { sourceId: "stock:1", label: "IBKR 2", kind: "broker", provider: "IBKR",
+        status: "stale", category: "rateLimit", detail: "IBKR rate limited" },
+    ]);
+    render(<I18nProvider><RefreshData loading={false} /></I18nProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "数据源状态" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("令牌已过期");
+    expect(dialog).toHaveTextContent("Client Portal");
+    expect(dialog).toHaveTextContent("一分钟后重试");
+    expect(dialog).not.toHaveTextContent("refresh.detail.");
+  });
+
+  it("shows localized IBKR cash and position warnings", async () => {
+    localStorage.setItem(localeLocalStorageKey, "zh");
+    writeStoredStatuses([
+      { sourceId: "stock:0", label: "IBKR 1", kind: "broker", provider: "IBKR",
+        status: "partial", partial: { category: "other",
+          endpoints: ["IBKR cash", "IBKR positions: OPT x2, BOND x1"] } },
+    ]);
+    render(<I18nProvider><RefreshData loading={false} /></I18nProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "数据源状态" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("未包含 IBKR 现金");
+    expect(dialog).toHaveTextContent("未包含 3 个持仓（OPT x2, BOND x1）");
+    expect(dialog).not.toHaveTextContent("refresh.endpoint.");
+  });
+
   it("carries the last successful time into a full refresh that fails without saved holdings", async () => {
     localStorage.setItem("track3-refresh-source-statuses", JSON.stringify([
       { sourceId: "cex:0", label: "Main", kind: "exchange", provider: "Binance", hint: "#1",

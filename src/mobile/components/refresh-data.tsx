@@ -36,7 +36,7 @@ import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { redactSecrets } from "@/middlelayers/security/redact";
 import { cancelInsightRefresh, refreshInsights } from "@/middlelayers/insights-service";
 import { normalizeSourceStatuses, sourceIdentity, sortSourceStatuses } from "@/middlelayers/source-status";
-import { partialEndpointKeys } from "@/middlelayers/datafetch/utils/source-failure";
+import { partialEndpointText } from "@/middlelayers/datafetch/utils/source-failure";
 import { isIOS } from "@/utils/platform";
 import { invoke } from "@tauri-apps/api/core";
 import { listPortfolioSources } from "@/middlelayers/data";
@@ -322,7 +322,10 @@ const App = ({
     partial: ExclamationTriangleIcon, failed: CrossCircledIcon };
   const partialMessage = (source: PortfolioSourceStatus) => {
     const endpoints = source.partial?.endpoints.map((name) =>
-      t(`refresh.endpoint.${partialEndpointKeys[name] ?? "other"}`)) ?? [];
+      partialEndpointText(name, t)) ?? [];
+    if (source.kind === "broker" && source.partial?.endpoints.every((name) => name.startsWith("IBKR "))) {
+      return endpoints.join("; ");
+    }
     const names = new Intl.ListFormat(locale === "zh" ? "zh-CN" : "en", {
       style: "long", type: "conjunction",
     }).format(endpoints);
@@ -335,6 +338,13 @@ const App = ({
     "Invalid source holdings": "refresh.detail.invalidholdings",
     "ERC20 balance provider is not configured": "refresh.detail.providerNotConfigured",
     "Upstream provider error": "refresh.detail.upstreamProvider",
+    "IBKR token expired": "refresh.detail.ibkrTokenExpired",
+    "IBKR IP restricted": "refresh.detail.ibkrIpRestricted",
+    "IBKR invalid token": "refresh.detail.ibkrInvalidToken",
+    "IBKR invalid query": "refresh.detail.ibkrInvalidQuery",
+    "IBKR no permission": "refresh.detail.ibkrNoPermission",
+    "IBKR rate limited": "refresh.detail.ibkrRateLimited",
+    "IBKR not ready": "refresh.detail.ibkrNotReady",
   };
 
   return (
@@ -505,13 +515,13 @@ const App = ({
                         {t(`refresh.status.${source.status}`)}
                       </span>}
                     {source.status !== "ok" && source.status !== "partial" && <span className="text-muted-foreground">
-                      · {t(`refresh.reason.${source.category ?? "other"}`)}
+                      · {source.detail?.startsWith("IBKR ") ? t(detailKey[source.detail]) : t(`refresh.reason.${source.category ?? "other"}`)}
                     </span>}
                   </div>
                   {source.status === "partial" && <div className="ios-d3-refresh-extra mt-1 text-xs text-amber-900 dark:text-amber-300">
                     {partialMessage(source)}
                   </div>}
-                  {source.status !== "ok" && source.detail && <details className="ios-d3-refresh-extra mt-1 text-xs text-muted-foreground">
+                  {source.status !== "ok" && source.detail && !source.detail.startsWith("IBKR ") && <details className="ios-d3-refresh-extra mt-1 text-xs text-muted-foreground">
                     <summary>{t("refresh.details")}</summary>
                     <span>{redactSecrets(t(detailKey[source.detail]))}</span>
                   </details>}

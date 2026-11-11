@@ -25,7 +25,17 @@ export class SanitizedSourceError extends Error {
   }
 }
 
+export class SourceStatusError extends Error {
+  constructor(
+    readonly category: SourceErrorCategory,
+    readonly detail: string,
+  ) {
+    super(safeMessages[category]);
+  }
+}
+
 export function serviceSourceDetail(error: unknown): string | undefined {
+  if (error instanceof SourceStatusError) return error.detail;
   if (error instanceof SanitizedSourceError) return error.detail;
   if (!(error instanceof HttpRequestError) || classifySourceError(error) !== "service") return;
   return error.serverMessage === "ERC20 balance provider is not configured" ||
@@ -34,6 +44,7 @@ export function serviceSourceDetail(error: unknown): string | undefined {
 }
 
 export function classifySourceError(error: unknown): SourceErrorCategory {
+  if (error instanceof SourceStatusError) return error.category;
   if (error instanceof SanitizedSourceError) return error.category;
   const status = (error as { status?: number })?.status;
   const message = error instanceof Error ? error.message : String(error);
@@ -75,11 +86,24 @@ export const partialEndpointKeys: Record<string, string> = {
   "COIN-M Futures": "coinMFutures",
   Spot: "spot", "USDT-FUTURES": "usdtFutures", "COIN-FUTURES": "coinFutures",
   "USDC-FUTURES": "usdcFutures",
+  "IBKR cash": "ibkrCash",
+  "IBKR cash rate": "ibkrCashRate",
 };
 
 export function safePartialEndpoint(label: string): string | undefined {
+  if (label.length <= 240 && /^IBKR positions: [A-Z]{1,16} x[1-9]\d{0,4}(?:, [A-Z]{1,16} x[1-9]\d{0,4})*$/.test(label)) return label;
   if (/^Portfolio [A-Z_]+$/.test(label)) return label === "Portfolio DEFAULT" ? undefined : label;
   return Object.keys(partialEndpointKeys).find((name) => name.toLowerCase() === label.toLowerCase());
+}
+
+export function partialEndpointText(name: string, t: (key: string) => string): string {
+  if (name.startsWith("IBKR positions: ")) {
+    const categories = name.slice("IBKR positions: ".length);
+    const count = categories.split(", ").reduce((sum, entry) => sum + Number(entry.split(" x")[1]), 0);
+    return t("refresh.endpoint.ibkrUnvaluedPositions")
+      .replace("{count}", String(count)).replace("{categories}", categories);
+  }
+  return t(`refresh.endpoint.${partialEndpointKeys[name] ?? "other"}`);
 }
 const priority: Record<SourceErrorCategory, number> = {
   quota: 5,

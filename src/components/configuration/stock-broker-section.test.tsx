@@ -67,6 +67,12 @@ describe("StockBrokerSection", () => {
     expect(screen.getByText("Add Stock Broker")).toBeInTheDocument();
   });
 
+  it("explains token expiry in the broker configuration dialog", () => {
+    render(<StockBrokerSection {...baseProps} addStockBrokerDialogOpen />);
+    expect(screen.getByText(/choose the longest expiry/i)).toBeVisible();
+    expect(screen.getByText(/invalidates the old token/i)).toBeVisible();
+  });
+
   it("requires confirmation before removing a broker", () => {
     const onRemove = vi.fn();
     render(<StockBrokerSection {...baseProps} onRemove={onRemove} />);

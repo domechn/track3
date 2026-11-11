@@ -5,7 +5,9 @@ import { safePartialEndpoint } from "./datafetch/utils/source-failure";
 const categories = new Set(["auth", "service", "network", "rateLimit", "quota", "unsupported", "other"]);
 const kinds = new Set(["exchange", "wallet", "broker", "others"]);
 const details = new Set(["Source timed out", "Unsupported exchange", "Invalid source holdings",
-  "ERC20 balance provider is not configured", "Upstream provider error"]);
+  "ERC20 balance provider is not configured", "Upstream provider error",
+  "IBKR token expired", "IBKR IP restricted", "IBKR invalid token", "IBKR invalid query",
+  "IBKR no permission", "IBKR rate limited", "IBKR not ready"]);
 const maskedHint = /^(?:[A-Za-z0-9_-]{4}…[A-Za-z0-9_-]{4}|[A-Za-z0-9_-]{6}…[A-Za-z0-9_-]{4}|#(?:[1-9]\d{0,4}))$/;
 
 export function maskSourceIdentifier(value: string, start: 4 | 6): string | undefined {

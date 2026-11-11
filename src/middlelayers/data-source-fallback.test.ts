@@ -5,6 +5,7 @@ import { mergePortfoliosWithBaseline } from "./portfolio-baseline";
 import { AssetModel, UserLicenseInfo } from "./types";
 import { GlobalConfig, WalletCoin } from "./datafetch/types";
 import { isSameWallet } from "../lib/utils";
+import { recordOptionalSourceFailure, SourceStatusError } from "./datafetch/utils/source-failure";
 
 const mockProgress = vi.fn();
 
@@ -23,6 +24,8 @@ async function fetchAndMerge(
 const mockAnalyzers = vi.hoisted(() => {
   const scenario = {
     attachedOthersOverlapsFailedWallet: false,
+    stockError: undefined as SourceStatusError | undefined,
+    stockPartial: false,
   };
 
   class SuccessfulAnalyzer {
@@ -66,6 +69,12 @@ const mockAnalyzers = vi.hoisted(() => {
     }
 
     async loadPortfolio(): Promise<WalletCoin[]> {
+      if (scenario.stockError) throw scenario.stockError;
+      if (scenario.stockPartial) {
+        recordOptionalSourceFailure(this, new Error("IBKR cash not included"), "IBKR cash");
+        recordOptionalSourceFailure(this, new Error("IBKR positions not included"), "IBKR positions: OPT x2, BOND x1");
+        return [{ symbol: "AAPL", assetType: "stock", amount: 3, wallet: "ibkr:query-1" }];
+      }
       throw new Error("IBKR maintenance");
     }
   }
@@ -181,9 +190,28 @@ const lastAssets: AssetModel[] = [
 beforeEach(() => {
   vi.clearAllMocks();
   mockAnalyzers.scenario.attachedOthersOverlapsFailedWallet = false;
+  mockAnalyzers.scenario.stockError = undefined;
+  mockAnalyzers.scenario.stockPartial = false;
 });
 
 describe("portfolio data source fallback", () => {
+  it("propagates IBKR cash and category warnings as a partial source", async () => {
+    mockAnalyzers.scenario.stockPartial = true;
+    const result = await fetchPortfolios(config, mockProgress, userInfo);
+    expect(result.sourceResults?.find((source) => source.sourceId === "stock:0")).toMatchObject({
+      status: "partial", partial: {
+        category: "other", endpoints: ["IBKR cash", "IBKR positions: OPT x2, BOND x1"],
+      },
+    });
+  });
+
+  it("propagates token expiry as an actionable auth failure", async () => {
+    mockAnalyzers.scenario.stockError = new SourceStatusError("auth", "IBKR token expired");
+    const result = await fetchPortfolios(config, mockProgress, userInfo);
+    expect(result.sourceResults?.find((source) => source.sourceId === "stock:0")).toMatchObject({
+      status: "stale", category: "auth", detail: "IBKR token expired",
+    });
+  });
   it("reports failed data sources before applying last-known data", async () => {
     const result = await fetchPortfolios(
       config,

@@ -43,22 +43,27 @@ export async function fetchStockPrices(
     return {};
   }
 
-  // "USD" represents a cash balance (e.g. IBKR cash position), not a tradable
-  // security. It is always worth 1 USD, so anchor it instead of querying the
-  // price endpoint, which would otherwise return the US Dollar Index value.
-  const hasUsdCash = normalizedSymbols.includes("USD");
-  const fetchableSymbols = normalizedSymbols.filter((s) => s !== "USD");
+  // Currency symbols represent broker cash; asking for stock quotes can return
+  // an unrelated ticker or currency index.
+  const candidates = normalizedSymbols.filter((s) => /^[A-Z]{3}$/.test(s) && s !== "USD");
+  const currencyRates = candidates.length
+    ? await listAllCurrencyRates().catch(() => []) : [];
+  const cashPrices: Record<string, number> = {};
+  if (normalizedSymbols.includes("USD")) cashPrices.USD = 1;
+  for (const rate of currencyRates) {
+    const symbol = rate.currency.toUpperCase();
+    if (candidates.includes(symbol) && Number.isFinite(rate.rate) && rate.rate > 0) {
+      cashPrices[symbol] = 1 / rate.rate;
+    }
+  }
+  const fetchableSymbols = normalizedSymbols.filter((s) => cashPrices[s] === undefined);
 
   const entries =
     fetchableSymbols.length > 0
       ? await fetchStockPriceEntries(fetchableSymbols)
       : [];
 
-  const prices = await convertEntriesToUsd(entries);
-  if (hasUsdCash) {
-    prices.USD = 1;
-  }
-  return prices;
+  return { ...await convertEntriesToUsd(entries), ...cashPrices };
 }
 
 async function convertEntriesToUsd(

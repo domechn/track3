@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StockAnalyzer } from "./stock-analyzer";
+import { recordOptionalSourceFailure, takeOptionalSourceFailures } from "../../utils/source-failure";
 
 const mockBroker = {
   getBrokerName: vi.fn(() => "IBKR"),
@@ -19,6 +20,7 @@ vi.mock("./ibkr", () => ({
 describe("StockAnalyzer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Reflect.deleteProperty(mockBroker, "loadPortfolio");
     mockBroker.fetchPositions.mockResolvedValue({
       AAPL: 3,
       USD: 140,
@@ -79,5 +81,21 @@ describe("StockAnalyzer", () => {
     });
 
     expect(analyzer.getWalletIdentities()).toEqual(["ibkr:query-1"]);
+  });
+
+  it("keeps IBKR crypto asset types and transfers broker partial warnings", async () => {
+    Object.assign(mockBroker, { loadPortfolio: vi.fn(async () => {
+      recordOptionalSourceFailure(mockBroker, new Error("cash omitted"), "IBKR cash");
+      return [{ symbol: "BTC", assetType: "crypto" as const, amount: 0.2, wallet: "ibkr:query-1" }];
+    }) });
+    const analyzer = new StockAnalyzer({ stockConfig: { brokers: [{
+      name: "ibkr", initParams: { token: "token-1", queryId: "query-1" },
+    }] } });
+    await expect(analyzer.loadPortfolio()).resolves.toEqual([
+      { symbol: "BTC", assetType: "crypto", amount: 0.2, wallet: "ibkr:query-1" },
+    ]);
+    expect(takeOptionalSourceFailures(analyzer)).toEqual({
+      category: "other", endpoints: ["IBKR cash"],
+    });
   });
 });
