@@ -3281,5 +3281,18 @@
   "config.renamePreview": "其他位置显示为 {name}",
   "config.aliasTooLong": "请使用不超过 40 个字符。",
   "config.renamedTo": "已重命名为 {name}",
-  "externalLinks.openFailed": "无法打开链接"
+  "externalLinks.openFailed": "无法打开链接",
+  "refresh.detail.ibkrTokenExpired": "需要处理：令牌已过期。请在 Client Portal > Performance & Reports > Flex Queries 生成新令牌，并选择最长有效期。",
+  "refresh.detail.ibkrIpRestricted": "IBKR IP 地址受限：请在 Flex Web Service 设置中清除 Valid For IP Address，或使用允许的 IP 地址。",
+  "refresh.detail.ibkrInvalidToken": "IBKR 令牌无效。请从 Client Portal 复制当前 Flex Web Service 令牌并重新保存。",
+  "refresh.detail.ibkrInvalidQuery": "IBKR Flex Query ID 无效。请在 Client Portal 核对 Activity Flex Query ID。",
+  "refresh.detail.ibkrNoPermission": "IBKR 账户无法使用此 Flex 查询。请核对账户，并在 Client Portal 启用 Flex Web Service。",
+  "refresh.detail.ibkrRateLimited": "IBKR 已限制请求频率，请一分钟后重试。",
+  "refresh.detail.ibkrNotReady": "IBKR 报表尚未就绪，请稍后重新刷新。",
+  "refresh.detail.ibkrCashMissing": "未包含 IBKR 现金：请在 Flex 查询中启用 Account Information 或 Currency Breakout。",
+  "refresh.endpoint.ibkrCash": "未包含 IBKR 现金：请在 Flex 查询中启用 Account Information 或 Currency Breakout。",
+  "refresh.endpoint.ibkrUnvaluedPositions": "IBKR：未包含 {count} 个持仓（{categories}）",
+  "fidelity.editor.brokerTokenExpiry": "请为 Flex Web Service 令牌选择最长有效期。生成新令牌会使旧令牌失效。",
+  "fidelity.settings.add.flexTokenExpiry": "请为 Flex Web Service 令牌选择最长有效期。生成新令牌会使旧令牌失效。",
+  "refresh.endpoint.ibkrCashRate": "未包含 IBKR 现金：汇率不可用。请刷新汇率后重试。"
 }

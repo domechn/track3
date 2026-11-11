@@ -3,6 +3,7 @@ import { Analyzer, StockConfig, WalletCoin } from "../../types";
 import { getMemoryCacheInstance } from "../../utils/cache";
 import { IbkrBroker } from "./ibkr";
 import { StockBroker } from "./stock-broker";
+import { transferOptionalSourceFailures } from "../../utils/source-failure";
 
 export class StockAnalyzer implements Analyzer {
   private readonly brokers: StockBroker[];
@@ -65,6 +66,11 @@ export class StockAnalyzer implements Analyzer {
 
   async loadPortfolio(): Promise<WalletCoin[]> {
     const coinLists = await bluebird.map(this.brokers, async (broker) => {
+      if (broker.loadPortfolio) {
+        const coins = await broker.loadPortfolio();
+        transferOptionalSourceFailures(broker, this);
+        return coins;
+      }
       const positions = await this.fetchPositions(broker);
       return Object.keys(positions)
           .filter((symbol) => positions[symbol] !== 0)

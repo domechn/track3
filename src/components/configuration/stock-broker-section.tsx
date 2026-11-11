@@ -190,6 +190,7 @@ const StockBrokerSection = memo(function StockBrokerSection({
                     className="col-span-3"
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">{t("fidelity.editor.brokerTokenExpiry")}</p>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="stockBrokerQueryId" className="text-right">
                     Query ID

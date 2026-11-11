@@ -3368,5 +3368,18 @@
   "update.fidelity.proxyHint": "If you use a proxy or VPN, make sure github.com and release-assets.githubusercontent.com are allowed.",
   "update.fidelity.retryScheduled": "Retrying in {seconds}s…",
   "update.fidelity.details": "Details",
-  "update.fidelity.checking": "Checking for updates…"
+  "update.fidelity.checking": "Checking for updates…",
+  "refresh.detail.ibkrTokenExpired": "Needs attention: token expired. Generate a new token in Client Portal > Performance & Reports > Flex Queries and choose the longest expiry.",
+  "refresh.detail.ibkrIpRestricted": "IBKR IP restriction: clear Valid For IP Address in Flex Web Service settings, or use the allowed IP.",
+  "refresh.detail.ibkrInvalidToken": "IBKR token is invalid. Copy the current Flex Web Service token from Client Portal and save it again.",
+  "refresh.detail.ibkrInvalidQuery": "IBKR Flex Query ID is invalid. Check the Activity Flex Query ID in Client Portal.",
+  "refresh.detail.ibkrNoPermission": "IBKR account cannot use this Flex query. Check the account and enable Flex Web Service in Client Portal.",
+  "refresh.detail.ibkrRateLimited": "IBKR is rate limiting, try again in a minute.",
+  "refresh.detail.ibkrNotReady": "IBKR statement is not ready. Try refreshing again shortly.",
+  "refresh.detail.ibkrCashMissing": "IBKR cash not included: enable Account Information or Currency Breakout in the Flex query.",
+  "refresh.endpoint.ibkrCash": "IBKR cash not included: enable Account Information or Currency Breakout in the Flex query.",
+  "refresh.endpoint.ibkrUnvaluedPositions": "IBKR: {count} positions not included ({categories})",
+  "fidelity.editor.brokerTokenExpiry": "Choose the longest expiry for the Flex Web Service token. Generating a new token invalidates the old token.",
+  "fidelity.settings.add.flexTokenExpiry": "Choose the longest expiry for the Flex Web Service token. Generating a new token invalidates the old token.",
+  "refresh.endpoint.ibkrCashRate": "IBKR cash not included: currency rate unavailable. Refresh rates and try again."
 }

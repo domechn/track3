@@ -119,4 +119,24 @@ describe("fetchStockPrices", () => {
       { symbols: ["AAPL"] },
     );
   });
+
+  it("prices supported non-USD cash from local currency rates instead of a stock quote", async () => {
+    vi.mocked(listAllCurrencyRates).mockResolvedValue([
+      { currency: "USD", alias: "US dollar", symbol: "$", rate: 1 },
+      { currency: "HKD", alias: "Hong Kong dollar", symbol: "$", rate: 7.8 },
+    ] as never);
+    await expect(fetchStockPrices(["HKD", "USD"])).resolves.toEqual({
+      HKD: 1 / 7.8,
+      USD: 1,
+    });
+    expect(sendHttpRequest).not.toHaveBeenCalled();
+  });
+
+  it("still quotes a three-letter stock when currency rates are unavailable", async () => {
+    vi.mocked(listAllCurrencyRates).mockRejectedValueOnce(new Error("rates offline"));
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({
+      data: { IBM: { price: 180, currency: "USD" } },
+    });
+    await expect(fetchStockPrices(["IBM"])).resolves.toEqual({ IBM: 180 });
+  });
 });

@@ -82,3 +82,17 @@ it("drops a DEFAULT portfolio warning from saved partial status", () => {
     partial: { category: "auth", endpoints: ["Portfolio DEFAULT", "Portfolio INTX"] } }])[0].partial?.endpoints)
     .toEqual(["Portfolio INTX"]);
 });
+
+it("preserves safe IBKR warning counts and token guidance through status storage", () => {
+  expect(normalizeSourceStatuses([
+    { sourceId: "stock:0", label: "IBKR", status: "partial", partial: {
+      category: "other", endpoints: ["IBKR cash", "IBKR positions: OPT x2, BOND x1",
+        "IBKR positions: OPT x2; token=secret"],
+    } },
+    { sourceId: "stock:1", label: "IBKR", status: "stale", category: "auth",
+      detail: "IBKR token expired" },
+  ])).toMatchObject([
+    { partial: { endpoints: ["IBKR cash", "IBKR positions: OPT x2, BOND x1"] } },
+    { detail: "IBKR token expired" },
+  ]);
+});

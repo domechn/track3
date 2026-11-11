@@ -145,9 +145,11 @@ function createRequestPayload(
   json: object,
   formData: object,
 ): RequestPayload {
-  const hs: { [k: string]: string } = {
-    "user-agent": getCurrentUA(),
-  };
+  const hs: { [k: string]: string } = {};
+  if (!Object.keys(headers).some((key) => key.toLowerCase() === "user-agent" &&
+    headers[key] !== undefined)) {
+    hs["user-agent"] = getCurrentUA();
+  }
   Object.entries(headers).forEach(([key, value]) => {
     if (value !== undefined) {
       hs[key] = value;

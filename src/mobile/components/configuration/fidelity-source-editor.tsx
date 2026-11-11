@@ -175,6 +175,7 @@ export function FidelitySourceEditor({
             value={draft.alias ?? ""} placeholder={t("fidelity.settings.add.interactiveBrokers")}
             disabled={saving} onChange={(alias) => onUpdate({ alias })} />
           <p className="fidelity-editor-help">{t("fidelity.settings.add.flexGuide")}<br />
+            {t("fidelity.settings.add.flexTokenExpiry")}<br />
             <button type="button" onClick={() => { void openExternal("docs"); }}>
               {t("fidelity.settings.add.flexGuideLink")} ↗
             </button></p>

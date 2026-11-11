@@ -192,6 +192,7 @@ export function SourceEditorDesign({ tab, onClose, onSaveExchange, onSaveWallet,
           <EditorField label={t("fidelity.editor.flexToken")} error={saveError}><div className={`t3-fidelity-editor-secret ${saveError ? "error" : ""}`}><input aria-label={t("fidelity.editor.flexToken")} type={showToken ? "text" : "password"} value={broker.token} onChange={(event) => setBroker({ ...broker, token: event.target.value })} autoComplete="off" /><button type="button" aria-label={t(showToken ? "fidelity.editor.hide" : "fidelity.editor.show")} onClick={() => setShowToken(!showToken)}>{showToken ? <EyeNoneIcon /> : <EyeOpenIcon />}</button></div></EditorField>
           <EditorField label={t("fidelity.editor.label")} optional><input aria-label={t("fidelity.editor.label")} placeholder="Interactive Brokers" value={broker.alias ?? ""} onChange={(event) => setBroker({ ...broker, alias: event.target.value })} /></EditorField>
           <p>{t("fidelity.editor.brokerHelp")} <a href={externalLinks.docs} target="_blank" rel="noreferrer">{t("fidelity.editor.flexHelp")}</a></p>
+          <p>{t("fidelity.editor.brokerTokenExpiry")}</p>
           <div className="t3-fidelity-editor-banner">{shield}<div><b>{t("fidelity.editor.localOnly")}</b><span>{t("fidelity.editor.localOnlyDetail")}</span></div></div>
         </>}
         {tab === "custom" && <>

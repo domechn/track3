@@ -80,4 +80,6 @@ export interface StockBroker {
   fetchPositionsPrice(): Promise<{ [symbol: string]: number }>;
 
   verifyConfig(): Promise<boolean>;
+
+  loadPortfolio?(): Promise<import("../../types").WalletCoin[]>;
 }
