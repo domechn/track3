@@ -1545,6 +1545,7 @@ mod tests {
         assert!(!version_is_less("0.8.0", "0.7.0").unwrap());
         assert!(version_is_greater("0.10.0", "0.9.0").unwrap());
         assert!(version_is_greater("0.9.12", "0.9.11").unwrap());
+        assert!(version_is_greater("0.9.13", "0.9.12").unwrap());
         for path in [
             "v01t02/assets_v2_up.sql",
             "v03t04/asset_prices_up.sql",
