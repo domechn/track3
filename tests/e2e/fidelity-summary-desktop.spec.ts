@@ -310,7 +310,9 @@ test("Summary end label, rail separators and Refresh control match the source", 
     const style = getComputedStyle(node);
     return [style.fontWeight, style.fill];
   })).toEqual(["600", "rgb(95, 196, 155)"]);
-  expect((await label.boundingBox())!.x).toBeCloseTo(976.4, 0);
+  const labelBox = (await label.boundingBox())!;
+  const chartBox = (await page.locator(".fidelity-summary-chart").boundingBox())!;
+  expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(chartBox.x + chartBox.width - 10);
   const separators = await page.locator(".t3-fidelity-nav-group").evaluateAll((nodes) =>
     nodes.map((node) => {
       const box = node.getBoundingClientRect();
@@ -368,11 +370,62 @@ test("Summary KPI, ATH rule and chart axes use the source page coordinates", asy
   });
   expect(metrics).toMatchObject({
     big: 212, percent: 212, athRule: 336,
-    gridColor: "rgb(38, 38, 41)",
   });
+  await expect(page.locator(".fidelity-summary-chart g:first-child line")).toHaveAttribute("stroke", "hsl(var(--border))");
   expect(metrics.gridX).toBeCloseTo(149, 0);
   expect(metrics.gridY).toBeCloseTo(499, 0);
 });
+
+for (const fixture of ["twenty-months", "five-in-one-month"] as const) {
+  test(`Summary P&L labels fit at desktop widths with ${fixture}`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.clock.setFixedTime(new Date("2026-10-31T09:41:00Z"));
+    const bridge = await installTauriBridge(page, { fidelityDesktop: fixture === "twenty-months" ? "summary" : "full" });
+    if (fixture === "twenty-months") await bridge.addFourEarlyMonthlySnapshots();
+    else await bridge.keepFiveOctoberSnapshots();
+    await page.goto("/#/summary");
+    for (const theme of ["dark", "light"]) {
+      await page.evaluate((value) => localStorage.setItem("track3-ui-theme", value), theme);
+      await page.reload();
+      for (const width of [1100, 1280, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await expect(page.locator(".fidelity-summary")).toHaveAttribute("aria-busy", "false", { timeout: 40_000 });
+        await expect(page.locator("html")).toHaveClass(new RegExp(theme));
+        await expect(page.locator(".fidelity-summary").locator("..")).toHaveCSS("opacity", "1");
+        const boxes = await page.locator(".fidelity-summary-chart").evaluate((svg) => {
+          const chart = svg.getBoundingClientRect();
+          const card = svg.closest(".fidelity-summary-pnl")!.getBoundingClientRect();
+          const labels = [...svg.querySelectorAll("[data-date-tick]")].map((node) => ({
+            text: node.textContent,
+            box: node.getBoundingClientRect(),
+          }));
+          const end = svg.querySelector("[data-direction-end]")!.getBoundingClientRect();
+          const best = [...svg.querySelectorAll("g text")].find((node) => node.textContent?.includes("Best month"))?.getBoundingClientRect();
+          return { chart: { left: chart.left, right: chart.right }, cardRight: card.right,
+            labels: labels.map(({ text, box }) => ({ text, left: box.left, right: box.right })),
+            end: { left: end.left, right: end.right },
+            best: best && { left: best.left, right: best.right } };
+        });
+        expect(new Set(boxes.labels.map(({ text }) => text)).size).toBe(boxes.labels.length);
+        for (const [index, label] of boxes.labels.entries()) {
+          expect(label.left).toBeGreaterThanOrEqual(boxes.chart.left - 1);
+          expect(label.right).toBeLessThanOrEqual(boxes.chart.right + 1);
+          if (index) expect(label.left - boxes.labels[index - 1].right).toBeGreaterThanOrEqual(54);
+        }
+        expect(boxes.end.right).toBeLessThanOrEqual(boxes.cardRight - 10);
+        expect(boxes.end.left).toBeGreaterThanOrEqual(boxes.chart.left);
+        if (boxes.best) {
+          expect(boxes.best.left).toBeGreaterThanOrEqual(boxes.chart.left);
+          expect(boxes.best.right).toBeLessThanOrEqual(boxes.chart.right);
+        }
+        if (width === 1280) {
+          mkdirSync("/tmp/summary-pnl-chart", { recursive: true });
+          await page.locator(".fidelity-summary-pnl").screenshot({ path: `/tmp/summary-pnl-chart/${fixture}-${theme}.png` });
+        }
+      }
+    }
+  });
+}
 
 test("Summary range starts at the source heading position", async ({ page }) => {
   await installTauriBridge(page, { fidelityDesktop: "summary" });

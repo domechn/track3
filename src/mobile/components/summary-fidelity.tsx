@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CurrencyRateDetail, QuoteColor, TDateRange, TotalValuesData } from "@/middlelayers/types";
 import { queryTotalValues, queryHistoricalData, calculateTotalProfit } from "@/middlelayers/charts";
 import { queryPreviousProfitSnapshotDate } from "@/middlelayers/charts-profit";
@@ -24,6 +24,7 @@ import { directionColorVar, directionTone } from "@/utils/color";
 import { splitDirectionLine } from "@/components/direction-line";
 import { selectSummaryRange, summaryPresetRange, type SummaryPreset } from "@/middlelayers/summary-range";
 import { roundedSummaryBreakdown } from "@/middlelayers/summary-breakdown";
+import { chooseDateTicks, endLabelPosition, estimatedChartTextWidth } from "@/components/fidelity-data";
 
 type Profit = Awaited<ReturnType<typeof calculateTotalProfit>>;
 type ChartProfit = Pick<Profit, "total" | "knownTotal" | "unknownCoins">;
@@ -63,8 +64,16 @@ function Empty({ children, refresh = false }: { children: React.ReactNode; refre
 function Skeleton({ width, height = 12 }: { width: string; height?: number }) {
   return <span className="fd-skeleton" style={{ width, height }} aria-hidden="true" />;
 }
-function LineChart({ values, dates, label, symbol, formatMonth, bestMonthText, focusedMonth, approximate }: { values: number[]; dates: Date[]; label: string; symbol: string; formatMonth: (date: Date) => string; bestMonthText: string; focusedMonth: Date | null; approximate?: boolean }) {
+function LineChart({ values, dates, label, symbol, locale, formatMonth, bestMonthText, focusedMonth, approximate }: { values: number[]; dates: Date[]; label: string; symbol: string; locale: "en" | "zh"; formatMonth: (date: Date) => string; bestMonthText: string; focusedMonth: Date | null; approximate?: boolean }) {
   const [selected, setSelected] = useState<number | null>(null);
+  const chartRef = useRef<SVGSVGElement>(null);
+  const [renderedWidth, setRenderedWidth] = useState(324);
+  useEffect(() => {
+    if (!chartRef.current || !globalThis.ResizeObserver) return;
+    const observer = new ResizeObserver(([entry]) => setRenderedWidth(entry.contentRect.width || 324));
+    observer.observe(chartRef.current);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     if (focusedMonth) {
       const index = dates.findIndex((date) => date.getTime() === focusedMonth.getTime());
@@ -83,20 +92,27 @@ function LineChart({ values, dates, label, symbol, formatMonth, bestMonthText, f
   const tickLabel = (n: number) => n === 0 ? "0" : `${Math.round(n / 1000)}K`;
   const endLabel = `${approximate ? "~" : ""}${money(values.at(-1) ?? 0, symbol, 0)}`;
   const padL = 12 + Math.max(...ticks.map(n => tickLabel(n).length * 8));
-  const padR = 10 + endLabel.length * 7.5;
+  const padR = 24 + endLabel.length * 7.5;
   const x = (i: number) => padL + i / Math.max(values.length - 1, 1) * (324 - padL - padR);
   const y = (v: number) => 164 - (v - tickMin) / (tickMax - tickMin) * 138;
+  const scale = Math.min(renderedWidth / 324, 1);
+  const dateTicks = chooseDateTicks(dates.map((date) => date.getTime()), dates.map((_, index) => x(index) * scale), locale);
   const bestMonth = values.reduce((best, value, index) =>
     index && value - values[index - 1] > values[best] - values[Math.max(0, best - 1)] ? index : best, 1);
+  const bestLabelAtRight = x(bestMonth) + 4 + estimatedChartTextWidth(bestMonthText) > 316;
+  const bestLabelX = x(bestMonth) + (bestLabelAtRight ? -4 : 4);
+  const endPosition = endLabelPosition(x(values.length - 1), y(values.at(-1) ?? 0), 324, endLabel, {
+    x: bestLabelX, y: 17, anchor: bestLabelAtRight ? "end" : "start", label: bestMonthText,
+  });
   const scrub = (event: React.PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const pointer = (event.clientX - rect.left) / rect.width * 324;
     setSelected(values.reduce((best, _, index) => Math.abs(x(index) - pointer) < Math.abs(x(best) - pointer) ? index : best, 0));
   };
-  return <svg className="fd-summary-chart" viewBox="0 0 324 190" role="img" aria-label={label} onPointerMove={scrub} onPointerDown={scrub}>
+  return <svg ref={chartRef} className="fd-summary-chart" viewBox="0 0 324 190" role="img" aria-label={label} onPointerMove={scrub} onPointerDown={scrub}>
     {ticks.map(n => <g key={n}><line x1={padL} x2="324" y1={y(n)} y2={y(n)} stroke="var(--fd-border)" /><text x={padL-8} y={y(n)+4} fill="var(--fd-faint)" textAnchor="end" fontSize="12">{tickLabel(n)}</text></g>)}
     <line x1={x(bestMonth)} x2={x(bestMonth)} y1="9" y2="26" stroke="var(--fd-faint)" strokeWidth="1" opacity=".45" shapeRendering="crispEdges" /><line x1={x(bestMonth)} x2={x(bestMonth)} y1="26" y2="164" stroke="var(--fd-faint)" strokeWidth="1" opacity=".45" shapeRendering="crispEdges" />
-    <text x={x(bestMonth)+4} y="17" fill="var(--fd-muted)" fontSize="11">{bestMonthText}</text>
+    <text x={bestLabelX} y="17" textAnchor={bestLabelAtRight ? "end" : "start"} fill="var(--fd-muted)" fontSize="11">{bestMonthText}</text>
     {splitDirectionLine(values, x, y).map(({ start, end, value }, index) =>
       <line key={index} data-direction={value > 0 ? "gain" : value < 0 ? "loss" : "neutral"}
         x1={start.x} y1={start.y} x2={end.x} y2={end.y}
@@ -105,10 +121,9 @@ function LineChart({ values, dates, label, symbol, formatMonth, bestMonthText, f
       <rect width="160" height="26" rx="13" fill="var(--fd-raised)" stroke="var(--fd-control)" />
       <text x="80" y="17" textAnchor="middle" fill="var(--fd-text)" fontSize="11">{formatMonth(dates[selected])} {dates[selected].getFullYear()} · {money(values[selected],symbol,0,true)}</text>
     </g>}
-    <text x={x(0)} y="182" fill="var(--fd-faint)" fontSize="12">{dates.length ? `${dates[0].getDate()} ${formatMonth(dates[0])} ${String(dates[0].getFullYear()).slice(2)}` : ""}</text>
-    {dates.length > 2 && <text x={x(Math.floor((dates.length-1)/2))} y="182" fill="var(--fd-faint)" textAnchor="middle" fontSize="12">{formatMonth(dates[Math.floor((dates.length-1)/2)])} {String(dates[Math.floor((dates.length-1)/2)].getFullYear()).slice(2)}</text>}
-    <text x={x(values.length-1)} y="182" fill="var(--fd-faint)" textAnchor="end" fontSize="12">{dates.length ? formatMonth(dates.at(-1)!) + " " + String(dates.at(-1)!.getFullYear()).slice(2) : ""}</text>
-    <text x={x(values.length-1)+6} y={y(values.at(-1) ?? 0)+4}
+    {dateTicks.map(({ index, x: tickX, anchor, label: tickLabel }) =>
+      <text key={index} data-date-tick="" x={tickX / scale} y="182" fill="var(--fd-faint)" textAnchor={anchor} fontSize="12">{tickLabel}</text>)}
+    <text data-direction-end="" x={endPosition.x} y={endPosition.y} textAnchor="end"
       fill={directionColorVar(values.at(-1))} fontSize="12" fontWeight="600">{endLabel}</text>
   </svg>;
 }
@@ -382,7 +397,7 @@ export default function SummaryFidelity({ currency, dateRange, quoteColor, check
       {loading || selecting ? <><div className="fd-primary-stat"><Skeleton width="60%" /><Skeleton width="80%" height={24} /><Skeleton width="50%" /></div><div className="fd-kpis fd-three">{[0,1,2].map(i=><div key={i}><Skeleton width="60%" /><Skeleton width="75%" height={24} /><Skeleton width="50%" /></div>)}</div><div className="fd-block" style={{ height: 190 }} /></>
       : <><div className="fd-primary-stat"><span className="fd-label">{range === "All" ? title("netPnl") : title("netPnl.range").replace("{range}", range)}</span><strong data-tone={empty ? "neutral" : tone(shownPnl)} title={shownPnl === null ? unavailableReason : shownProfit?.unrecordedChange ? t("profitSummary.unrecordedChanges").replace("{amount}", cash(shownProfit.unrecordedChange, 2, true)) : undefined}>{empty || shownPnl === null || !selectedRange.baseline ? missingMetric : cash(shownPnl, 2, true)}</strong><small>{empty || shownPnl === null || !selectedRange.baseline ? unavailableReason : t("profitSummary.since").replace("{date}", dateLabel(selectedRange.baseline))}</small></div>
       <div className="fd-kpis fd-three"><div><span className="fd-label">{title("pnlPercent")}</span><strong data-tone={empty ? "neutral" : tone(shownPercentage)} title={shownPercentage === null ? percentUnavailableReason : undefined}>{empty || shownPnl === null || !selectedRange.baseline ? missingMetric : shownPercentage === undefined ? "∞" : shownPercentage === null ? missingMetric : percent(shownPercentage)}</strong><small>{empty ? title("onCapital") : shownPnl === null || shownPercentage === null ? percentUnavailableReason : title("onAmount").replace("{amount}", cash(shownInvested ?? 0, 0))}</small></div><div><span className="fd-label">{title("breakeven")}</span><strong data-tone={empty ? "neutral" : undefined} title={shownBreakeven === null ? unavailableReason : undefined}>{empty || shownBreakeven === null || !selectedRange.baseline ? missingMetric : cash(shownBreakeven, 0)}</strong><small>{empty ? title("breakevenDetail") : shownBreakeven === null ? unavailableReason : title("pnlZero").replace("{zero}", cash(0, 0))}</small></div><div><span className="fd-label">{title("positions")}</span><strong>{display?.assets ?? 0}</strong><small title={positionSnapshotNote}>{empty ? title("inOneSnapshot") : <><span data-tone="gain">{title("upCount").replace("{n}", String(positionCounts.up))}</span> · <span data-tone="loss">{title("downCount").replace("{n}", String(positionCounts.down))}</span><br />{title("flatCount").replace("{n}", String(positionCounts.flat))}</>}</small></div></div>
-      {empty || !selectedRange.baseline || !shownChart?.length ? <Empty refresh>{unavailableReason || title("lineNeedsSecond")}</Empty> : <><p className="fd-chart-caption">{title("cumulative").replace("{date}", dateLabel(selectedRange.baseline))}</p><LineChart values={[0,...shownChart.map((p) => currencyWrapper(currency)(p.total ?? p.knownTotal ?? 0))]} dates={[selectedRange.baseline,...(shownChartDates ?? [])]} label={title("cumulative").replace("{date}", dateLabel(selectedRange.baseline))} symbol={currency.symbol} formatMonth={monthLabel} bestMonthText={title("bestMonth")} focusedMonth={focusedMonth} approximate={shownChart.some((p) => p.total === null)} /></>}</>}
+      {empty || !selectedRange.baseline || !shownChart?.length ? <Empty refresh>{unavailableReason || title("lineNeedsSecond")}</Empty> : <><p className="fd-chart-caption">{title("cumulative").replace("{date}", dateLabel(selectedRange.baseline))}</p><LineChart values={[0,...shownChart.map((p) => currencyWrapper(currency)(p.total ?? p.knownTotal ?? 0))]} dates={[selectedRange.baseline,...(shownChartDates ?? [])]} label={title("cumulative").replace("{date}", dateLabel(selectedRange.baseline))} symbol={currency.symbol} locale={locale} formatMonth={monthLabel} bestMonthText={title("bestMonth")} focusedMonth={focusedMonth} approximate={shownChart.some((p) => p.total === null)} /></>}</>}
     </>, "fd-profit-loss")}
     {card(<><Heading title={title("ath")} right={loading ? t("profitSummary.since").replace("{date}", dateLabel(dateRange.start)) : empty ? title("fromOneSnapshot") : t("profitSummary.since").replace("{date}", dateLabel(firstDate))} />
       {loading ? <div className="fd-ath-skeleton"><Skeleton width="40%"/><Skeleton width="70%" height={30}/><Skeleton width="55%"/><Skeleton width="100%" height={6}/>{[0,1,2].map(i=><Skeleton key={i} width="100%" height={14}/>)}</div> : <><div className="fd-label">{empty ? title("highestSoFar") : title("highestRecorded")}</div><div className="fd-big-value">{cash(peak.totalValue)}</div><div className="fd-sub">{empty ? title("onlySnapshotAt").replace("{date}", dateLabel(new Date(peak.timestamp))) : title("athWhen").replace("{date}", dateLabel(new Date(peak.timestamp))).replace("{days}", String(Math.floor((lastDate.getTime()-peak.timestamp)/86_400_000)))}</div><div className="fd-meter" role="progressbar" aria-label={title("ath")} aria-valuenow={peak.totalValue ? (last?.totalValue ?? 0) / peak.totalValue * 100 : 0} aria-valuemin={0} aria-valuemax={100}><span style={{width:`${peak.totalValue ? Math.min(100,(last?.totalValue ?? 0)/peak.totalValue*100):0}%`}} /></div><div className="fd-sub fd-meter-label">{empty ? title("atHigh").replace("{zero}", cash(0, 0)) : <><span>{title("nowOfAth.dynamic").replace("{percent}", peak.totalValue ? ((last?.totalValue ?? 0)/peak.totalValue*100).toFixed(1) : "0")}</span><span>ATH</span></>}</div><div className="fd-facts">{(empty ? [[title("firstSnapshot"), dateTimeLabel(firstDate)], [title("assets"), String(display?.assets ?? 0)], [title("sources"), String(display?.sources ?? 0)], [title("currentValue"), cash(last?.totalValue ?? 0)]] : [[title("distanceAth"), `${cash(distance,2,true)} · ${percent(peak.totalValue ? distance/peak.totalValue : 0)}`], [title("gainNeeded"), peak.totalValue && last?.totalValue ? percent(peak.totalValue/last.totalValue-1) : dash], [title("previousHigh"), previousHigh ? `${cash(previousHigh.totalValue)} · ${dateLabel(new Date(previousHigh.timestamp))}` : dash], [title("lowestSince"), lowestSince ? `${cash(lowestSince.totalValue)} · ${dateLabel(new Date(lowestSince.timestamp))}` : dash], [title("currentValue"), cash(last?.totalValue ?? 0)]]).map(([label,value])=><div key={label}><span>{label}</span><span data-tone={label===title("distanceAth")?tone(distance):undefined}>{value}</span></div>)}</div></>}

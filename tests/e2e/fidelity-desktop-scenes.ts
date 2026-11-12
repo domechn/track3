@@ -223,5 +223,18 @@ export async function installTauriBridge(page: Page, options: FidelityOptions = 
       query: "DELETE FROM assets_v2 WHERE uuid NOT IN ('fidelity-oct-30', 'fidelity-oct-31')",
       values: [],
     })),
+    keepFiveOctoberSnapshots: () => page.evaluate(() => (window as any).__e2eInvoke("plugin:sql|execute", {
+      query: "DELETE FROM assets_v2 WHERE uuid NOT IN ('fidelity-oct-27', 'fidelity-oct-28', 'fidelity-oct-29', 'fidelity-oct-30', 'fidelity-oct-31')",
+      values: [],
+    })),
+    addFourEarlyMonthlySnapshots: () => page.evaluate(async () => {
+      for (const month of [3, 4, 5, 6]) {
+        await (window as any).__e2eInvoke("plugin:sql|execute", {
+          query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+            SELECT ?, ?, wallet, asset_type, symbol, amount, value, price FROM assets_v2 WHERE uuid = 'fidelity-start'`,
+          values: [`fidelity-2025-${String(month).padStart(2, "0")}`, `2025-${String(month).padStart(2, "0")}-28T09:41:00.000Z`],
+        });
+      }
+    }),
   };
 }
