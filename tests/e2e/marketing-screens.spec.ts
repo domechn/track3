@@ -41,7 +41,7 @@ async function scene(browser: Browser, size: Size, theme: "dark" | "light", fixt
     else await installDesktopPlan(page, fixture === "plan-goals" ? "goals" : "rebalance");
   } else {
     await seedDesktopSourceStatuses(page);
-    await installSampleBridge(page, { fidelitySample: "full", appVersion: "0.9.13" });
+    await installSampleBridge(page, { fidelitySample: "full", appVersion: "0.9.14" });
     await seedDesktopAiSummary(page);
     await page.evaluate(async () => (window as any).__e2eInvoke("plugin:sql|execute", {
       query: "INSERT OR REPLACE INTO configuration (id, data) VALUES (6, '31')", values: [],

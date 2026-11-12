@@ -2,10 +2,10 @@ import { expect, test } from "@playwright/test";
 import { installTauriBridge } from "./tauri-bridge";
 
 test("desktop Settings menu opens focused source and currency sections", async ({ page }) => {
-  await installTauriBridge(page, { appVersion: "0.9.13" });
+  await installTauriBridge(page, { appVersion: "0.9.14" });
   await page.goto("/#/settings/configuration");
   await expect(page).toHaveURL(/#\/settings\/configuration\?section=sources$/);
-  await expect(page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "About 0.9.13" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "About 0.9.14" })).toBeVisible();
   await expect(page.locator(".t3-settings-source-tabs")).toBeVisible();
   await expect(page.getByRole("heading", { name: "General", exact: true })).toHaveCount(0);
   await expect(page.evaluate(() =>
@@ -57,7 +57,7 @@ test("About offers an in-app update beside the release link in light and dark", 
   await page.addInitScript(() => {
     if (!localStorage.getItem("track3-ui-theme")) localStorage.setItem("track3-ui-theme", "light");
   });
-  await installTauriBridge(page, { appVersion: "0.9.12" });
+  await installTauriBridge(page, { appVersion: "0.9.13" });
   for (const theme of ["light", "dark"] as const) {
     if (theme === "dark") {
       await page.evaluate(() => localStorage.setItem("track3-ui-theme", "dark"));
@@ -71,7 +71,7 @@ test("About offers an in-app update beside the release link in light and dark", 
       (window as any).__updateDownloads = 0;
       (window as any).__e2eInvoke = (command: string, args: unknown, options: unknown) => {
         if (command === "plugin:updater|check") return Promise.resolve({
-          rid: 44, currentVersion: "0.9.12", version: "0.9.13", date: "", body: "", rawJson: {},
+          rid: 44, currentVersion: "0.9.13", version: "0.9.14", date: "", body: "", rawJson: {},
         });
         if (command === "plugin:updater|download") {
           (window as any).__updateDownloads++;
@@ -95,7 +95,7 @@ test("About offers an in-app update beside the release link in light and dark", 
     expect(bounds[2].right).toBeLessThanOrEqual((await card.boundingBox())!.x + (await card.boundingBox())!.width);
     await page.screenshot({ path: `/tmp/track3-about-update-now-${theme}.png`, animations: "disabled" });
     await update.click();
-    await expect(page.getByRole("dialog", { name: "Downloading Track3 0.9.13" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Downloading Track3 0.9.14" })).toBeVisible();
     await expect(card.getByRole("button", { name: "Downloading...", includeHidden: true })).toBeDisabled();
     expect(await page.evaluate(() => (window as any).__updateDownloads)).toBe(1);
   }
