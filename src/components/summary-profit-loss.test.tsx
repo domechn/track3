@@ -60,6 +60,34 @@ it("colours cumulative P&L above and below zero with gain and loss tokens", asyn
   expect(chart.querySelector("[data-direction-end]")).toHaveTextContent("+$10");
 });
 
+it("keeps short-range dates distinct and a wide JPY end label inside the chart", async () => {
+  vi.mocked(queryPNLChartValue).mockResolvedValue([
+    { timestamp: Date.parse("2026-11-05T12:00:00Z"), totalValue: 100 },
+    { timestamp: Date.parse("2026-11-17T12:00:00Z"), totalValue: 120 },
+  ]);
+  vi.mocked(calculateTotalProfit).mockImplementation(async (range) => {
+    const total = range.end.getUTCDate() === 5 ? 10 : 2_247_561;
+    return { total, knownTotal: total, percentage: 0, coins: [], unknownCoins: [] } as never;
+  });
+  render(<SummaryProfitLoss
+    dateRange={{ start: new Date("2026-11-01T00:00:00Z"), end: new Date("2026-11-30T23:59:59Z") }}
+    baseline={new Date("2026-11-01T00:00:00Z")}
+    currency={{ currency: "JPY", symbol: "¥", rate: 1, alias: "JPY" }}
+    quoteColor="green-up-red-down"
+  />);
+  const chart = await screen.findByRole("img", { name: /Cumulative net P&L/ });
+  const labels = [...chart.querySelectorAll("[data-date-tick]")].map((node) => node.textContent);
+  expect(labels).toContain("1 Nov");
+  expect(labels).toContain("17 Nov");
+  expect(new Set(labels).size).toBe(labels.length);
+  const end = chart.querySelector("[data-direction-end]")!;
+  expect(end).toHaveAttribute("text-anchor", "end");
+  expect(Number(end.getAttribute("x"))).toBeLessThanOrEqual(933);
+  expect(Number(end.getAttribute("y"))).toBeLessThan(Number(chart.querySelector("[data-point]:last-of-type")?.getAttribute("cy")));
+  expect([...chart.querySelectorAll("g text")].find((node) => node.textContent?.includes("Best month")))
+    .toHaveAttribute("text-anchor", "end");
+});
+
 it("shows the selected range and the earlier snapshot for a one point chart", async () => {
   vi.mocked(queryPNLChartValue).mockResolvedValue([{ timestamp: Date.parse("2026-10-09T12:00:00Z"), totalValue: 120 }]);
   vi.mocked(calculateTotalProfit).mockResolvedValue({

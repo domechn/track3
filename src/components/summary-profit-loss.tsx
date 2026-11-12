@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { calculateTotalProfit, queryLatestAssets, queryPNLChartValue, queryTotalValue } from "@/middlelayers/charts";
 import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
 import type { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
@@ -8,7 +8,7 @@ import { useTranslation } from "@/i18n";
 import { currencyWrapper } from "@/utils/currency";
 import { cn } from "@/lib/utils";
 import bluebird from "bluebird";
-import { axisForValues, boundedMonthTimestamps, compactMoney, hasProfitLine } from "./fidelity-data";
+import { boundedMonthTimestamps, chooseDateTicks, compactMoney, endLabelPosition, estimatedChartTextWidth, hasProfitLine, summaryProfitAxis } from "./fidelity-data";
 import { requestFullRefresh } from "./refresh-request";
 import { directionColorVar } from "@/utils/color";
 import { splitDirectionLine } from "@/components/direction-line";
@@ -110,16 +110,34 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
 
   const usablePoints = useMemo(() => data?.points.filter((point): point is { timestamp: number; value: number } => point.value !== null) ?? [], [data]);
   const hasLine = hasProfitLine(data?.snapshotTimestamps ?? []) && usablePoints.length >= 2;
-  const axis = axisForValues(usablePoints.map((point) => point.value));
+  const chartRef = useRef<SVGSVGElement>(null);
+  const [chartWidth, setChartWidth] = useState(945);
+  useEffect(() => {
+    if (!hasLine || !chartRef.current || !globalThis.ResizeObserver) return;
+    const observer = new ResizeObserver(([entry]) => setChartWidth(entry.contentRect.width || 945));
+    observer.observe(chartRef.current);
+    return () => observer.disconnect();
+  }, [hasLine]);
+  const axis = summaryProfitAxis(usablePoints.map((point) => point.value));
   const topValue = axis.upper;
   const span = axis.upper - axis.lower;
-  const width = 945, height = 215, left = 44, right = 70, top = 26, bottom = 26;
+  const width = chartWidth, height = 215, left = 44, right = 70, top = 26, bottom = 26;
   const x = (index: number) => left + index / Math.max(usablePoints.length - 1, 1) * (width - left - right);
   const y = (value: number) => top + (topValue - value) / span * (height - top - bottom);
   const lineSegments = splitDirectionLine(usablePoints.map((point) => point.value), x, y);
   const ticks = axis.ticks;
+  const dateTicks = chooseDateTicks(usablePoints.map((point) => point.timestamp), usablePoints.map((_, index) => x(index)), locale);
+  const endValue = usablePoints.at(-1)?.value ?? 0;
+  const endText = money(endValue, currency, 0);
   const best = data?.sampled ? undefined : usablePoints.slice(1).map((point, index) => ({ point, index: index + 1, change: point.value - usablePoints[index].value }))
     .sort((a, b) => b.change - a.change)[0];
+  const bestText = best ? t("summary.fidelity.bestMonth")
+    .replace("{month}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(best.point.timestamp))
+    .replace("{amount}", money(best.change, currency, 0)) : "";
+  const bestLabelAtRight = Boolean(best && x(best.index) + 4 + estimatedChartTextWidth(bestText) > width - 12);
+  const bestLabelX = best ? x(best.index) + (bestLabelAtRight ? -4 : 4) : 0;
+  const endPosition = endLabelPosition(x(usablePoints.length - 1), y(endValue), width, endText,
+    best ? { x: bestLabelX, y: 17, anchor: bestLabelAtRight ? "end" : "start", label: bestText } : undefined);
   const noComparison = oneSnapshot || (snapshotCount !== undefined && (!baseline || snapshotCount === 0));
   const missingReason = error ? t("summary.fidelity.loadError")
     : oneSnapshot ? t("summary.fidelity.needsSecond")
@@ -171,8 +189,8 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
       !hasLine ? <div className="fidelity-empty fidelity-summary-chart-empty"><div>{missingReason || t("summary.fidelity.lineStarts")}</div><button type="button" onClick={requestFullRefresh}><svg aria-hidden="true" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3h-3" /></svg>{t("summary.fidelity.refreshNow")}</button></div> :
       <>
         <p className="fidelity-caption">{t("summary.fidelity.chartCaption").replace("{date}", date(baseline ?? dateRange.start))}</p>
-        <svg className="fidelity-summary-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={t("summary.fidelity.chartCaption").replace("{date}", date(baseline ?? dateRange.start))}>
-          {ticks.map((tick, index) => <g key={index}><line x1={left} x2={width} y1={y(tick)} y2={y(tick)} stroke="#262629" shapeRendering="crispEdges" /><text x={left - 8} y={y(tick) + 4} textAnchor="end" fill="#9b9da3" fontSize="12">{compactMoney(currencyWrapper(currency)(tick), currency.symbol).replace(currency.symbol, "")}</text></g>)}
+        <svg ref={chartRef} className="fidelity-summary-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label={t("summary.fidelity.chartCaption").replace("{date}", date(baseline ?? dateRange.start))}>
+          {ticks.map((tick, index) => <g key={index}><line x1={left} x2={width} y1={y(tick)} y2={y(tick)} stroke="hsl(var(--border))" shapeRendering="crispEdges" /><text x={left - 8} y={y(tick) + 4} textAnchor="end" fill="hsl(var(--faint))" fontSize="12">{compactMoney(currencyWrapper(currency)(tick), currency.symbol).replace(currency.symbol, "")}</text></g>)}
           {lineSegments.map(({ start, end, value }, index) => <line key={index} data-direction={value > 0 ? "gain" : value < 0 ? "loss" : "neutral"}
             x1={start.x} y1={start.y} x2={end.x} y2={end.y}
             stroke={directionColorVar(value, quoteColor)} strokeWidth="2" />)}
@@ -180,14 +198,12 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
             const label = `${date(new Date(point.timestamp))}: ${money(point.value, currency)}`;
             return <circle key={point.timestamp} data-point cx={x(index)} cy={y(point.value)} r="6" fill="transparent" role="img" tabIndex={0} aria-label={label}><title>{label}</title></circle>;
           })}
-          {best && <g><line x1={x(best.index)} x2={x(best.index)} y1="9" y2={height-bottom} stroke="#9b9da3" opacity=".45" strokeWidth="1" shapeRendering="crispEdges" /><text x={x(best.index)+4} y="17" fill="#9b9da3" fontSize="11">{t("summary.fidelity.bestMonth").replace("{month}", new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { month: "short", year: "numeric" }).format(best.point.timestamp)).replace("{amount}", money(best.change, currency, 0))}</text></g>}
-          {usablePoints.filter((_, index) => index === 0 || index === usablePoints.length - 1 || index % Math.max(1, Math.floor(usablePoints.length / 4)) === 0).map((point) => {
-            const index = usablePoints.indexOf(point);
-            return <text key={index} x={x(index)} y={height - 8} textAnchor={index === 0 ? "start" : index === usablePoints.length - 1 ? "end" : "middle"} fill="#9b9da3" fontSize="12">{new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", { ...(index === 0 ? { day: "numeric" as const } : {}), month: "short", year: "2-digit" }).format(point.timestamp)}</text>;
-          })}
-          <text data-direction-end="" x={x(usablePoints.length - 1) + 6} y={y(usablePoints.at(-1)!.value) + 4}
-            textAnchor="start" fill={directionColorVar(usablePoints.at(-1)!.value, quoteColor)}
-            fontSize="12" fontWeight="600">{money(usablePoints.at(-1)!.value, currency, 0)}</text>
+          {best && <g><line x1={x(best.index)} x2={x(best.index)} y1="9" y2={height-bottom} stroke="hsl(var(--faint))" opacity=".45" strokeWidth="1" shapeRendering="crispEdges" /><text x={bestLabelX} y="17" textAnchor={bestLabelAtRight ? "end" : "start"} fill="hsl(var(--faint))" fontSize="11">{bestText}</text></g>}
+          {dateTicks.map(({ index, x: tickX, anchor, label }) =>
+            <text key={index} data-date-tick="" x={tickX} y={height - 8} textAnchor={anchor} fill="hsl(var(--faint))" fontSize="12">{label}</text>)}
+          <text data-direction-end="" x={endPosition.x} y={endPosition.y}
+            textAnchor="end" fill={directionColorVar(endValue, quoteColor)}
+            fontSize="12" fontWeight="600">{endText}</text>
         </svg>
       </>}
   </section>;

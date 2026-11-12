@@ -13,6 +13,84 @@ export function axisForValues(values: number[], includeZero = true): { lower: nu
   return { lower, upper, ticks };
 }
 
+export function summaryProfitAxis(values: number[]) {
+  const finite = values.filter(Number.isFinite);
+  if (!finite.length) return axisForValues(values);
+  const min = Math.min(...finite);
+  const max = Math.max(...finite);
+  const padding = (max - min || Math.abs(max) || 1) * 0.06;
+  return axisForValues([min - padding, max + padding], false);
+}
+
+type DateTick = { index: number; label: string; x: number; anchor: "start" | "middle" | "end" };
+
+export function estimatedChartTextWidth(text: string, latinWidth = 7) {
+  return [...text].reduce((sum, char) => sum + (/[\u2e80-\u9fff]/.test(char) ? 12 : latinWidth), 0);
+}
+
+export function chooseDateTicks(timestamps: readonly number[], positions: readonly number[], locale: "en" | "zh"): DateTick[] {
+  if (!timestamps.length) return [];
+  const span = timestamps.at(-1)! - timestamps[0];
+  const short = span <= 31 * 86400000;
+  const multiYear = span > 2 * 365 * 86400000;
+  const formatter = (date: Date, options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB", options).format(date);
+  const label = (index: number) => {
+    const date = new Date(timestamps[index]);
+    if (short) return formatter(date, { day: "numeric", month: "short" });
+    if (!multiYear) return formatter(date, { month: "short", year: "numeric" });
+    return date.getMonth() === 0
+      ? formatter(date, { year: "numeric" })
+      : formatter(date, { month: "short" });
+  };
+  const last = timestamps.length - 1;
+  const tick = (index: number): DateTick => ({
+    index, label: label(index), x: positions[index],
+    anchor: index === 0 ? "start" : index === last ? "end" : "middle",
+  });
+  const firstTick = tick(0);
+  const lastTick = tick(last);
+  if (firstTick.label === lastTick.label && last > 0) {
+    if (!multiYear) return [lastTick];
+    const options = { month: "short", year: "numeric" } as const;
+    firstTick.label = formatter(new Date(timestamps[0]), options);
+    lastTick.label = formatter(new Date(timestamps[last]), options);
+  }
+  const bounds = ({ x, label: text, anchor }: DateTick) => {
+    const width = estimatedChartTextWidth(text);
+    const start = anchor === "start" ? x : anchor === "end" ? x - width : x - width / 2;
+    return { start, end: start + width };
+  };
+  if (last === 0) return [firstTick];
+  if (bounds(lastTick).start - bounds(firstTick).end < 56) return [lastTick];
+  const selected = [firstTick];
+  const labels = new Set([firstTick.label, lastTick.label]);
+  for (let index = 1; index < last; index++) {
+    const candidate = tick(index);
+    if (labels.has(candidate.label)) continue;
+    if (bounds(candidate).start - bounds(selected.at(-1)!).end < 56) continue;
+    if (bounds(lastTick).start - bounds(candidate).end < 56) continue;
+    selected.push(candidate);
+    labels.add(candidate.label);
+  }
+  return [...selected, lastTick];
+}
+
+export function endLabelPosition(pointX: number, pointY: number, chartWidth: number, label: string,
+  bestLabel?: { x: number; y: number; anchor: "start" | "end"; label: string }) {
+  const labelWidth = estimatedChartTextWidth(label, 7.5);
+  const wide = labelWidth > chartWidth - pointX - 18;
+  let y = wide ? Math.max(14, pointY - 12) : pointY + 4;
+  if (wide && bestLabel && y < bestLabel.y + 14) {
+    const bestWidth = estimatedChartTextWidth(bestLabel.label);
+    const bestLeft = bestLabel.x - (bestLabel.anchor === "end" ? bestWidth : 0);
+    const bestRight = bestLeft + bestWidth;
+    if (bestRight > chartWidth - 12 - labelWidth - 4 && bestLeft < chartWidth - 8)
+      y = pointY + 20;
+  }
+  return { x: chartWidth - 12, y };
+}
+
 export function coinAxisForValues(values: number[]) {
   const finite = values.filter(Number.isFinite);
   if (!finite.length) return axisForValues(values, false);
