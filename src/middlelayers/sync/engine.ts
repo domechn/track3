@@ -3,7 +3,7 @@ import { isS3Conflict, readSyncHeader, S3Error, type S3Store } from "./object-st
 import { compareClock, MAX_REMOTE_SKEW_MS, nextClock, validRemoteClock, type Hlc } from "./clock";
 import { syncCategory, type SyncCategory } from "./config-keys";
 import { countSyncConflicts, createSyncDiagnostics, sanitizeImportError, summarizeFailedPulls, type SyncDiagnostics } from "./diagnostics";
-import { getVersion } from "@/utils/app";
+import { getVersion } from "@tauri-apps/api/app";
 import type { PartialSnapshot } from "../snapshot-partial";
 
 class InvalidRemoteEntry extends Error {
