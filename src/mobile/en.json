@@ -3355,5 +3355,9 @@
   "sync.status.retryPaused": "Automatic retry paused after {count} attempts",
   "sync.status.retryPausedOne": "Automatic retry paused after 1 attempt",
   "sync.details.failures.invalidSnapshots": "{count} {kind} could not be imported, dated {dates}, written by device {devices}",
-  "sync.details.failures.invalidSnapshotsUndated": "{count} {kind} could not be imported, written by device {devices}"
+  "sync.details.failures.invalidSnapshotsUndated": "{count} {kind} could not be imported, written by device {devices}",
+  "startup.load.error.title": "Could not load portfolio data",
+  "startup.load.error.reason": "Reason: {reason}",
+  "startup.load.error.retry": "Retry",
+  "startup.load.error.unknown": "Unknown error"
 }

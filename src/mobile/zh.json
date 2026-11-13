@@ -3355,5 +3355,9 @@
   "sync.status.retryPaused": "已尝试 {count} 次，自动重试已暂停",
   "sync.status.retryPausedOne": "已尝试 1 次，自动重试已暂停",
   "sync.details.failures.invalidSnapshots": "{count} 个{kind}无法导入，日期 {dates}，写入设备 {devices}",
-  "sync.details.failures.invalidSnapshotsUndated": "{count} 个{kind}无法导入，写入设备 {devices}"
+  "sync.details.failures.invalidSnapshotsUndated": "{count} 个{kind}无法导入，写入设备 {devices}",
+  "startup.load.error.title": "无法加载投资组合数据",
+  "startup.load.error.reason": "原因：{reason}",
+  "startup.load.error.retry": "重试",
+  "startup.load.error.unknown": "未知错误"
 }

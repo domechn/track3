@@ -72,6 +72,38 @@ afterEach(() => {
 });
 
 describe("useChat", () => {
+  it("keeps every streamed token in the rendered and saved answer when passive effects run late", async () => {
+    const answer = "streamed answer stays complete across delayed renders";
+    vi.mocked(streamChatCompletion).mockImplementation(async function* () {
+      for (const character of answer) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        yield { kind: "text", delta: character };
+      }
+      yield { kind: "done" };
+    });
+    const onStreamComplete = vi.fn();
+    const { result } = renderHook(() => {
+      const chat = useChat({ config, baseCurrency, onStreamComplete });
+      if (chat.isStreaming) {
+        const until = performance.now() + 25;
+        while (performance.now() < until) { /* Simulate an expensive thread render. */ }
+      }
+      return chat;
+    });
+
+    act(() => { void result.current.send("Hello"); });
+    await waitFor(() => expect(onStreamComplete).toHaveBeenCalledOnce(), { timeout: 10_000 });
+
+    expect(result.current.messages[1]).toMatchObject({
+      role: "assistant",
+      blocks: [{ kind: "text", text: answer }],
+    });
+    expect(onStreamComplete.mock.calls[0][0][1]).toMatchObject({
+      role: "assistant",
+      blocks: [{ kind: "text", text: answer }],
+    });
+  }, 10_000);
+
   it("sends action argument shapes and private page context to the model without saving the hint in chat", async () => {
     const requests: Array<Parameters<typeof streamChatCompletion>[0]> = [];
     vi.mocked(streamChatCompletion).mockImplementation(async function* (request) {
@@ -565,6 +597,12 @@ describe("useChat", () => {
     expect(result.current.messages).toHaveLength(0);
     expect(result.current.input).toBe("");
     expect(result.current.isStreaming).toBe(false);
+
+    await act(async () => {
+      await result.current.send("Fresh");
+    });
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[0]).toMatchObject({ role: "user", content: "Fresh" });
   });
 
   it("isStreaming guard sequential send works correctly", async () => {

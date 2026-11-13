@@ -152,9 +152,6 @@ export function useChat(options: UseChatOptions): UseChatResult {
   const onStreamingChangeRef = useRef(options.onStreamingChange);
   onStreamingChangeRef.current = options.onStreamingChange;
 
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
   // Notify parent when streaming state changes (used by the sidebar
   // to show a processing indicator on the active session).
   const prevStreamingRef = useRef(isStreaming);
@@ -300,6 +297,7 @@ export function useChat(options: UseChatOptions): UseChatResult {
   const clear = useCallback(() => {
     stop();
     stoppedControllerRef.current = null;
+    messagesRef.current = [];
     setMessages([]);
     summaryRef.current = undefined;
     retryAfterMessageCountRef.current = 0;
