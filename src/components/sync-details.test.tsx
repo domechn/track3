@@ -196,3 +196,48 @@ it("renders grouped failure reasons in Chinese", () => {
   expect(screen.getByText(/读取失败：哈希不匹配/)).toBeInTheDocument();
   localStorage.removeItem("track3-ui-locale");
 });
+
+it("says which days and writer device the invalid snapshots come from, counted per sub-reason", () => {
+  const diagnostics = createSyncDiagnostics(new FakeS3()).diagnostics;
+  const priceNull = "import-failed: Error: Invalid sync snapshot: parse (assets[].price is null)";
+  const badId = "import-failed: Error: Invalid sync snapshot: asset id <= 0";
+  diagnostics.failures = [
+    { phase: "pull", kind: "snapshot", reason: priceNull, count: 9 },
+    { phase: "pull", kind: "snapshot", reason: badId, count: 5 },
+  ];
+  diagnostics.invalidSnapshots = [
+    ...Array.from({ length: 9 }, (_, index) => ({
+      device: "ab12cd34", reason: priceNull, path: "assets[3].price", date: index ? "2023-03-26" : "2024-01-07",
+    })),
+    ...Array.from({ length: 5 }, () => ({ device: "ab12cd34", reason: badId, path: "assets[0].id", date: "2023-06-01" })),
+  ];
+  const report: SyncReport = {
+    pulled: 0, pushed: 1, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [], skipped: 14,
+  };
+  render(<SyncDetails report={report} diagnostics={diagnostics} t={t} defaultExpanded />);
+  expect(screen.getByRole("button", { name: "Details, 14 issues" })).toBeInTheDocument();
+  expect(screen.getByText("Could not read or validate 14 remote objects (snapshot ×14)")).toBeInTheDocument();
+  expect(screen.getByText(
+    "14 snapshots could not be imported, dated 2023-03-26 .. 2024-01-07, written by device ab12cd34")).toBeInTheDocument();
+  expect(screen.getByText("9 × assets[].price is null, 5 × asset id <= 0")).toBeInTheDocument();
+});
+
+it("leaves the date out when an invalid snapshot has no readable day", () => {
+  const diagnostics = createSyncDiagnostics(new FakeS3()).diagnostics;
+  const reason = "import-failed: Error: Invalid sync snapshot: parse (snapshot is null)";
+  diagnostics.failures = [{ phase: "pull", kind: "snapshot", reason, count: 1 }];
+  diagnostics.invalidSnapshots = [{ device: "ab12cd34", reason }];
+  render(<SyncDetails diagnostics={diagnostics} t={t} defaultExpanded />);
+  expect(screen.getByText("1 snapshot could not be imported, written by device ab12cd34")).toBeInTheDocument();
+  expect(screen.getByText("1 × snapshot is null")).toBeInTheDocument();
+});
+
+it("caps the writer device list of invalid snapshots", () => {
+  const diagnostics = createSyncDiagnostics(new FakeS3()).diagnostics;
+  const reason = "import-failed: Error: Invalid sync snapshot: parse (snapshot is null)";
+  diagnostics.failures = [{ phase: "pull", kind: "snapshot", reason, count: 7 }];
+  diagnostics.invalidSnapshots = Array.from({ length: 7 }, (_, index) => ({ device: `device0${index}`, reason }));
+  render(<SyncDetails diagnostics={diagnostics} t={t} defaultExpanded />);
+  expect(screen.getByText(
+    "7 snapshots could not be imported, written by device device00, device01, device02, device03, device04 +2")).toBeInTheDocument();
+});

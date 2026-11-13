@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { countSyncConflicts, createSyncDiagnostics, recordSyncRetry, sanitizeImportError, serializeSyncDiagnostics, summarizeFailedPulls } from "./diagnostics";
+import { countSyncConflicts, createSyncDiagnostics, explainInvalidSnapshots, recordSyncRetry, sanitizeImportError, serializeSyncDiagnostics, splitSnapshotReason, summarizeFailedPulls } from "./diagnostics";
 import { FakeS3, S3Error } from "./object-store";
 
 it("counts store traffic without retaining object names or credentials", async () => {
@@ -102,4 +102,51 @@ it("serializes a round without configured credentials, object paths, or full dev
   const strings = (value: unknown): string[] => typeof value === "string" ? [value]
     : value && typeof value === "object" ? Object.entries(value).flatMap(([key, item]) => [key, ...strings(item)]) : [];
   expect(strings(JSON.parse(output)).join(" ")).not.toMatch(/\d{7,}/);
+});
+
+it("keeps the native importer's sub-reason and redacts look-alikes that carry values", () => {
+  for (const text of [
+    "Invalid sync snapshot",
+    "Invalid sync snapshot: parse (assets[].price is null) at assets[3].price",
+    "Invalid sync snapshot: parse (prices[].assetID is non-i64 number) at prices[0].assetID",
+    "Invalid sync snapshot: parse (assets[].assetType is duplicate) at assets[0].assetType",
+    "Invalid sync snapshot: parse (uuid is missing) at uuid",
+    "Invalid sync snapshot: parse (prices is object) at prices",
+    "Invalid sync snapshot: parse (assets[] is number) at assets[0]",
+    "Invalid sync snapshot: parse (snapshot is array)",
+    "Invalid sync snapshot: parse (unknown)",
+    "Invalid sync snapshot: empty uuid",
+    "Invalid sync snapshot: uuid mismatch (transactions) at transactions[12].uuid",
+    "Invalid sync snapshot: uuid mismatch (orphan transactions) at orphanTransactions[1].uuid",
+    "Invalid sync snapshot: asset id <= 0 at assets[1].id",
+    "Invalid sync snapshot: non-finite price (prices) at prices[2].price",
+  ]) expect(sanitizeImportError(text)).toBe(`Error: ${text}`);
+  for (const text of [
+    "Invalid sync snapshot: parse (assets[].price is 42.5) at assets[3].price",
+    "Invalid sync snapshot: parse (assets[].symbol is BTC) at assets[3].symbol",
+    "Invalid sync snapshot: asset id <= 0 at assets[1].id = -5",
+    "Invalid sync snapshot: uuid mismatch (assets) at assets[0].uuid wallet main",
+  ]) expect(sanitizeImportError(text)).toBe("Error: <redacted>");
+});
+
+it("explains invalid snapshots by sub-reason, day, and writer device without any values", () => {
+  const { diagnostics } = createSyncDiagnostics(new FakeS3());
+  const parse = "import-failed: Error: Invalid sync snapshot: parse (assets[].price is null)";
+  expect(splitSnapshotReason(`${parse} at assets[3].price`)).toEqual({ reason: parse, path: "assets[3].price" });
+  expect(splitSnapshotReason("read-failed:hash")).toEqual({ reason: "read-failed:hash" });
+  diagnostics.invalidSnapshots = [
+    { date: "2024-01-07", device: "ab12cd34", reason: parse, path: "assets[3].price" },
+    { date: "2023-03-26", device: "ab12cd34", reason: parse, path: "assets[0].price" },
+    { device: "ef56ab78", reason: "import-failed: Error: Invalid sync snapshot: asset id <= 0", path: "assets[1].id" },
+  ];
+  expect(explainInvalidSnapshots(diagnostics)).toEqual({
+    count: 3,
+    reasons: [{ reason: "assets[].price is null", count: 2 }, { reason: "asset id <= 0", count: 1 }],
+    from: "2023-03-26", to: "2024-01-07", devices: ["ab12cd34", "ef56ab78"],
+  });
+  expect(explainInvalidSnapshots({})).toEqual({ count: 0, reasons: [], devices: [] });
+  const exported = JSON.parse(serializeSyncDiagnostics(diagnostics));
+  expect(exported.invalidSnapshots).toHaveLength(3);
+  expect(exported.invalidSnapshotSummary.reasons[0]).toEqual({ reason: "assets[].price is null", count: 2 });
+  expect(JSON.parse(serializeSyncDiagnostics(createSyncDiagnostics(new FakeS3()).diagnostics))).not.toHaveProperty("invalidSnapshotSummary");
 });

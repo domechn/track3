@@ -204,10 +204,15 @@ To use the desktop adapter, construct it with `createSqliteSyncEngine`; call
 the returned `unregister` when sync is disabled. `SyncRuntime` owns the
 desktop adapter, session passphrase, and `SyncScheduler`. The scheduler
 debounces triggers, keeps one round in flight, throttles focus, and retries
-failures with exponential backoff. After five consecutive failed rounds it
-stops automatic retry and marks the indicator accordingly. **Sync now** or a
-successful portfolio refresh starts a new attempt sequence; focus alone does
-not. It never blocks a portfolio refresh.
+failed rounds after about 5 s, 30 s, 2 min, 10 min, and 30 min (each within
+20%). After the fifth retry fails, or after two failed rounds with the same
+errors and no progress, it stops automatic retry and marks the indicator
+accordingly. Refresh, focus, and start triggers during the backoff or the
+pause do not start a round or reset the count; only **Sync now**, saving the
+sync settings, or a successful round does. The retry count and next retry time
+are stored with the encrypted local sync settings, so a restart waits for the
+pending retry instead of starting a new sequence. It never blocks a portfolio
+refresh.
 
 S3 metadata requests have a 30-second deadline; encrypted object transfers
 have a base 120-second request deadline. PUTs and GET/LIST response bodies
@@ -220,9 +225,15 @@ sync waits up to five seconds for an aborted round; **Forget remote data**
 leaves remote objects untouched if the round is still running and can be
 retried after it finishes.
 
-Malformed individual objects are reported once and retried after 24 hours.
-Partial rounds retry transient failures with exponential backoff; permanently
-damaged remote data needs repair before a retry can succeed.
+Malformed individual objects, and snapshots the local importer rejects for a
+reason that depends only on their content, are parked: retried after 24 hours,
+then every 7 days. **Sync now** tries parked import failures again right away,
+so an app update that fixes the importer does not wait out the park. They are
+counted as skipped, stay listed in Details with
+their sanitized reason, and do not fail the round. Remote objects are never
+changed or deleted. A round that made progress or only skipped parked objects
+ends idle with a warning instead of retrying; permanently damaged remote data
+needs repair before it can be imported.
 A missing remote header, invalid passphrase, access error, or invalid configuration
 stops automatic retries and shows the reason. The first
 round downloads existing manifests and merges without deleting local-only

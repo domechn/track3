@@ -1,5 +1,5 @@
 import type { SyncProgress, SyncReport } from "./engine";
-import { classifySyncError, type SyncConnectionResult } from "./settings";
+import { classifySyncError, type SyncConnectionResult, type SyncRetryState } from "./settings";
 import { SyncTimeoutError } from "./object-store";
 import type { SyncDiagnostics } from "./diagnostics";
 
@@ -16,7 +16,13 @@ export type SyncStatus = {
   error?: Exclude<SyncConnectionResult, "ok"> | "sync";
   retryStopped?: boolean;
   diagnostics?: SyncDiagnostics;
+  failures?: number;
+  nextRetryAt?: number;
+  partial?: boolean;
 };
+
+const RETRY_DELAYS_MS = [5_000, 30_000, 2 * 60_000, 10 * 60_000, 30 * 60_000];
+const HARD_ERRORS = ["header", "passphrase", "access", "configuration"];
 
 export class SyncScheduler {
   private controller?: AbortController;
@@ -30,11 +36,40 @@ export class SyncScheduler {
   private pending = false;
   private runId = 0;
   private state: SyncStatus = { phase: "idle" };
+  private lastErrors?: string;
+  private retryPersisted = false;
+  private readonly delays: number[];
 
   constructor(
     private readonly run: (signal: AbortSignal, activity: (progress?: SyncProgress) => void, onDiagnostics: (diagnostics: SyncDiagnostics) => void) => Promise<SyncReport>,
-    private readonly options: { debounceMs?: number; focusThrottleMs?: number; retryBaseMs?: number } = {},
-  ) {}
+    private readonly options: {
+      debounceMs?: number; focusThrottleMs?: number; retryDelaysMs?: number[]; random?: () => number;
+      retry?: SyncRetryState; onRetryState?: (retry?: SyncRetryState) => void;
+    } = {},
+  ) {
+    this.delays = options.retryDelaysMs ?? RETRY_DELAYS_MS;
+    const retry = options.retry;
+    if (!retry) return;
+    this.retryPersisted = true;
+    const longest = this.delays[this.delays.length - 1] ?? 0;
+    const error = retry.error ?? "sync";
+    if (retry.stopped) {
+      // A restart long after the pause gets one probe round, never a new burst.
+      this.failures = this.delays.length;
+      if (Date.now() - retry.lastFailureAt < longest) {
+        this.state = { phase: "error", error, failures: retry.failures, retryStopped: true };
+      }
+      return;
+    }
+    this.failures = Math.max(0, Math.min(Math.floor(retry.failures) || 0, this.delays.length));
+    const wait = Math.min((retry.nextRetryAt ?? 0) - Date.now(), longest);
+    if (wait <= 0) return;
+    this.state = { phase: "error", error, failures: this.failures, nextRetryAt: Date.now() + wait };
+    this.timer = setTimeout(() => {
+      this.timer = undefined;
+      void this.runNow();
+    }, wait);
+  }
 
   status(): SyncStatus { return this.state; }
 
@@ -50,12 +85,9 @@ export class SyncScheduler {
 
   trigger(kind: "start" | "refresh" | "focus"): void {
     if (this.stopped) return;
-    if (this.state.phase === "error" &&
-        ["header", "passphrase", "access", "configuration"].includes(this.state.error ?? "")) return;
-    if (this.state.retryStopped) {
-      if (kind !== "refresh") return;
-      this.failures = 0;
-    }
+    if (this.state.phase === "error" && HARD_ERRORS.includes(this.state.error ?? "")) return;
+    // Only Sync now, a settings change, or a successful round ends the pause.
+    if (this.state.retryStopped) return;
     if (kind === "focus") {
       if (Date.now() - this.lastFocus < (this.options.focusThrottleMs ?? 60_000)) return;
       this.lastFocus = Date.now();
@@ -73,7 +105,10 @@ export class SyncScheduler {
   }
 
   syncNow(): Promise<void> {
-    if (!this.current) this.failures = 0;
+    if (!this.current) {
+      this.failures = 0;
+      this.lastErrors = undefined;
+    }
     return this.runNow();
   }
 
@@ -89,7 +124,7 @@ export class SyncScheduler {
     const runId = ++this.runId;
     const controller = new AbortController();
     this.controller = controller;
-    this.setStatus({ ...this.state, phase: "syncing", startedAt: Date.now(), progress: undefined, error: undefined, retryStopped: false });
+    this.setStatus({ ...this.state, phase: "syncing", startedAt: Date.now(), progress: undefined, error: undefined, retryStopped: false, nextRetryAt: undefined });
     const work = (async () => {
       let idleWatchdog: ReturnType<typeof setTimeout> | undefined;
       let absoluteWatchdog: ReturnType<typeof setTimeout> | undefined;
@@ -154,11 +189,25 @@ export class SyncScheduler {
         void run.then(() => { settled = true; }, () => { settled = true; });
         const report = await Promise.race([run, timedOut, cancelled]);
         if (this.stopped || runId !== this.runId) return;
-        if (report.errors.length) {
-          this.fail("sync", report);
+        const errors = [...report.errors].sort().join("\n");
+        const progress = report.pulled + report.pushed + report.tombstonesApplied + report.configChanges > 0;
+        if (errors && !progress) {
+          const persistent = errors === this.lastErrors;
+          this.lastErrors = errors;
+          this.fail("sync", report, persistent);
         } else {
+          // Rounds that moved data or only skipped parked objects end idle with a warning instead of retrying.
           this.failures = 0;
-          this.setStatus({ phase: "idle", report, diagnostics: report.diagnostics ?? this.state.diagnostics, lastSync: Date.now() });
+          this.lastErrors = undefined;
+          this.setStatus({
+            phase: "idle", report, diagnostics: report.diagnostics ?? this.state.diagnostics,
+            lastSync: errors ? this.state.lastSync : Date.now(),
+            ...(errors || report.skipped ? { partial: true } : {}),
+          });
+          if (this.retryPersisted) {
+            this.retryPersisted = false;
+            this.options.onRetryState?.();
+          }
         }
       } catch (error) {
         if (!this.stopped && runId === this.runId) this.fail(
@@ -201,23 +250,30 @@ export class SyncScheduler {
     }
   }
 
-  private fail(error: Exclude<SyncConnectionResult, "ok"> | "sync", report?: SyncReport): void {
-    this.setStatus({ ...this.state, phase: "error", startedAt: undefined, progress: undefined, report, error });
-    if (["header", "passphrase", "access", "configuration"].includes(error)) {
-      this.pending = false;
-      return;
-    }
-    this.failures++;
-    if (this.failures >= 5) {
-      this.pending = false;
-      this.setStatus({ ...this.state, retryStopped: true });
-      return;
-    }
-    const delay = Math.min((this.options.retryBaseMs ?? 1_000) * 2 ** (this.failures - 1), 60_000);
+  private fail(error: Exclude<SyncConnectionResult, "ok"> | "sync", report?: SyncReport, persistent = false): void {
+    const hard = HARD_ERRORS.includes(error);
+    if (!hard) this.failures++;
+    const delay = hard || persistent ? undefined : this.delays[this.failures - 1];
+    const now = Date.now();
+    const nextRetryAt = delay === undefined ? undefined
+      : now + Math.round(delay * (0.8 + 0.4 * (this.options.random ?? Math.random)()));
+    const retryStopped = !hard && !nextRetryAt;
+    if (!nextRetryAt) this.pending = false;
+    this.setStatus({
+      ...this.state, phase: "error", startedAt: undefined, progress: undefined, report, error,
+      partial: undefined, failures: this.failures, nextRetryAt, retryStopped,
+    });
+    if (hard) return;
+    this.retryPersisted = true;
+    this.options.onRetryState?.({
+      failures: this.failures, lastFailureAt: now, error,
+      ...(nextRetryAt ? { nextRetryAt } : { stopped: true }),
+    });
+    if (!nextRetryAt) return;
     this.timer = setTimeout(() => {
       this.timer = undefined;
       void this.runNow();
-    }, delay);
+    }, nextRetryAt - now);
   }
 
   async stop(): Promise<boolean> {

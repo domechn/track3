@@ -2,7 +2,7 @@ import { decryptObject, encryptObject, objectName, unlockSyncHeader, unlockSyncH
 import { isS3Conflict, readSyncHeader, S3Error, type S3Store } from "./object-store";
 import { compareClock, MAX_REMOTE_SKEW_MS, nextClock, validRemoteClock, type Hlc } from "./clock";
 import { syncCategory, type SyncCategory } from "./config-keys";
-import { countSyncConflicts, createSyncDiagnostics, sanitizeImportError, summarizeFailedPulls, type SyncDiagnostics } from "./diagnostics";
+import { countSyncConflicts, createSyncDiagnostics, sanitizeImportError, splitSnapshotReason, summarizeFailedPulls, type SyncDiagnostics } from "./diagnostics";
 import { getVersion } from "@tauri-apps/api/app";
 import type { PartialSnapshot } from "../snapshot-partial";
 
@@ -70,6 +70,7 @@ export type SyncState = {
   deviceListAt?: number;
   probe?: { identity: string; checkedAt: number };
   failedPulls?: Record<string, number>;
+  failedPullInfo?: Record<string, { reason: string; fails: number; path?: string; date?: string }>;
   unfinishedPush?: boolean;
 };
 
@@ -110,7 +111,7 @@ export interface SyncRepository {
 
 export type SyncReport = {
   pulled: number; pushed: number; tombstonesApplied: number; configChanges: number;
-  conflicts: string[]; errors: string[]; pulledFrom?: string[];
+  conflicts: string[]; errors: string[]; skipped?: number; pulledFrom?: string[];
   devices?: Array<{ id: string; name?: string; lastUpload?: string }>;
   diagnostics?: SyncDiagnostics;
 };
@@ -133,6 +134,14 @@ const PART_BYTES = 8 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
 const PUSH_CONCURRENCY = 4;
 const PUSH_CHECKPOINT_SIZE = 1000;
+const DETERMINISTIC_IMPORT_FAILURE = /^import-failed: \w+: (Invalid sync (snapshot|transaction asset)|Duplicate sync asset id|Failed to insert sync (asset|price|transaction)|(UNIQUE|NOT NULL|CHECK|FOREIGN KEY) constraint failed)/;
+// Day of the first dated row; manifest entries carry no timestamp.
+function snapshotDay(value: Snapshot): string | undefined {
+  for (const row of [...value.assets, ...value.prices]) {
+    const day = /^\d{4}-\d{2}-\d{2}/.exec(String(row?.createdAt ?? row?.assetCreatedAt ?? ""))?.[0];
+    if (day) return day;
+  }
+}
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function validEntry(value: Entry): boolean {
@@ -698,6 +707,9 @@ export class SyncEngine {
       for (const token of Object.keys(state.failedPulls ?? {})) {
         if (!visible.has(token)) delete state.failedPulls![token];
       }
+      for (const token of Object.keys(state.failedPullInfo ?? {})) {
+        if (!visible.has(token)) delete state.failedPullInfo![token];
+      }
     }
     const blockedConfig = new Set<string>();
     for (const [id, source] of Object.entries(state.applyingConfig)) {
@@ -734,6 +746,17 @@ export class SyncEngine {
       Number(b.entry.kind === "tombstone") - Number(a.entry.kind === "tombstone"));
     const tombstonedSnapshotIds = new Set(entries
       .filter(({ entry }) => entry.kind === "tombstone").map(({ entry }) => entry.id));
+    const recordPullFailure = (owner: string, entry: Entry, reason: string, detail: { path?: string; date?: string }) => {
+      const diagnostics = this.roundDiagnostics!.diagnostics;
+      const grouped = diagnostics.failures!.find((item) => item.phase === "pull" && item.kind === entry.kind && item.reason === reason);
+      if (grouped) grouped.count++;
+      else diagnostics.failures!.push({ phase: "pull", kind: entry.kind, reason, count: 1 });
+      const device = UUID_PATTERN.test(owner) ? owner.slice(0, 8) : "unknown";
+      if (owner !== state.deviceId && device !== "unknown") diagnostics.perDevice![device].failed++;
+      if (entry.kind === "snapshot" && reason.startsWith("import-failed:")) {
+        (diagnostics.invalidSnapshots ??= []).push({ device, reason, ...detail });
+      }
+    };
     let nextPull = 0;
     fillPulls = () => {
       while (pendingPulls.size < 4 && nextPull < orderedPulls.length) {
@@ -753,14 +776,23 @@ export class SyncEngine {
       currentPullIndex = index;
       aborted();
       const token = entryToken(owner, entry);
-      if (state.failedPulls?.[token] && state.failedPulls[token] > this.now()) {
+      // Sync now tries parked import failures again: an app update can fix those, unlike malformed remote bytes.
+      const retryParked = options.manual && !options.dryRun && state.failedPullInfo?.[token]?.reason.startsWith("import-failed:");
+      if (!retryParked && state.failedPulls?.[token] && state.failedPulls[token] > this.now()) {
         pendingPulls.delete(index);
         fillPulls();
+        if (enabled("history") || !["snapshot", "edit", "tombstone"].includes(entry.kind)) {
+          // Parked objects stay visible in Details every round without being downloaded again.
+          report.skipped = (report.skipped ?? 0) + 1;
+          const { reason, fails: _fails, ...detail } = state.failedPullInfo?.[token] ?? { reason: "", fails: 0 };
+          if (reason) recordPullFailure(owner, entry, reason, detail);
+        }
         continue;
       }
       if (known.has(token) && !(entry.kind === "config" && state.configConflicts[entry.id])) continue;
       if (!enabled("history") && ["snapshot", "edit", "tombstone"].includes(entry.kind)) continue;
       let pullStage: "read" | "import" | "apply" = "read";
+      let pulledDay: string | undefined;
       try {
         if ((entry.kind === "session" || entry.kind === "session-delete") && !enabled("chat")) continue;
         if (entry.kind === "config") {
@@ -792,6 +824,7 @@ export class SyncEngine {
               if (!localIdsBeforePull.has(entry.id)) report.pulled++;
             } else {
               pullStage = "import";
+              pulledDay = snapshotDay(value);
               const imported = await this.repo.importSnapshot(value);
               if (imported) {
                 report.pulled++;
@@ -857,22 +890,23 @@ export class SyncEngine {
         }
         if (!options.dryRun) known.add(token);
         delete state.failedPulls?.[token];
+        delete state.failedPullInfo?.[token];
         if (owner !== state.deviceId && UUID_PATTERN.test(owner)) this.roundDiagnostics!.diagnostics.perDevice![owner.slice(0, 8)].succeeded++;
         options.onProgress?.({ phase: "pull", completed: known.size, total: entries.length });
       } catch (error) {
-        report.errors.push(`Failed to pull ${entry.kind} object`);
-        const reason = error instanceof InvalidRemoteEntry ? error.reason
+        const { reason, path } = splitSnapshotReason(error instanceof InvalidRemoteEntry ? error.reason
           : error instanceof FutureRemoteEntry ? "invalid-remote-entry:clock"
           : pullStage === "read" ? "read-failed:http"
-            : pullStage === "import" ? `import-failed: ${sanitizeImportError(error)}` : "apply-failed";
-        const failures = this.roundDiagnostics!.diagnostics.failures!;
-        const grouped = failures.find((item) => item.phase === "pull" && item.kind === entry.kind && item.reason === reason);
-        if (grouped) grouped.count++;
-        else failures.push({ phase: "pull", kind: entry.kind, reason, count: 1 });
-        if (owner !== state.deviceId && UUID_PATTERN.test(owner)) this.roundDiagnostics!.diagnostics.perDevice![owner.slice(0, 8)].failed++;
-        if (!options.dryRun && error instanceof InvalidRemoteEntry) {
-          (state.failedPulls ??= {})[token] = this.now() + 24 * 60 * 60_000;
-        }
+            : pullStage === "import" ? `import-failed: ${sanitizeImportError(error)}` : "apply-failed");
+        const detail = { ...(path ? { path } : {}), ...(pulledDay ? { date: pulledDay } : {}) };
+        recordPullFailure(owner, entry, reason, detail);
+        // The same bytes fail the same way every round, so these are parked and skipped instead of failing the round.
+        if (!options.dryRun && (error instanceof InvalidRemoteEntry || DETERMINISTIC_IMPORT_FAILURE.test(reason))) {
+          const fails = (state.failedPullInfo?.[token]?.fails ?? 0) + 1;
+          (state.failedPullInfo ??= {})[token] = { reason, fails, ...detail };
+          (state.failedPulls ??= {})[token] = this.now() + (fails > 1 ? 7 : 1) * 24 * 60 * 60_000;
+          report.skipped = (report.skipped ?? 0) + 1;
+        } else report.errors.push(`Failed to pull ${entry.kind} object`);
       } finally {
         if (pendingPulls.has(index)) await pendingPulls.get(index);
         pendingPulls.delete(index);

@@ -616,6 +616,20 @@ describe("Sync settings page", () => {
     })));
   });
 
+  it("names skipped items in the Sync now toast instead of calling the round up to date", async () => {
+    status.mode = "ready";
+    vi.mocked(syncRuntime.syncNow).mockImplementationOnce(async () => {
+      status.sync.phase = "idle";
+      Object.assign(status.sync, { partial: true, report: { pulled: 0, pushed: 0, errors: [], conflicts: [], skipped: 14 } });
+    });
+    render(<SyncSettingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: "Sync now" }));
+    await waitFor(() => expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Sync complete", description: "Synced with 14 items skipped",
+    })));
+    Object.assign(status.sync, { partial: undefined });
+  });
+
   it("marks the current device in the list", async () => {
     status.mode = "ready";
     vi.mocked(syncRuntime.devices).mockResolvedValue([{ id: "device-one", name: "Laptop", current: true }]);

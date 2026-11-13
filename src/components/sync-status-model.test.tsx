@@ -31,6 +31,8 @@ for (const { name, status, label, icon, tone } of [
   { name: "syncing", status: { mode: "ready", sync: { phase: "syncing" } }, label: "Syncing...", icon: "sync", tone: "text-muted-foreground" },
   { name: "error", status: { mode: "ready", sync: { phase: "error" } }, label: "Sync failed - open Backup & sync", icon: "alert", tone: "text-destructive" },
   { name: "error", status: { mode: "ready", sync: { ...synced, report: { ...synced.report, errors: ["upload failed"] } } }, label: "Sync failed - open Backup & sync", icon: "alert", tone: "text-destructive" },
+  { name: "partial", status: { mode: "ready", sync: { ...synced, partial: true, report: { ...synced.report, pushed: 1, skipped: 14 } } }, label: "Synced with 14 items skipped - open Backup & sync", icon: "alert", tone: "text-warning" },
+  { name: "partial", status: { mode: "ready", sync: { ...synced, partial: true, report: { ...synced.report, pulled: 3, errors: ["Failed to pull edit object"] } } }, label: "Synced with 1 item skipped - open Backup & sync", icon: "alert", tone: "text-warning" },
   { name: "conflict", status: { mode: "ready", sync: { phase: "idle", report: { ...synced.report, conflicts: ["conflict"] } } }, label: "Sync conflicts - open Backup & sync", icon: "alert", tone: "text-warning" },
   { name: "off", status: { mode: "disabled", sync: { phase: "idle" } }, label: "Sync is off", icon: "off", tone: "text-muted-foreground" },
 ] as const) {

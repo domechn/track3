@@ -10,7 +10,7 @@ import { ConfigConflictChoices } from "@/components/sync-conflict-choices";
 import { isIOS } from "@/utils/platform";
 import { SyncActionButton } from "@/components/settings/sync-action-button";
 import { SyncRecoveryUnlock } from "@/components/settings/sync-recovery";
-import { SyncStatusCard } from "@/components/settings/sync-status-card";
+import { SyncStatusCard, syncSkippedCount, syncSkippedLabel } from "@/components/settings/sync-status-card";
 import { useSyncFeedback, waitForSyncResult } from "@/components/settings/use-sync-feedback";
 import { useTranslation } from "@/mobile/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
@@ -168,7 +168,8 @@ export default function SyncSettingsPage() {
       } else if (latest.phase === "idle") {
         const pulled = latest.report?.pulled ?? 0;
         const pushed = latest.report?.pushed ?? 0;
-        success(pulled === 0 && pushed === 0 ? t("sync.nowUpToDate")
+        const skipped = syncSkippedCount(latest);
+        success(skipped ? syncSkippedLabel(skipped, t) : pulled === 0 && pushed === 0 ? t("sync.nowUpToDate")
           : pulled === 0 ? t("sync.nowPushed").replace("{pushed}", String(pushed))
           : pushed === 0 ? t("sync.nowPulled").replace("{pulled}", String(pulled))
           : t("sync.nowSuccess").replace("{pulled}", String(pulled)).replace("{pushed}", String(pushed)),
@@ -183,7 +184,7 @@ export default function SyncSettingsPage() {
       {phone && <><p className="fidelity-b-subtitle">{t("fidelity.b.sync.subtitle")}</p>
         <button type="button" className="fidelity-b-sync-status"
           onClick={() => document.querySelector<HTMLButtonElement>(".ios-d3-sync-indicator button")?.click()}>
-          <span className={status.mode === "locked" ? "is-warning" : status.sync.phase === "error" ? "is-error" : ""} />
+          <span className={status.mode === "locked" || status.sync.partial ? "is-warning" : status.sync.phase === "error" ? "is-error" : ""} />
           {status.mode === "locked" ? t("fidelity.b.sync.locked")
             : status.sync.retryStopped ? t("fidelity.b.sync.stopped")
             : status.sync.phase === "error" ? t("fidelity.b.sync.failed")

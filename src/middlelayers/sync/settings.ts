@@ -17,6 +17,12 @@ export type SyncSettings = {
   categories: Record<SyncCategoryName, boolean>;
   enabled: boolean;
   deviceNames: Record<string, string>;
+  retry?: SyncRetryState;
+};
+// Automatic retry backoff, kept across restarts so a failing sync does not start a new burst.
+export type SyncRetryState = {
+  failures: number; lastFailureAt: number; nextRetryAt?: number; stopped?: boolean;
+  error?: Exclude<SyncConnectionResult, "ok"> | "sync";
 };
 
 const syncConfigId = "991";

@@ -230,6 +230,21 @@ mod sync_tests {
     }
 
     #[test]
+    fn import_reports_why_a_snapshot_is_invalid_before_touching_the_database() {
+        let missing = std::env::temp_dir().join(format!("track3-no-db-{}.db", uuid::Uuid::new_v4()));
+        let snapshot = serde_json::json!({
+            "uuid": "remote",
+            "assets": [{"id": 1, "uuid": "remote", "createdAt": "2026-01-01", "wallet": "", "asset_type": "crypto", "symbol": "ETH", "amount": 2, "value": 4, "price": null}],
+            "prices": [],
+            "transactions": []
+        });
+        let error = tokio::runtime::Runtime::new().unwrap()
+            .block_on(import_sync_snapshot(&missing, snapshot)).unwrap_err();
+        assert_eq!(error, "Invalid sync snapshot: parse (assets[].price is null) at assets[0].price");
+        assert!(!missing.exists());
+    }
+
+    #[test]
     fn import_replace_keeps_cost_prices_and_rejects_unmatched_prices() {
         let path =
             std::env::temp_dir().join(format!("track3-import-prices-{}.db", uuid::Uuid::new_v4()));

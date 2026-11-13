@@ -27,6 +27,7 @@ export type SyncDiagnostics = {
   slowest: Array<{ verb: SyncVerb; phase: SyncPhase; ms: number }>;
   failures?: Array<{ phase: SyncPhase; kind: string; reason: string; count: number }>;
   failedPulls?: { count: number; earliestRetryAt?: string };
+  invalidSnapshots?: Array<{ date?: string; device: string; reason: string; path?: string }>;
   conflicts?: Record<"snapshot" | "edit" | "config" | "session" | "tombstone", number>;
   perDevice?: Record<string, { failed: number; succeeded: number; manifestVersion: number | "unknown"; appVersion: string }>;
   appVersion?: string;
@@ -34,7 +35,34 @@ export type SyncDiagnostics = {
 };
 
 export const serializeSyncDiagnostics = (diagnostics: SyncDiagnostics): string =>
-  JSON.stringify(diagnostics, null, 2);
+  JSON.stringify(diagnostics.invalidSnapshots?.length
+    ? { ...diagnostics, invalidSnapshotSummary: explainInvalidSnapshots(diagnostics) } : diagnostics, null, 2);
+
+// Groups "… at assets[3].price" reasons without the row index so equal problems count together.
+export function splitSnapshotReason(reason: string): { reason: string; path?: string } {
+  const match = /^(.*Invalid sync snapshot: .*) at ([A-Za-z]+(?:\[\d+\])?(?:\.[A-Za-z]+)?)$/.exec(reason);
+  return match ? { reason: match[1], path: match[2] } : { reason };
+}
+
+// Which snapshots failed to import and why: counts, days and writer device prefixes only, never values.
+export function explainInvalidSnapshots(diagnostics: Pick<SyncDiagnostics, "invalidSnapshots">): {
+  count: number; reasons: Array<{ reason: string; count: number }>; from?: string; to?: string; devices: string[];
+} {
+  const rows = diagnostics.invalidSnapshots ?? [];
+  const counts = new Map<string, number>();
+  for (const { reason } of rows) {
+    const label = reason.replace(/^import-failed: (\w+: )?/, "").replace(/^Invalid sync snapshot: /, "")
+      .replace(/^parse \((.*)\)$/, "$1");
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  const dates = rows.flatMap(({ date }) => date ? [date] : []).sort();
+  return {
+    count: rows.length,
+    reasons: [...counts].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count),
+    ...(dates.length ? { from: dates[0], to: dates[dates.length - 1] } : {}),
+    devices: [...new Set(rows.map(({ device }) => device))],
+  };
+}
 
 export function countSyncConflicts(conflicts: string[]): NonNullable<SyncDiagnostics["conflicts"]> {
   const counts = { snapshot: 0, edit: 0, config: 0, session: 0, tombstone: 0 };
@@ -60,6 +88,16 @@ export function sanitizeImportError(error: unknown): string {
     .replace(/["'`][^"'`]*["'`]/g, "<redacted>")
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "<redacted>")
     .replace(/\d{7,}/g, "<redacted>");
+  const found = "(missing|null|bool|number|string|array|object|non-i64 number|duplicate)";
+  const table = "(assets|prices|transactions)";
+  const rows = "(assets|prices|transactions|orphanTransactions)";
+  const scope = "\\((assets|prices|transactions|orphan transactions)\\)";
+  // Sub-reasons from sync_persistence.rs: field paths and JSON types only, so anything else stays redacted.
+  if (new RegExp(`^Invalid sync snapshot: (parse \\((unknown|snapshot is ${found}|uuid is ${found}|${table}(\\[\\](\\.[A-Za-z]+)?)? is ${found})\\)` +
+    `( at (uuid|${table}(\\[\\d+\\](\\.[A-Za-z]+)?)?))?|empty uuid|uuid mismatch ${scope} at ${rows}\\[\\d+\\]\\.uuid|` +
+    `asset id <= 0 at assets\\[\\d+\\]\\.id|non-finite (amount|value|price) ${scope} at ${rows}\\[\\d+\\]\\.(amount|value|price))$`).test(text)) {
+    return `${name}: ${text}`;
+  }
   if (/^(Failed to (open sync database|begin sync import|inspect sync snapshot|read local cost prices|insert sync (asset|price|transaction)|record sync snapshot|commit sync snapshot|roll back sync snapshot)|Invalid sync (snapshot|transaction asset)|Duplicate sync asset id)$/.test(text)) return `${name}: ${text}`;
   const constraint = /^(UNIQUE|NOT NULL|CHECK) constraint failed: (assets_v2|asset_prices|transactions|history_snapshots|snapshot_partial)(?:\.[A-Za-z_][A-Za-z_0-9]*)?/i.exec(text);
   if (constraint) return `${name}: ${constraint[1].toUpperCase()} constraint failed: ${constraint[2]}.<redacted>`;
