@@ -49,7 +49,9 @@ test("phone shows partial months and year with a tap explanation", async ({ brow
       const mainYearBadge = mainYear.getByRole("button", { name: "Explain partial profit for 2026" });
       await expect(mainYearBadge).toContainText("?");
       await main.locator(".fd-years").screenshot({ path: `${directory}/mobile-390-${theme}-main-years.png` });
-      await expect(main.locator(".fd-summary-chart")).toContainText("31 Dec 25");
+      await expect(main.locator(".fd-chart-caption")).toHaveText("Cumulative net P&L at each month end, since 31 Dec 2025");
+      await expect(main.locator(".fd-summary-chart [data-date-tick]").first()).toHaveText("Dec 2025");
+      await expect(main.locator(".fd-summary-chart [data-date-tick]").last()).toHaveText("Oct 2026");
       await page.locator(".mobile-tab-bar").getByRole("link", { name: "Analytics" }).click();
       await page.getByRole("dialog", { name: "Analytics" }).getByRole("button", { name: /^Returns\b/ }).click();
       const summary = page.getByRole("dialog", { name: "Returns" }).locator(".profit-summary-card");
