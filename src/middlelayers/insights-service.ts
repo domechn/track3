@@ -10,6 +10,7 @@ import type { AIConfig } from "./types";
 import type { CurrencyRateDetail } from "./types";
 import type { PortfolioSourceStatus } from "./portfolio-baseline";
 import { normalizeSourceStatuses } from "./source-status";
+import { readRebalanceOptions } from "./ui-state/page-prefs";
 
 export const INSIGHTS_CHANGED_EVENT = "track3-insights-changed";
 export const INSIGHT_QUESTION_STORAGE_KEY = "track3-insight-question";
@@ -192,7 +193,8 @@ export async function refreshInsights(sourceStatuses?: PortfolioSourceStatus[], 
     previous = await loadInsightCard();
   }
   if (controller.signal.aborted) return true;
-  const input = { snapshots, stablecoinSymbols, sourceStatuses: sourceStatuses ?? storedStatuses(), alertRules, alertHistory, rebalanceProfile };
+  const input = { snapshots, stablecoinSymbols, stablecoinsAsCash: readRebalanceOptions().stablecoinsAsCash,
+    sourceStatuses: sourceStatuses ?? storedStatuses(), alertRules, alertHistory, rebalanceProfile };
   const insights = computeInsights(input);
   const newInsights = computeInsights({ ...input, previous: previous?.insights });
   const dismissedIds = previous?.dismissedIds.filter((id) => {

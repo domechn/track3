@@ -61,7 +61,8 @@ export default function SummaryProfitLoss({ currency, dateRange, quoteColor, one
     ]).then(async ([profit, snapshots, assets, current]) => {
       const lastByMonth = new Map<string, number>();
       for (const point of snapshots) {
-        const month = new Date(point.timestamp).toISOString().slice(0, 7);
+        const date = new Date(point.timestamp);
+        const month = `${date.getFullYear()}-${date.getMonth()}`;
         lastByMonth.set(month, point.timestamp);
       }
       const points: Point[] = [{ timestamp: (baseline ?? dateRange.start).getTime(), value: 0 }];

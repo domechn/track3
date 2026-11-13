@@ -37,6 +37,17 @@ it("includes first-snapshot holdings in the P&L percentage denominator", () => {
   expect(result.percentage).toBe(20);
 });
 
+it("marks a saved zero-price opening position unknown when its first quote arrives", () => {
+  const history = [
+    snap(0, [asset(0, "ETH", 2, 0)]),
+    snap(1, [asset(1, "ETH", 2, 100)]),
+  ];
+  const result = calculateSnapshotProfit(history, selected(0, 1));
+  expect(result.total).toBeNull();
+  expect(result.knownTotal).toBe(0);
+  expect(result.unknownCoins).toMatchObject([{ symbol: "ETH", intervals: [at(1)] }]);
+});
+
 it("keeps a lone untraded opening snapshot out of the profit coin list", () => {
   const result = calculateSnapshotProfit([snap(0, [asset(0, "BTC", 2, 100)])], selected(0, 0));
   expect(result.coins).toEqual([]);

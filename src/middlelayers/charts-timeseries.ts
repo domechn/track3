@@ -196,16 +196,16 @@ export async function queryTopCoinsPercentageChangeData(
           if (coinDataList.length === 0) {
             return [];
           }
-          const { value: firstCoinValue, price: firstCoinPrice } =
-            coinDataList[0];
+          const baseline = coinDataList.find((asset) =>
+            Number.isFinite(asset.value) && asset.value >= 0.01 &&
+            Number.isFinite(asset.price) && asset.price > 0,
+          );
           return coinDataList.map((asset) => ({
             timestamp: new Date(asset.createdAt).getTime(),
-            value:
-              ((asset.value - firstCoinValue) / (firstCoinValue + 10 ** -21)) *
-              100,
-            price:
-              ((asset.price - firstCoinPrice) / (firstCoinPrice + 10 ** -21)) *
-              100,
+            value: baseline && asset.createdAt >= baseline.createdAt
+              ? (asset.value - baseline.value) / baseline.value * 100 : null,
+            price: baseline && asset.createdAt >= baseline.createdAt
+              ? (asset.price - baseline.price) / baseline.price * 100 : null,
           }));
         })(),
       })),
@@ -246,14 +246,14 @@ async function querySampledTopAssets(dateRange: TDateRange, maxSize: number, inc
        VALUES ${sampled.map(() => "(?, ?)").join(",")}
      ), grouped AS (
        SELECT a.uuid, snapshots.createdAt, a.symbol, a.asset_type AS assetType,
-              SUM(a.value) AS value, MIN(a.id) AS firstId
+              SUM(a.value) AS value, SUM(a.amount) AS amount, MIN(a.id) AS firstId
        FROM assets_v2 a JOIN snapshots ON snapshots.uuid = a.uuid
        GROUP BY a.uuid, a.asset_type, a.symbol
      ), ranked AS (
        SELECT grouped.uuid, grouped.createdAt, grouped.symbol, grouped.assetType,
-              grouped.value, first.price, ROW_NUMBER() OVER (
+              grouped.value, first.price, CASE WHEN grouped.value > 0 AND grouped.amount > 0 THEN ROW_NUMBER() OVER (
          PARTITION BY grouped.uuid ORDER BY grouped.value DESC, grouped.symbol ASC, grouped.assetType ASC
-       ) AS rank FROM grouped JOIN assets_v2 first ON first.id = grouped.firstId
+       ) ELSE 11 END AS rank FROM grouped JOIN assets_v2 first ON first.id = grouped.firstId
      )
      SELECT * FROM ranked WHERE rank <= 10
        ${includeTopCoinHistory ? "OR (assetType, symbol) IN (SELECT assetType, symbol FROM ranked WHERE rank <= 10)" : ""}

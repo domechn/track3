@@ -161,15 +161,18 @@ describe("numeric profit from refresh snapshots", () => {
     expect(result.coins[0].buyAmount).toBe(11);
   });
 
-  it("a zero-price acquisition gaining 50 has undefined finite return", async () => {
+  it("keeps a zero-price opening quote out of known profit", async () => {
     fixture.load([
       { at: "2024-01-01T00:00:00.000Z", holdings: [holding("w1", 1, 0)] },
       { at: "2024-01-02T00:00:00.000Z", holdings: [holding("w1", 1, 50)] },
     ], generate);
     const result = await calculateTotalProfit(year, "BTC", "crypto");
-    expect(result.total).toBe(50);
-    expect(result.coins[0].costAvgPrice).toBe(0);
-    expect(result.coins[0].percentage).toBeUndefined();
+    expect(result.total).toBeNull();
+    expect(result.knownTotal).toBe(0);
+    expect(result.unknownCoins).toEqual([{
+      symbol: "BTC", assetType: "crypto", intervals: ["2024-01-02T00:00:00.000Z"], months: 1,
+    }]);
+    expect(result.coins[0].isUnknown).toBe(true);
   });
 
   it("shows a zero return when both cost and profit are zero", async () => {

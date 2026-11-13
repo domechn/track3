@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { calculateTotalProfit, queryPNLChartValue, queryTotalValue } from "@/middlelayers/charts";
 import SummaryProfitLoss from "./summary-profit-loss";
 
@@ -16,6 +16,30 @@ vi.mock("@/middlelayers/datafetch/coins/stable", () => ({
 }));
 
 beforeEach(() => vi.clearAllMocks());
+afterEach(() => vi.unstubAllEnvs());
+
+it("labels the best month from local month boundaries", async () => {
+  vi.stubEnv("TZ", "Asia/Shanghai");
+  vi.mocked(queryPNLChartValue).mockResolvedValue([
+    { timestamp: Date.parse("2024-01-15T12:00:00Z"), totalValue: 100 },
+    { timestamp: Date.parse("2024-01-31T23:00:00Z"), totalValue: 50 },
+    { timestamp: Date.parse("2024-02-15T12:00:00Z"), totalValue: 75 },
+  ]);
+  vi.mocked(calculateTotalProfit).mockImplementation(async (range) => {
+    const end = range.end.toISOString();
+    const total = end === "2024-01-15T12:00:00.000Z" ? 100
+      : end === "2024-01-31T23:00:00.000Z" ? -50 : 25;
+    return { total, knownTotal: total, percentage: 0, coins: [], unknownCoins: [] } as never;
+  });
+  render(<SummaryProfitLoss
+    dateRange={{ start: new Date("2024-01-01T00:00:00Z"), end: new Date("2024-02-29T23:59:59Z") }}
+    baseline={new Date("2024-01-01T00:00:00Z")}
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "USD" }}
+    quoteColor="green-up-red-down"
+  />);
+  const chart = await screen.findByRole("img", { name: /Cumulative net P&L/ });
+  expect(chart).toHaveTextContent("Best month, Jan 2024: +$100");
+});
 
 it.each([
   [26_010.84, "+$26,010.84", "+$26,010.84", false],

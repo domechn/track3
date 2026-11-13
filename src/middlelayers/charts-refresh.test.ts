@@ -27,6 +27,8 @@ import {
   refreshAllData,
   type RefreshOperation,
 } from "./charts-refresh";
+import { calculateCostBasis, fromStoredTransactions } from "./cost-basis";
+import { calculateSnapshotProfit } from "./charts-interval-profit";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -415,6 +417,148 @@ describe("generateTransactions", () => {
 });
 
 describe("refreshAllData persistence", () => {
+  it("keeps a held quantity and prior price when its quote is missing, without a withdrawal", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[
+      { id: 1, uuid: "before", createdAt: "2024-01-01T00:00:00.000Z",
+        assetType: "crypto", wallet: md5("wallet-a"), symbol: "ETH",
+        amount: 2, value: 200, price: 100 },
+    ]] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 100, USDT: 1 });
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ assetType: "crypto", wallet: "wallet-a", symbol: "ETH", amount: 2 }],
+      failedSources: [],
+    } as never);
+
+    await refreshAllData(vi.fn(), {}, operation);
+
+    const payload = vi.mocked(invoke).mock.calls[0][1] as {
+      assets: Array<{ symbol: string; amount: number; value: number; price: number }>;
+      txns: Array<{ symbol: string }>;
+      partial?: { missing: Array<{ wallet: string }> };
+    };
+    expect(payload.assets).toContainEqual(expect.objectContaining({
+      symbol: "ETH", amount: 2, value: 200, price: 100,
+    }));
+    expect(payload.txns.some((txn) => txn.symbol === "ETH")).toBe(false);
+    expect(payload.partial?.missing).toContainEqual(expect.objectContaining({ wallet: md5("wallet-a") }));
+  });
+
+  it("waits for a valid quote before recording a new holding", async () => {
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 100, USDT: 1 });
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ assetType: "crypto", wallet: "wallet-a", symbol: "ETH", amount: 2 }],
+      failedSources: [],
+    } as never);
+
+    const result = await refreshAllData(vi.fn(), {}, operation);
+
+    const payload = vi.mocked(invoke).mock.calls[0][1] as {
+      assets: Array<{ symbol: string; amount: number }>;
+      txns: Array<{ symbol: string }>;
+      partial?: { missing: Array<{ wallet: string }> };
+    };
+    expect(payload.assets.some((asset) => asset.symbol === "ETH")).toBe(false);
+    expect(payload.txns.some((txn) => txn.symbol === "ETH")).toBe(false);
+    expect(payload.partial).toBeUndefined();
+    expect(result.usedLastKnownData).toBe(false);
+  });
+
+  it("records a buy at the first real quote after an unpriced refresh, without a gain", async () => {
+    const payloads: Array<{
+      operationUuid: string;
+      createdAt: string;
+      assets: Array<{ assetType: "crypto" | "stock"; wallet: string; symbol: string; amount: number; value: number; price: number }>;
+      txns: Array<{ assetType: "crypto" | "stock"; wallet: string; symbol: string; amount: number; price: number; txnType: "buy"; txnCreatedAt: string }>;
+      partial?: unknown;
+    }> = [];
+    vi.mocked(ASSET_HANDLER.listAssets).mockImplementation(async () => {
+      const last = payloads.at(-1);
+      return last ? [last.assets.map((asset, index) => ({
+        ...asset, id: index + 1, uuid: last.operationUuid, createdAt: last.createdAt,
+      }))] : [];
+    });
+    vi.mocked(invoke).mockImplementation(async (_command, args) => {
+      payloads.push(args as (typeof payloads)[number]);
+    });
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ assetType: "crypto", wallet: "wallet-a", symbol: "ETH", amount: 2 }],
+      failedSources: [],
+    } as never);
+    vi.mocked(queryCoinPrices)
+      .mockResolvedValueOnce({ BTC: 100, USDT: 1 })
+      .mockResolvedValueOnce({ BTC: 100, USDT: 1, ETH: 100 });
+
+    await refreshAllData(vi.fn(), {}, operation);
+    await refreshAllData(vi.fn(), {}, {
+      operationUuid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    });
+
+    expect(payloads[0].assets.some((asset) => asset.symbol === "ETH")).toBe(false);
+    expect(payloads[0].txns).toEqual([]);
+    expect(payloads[1].assets).toContainEqual(expect.objectContaining({
+      symbol: "ETH", amount: 2, value: 200, price: 100,
+    }));
+    expect(payloads[1].txns).toContainEqual(expect.objectContaining({
+      symbol: "ETH", amount: 2, price: 100, txnType: "buy",
+    }));
+    const snapshots = payloads.map((payload) => ({
+      createdAt: payload.createdAt,
+      assets: payload.assets.map((asset, index) => ({
+        ...asset, id: index + 1, uuid: payload.operationUuid, createdAt: payload.createdAt,
+      })),
+      transactions: payload.txns.map((transaction, index) => ({
+        ...transaction, id: index + 1, assetID: index + 1, uuid: payload.operationUuid,
+        createdAt: payload.createdAt, updatedAt: payload.createdAt,
+      })),
+    }));
+    const profit = calculateSnapshotProfit(snapshots, {
+      start: new Date(payloads[0].createdAt),
+      end: new Date(payloads[1].createdAt),
+    });
+    expect(profit.total).toBe(0);
+    expect(profit.unknownCoins).toEqual([]);
+    const basis = calculateCostBasis(fromStoredTransactions(
+      snapshots.flatMap((snapshot) => snapshot.transactions),
+    ), { method: "FIFO" });
+    expect(basis.openLots).toEqual([expect.objectContaining({ amount: 2, costBasis: 200 })]);
+  });
+
+  it.each([0.0005, 0])("does not dispose of a held dust or unpriced position at quote %s", async (quote) => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[
+      { id: 1, uuid: "before", createdAt: "2024-01-01T00:00:00.000Z",
+        assetType: "crypto", wallet: md5("wallet-a"), symbol: "RUG",
+        amount: 1000, value: 500, price: 0.5 },
+    ]] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 100, USDT: 1, ...(quote ? { RUG: quote } : {}) });
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ assetType: "crypto", wallet: "wallet-a", symbol: "RUG", amount: 1000 }],
+      failedSources: [],
+    } as never);
+
+    await refreshAllData(vi.fn(), {}, operation);
+
+    const payload = vi.mocked(invoke).mock.calls[0][1] as {
+      assets: Array<{ symbol: string; amount: number; value: number }>;
+      txns: Array<{ symbol: string; wallet: string; amount: number; price: number; txnType: string }>;
+    };
+    expect(payload.assets).toContainEqual(expect.objectContaining({
+      symbol: "RUG", amount: 1000, value: quote ? 0.5 : 500,
+    }));
+    expect(payload.txns.some((txn) => txn.symbol === "RUG")).toBe(false);
+    const stored = [
+      { id: 1, uuid: "buy", assetType: "crypto" as const, symbol: "RUG", wallet: md5("wallet-a"),
+        amount: 1000, price: 0.5, txnType: "buy", txnCreatedAt: "2024-01-01T00:00:00.000Z" },
+      ...payload.txns.filter((txn) => txn.symbol === "RUG").map((txn, index) => ({
+        id: index + 2, uuid: operation.operationUuid, assetType: "crypto" as const, symbol: txn.symbol,
+        wallet: txn.wallet, amount: txn.amount, price: txn.price, txnType: txn.txnType,
+        txnCreatedAt: operation.refreshCreatedAt,
+      })),
+    ];
+    const basis = calculateCostBasis(fromStoredTransactions(stored), { method: "FIFO" });
+    expect(basis.disposals).toEqual([]);
+    expect(basis.openLots).toEqual([expect.objectContaining({ amount: 1000, costBasis: 500 })]);
+  });
+
   it("does not assume a stablecoin peg when its current quote is missing", async () => {
     vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[
       {
@@ -2307,14 +2451,20 @@ describe("partial source snapshots", () => {
     vi.mocked(fetchPortfolios).mockResolvedValue({
       coins: [{ symbol: "ABC", assetType: "crypto", amount: 2, wallet: "wallet-b" }],
       sourceResults: [
-        { sourceId: "stock:0", label: "IBKR 1", walletIdentities: ["ibkr:one"], status: "stale", coins: [], category: "network" },
-        { sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-b"], status: "ok", coins: [{ symbol: "ABC", assetType: "crypto", amount: 2, wallet: "wallet-b" }] },
+        { sourceId: "stock:0", label: "IBKR 1", kind: "broker", provider: "IBKR", walletIdentities: ["ibkr:one"], status: "stale", coins: [], category: "network" },
+        { sourceId: "btc:0", label: "BTC wallet 1", kind: "wallet", provider: "BTC", walletIdentities: ["wallet-b"], status: "ok", coins: [{ symbol: "ABC", assetType: "crypto", amount: 2, wallet: "wallet-b" }] },
       ],
       failedSources: [{ sourceId: "stock:0", analyzerName: "IBKR 1", walletIdentities: ["ibkr:one"], error: "network", category: "network" }],
     } as never);
     await refreshAllData(vi.fn(), {}, operation);
-    const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string; assetType: string; value: number }> };
+    const payload = vi.mocked(invoke).mock.calls[0][1] as {
+      assets: Array<{ symbol: string; assetType: string; amount: number; value: number; price: number }>;
+      partial?: { missing: Array<{ wallet: string }> };
+    };
     expect(payload.assets.some((asset) => asset.assetType === "crypto" && asset.symbol === "ABC")).toBe(false);
+    expect(payload.partial?.missing).toEqual([expect.objectContaining({
+      wallet: md5("ibkr:one"), kind: "broker", provider: "IBKR",
+    })]);
     expect(payload.assets.find((asset) => asset.assetType === "stock" && asset.symbol === "ABC")?.value).toBe(600);
   });
 

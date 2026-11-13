@@ -109,9 +109,9 @@ export type TopCoinsPercentageChangeData = {
     lineColor: string;
     percentageData: {
       // coin values percentage
-      value: number;
+      value: number | null;
       // coin price percentage
-      price: number;
+      price: number | null;
       timestamp: number;
     }[];
   }[];

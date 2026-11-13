@@ -160,6 +160,29 @@ describe("large time-series queries", () => {
     });
   });
 
+  it("does not divide a newly held top coin by an effectively zero first value", async () => {
+    addRows(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES
+      ('snapshot-000000', '2022-01-01T00:00:00.000Z', 'wallet', 'crypto', 'BTC', 0, 0.000000000000000000000001, 100),
+      ('snapshot-000042', '2022-01-02T18:00:00.000Z', 'wallet', 'crypto', 'BTC', 0.1, 50000, 500000)`);
+    const change = await queryTopCoinsPercentageChangeData(range, 6);
+    const btc = change.coins.find((coin) => coin.coin === "BTC");
+    expect(btc?.percentageData).toEqual([
+      { timestamp: range.start.getTime(), value: null, price: null },
+      { timestamp: new Date("2022-01-02T18:00:00.000Z").getTime(), value: 0, price: 0 },
+    ]);
+    expect((await queryTopCoinsRank(range, 6)).coins.find((coin) => coin.coin === "BTC")?.rankData[0].rank)
+      .toBeUndefined();
+  });
+
+  it("does not rank a zero-quantity placeholder with a nonzero stored value", async () => {
+    addRows(`UPDATE assets_v2 SET value = 0 WHERE uuid = 'snapshot-000000';
+      INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('snapshot-000000', '2022-01-01T00:00:00.000Z', 'wallet', 'crypto', 'BTC', 0, 1, 100)`);
+    const rank = await queryTopCoinsRank(range, 6);
+    expect(rank.coins.find((coin) => coin.coin === "BTC")).toBeUndefined();
+  });
+
   it("uses the snapshot timestamp for ranked assets with mixed row timestamps", async () => {
     addRows("UPDATE assets_v2 SET createdAt = '2022-01-02T18:01:00.000Z' WHERE uuid = 'snapshot-000042' AND symbol = 'ASSET199'");
     const rank = await queryTopCoinsRank(range, 6);

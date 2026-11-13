@@ -22,6 +22,7 @@ export type InsightSnapshot = { uuid: string; at: string; assets: InsightAsset[]
 export type InsightInput = {
   snapshots: InsightSnapshot[];
   stablecoinSymbols?: string[];
+  stablecoinsAsCash?: boolean;
   sourceStatuses?: PortfolioSourceStatus[];
   alertRules?: AlertRule[];
   alertHistory?: AlertHistory[];
@@ -191,7 +192,8 @@ export function computeInsights(input: InsightInput): Insight[] {
   }
   if (input.rebalanceProfile && total > 0 && !unreliableCount && !latest.partialSnapshot) {
     const calculation = calculateRebalance(latest.assets.map((asset) => ({ ...asset })), input.rebalanceProfile.targets,
-      { tolerancePercent: input.rebalanceProfile.tolerancePercent });
+      { tolerancePercent: input.rebalanceProfile.tolerancePercent,
+        stablecoinSymbols: input.stablecoinsAsCash === false ? [] : input.stablecoinSymbols });
     const drift = calculation.rows.filter((row) => row.kind === "asset")
       .sort((a, b) => Math.abs(b.deviationPercent) - Math.abs(a.deviationPercent))[0];
     if (drift && Math.abs(drift.deviationPercent) >= Math.max(5, input.rebalanceProfile.tolerancePercent)) {
