@@ -20,7 +20,9 @@ test("phone explains sparse 2026 profit months and the October baseline", async 
     await expect(main.locator(".fd-month").filter({ hasText: "Feb" })).toContainText("No snapshot");
     await expect(main.locator(".fd-month").filter({ hasText: "Oct" })).toContainText("since 4 Apr");
     await expect(main.locator(".fd-year")).toHaveCount(1);
-    await expect(main.locator(".fd-summary-chart")).toContainText("31 Dec 25");
+    await expect(main.locator(".fd-chart-caption")).toHaveText("Cumulative net P&L at each month end, since 31 Dec 2025");
+    await expect(main.locator(".fd-summary-chart [data-date-tick]").first()).toHaveText("Dec 2025");
+    await expect(main.locator(".fd-summary-chart [data-date-tick]").last()).toHaveText("Oct 2026");
     await page.locator(".mobile-tab-bar").getByRole("link", { name: "Analytics" }).click();
     await page.getByRole("dialog", { name: "Analytics" }).getByRole("button", { name: /^Returns\b/ }).click();
     const summary = page.getByRole("dialog", { name: "Returns" }).locator(".profit-summary-card");
