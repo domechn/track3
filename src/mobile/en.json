@@ -1328,6 +1328,7 @@
   "sync.devices.never": "Never synced",
   "sync.devices.localNames": "This device's name is shared when it syncs. Names you give other devices stay here.",
   "sync.status.retryStopped": "Automatic retry stopped after repeated errors. Sync now or refresh to try again.",
+  "sync.status.configDecisionDeferred": "Could not check every device. Your local settings were not shared. Retry after the read succeeds.",
   "sync.devices.lastUpload": "Last upload: {time}",
   "sync.devices.renameFailed": "Could not save the device name.",
   "sync.connection.ok": "Connection successful.",

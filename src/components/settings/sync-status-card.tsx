@@ -63,6 +63,9 @@ export function SyncStatusCard({ status, busy, onSyncNow, t, locale }: Props) {
           <div><dt>{t("sync.status.downloaded")}</dt><dd>{sync.report.pulled.toLocaleString()}</dd></div>
         </>}
       </dl>
+      {sync.report?.configDecisionDeferred && <p role="alert" className="mb-3 text-sm text-warning">
+        {t("sync.status.configDecisionDeferred")}
+      </p>}
       {retryNote && <p className="mb-3 text-sm text-muted-foreground">{retryNote}</p>}
       <SyncActionButton disabled={!!busy || status.mode !== "ready"} pending={busy === "now"}
         pendingLabel={t("sync.pending.now")} onClick={onSyncNow}><ReloadIcon aria-hidden="true" />{t("sync.now")}</SyncActionButton>

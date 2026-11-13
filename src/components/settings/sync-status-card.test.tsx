@@ -31,3 +31,13 @@ it("names a round that skipped parked objects instead of calling it connected or
   expect(screen.queryByText("Sync error")).not.toBeInTheDocument();
   expect(screen.queryByText(/Automatic retry|Next automatic retry/)).not.toBeInTheDocument();
 });
+
+it("warns that first-join config waits for a complete peer read", () => {
+  card({ phase: "error", error: "sync", nextRetryAt: Date.now() + 5_000, report: {
+    pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [],
+    errors: ["Failed to read sync manifest"], configDecisionDeferred: true,
+  } });
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Could not check every device. Your local settings were not shared. Retry after the read succeeds.",
+  );
+});

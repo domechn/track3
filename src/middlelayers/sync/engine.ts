@@ -112,6 +112,7 @@ export interface SyncRepository {
 export type SyncReport = {
   pulled: number; pushed: number; tombstonesApplied: number; configChanges: number;
   conflicts: string[]; errors: string[]; skipped?: number; pulledFrom?: string[];
+  configDecisionDeferred?: boolean;
   devices?: Array<{ id: string; name?: string; lastUpload?: string }>;
   diagnostics?: SyncDiagnostics;
 };
@@ -712,6 +713,7 @@ export class SyncEngine {
       }
     }
     const blockedConfig = new Set<string>();
+    let configReadFailed = false;
     for (const [id, source] of Object.entries(state.applyingConfig)) {
       if (!enabled(syncCategory(id) ?? "settings")) continue;
       if (options.dryRun) continue;
@@ -781,6 +783,7 @@ export class SyncEngine {
       if (!retryParked && state.failedPulls?.[token] && state.failedPulls[token] > this.now()) {
         pendingPulls.delete(index);
         fillPulls();
+        if (entry.kind === "config") configReadFailed = true;
         if (enabled("history") || !["snapshot", "edit", "tombstone"].includes(entry.kind)) {
           // Parked objects stay visible in Details every round without being downloaded again.
           report.skipped = (report.skipped ?? 0) + 1;
@@ -894,6 +897,7 @@ export class SyncEngine {
         if (owner !== state.deviceId && UUID_PATTERN.test(owner)) this.roundDiagnostics!.diagnostics.perDevice![owner.slice(0, 8)].succeeded++;
         options.onProgress?.({ phase: "pull", completed: known.size, total: entries.length });
       } catch (error) {
+        if (entry.kind === "config") configReadFailed = true;
         const { reason, path } = splitSnapshotReason(error instanceof InvalidRemoteEntry ? error.reason
           : error instanceof FutureRemoteEntry ? "invalid-remote-entry:clock"
           : pullStage === "read" ? "read-failed:http"
@@ -930,6 +934,10 @@ export class SyncEngine {
         }
       }
       if (state.config[id]?.hash === hash) continue;
+      if (!state.config[id] && (manifestReadFailed || configReadFailed)) {
+        report.configDecisionDeferred = true;
+        continue;
+      }
       if (state.configConflicts[id] && !remoteConfig.has(id)) continue;
       if (!state.config[id] && remoteConfig.has(id)) {
         const source = remoteConfig.get(id)!;
@@ -1178,6 +1186,11 @@ export class SyncEngine {
       }
       const { value } = source;
       const old = state.config[id];
+      if (!old && (manifestReadFailed || configReadFailed)) {
+        report.configDecisionDeferred = true;
+        known.delete(entryToken(source.owner, source.entry));
+        continue;
+      }
       if (old && compareClock(value.clock, old.clock) <= 0) {
         if (compareClock(value.clock, old.clock) < 0 && !resolvedLocalConfig.has(id)) report.conflicts.push(id);
         continue;
@@ -1500,6 +1513,7 @@ export class SyncEngine {
             latest.get(`${entry.kind}:${entry.id}`) !== entry) obsolete.push(entry);
       }
       const manifestEntries = candidateEntries.filter((entry) => !obsolete.includes(entry));
+      const liveTokens = new Set(manifestEntries.map((entry) => entryToken(state.deviceId!, entry)));
       const path = `devices/${state.deviceId}/manifest`;
       const body = encoder.encode(JSON.stringify(await encryptObject(key, path, encoder.encode(JSON.stringify({
         version: 1, deviceId: state.deviceId!, name: deviceName, entries: manifestEntries,
@@ -1553,6 +1567,7 @@ export class SyncEngine {
         this.roundDiagnostics?.phase("prune");
         for (const entry of obsolete) {
           if (entry.kind === "config" || entry.kind === "tombstone") continue;
+          if (liveTokens.has(entryToken(state.deviceId!, entry))) continue;
           try {
             const oldPath = await pathFor(state.deviceId!, entry);
             if (entry.kind === "session" || entry.kind === "edit") {

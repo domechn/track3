@@ -106,6 +106,29 @@ describe("SyncScheduler", () => {
     expect(retryStates).toEqual([]);
     scheduler.stop();
   });
+  it("schedules a retry for undecided first-join config even when snapshots were pushed", async () => {
+    vi.useFakeTimers();
+    const deferred = { ...success, errors: ["Failed to read sync manifest"], configDecisionDeferred: true };
+    const run = vi.fn().mockResolvedValueOnce(deferred).mockResolvedValue(success);
+    const scheduler = new SyncScheduler(run, { random, retryDelaysMs: [5_000] });
+    await scheduler.syncNow();
+    expect(scheduler.status()).toMatchObject({ phase: "error", report: deferred, nextRetryAt: Date.now() + 5_000 });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(scheduler.status().phase).toBe("idle");
+    scheduler.stop();
+  });
+  it("schedules a retry when an undecided config read was parked without a round error", async () => {
+    vi.useFakeTimers();
+    const deferred = { ...nothing, skipped: 1, configDecisionDeferred: true };
+    const run = vi.fn().mockResolvedValueOnce(deferred).mockResolvedValue(success);
+    const scheduler = new SyncScheduler(run, { random, retryDelaysMs: [5_000] });
+    await scheduler.syncNow();
+    expect(scheduler.status()).toMatchObject({ phase: "error", report: deferred, nextRetryAt: Date.now() + 5_000 });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(run).toHaveBeenCalledTimes(2);
+    scheduler.stop();
+  });
 
   it("follows the transient backoff, stops, ignores triggers, and lets Sync now run once", async () => {
     vi.useFakeTimers();
