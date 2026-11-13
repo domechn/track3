@@ -70,12 +70,14 @@ import { useSearchParams } from "react-router-dom";
 import { queryBackupSummary, type BackupSummary } from "@/middlelayers/backup-summary";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { SyncRecoveryExport } from "@/components/settings/sync-recovery";
+import { usePassphraseRequest } from "@/components/common/use-passphrase-request";
 
 const App = ({ onDataImported, currency }: { onDataImported?: () => void; currency?: CurrencyRateDetail }) => {
   const { toast } = useToast();
   const { t, locale } = useTranslation();
   const [searchParams] = useSearchParams();
   const [exportConfiguration, setExportConfiguration] = useState(false);
+  const passphraseDialog = usePassphraseRequest();
   const [showConflictResolverDialog, setShowConflictResolverDialog] =
     useState(false);
   const [exportData, setExportData] = useState<ExportData | undefined>(
@@ -226,15 +228,21 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   }
 
   async function onExportDataClick() {
-    const exported = await exportHistoricalData(exportConfiguration);
-    if (exported) {
-      toast({ description: t("data.exportSuccess") });
+    const passphrase = exportConfiguration ? await passphraseDialog.ask("export") : undefined;
+    if (exportConfiguration && !passphrase) return;
+    try {
+      const exported = await exportHistoricalData(exportConfiguration, passphrase);
+      if (exported) toast({ description: t("data.exportSuccess") });
+    } catch {
+      toast({ description: t("data.exportFailed"), variant: "destructive" });
     }
   }
 
   async function onShareDataClick() {
+    const passphrase = exportConfiguration ? await passphraseDialog.ask("export") : undefined;
+    if (exportConfiguration && !passphrase) return;
     try {
-      await shareHistoricalData(exportConfiguration);
+      await shareHistoricalData(exportConfiguration, passphrase);
     } catch {
       toast({ description: t("data.shareFailed"), variant: "destructive" });
     }
@@ -309,7 +317,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       });
       return;
     }
-    return importHistoricalData(cr, selectedData)
+    return importHistoricalData(cr, selectedData, passphraseDialog.ask)
       .then(async (imported) => {
         if (!imported) {
           return;
@@ -556,6 +564,32 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
 
   return (
     <div className={`ios-d3-settings-content ios-d3-data-settings space-y-6${isIOS() && section === "backup" ? " fidelity-b fidelity-b-backup" : ""}`}>
+      <Dialog open={!!passphraseDialog.request} onOpenChange={(open) => { if (!open) passphraseDialog.answer(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t(passphraseDialog.request?.kind === "export" ? "data.export" : "data.import")}</DialogTitle>
+            <DialogDescription>{t(passphraseDialog.request?.kind === "export"
+              ? "data.encryption.key.exportPassphrase"
+              : passphraseDialog.request?.kind === "legacy"
+                ? "data.encryption.key.legacyImportKey"
+                : "data.encryption.key.importPassphrase")}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(event) => { event.preventDefault(); passphraseDialog.answer(passphraseDialog.passphrase); }} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="backup-passphrase">{t("data.encryption.key.passphraseLabel")}</Label>
+              <Input id="backup-passphrase" type="password" autoComplete="off" value={passphraseDialog.passphrase}
+                onChange={(event) => passphraseDialog.setPassphrase(event.target.value)} />
+              {passphraseDialog.request?.kind === "export" && passphraseDialog.passphrase.length > 0 && Array.from(passphraseDialog.passphrase).length < 8 &&
+                <p className="text-sm text-destructive">{t("data.encryption.key.exportPassphraseShort")}</p>}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => passphraseDialog.answer()}>{t("common.cancel")}</Button>
+              <Button type="submit" disabled={!passphraseDialog.passphrase.trim() ||
+                (passphraseDialog.request?.kind === "export" && Array.from(passphraseDialog.passphrase).length < 8)}>{t("common.confirm")}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       {showBackup && <Dialog open={!!itemPreview} onOpenChange={(open) => { if (!open && !itemBusy) setItemPreview(undefined); }}>
         <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto sm:max-w-[680px]">
           <DialogHeader><DialogTitle>{t("data.importPreview.title")}</DialogTitle></DialogHeader>

@@ -134,7 +134,7 @@ describe("Data Management", () => {
     expect(mocks.importHistoricalData).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Import" }));
     fireEvent.click(within(await screen.findByRole("alertdialog", { name: "Restore data?" })).getByRole("button", { name: "Restore" }));
-    await waitFor(() => expect(mocks.importHistoricalData).toHaveBeenCalledWith("IGNORE", imported));
+    await waitFor(() => expect(mocks.importHistoricalData).toHaveBeenCalledWith("IGNORE", imported, expect.any(Function)));
     vi.mocked(isIOS).mockReturnValue(false);
     window.location.hash = "";
   });
@@ -194,7 +194,10 @@ describe("Data Management", () => {
       fireEvent.click(include);
       expect(include).toHaveAttribute("aria-checked", "true");
       fireEvent.click(screen.getByRole("button", { name: "Export" }));
-      await waitFor(() => expect(mocks.exportHistoricalData).toHaveBeenCalledWith(true));
+      const dialog = await screen.findByRole("dialog");
+      fireEvent.change(within(dialog).getByLabelText("Passphrase"), { target: { value: "export passphrase" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+      await waitFor(() => expect(mocks.exportHistoricalData).toHaveBeenCalledWith(true, "export passphrase"));
     } finally {
       vi.mocked(isIOS).mockReturnValue(false);
       window.location.hash = "";

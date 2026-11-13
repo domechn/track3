@@ -393,18 +393,19 @@ export async function saveStockConfig(cfg: StockConfig) {
   );
 }
 
-export async function parseRawConfiguration(data: string) {
+export type RequestImportPassphrase = (kind: "import" | "legacy") => Promise<string | undefined>;
+
+export async function parseRawConfiguration(data: string, requestPassphrase?: RequestImportPassphrase) {
   let raw = data;
-  if (raw.startsWith(prefix)) {
+  if (raw.startsWith("!ent:v3:")) {
+    const passphrase = await requestPassphrase?.("import");
+    if (!passphrase) throw new Error("Import cancelled: no passphrase provided");
+    raw = await invoke<string>("decrypt_export_with_passphrase", { data: raw, passphrase });
+  } else if (raw.startsWith(prefix)) {
     try {
       raw = await invoke<string>("decrypt", { data: raw });
     } catch {
-      // The data was encrypted with a different key — ask the user for
-      // the original export key so we can still import it.
-      const customKey = window.prompt?.(
-        "The imported configuration was encrypted with a different key.\n" +
-        "Please enter the encryption key that was used when exporting:",
-      );
+      const customKey = await requestPassphrase?.("legacy");
       if (!customKey) throw new Error("Import cancelled: no decryption key provided");
       raw = await invoke<string>("decrypt_with_key", { data: raw, key: customKey });
     }
@@ -413,8 +414,8 @@ export async function parseRawConfiguration(data: string) {
 }
 
 // used for import data
-export async function importRawConfiguration(data: string) {
-  const cfg = await parseRawConfiguration(data);
+export async function importRawConfiguration(data: string, requestPassphrase?: RequestImportPassphrase) {
+  const cfg = await parseRawConfiguration(data, requestPassphrase);
   await runWithPreparedConfigurationWrite(
     cfg,
     (_writeDatabase, writeConfiguration) => writeConfiguration(true),
@@ -479,13 +480,16 @@ async function deletePortfolioInputConfigurationById(id: string) {
   await deleteConfigurationById(id, true);
 }
 
-export async function exportConfigurationString(): Promise<string | undefined> {
+export async function exportConfigurationString(passphrase?: string): Promise<string | undefined> {
+  if (!passphrase?.trim() || Array.from(passphrase).length < 8) {
+    throw new Error("Export passphrase must be at least 8 characters");
+  }
   const cfg = await getConfiguration();
   if (!cfg) {
     return;
   }
   const data = yaml.stringify({ ...cfg, costBasisMethod: await getCostBasisMethod() });
-  return invoke<string>("encrypt", { data });
+  return invoke<string>("encrypt_export_with_passphrase", { data, passphrase });
 }
 
 async function getConfigurationById(

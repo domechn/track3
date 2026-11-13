@@ -7,6 +7,7 @@ import {
   cleanLicense,
   getConfiguration,
   importRawConfiguration,
+  parseRawConfiguration,
   exportConfigurationString,
   getCostBasisMethod,
   saveCostBasisMethod,
@@ -26,7 +27,12 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (command === "encrypt") {
       return `!ent:${args.data}`;
     }
+    if (command === "encrypt_export_with_passphrase") return `!ent:v3:${args.data}`;
+    if (command === "decrypt_export_with_passphrase") return args.data.slice("!ent:v3:".length);
+    if (command === "decrypt_with_key") return "configs:\n  groupUSD: true\n";
     if (command === "decrypt") {
+      if (args.data === "!ent:v2:old-export") return "configs:\n  groupUSD: true\n";
+      if (args.data === "!ent:v2:foreign-export") throw new Error("wrong device key");
       return args.data.replace(/^!ent:/, "");
     }
     throw new Error(`unknown command ${command}`);
@@ -114,12 +120,52 @@ describe("saveConfiguration", () => {
       { id: "20", data: yaml.stringify({ brokers: [{ type: "ibkr", token: "broker-private-token" }] }) },
     ] as never);
 
-    const exported = await exportConfigurationString();
-    const parsed = yaml.parse(String(exported).replace(/^!ent:/, ""));
-    expect(parsed.exchanges[0].initParams.apiKey).toBe("k1");
-    expect(parsed.exchanges[0].initParams.secret).toBe("s1");
-    expect(parsed.stockConfig.brokers[0].token).toBe("broker-private-token");
-    expect(parsed.btc.addresses[0].address).toBe("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa");
+    await exportConfigurationString("a private export passphrase");
+    expect(invoke).toHaveBeenCalledWith("encrypt_export_with_passphrase", {
+      data: expect.stringContaining("apiKey: k1"),
+      passphrase: "a private export passphrase",
+    });
+    expect(invoke).toHaveBeenCalledWith("encrypt_export_with_passphrase", {
+      data: expect.stringContaining("secret: s1"),
+      passphrase: "a private export passphrase",
+    });
+    expect(invoke).toHaveBeenCalledWith("encrypt_export_with_passphrase", {
+      data: expect.stringContaining("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"),
+      passphrase: "a private export passphrase",
+    });
+    expect(invoke).toHaveBeenCalledWith("encrypt_export_with_passphrase", {
+      data: expect.stringContaining("broker-private-token"),
+      passphrase: "a private export passphrase",
+    });
+    expect(invoke).not.toHaveBeenCalledWith("encrypt", expect.objectContaining({
+      data: expect.stringContaining("broker-private-token"),
+    }));
+  });
+
+  it("refuses to export configuration without a passphrase", async () => {
+    await expect(exportConfigurationString()).rejects.toThrow("Export passphrase");
+    expect(invoke).not.toHaveBeenCalledWith("encrypt_export_with_passphrase", expect.anything());
+  });
+
+  it("does not export secrets with a short passphrase", async () => {
+    await expect(exportConfigurationString("short")).rejects.toThrow("Export passphrase");
+    expect(invoke).not.toHaveBeenCalledWith("encrypt_export_with_passphrase", expect.anything());
+  });
+
+  it("gets a passphrase for v3 imports and still imports old device-key exports", async () => {
+    await parseRawConfiguration("!ent:v3:payload", async () => "export passphrase");
+    expect(invoke).toHaveBeenCalledWith("decrypt_export_with_passphrase", {
+      data: "!ent:v3:payload", passphrase: "export passphrase",
+    });
+    expect((await parseRawConfiguration("!ent:v2:old-export")).configs.groupUSD).toBe(true);
+    expect(invoke).toHaveBeenCalledWith("decrypt", { data: "!ent:v2:old-export" });
+  });
+
+  it("gets the original key when a legacy export cannot use the current device key", async () => {
+    const request = vi.fn(async () => "old key");
+    await parseRawConfiguration("!ent:v2:foreign-export", request);
+    expect(request).toHaveBeenCalledWith("legacy");
+    expect(invoke).toHaveBeenCalledWith("decrypt_with_key", { data: "!ent:v2:foreign-export", key: "old key" });
   });
 
   it("restores the cost basis method from a configuration export", async () => {
@@ -137,10 +183,10 @@ describe("saveConfiguration", () => {
       return { rowsAffected: values.length / 2 };
     });
     await saveCostBasisMethod("HIFO");
-    const exported = await exportConfigurationString();
-    expect(yaml.parse(String(exported).replace(/^!ent:/, "")).costBasisMethod).toBe("HIFO");
+    const exported = await exportConfigurationString("export passphrase");
+    expect((await parseRawConfiguration(exported!, async () => "export passphrase")).costBasisMethod).toBe("HIFO");
     await saveCostBasisMethod("FIFO");
-    await importRawConfiguration(exported!);
+    await importRawConfiguration(exported!, async () => "export passphrase");
     expect(await getCostBasisMethod()).toBe("HIFO");
   });
 

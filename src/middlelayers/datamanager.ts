@@ -10,6 +10,7 @@ import {
   exportConfigurationString,
   parseRawConfiguration,
   runWithPreparedConfigurationWrite,
+  type RequestImportPassphrase,
 } from "./configuration";
 import { writeTextFile, readTextFile, stat } from "@tauri-apps/plugin-fs";
 import { ASSET_HANDLER, AssetHandlerImpl } from "./entities/assets";
@@ -48,6 +49,7 @@ export interface DataManager {
   exportHistoricalData(
     filePath: string,
     exportConfiguration: boolean,
+    passphrase?: string,
   ): Promise<void>;
   importHistoricalData(
     conflictResolver: "REPLACE" | "IGNORE",
@@ -96,14 +98,21 @@ class DataManagement implements DataManager {
   async exportHistoricalData(
     filePath: string,
     exportConfiguration = false,
+    passphrase?: string,
   ): Promise<void> {
+    if (exportConfiguration && !passphrase) {
+      throw new Error("Export passphrase is required");
+    }
     const historicalData = await queryHistoricalData(-1, false);
 
     const exportAt = new Date().toISOString();
 
     const cfg = exportConfiguration
-      ? await exportConfigurationString()
+      ? await exportConfigurationString(passphrase)
       : undefined;
+    if (exportConfiguration && !cfg) {
+      throw new Error("Configuration is unavailable for export");
+    }
 
     const exportData = {
       exportAt,
@@ -340,12 +349,13 @@ class DataManagement implements DataManager {
     conflictResolver: "REPLACE" | "IGNORE",
     data: ExportData,
     dataFilter?: (origin: PartlyHistoricalData) => PartlyHistoricalData,
+    requestPassphrase?: RequestImportPassphrase,
   ): Promise<void> {
     const historicalData = this.validateExportData(data);
     const savedData = dataFilter ? dataFilter(historicalData) : historicalData;
     this.validateHistoricalData(savedData);
     const importedConfiguration = data.configuration
-      ? await parseRawConfiguration(data.configuration)
+      ? await parseRawConfiguration(data.configuration, requestPassphrase)
       : undefined;
 
     // start to import

@@ -152,7 +152,7 @@ describe.skipIf(!mode)("cross-version export and backup", () => {
         { symbol: "STBTC", amount: 1, price: { kind: "follow", assetType: "crypto", symbol: "BTC", ratio: 0.5 } },
       ],
     });
-    await DATA_MANAGER.exportHistoricalData("/forward.json", true);
+    await DATA_MANAGER.exportHistoricalData("/forward.json", true, "compat passphrase");
     const extended = JSON.parse(state.files.get("/forward.json")!) as ExportData;
     expect(extended.historicalData[0].partial?.missing[0].provider).toBe("OKX");
     expect(yaml.parse(extended.configuration!).others[0].price.usd).toBe(0.42);

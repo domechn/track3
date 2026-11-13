@@ -29,6 +29,7 @@ it("uses the native iOS folder picker", async () => {
 
 it("continues to allow a chosen desktop directory", async () => {
   expect(await chooseBackupLocation()).toBe("/desktop/backup");
+  expect(mocks.open).toHaveBeenCalledWith({ multiple: false, directory: true, recursive: true });
 });
 
 it("keeps a canceled iOS folder choice unset", async () => {

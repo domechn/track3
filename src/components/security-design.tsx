@@ -13,8 +13,10 @@ type Props = {
   setEncKeyConfirm: (value: string) => void;
   encKeySaving: boolean;
   keyRotated: boolean;
+  customKey: boolean | undefined;
   secretInventory?: { exchanges: string[]; brokers: string[]; assistant?: string; sync?: string };
   onRotate: () => void;
+  onReset: () => void;
 };
 
 export function SecurityDesign(p: Props) {
@@ -27,8 +29,8 @@ export function SecurityDesign(p: Props) {
   return <div className="t3-b-security t3-b-grid">
     {p.keyRotated && <div className="t3-b-banner positive"><CheckIcon /><div><b>{t("fidelity.settingsB.security.rotated")}</b><span>{t("fidelity.settingsB.security.rotatedDesc")}</span></div></div>}
     <section className="t3-b-card t3-b-security-key">
-      <div className="t3-b-card-head"><div><h3>{t("fidelity.settingsB.security.key")}</h3><p>{t("fidelity.settingsB.security.keyDesc")}</p></div>
-        <span className="t3-b-pill connected">{t("fidelity.settingsB.security.inUse")}</span></div>
+      <div className="t3-b-card-head"><div><h3>{t("fidelity.settingsB.security.key")}</h3><p>{t("fidelity.settingsB.security.keyDesc")}</p><p>{t("data.encryption.key.sharedDefault")}</p></div>
+        {p.customKey !== undefined && <span className={`t3-b-pill ${p.customKey ? "connected" : "testing"}`}>{t(p.customKey ? "data.encryption.key.customStatus" : "data.encryption.key.defaultStatus")}</span>}</div>
       <div className="t3-b-kpis">
         <div><small>{t("fidelity.settingsB.security.keyId")}</small><strong>—</strong></div>
         <div><small>{t("fidelity.settingsB.security.created")}</small><strong>—</strong></div>
@@ -49,10 +51,11 @@ export function SecurityDesign(p: Props) {
         <button className="t3-b-button" onClick={() => setRotateOpen(true)} disabled={p.encKeySaving}>
           {p.encKeySaving ? <ReloadIcon className="animate-spin" /> : <ReloadIcon />}
           {t(p.encKeySaving ? "data.encryption.key.saving" : "fidelity.settingsB.security.rotate")}</button>
+        {p.customKey && <button className="t3-b-button small" onClick={p.onReset} disabled={p.encKeySaving}>{t("data.encryption.key.remove")}</button>}
         <small>{t("fidelity.settingsB.security.rotateHint")}</small>
       </div>
       <ConfirmDeleteDialog open={rotateOpen} onOpenChange={setRotateOpen}
-        title={t("fidelity.settingsB.security.rotateTitle")} description={t("fidelity.settingsB.security.rotateDesc")}
+        title={t("fidelity.settingsB.security.rotateTitle")} description={t("data.encryption.key.storageWarning")}
         cancelLabel={t("common.cancel")}
         actions={[{ label: t("fidelity.settingsB.security.rotateAction"), onClick: p.onRotate, keepOpen: true, disabled: p.encKeySaving }]}>
         <div className="t3-b-rotate-form">

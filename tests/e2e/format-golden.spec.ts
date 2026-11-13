@@ -33,10 +33,6 @@ test("Settings imports the committed 0.9.4 file into History", async ({ page }) 
   bridge.setImportFile(readFileSync(resolve("tests/golden/export-0.9.4.json"), "utf8"));
   await page.goto("/#/settings/data");
   await page.getByRole("button", { name: "Import", exact: true }).click();
-  // Current no-conflict flow reads the previous React state; a second click imports the selected file.
-  await expect(page.getByText("No data to import", { exact: true })).toBeVisible();
-  expect(bridge.historyIds()).toStrictEqual(["snapshot-new", "snapshot-old"]);
-  await page.getByRole("button", { name: "Import", exact: true }).click();
   await expect(page.getByText("Import data successfully", { exact: true })).toBeVisible();
   expect(bridge.historyIds()).toStrictEqual(["snapshot-000000", "snapshot-000001", "snapshot-new", "snapshot-old"]);
   await page.reload();

@@ -7,6 +7,8 @@ use std::sync::{
 };
 use std::{collections::HashMap, io, path::Path};
 
+#[cfg(not(target_os = "ios"))]
+use crate::key_rotation::reset_encryption_key_for_command as reset_encryption_key_recoverably;
 use crate::{
     database_path::{
         initialize_database_if_needed, resolve_database_path, sqlite_url, DatabasePath,
@@ -32,8 +34,9 @@ use crate::{
     },
     types::{RefreshAssetInput, RefreshTransactionInput},
 };
+#[cfg(not(target_os = "ios"))]
+use sqlx::{sqlite::SqliteConnectOptions, Connection, SqliteConnection};
 use tauri::Manager;
-#[cfg(target_os = "ios")]
 use tauri_plugin_fs::FsExt;
 
 lazy_static! {
@@ -56,10 +59,6 @@ fn set_ios_startup_failure(error: String, retryable: bool) {
 
 /// Decrypt data with an explicit key (for import where the current ENT key
 /// does not match the one used during export).
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
 #[tauri::command]
 fn decrypt_with_key(data: String, key: String) -> Result<String, String> {
     match ENT.decrypt_with_key(data, &key) {
@@ -68,10 +67,24 @@ fn decrypt_with_key(data: String, key: String) -> Result<String, String> {
     }
 }
 
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
+#[cfg(not(target_os = "ios"))]
+#[tauri::command]
+fn encryption_key_status() -> Result<bool, String> {
+    Ok(ENT.current_key()? != LEGACY_ENCRYPTION_KEY)
+}
+
+#[tauri::command]
+fn encrypt_export_with_passphrase(data: String, passphrase: String) -> Result<String, String> {
+    ENT.encrypt_export_with_passphrase(data, &passphrase)
+        .map_err(|_| "failed to encrypt export".to_string())
+}
+
+#[tauri::command]
+fn decrypt_export_with_passphrase(data: String, passphrase: String) -> Result<String, String> {
+    ENT.decrypt_export_with_passphrase(&data, &passphrase)
+        .map_err(|_| "incorrect passphrase or invalid export".to_string())
+}
+
 #[tauri::command]
 async fn rotate_encryption_key(
     handle: tauri::AppHandle,
@@ -88,10 +101,21 @@ async fn rotate_encryption_key(
     rotate_encryption_key_recoverably(&database_path, &app_dir, &ENT, new_key).await
 }
 
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
+#[cfg(not(target_os = "ios"))]
+#[tauri::command]
+async fn reset_encryption_key(
+    handle: tauri::AppHandle,
+    database_path: tauri::State<'_, DatabasePath>,
+) -> Result<(), RotationCommandError> {
+    let app_dir = handle
+        .path()
+        .app_data_dir()
+        .map_err(|error| RotationCommandError::Failed {
+            message: format!("failed to resolve application data directory: {error}"),
+        })?;
+    reset_encryption_key_recoverably(&database_path.0, &app_dir, &ENT).await
+}
+
 #[tauri::command]
 async fn persist_refresh(
     database_path: tauri::State<'_, DatabasePath>,
@@ -213,10 +237,6 @@ async fn save_sync_state(
     .await
 }
 
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
 #[tauri::command]
 async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>, String> {
     let client = get_coin_info_provider();
@@ -238,10 +258,6 @@ async fn query_coins_prices(symbols: Vec<String>) -> Result<HashMap<String, f64>
     }
 }
 
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
 #[tauri::command]
 fn encrypt(data: String) -> Result<String, String> {
     let res = ENT.encrypt(data);
@@ -251,10 +267,6 @@ fn encrypt(data: String) -> Result<String, String> {
     }
 }
 
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
 #[tauri::command]
 fn decrypt(data: String) -> Result<String, String> {
     // Sessions written before a user-specific key existed stay readable.
@@ -265,10 +277,6 @@ fn decrypt(data: String) -> Result<String, String> {
     }
 }
 
-#[cfg_attr(
-    all(not(debug_assertions), target_os = "windows"),
-    windows_subsystem = "windows"
-)]
 #[tauri::command]
 fn get_database_url(database_path: tauri::State<'_, DatabasePath>) -> Result<String, String> {
     sqlite_url(&database_path.0)
@@ -415,6 +423,34 @@ fn allow_backup_folder(handle: &tauri::AppHandle, path: &str) -> Result<(), Stri
         .fs_scope()
         .allow_directory(selected, true)
         .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[cfg(not(target_os = "ios"))]
+async fn grant_saved_backup_folder(
+    handle: &tauri::AppHandle,
+    database_path: &Path,
+) -> Result<(), String> {
+    let options = SqliteConnectOptions::new()
+        .filename(database_path)
+        .read_only(true);
+    let mut database = SqliteConnection::connect_with(&options)
+        .await
+        .map_err(|error| error.to_string())?;
+    let folder: Option<String> = sqlx::query_scalar("SELECT data FROM configuration WHERE id = 3")
+        .fetch_optional(&mut database)
+        .await
+        .map_err(|error| error.to_string())?;
+    database.close().await.map_err(|error| error.to_string())?;
+    if let Some(folder) = folder {
+        let path = Path::new(&folder);
+        if path.is_dir() {
+            handle
+                .fs_scope()
+                .allow_directory(path, true)
+                .map_err(|error| error.to_string())?;
+        }
+    }
     Ok(())
 }
 
@@ -713,6 +749,13 @@ pub fn run() {
                 &app_version,
             ))
             .map_err(io::Error::other)?;
+            #[cfg(not(target_os = "ios"))]
+            if let Err(error) = tauri::async_runtime::block_on(grant_saved_backup_folder(
+                app.handle(),
+                &database_path,
+            )) {
+                log::warn!("Saved backup folder grant failed: {error}");
+            }
             #[cfg(target_os = "ios")]
             app.manage(DatabasePath(database_path));
             Ok(())
@@ -737,6 +780,8 @@ pub fn run() {
         encrypt,
         decrypt,
         decrypt_with_key,
+        encrypt_export_with_passphrase,
+        decrypt_export_with_passphrase,
         rotate_encryption_key,
         persist_refresh,
         import_sync_snapshot,
@@ -776,6 +821,8 @@ pub fn run() {
         encrypt,
         decrypt,
         decrypt_with_key,
+        encrypt_export_with_passphrase,
+        decrypt_export_with_passphrase,
         rotate_encryption_key,
         persist_refresh,
         import_sync_snapshot,
@@ -813,6 +860,10 @@ pub fn run() {
         encrypt,
         decrypt,
         decrypt_with_key,
+        encrypt_export_with_passphrase,
+        decrypt_export_with_passphrase,
+        encryption_key_status,
+        reset_encryption_key,
         rotate_encryption_key,
         persist_refresh,
         import_sync_snapshot,
@@ -836,6 +887,10 @@ pub fn run() {
         encrypt,
         decrypt,
         decrypt_with_key,
+        encrypt_export_with_passphrase,
+        decrypt_export_with_passphrase,
+        encryption_key_status,
+        reset_encryption_key,
         rotate_encryption_key,
         persist_refresh,
         import_sync_snapshot,

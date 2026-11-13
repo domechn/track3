@@ -18,9 +18,9 @@ use super::{
         write_random_restricted, ReplacementStrategy, BACKUP_SUFFIX,
     },
     journal::{JOURNAL_NAME, MAX_JOURNAL_BYTES},
-    preflight, recover_pending_rotation, rotate_encryption_key, rotate_for_command_with_failpoint,
-    rotate_with_failpoint, RotationCommandError, RotationFailpoint, RotationPhase,
-    MAX_CIPHERTEXT_BYTES, RECOVERY_REQUIRED_MESSAGE,
+    preflight, recover_pending_rotation, reset_encryption_key_for_command, rotate_encryption_key,
+    rotate_for_command_with_failpoint, rotate_with_failpoint, RotationCommandError,
+    RotationFailpoint, RotationPhase, MAX_CIPHERTEXT_BYTES, RECOVERY_REQUIRED_MESSAGE,
 };
 
 const OLD_KEY: &str = "old-key-for-tests";
@@ -303,6 +303,153 @@ fn successful_rotation_reencrypts_all_targets_and_survives_restart() {
         for ciphertext in session_files(&fixture.app_data_dir).into_values() {
             restarted.decrypt(ciphertext).unwrap();
         }
+        assert_no_rotation_artifacts(&fixture.app_data_dir);
+    });
+}
+
+#[test]
+fn removing_custom_key_restores_default_and_survives_restart() {
+    tauri::async_runtime::block_on(async {
+        let fixture = Fixture::new().await;
+        reset_encryption_key_for_command(
+            &fixture.database_path,
+            &fixture.app_data_dir,
+            &fixture.ent,
+        )
+        .await
+        .unwrap();
+        assert!(!fixture.app_data_dir.join(".ent-key").exists());
+        assert_all_data_uses_key(&fixture, LEGACY_KEY).await;
+        let restarted = fresh_ent(&fixture.app_data_dir);
+        assert_eq!(restarted.current_key().unwrap(), LEGACY_KEY);
+        assert_no_rotation_artifacts(&fixture.app_data_dir);
+    });
+}
+
+#[test]
+fn interrupted_removal_recovers_to_default_without_a_key_file() {
+    tauri::async_runtime::block_on(async {
+        let fixture = Fixture::new().await;
+        rotate_with_failpoint(
+            &fixture.database_path,
+            &fixture.app_data_dir,
+            &fixture.ent,
+            LEGACY_KEY.to_string(),
+            RotationFailpoint::CrashAfter(RotationPhase::DatabaseCommitted),
+        )
+        .await
+        .unwrap_err();
+        let restarted = fresh_ent(&fixture.app_data_dir);
+        recover_pending_rotation(&fixture.database_path, &fixture.app_data_dir, &restarted)
+            .await
+            .unwrap();
+        assert_eq!(restarted.current_key().unwrap(), LEGACY_KEY);
+        assert!(!fixture.app_data_dir.join(".ent-key").exists());
+        assert_all_data_uses_key(&fixture, LEGACY_KEY).await;
+    });
+}
+
+#[cfg(unix)]
+#[test]
+fn first_custom_key_is_atomically_installed_with_owner_only_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+
+    tauri::async_runtime::block_on(async {
+        let fixture = Fixture::new().await;
+        fs::remove_file(fixture.app_data_dir.join(".ent-key")).unwrap();
+        rotate_encryption_key(
+            &fixture.database_path,
+            &fixture.app_data_dir,
+            &fixture.ent,
+            NEW_KEY.to_string(),
+        )
+        .await
+        .unwrap();
+        let path = fixture.app_data_dir.join(".ent-key");
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), NEW_KEY);
+        assert_no_rotation_artifacts(&fixture.app_data_dir);
+    });
+}
+
+#[cfg(windows)]
+#[test]
+fn first_custom_key_has_a_protected_owner_only_windows_acl() {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::{
+        Foundation::LocalFree,
+        Security::{
+            Authorization::ConvertSecurityDescriptorToStringSecurityDescriptorW, GetFileSecurityW,
+            DACL_SECURITY_INFORMATION,
+        },
+    };
+
+    tauri::async_runtime::block_on(async {
+        let fixture = Fixture::new().await;
+        fs::remove_file(fixture.app_data_dir.join(".ent-key")).unwrap();
+        rotate_encryption_key(
+            &fixture.database_path,
+            &fixture.app_data_dir,
+            &fixture.ent,
+            NEW_KEY.to_string(),
+        )
+        .await
+        .unwrap();
+        let path = fixture.app_data_dir.join(".ent-key");
+        let wide = path
+            .as_os_str()
+            .encode_wide()
+            .chain(Some(0))
+            .collect::<Vec<_>>();
+        let mut size = 0;
+        unsafe {
+            GetFileSecurityW(
+                wide.as_ptr(),
+                DACL_SECURITY_INFORMATION,
+                std::ptr::null_mut(),
+                0,
+                &mut size,
+            )
+        };
+        assert!(size > 0);
+        let mut descriptor = vec![0u8; size as usize];
+        assert_ne!(
+            unsafe {
+                GetFileSecurityW(
+                    wide.as_ptr(),
+                    DACL_SECURITY_INFORMATION,
+                    descriptor.as_mut_ptr().cast(),
+                    size,
+                    &mut size,
+                )
+            },
+            0
+        );
+        let mut sddl = std::ptr::null_mut();
+        assert_ne!(
+            unsafe {
+                ConvertSecurityDescriptorToStringSecurityDescriptorW(
+                    descriptor.as_mut_ptr().cast(),
+                    1,
+                    DACL_SECURITY_INFORMATION,
+                    &mut sddl,
+                    std::ptr::null_mut(),
+                )
+            },
+            0
+        );
+        let length = (0..)
+            .take_while(|&index| unsafe { *sddl.add(index) } != 0)
+            .count();
+        let acl = String::from_utf16_lossy(unsafe { std::slice::from_raw_parts(sddl, length) });
+        unsafe { LocalFree(sddl.cast()) };
+        assert!(acl.starts_with("D:P"));
+        assert_eq!(acl.matches("(A;").count(), 2);
+        assert!(acl.contains(";;;OW)"));
+        assert!(acl.contains(";;;SY)"));
         assert_no_rotation_artifacts(&fixture.app_data_dir);
     });
 }

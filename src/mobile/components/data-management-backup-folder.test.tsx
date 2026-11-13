@@ -7,6 +7,7 @@ import { Toast, ToastProvider, ToastViewport } from "@/mobile/components/ui/toas
 const m = vi.hoisted(() => ({
   invoke: vi.fn(), choose: vi.fn(), find: vi.fn(), list: vi.fn(), read: vi.fn(), save: vi.fn(),
   getFolder: vi.fn(), getBlacklist: vi.fn(), getTime: vi.fn(), duplicate: vi.fn(), importData: vi.fn(), previewImport: vi.fn(), importSelected: vi.fn(), toast: vi.fn(), clean: vi.fn(), documents: vi.fn(),
+  exportData: vi.fn(), shareData: vi.fn(), readFile: vi.fn(),
 }));
 vi.mock("@/utils/platform", () => ({ isIOS: () => true }));
 vi.mock("@/utils/backup-location", () => ({ chooseBackupLocation: m.choose, documentsBackupLocation: m.documents }));
@@ -24,6 +25,7 @@ vi.mock("@/middlelayers/configuration", () => ({
 vi.mock("@/middlelayers/data", () => ({
   checkIfDuplicatedHistoricalData: m.duplicate, importHistoricalData: m.importData,
   readHistoricalDataFromPath: vi.fn(), previewImport: m.previewImport, importSelected: m.importSelected,
+  exportHistoricalData: m.exportData, shareHistoricalData: m.shareData, readHistoricalDataFromFile: m.readFile,
 }));
 
 beforeEach(() => {
@@ -41,10 +43,47 @@ beforeEach(() => {
   m.getTime.mockResolvedValue(new Date(0));
   m.duplicate.mockResolvedValue(false);
   m.importData.mockResolvedValue(true);
+  m.exportData.mockResolvedValue(true);
   m.previewImport.mockResolvedValue({ rows: [{ uuid: "snapshot-one", createdAt: "2024-02-01T00:00:00Z", total: 42, assetCount: 1, status: "new", choice: "import", transactionIdCollisions: 0 }] });
   m.importSelected.mockResolvedValue({ imported: 1, replaced: 0, skipped: 0, failures: [] });
   m.clean.mockResolvedValue(undefined);
   m.save.mockResolvedValue(undefined);
+});
+
+it("uses an in-app passphrase for an iOS configuration export", async () => {
+  render(<HashRouter><DataManagement /></HashRouter>);
+  fireEvent.click(screen.getByRole("switch", { name: "Include configuration" }));
+  fireEvent.click(screen.getByRole("button", { name: "Export" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(m.exportData).not.toHaveBeenCalled();
+  fireEvent.change(within(dialog).getByLabelText("Passphrase"), { target: { value: "export passphrase" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+  await waitFor(() => expect(m.exportData).toHaveBeenCalledWith(true, "export passphrase"));
+});
+
+it("requires a passphrase before sharing configuration on iOS", async () => {
+  render(<HashRouter><DataManagement /></HashRouter>);
+  fireEvent.click(screen.getByRole("switch", { name: "Include configuration" }));
+  fireEvent.click(screen.getByRole("button", { name: "Share JSON" }));
+  const dialog = await screen.findByRole("dialog");
+  expect(m.shareData).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  expect(m.shareData).not.toHaveBeenCalled();
+});
+
+it("uses an in-app passphrase to restore a v3 export on iOS", async () => {
+  m.readFile.mockResolvedValue({ configuration: "!ent:v3:encrypted", historicalData: [] });
+  m.importData.mockImplementation(async (_mode, _data, request) =>
+    (await request("import")) === "import passphrase");
+  render(<HashRouter><DataManagement /></HashRouter>);
+  fireEvent.click(screen.getByRole("button", { name: "Import" }));
+  const confirm = await screen.findByRole("alertdialog", { name: "Restore data?" });
+  fireEvent.click(within(confirm).getByRole("button", { name: "Restore" }));
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(within(dialog).getByLabelText("Passphrase"), { target: { value: "import passphrase" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+  await waitFor(() => expect(m.importData).toHaveBeenCalled());
+  expect(m.toast).toHaveBeenCalledWith(expect.objectContaining({ description: "Import data successfully" }));
 });
 
 it("reviews a selected folder and imports without changing auto backup", async () => {
@@ -226,5 +265,5 @@ it("offers the existing conflict choice for a folder import", async () => {
   fireEvent.click(within(await screen.findByRole("alertdialog", { name: "Restore data?" })).getByRole("button", { name: "Restore" }));
   const conflict = await screen.findByRole("dialog");
   fireEvent.click(within(conflict).getByRole("button", { name: "Overwrite" }));
-  await waitFor(() => expect(m.importData).toHaveBeenCalledWith("REPLACE", expect.objectContaining({ client: "device-a" })));
+  await waitFor(() => expect(m.importData).toHaveBeenCalledWith("REPLACE", expect.objectContaining({ client: "device-a" }), expect.any(Function)));
 });

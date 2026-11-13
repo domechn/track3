@@ -73,6 +73,7 @@
   "src/components/data-management.tsx": [
     "import { open } from \"@tauri-apps/plugin-dialog\";",
     "invoke(\"rotate_encryption_key\", { newKey: encKeyInput }),",
+    "await runEncryptionKeyRotation(() => invoke(\"reset_encryption_key\"));",
     "await saveAutoBackupDirectory(path);",
     "undo: () => saveAutoBackupDirectory(path),"
   ],
