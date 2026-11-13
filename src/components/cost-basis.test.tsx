@@ -70,6 +70,20 @@ it("exposes desktop chart and prices as keyboard scroll regions", () => {
   }
 });
 
+it("does not add a selected year's realized gain to current unrealized gain", () => {
+  const filtered = { ...report, unrealized: [{
+    id: "open", assetType: "crypto", symbol: "ETH", acquiredAt: "2024-01-01",
+    amount: 1, costBasis: 50, marketValue: 80, gainLoss: 30,
+  }] } as unknown as CostBasisReport;
+  const { container } = render(<CostBasisDesktopView report={filtered} method="FIFO" year="2025"
+    quoteColor="green-up-red-down" t={(key) => key} locale="en" transactions={[]} from="2025-01-01"
+    to="2025-12-31" holdingPeriodDays={365} holdingValues={new Map()} onChooseYear={vi.fn()} />);
+  const total = container.querySelectorAll(".fidelity-cost-kpi-row:first-child .fidelity-metric")[2];
+  expect(total).toHaveTextContent("cost.design.totalPnl");
+  expect(total.querySelector("strong")).toHaveTextContent("–");
+  expect(total).not.toHaveTextContent("$130.00");
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.removeItem(COST_BASIS_SETTINGS_KEY);

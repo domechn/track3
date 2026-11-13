@@ -123,8 +123,8 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
     return days >= 365 ? t("cost.fidelity.heldYears").replace("{n}", (days / 365.25).toFixed(1))
       : t("cost.fidelity.heldDays").replace("{n}", String(days));
   };
-  const metric = (label: string, value: number, note: string, signedValue = true) => <div className="fidelity-metric">
-    <span>{label}</span><strong className={signedValue ? tone(value, quoteColor) : ""}>{signedValue ? signed(value) : money(value)}</strong><small>{note}</small>
+  const metric = (label: string, value: number | null, note: string, signedValue = true) => <div className="fidelity-metric">
+    <span>{label}</span><strong className={signedValue ? tone(value, quoteColor) : ""}>{value === null ? "–" : signedValue ? signed(value) : money(value)}</strong><small>{note}</small>
   </div>;
   const pager = (page: number, count: number, size: number, change: (page: number) => void, label: string) => count <= size ? null : <div className="fidelity-pager">
     <span>{t("cost.fidelity.pagerCount").replace("{start}", String(page * size + 1))
@@ -158,7 +158,8 @@ export function CostBasisDesktopView({ report, method, pending = false, year, qu
               .replace("{count}", String(new Set(disposed.map((row) => row.eventId)).size)) : t("cost.fidelity.noSales"))}
           {metric(t("finance.unrealizedPnl"), unrealized,
             t("cost.fidelity.atTodaysPrices").replace("{count}", String(open.length)))}
-          {metric(t("cost.design.totalPnl"), report.totals.gainLoss + unrealized, t("cost.design.realizedPlusUnrealized"))}
+          {metric(t("cost.design.totalPnl"), from || to ? null : report.totals.gainLoss + unrealized,
+            t(from || to ? "cost.fidelity.totalRequiresAllTime" : "cost.design.realizedPlusUnrealized"))}
         </div>
         <div className="fidelity-cost-kpi-row fidelity-cost-kpi-secondary">
           {metric(t("cost.fidelity.saleProceeds"), report.totals.proceeds,

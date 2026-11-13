@@ -55,7 +55,7 @@ import {
   getLatestCommittedRefreshCreatedAt,
 } from "./database";
 import { FullRefreshRequiredError } from "./refresh-error";
-import { partialFromSourceStatuses, type PartialSnapshot } from "./snapshot-partial";
+import { partialFromSourceStatuses, validatePartialSnapshot, type PartialSnapshot } from "./snapshot-partial";
 import { customFollowTargets, resolveCustomPrices } from "./custom-price";
 
 export const WALLET_ANALYZER = new WalletAnalyzer((size) =>
@@ -406,6 +406,8 @@ export async function refreshAllData(
             readyQueryResult.valueContext.priceMap,
           );
         }
+        const missingQuoteWallets: string[] = [];
+        const missingQuoteAssets = new Set<string>();
         const coins = resolveWalletCoins(
           portfolioResult.coins,
           latestBaseline,
@@ -413,6 +415,8 @@ export async function refreshAllData(
           canonicalization,
           undefined,
           readyQueryResult.failedSources.flatMap((source) => source.walletIdentities),
+          missingQuoteWallets,
+          missingQuoteAssets,
         );
         const transactions = generateTransactions(
           operation.operationUuid,
@@ -421,11 +425,25 @@ export async function refreshAllData(
           coins,
           readyQueryResult.blacklistedSymbols,
           currentPrices,
+          missingQuoteAssets,
         );
         const refreshAssets = generateRefreshAssets(coins, transactions);
-        const partial = sourceStatuses && partialFromSourceStatuses(
+        let partial = sourceStatuses && partialFromSourceStatuses(
           sourceStatuses, readyQueryResult.portfolioResult.sourceResults, refreshCreatedAt,
         );
+        if (missingQuoteWallets.length) {
+          const missing = partial?.missing.slice() ?? [];
+          for (const wallet of new Set(missingQuoteWallets.map(normalizeWalletToMD5))) {
+            if (missing.length === 64) break;
+            if (!missing.some((source) => source.wallet === wallet)) {
+              missing.push({ wallet, kind: "wallet", provider: "Price quote", category: "service" });
+            }
+          }
+          partial = validatePartialSnapshot({
+            sourcesTotal: Math.max(sourceStatuses?.length ?? 0, 1),
+            missing, fill: "last_known", createdAt: refreshCreatedAt,
+          });
+        }
         operation.prepared = {
           payload: {
             operationUuid: operation.operationUuid,
@@ -437,7 +455,7 @@ export async function refreshAllData(
           result: {
             failedSources: readyQueryResult.failedSources,
             requiresDataSourceAction: false,
-            usedLastKnownData: !!sourceStatuses?.some((source) => source.status === "stale"),
+            usedLastKnownData: missingQuoteWallets.length > 0 || !!sourceStatuses?.some((source) => source.status === "stale"),
             sourceResults: readyQueryResult.portfolioResult.sourceResults,
             sourceStatuses,
             persisted: true,
@@ -470,6 +488,7 @@ export function generateTransactions(
   afterCoins: WalletCoinUSD[],
   blacklistedSymbols: string[] = [],
   currentPrices: Record<string, number> = {},
+  missingQuoteAssets: ReadonlySet<string> = new Set(),
 ): RefreshTransactionDraft[] {
   const beforeAssetMap = new Map<string, AssetModel>();
   const afterAssetMap = new Map<string, WalletCoinUSD>();
@@ -521,6 +540,7 @@ export function generateTransactions(
 
   const updatedTxns = afterCoins
     .map((a) => {
+      if (missingQuoteAssets.has(getRefreshCoinIdentity(a))) return undefined;
       const wallet = normalizeWalletToMD5(a.wallet);
       const l = beforeAssetMap.get(getRefreshCoinIdentity(a));
       if (!l) {
@@ -559,6 +579,7 @@ export function generateTransactions(
     .filter(
       (lastAsset) =>
         !afterAssetMap.has(getStoredAssetIdentity(lastAsset)) &&
+        !missingQuoteAssets.has(getStoredAssetIdentity(lastAsset)) &&
         !blacklisted.has(lastAsset.symbol.toUpperCase()),
     )
     .map((la) => {
@@ -818,6 +839,8 @@ function resolveWalletCoins(
   canonicalization: PortfolioCanonicalization,
   addProgress?: AddProgressFunc,
   staleWalletIdentities: string[] = [],
+  missingQuoteWallets: string[] = [],
+  missingQuoteAssets: Set<string> = new Set(),
 ): WalletCoinUSD[] {
   const { priceMap } = valueContext;
   const latestAssets = canonicalizePortfolioCoins(
@@ -837,74 +860,43 @@ function resolveWalletCoins(
     });
   }
   const totals = calculateTotalValue(latestAssets, priceMap);
+  for (const total of totals) {
+    if (total.amount <= 0 || Number.isFinite(total.price) && total.price > 0) continue;
+    const previous = lastAssets.find((asset) =>
+      asset.symbol === total.symbol && getAssetType(asset) === getAssetType(total) &&
+      isSameWallet(asset.wallet ?? "", total.wallet) &&
+      Number.isFinite(asset.price) && asset.price > 0,
+    );
+    if (previous) {
+      missingQuoteWallets.push(total.wallet);
+      missingQuoteAssets.add(getRefreshCoinIdentity(total));
+      total.price = previous.price;
+      total.usdValue = total.amount * previous.price;
+    }
+  }
   const isStaleWallet = (wallet: string) =>
     staleWalletIdentities.some((identity) => isSameWallet(identity, wallet));
-  // 1. If USD value < 1, consider it sold out, set amount and value to 0
-  // 2. If this asset is found both this time and last time (same symbol and wallet)
-  // 2.1 If last time was 0, this time is also 0 or < 1, then drop this time
-  // 2.2 Last time was 0, this time >= 1, save it
-  // 2.3 If last time was not 0, this time is 0 or < 1, then save it
-  // 2.4 If last time was not 0, this time > 1, then save it
-  // 3. BTC always save regardless
+  // Only a reported zero quantity can close a position. A tiny or unknown value cannot.
   const filteredTotals = totals
     .filter((t) => {
+      if (t.amount > 0 && (!Number.isFinite(t.price) || t.price <= 0)) {
+        return false;
+      }
       if (isStaleWallet(t.wallet)) {
         return t.amount > 0;
       }
-      // 3. BTC always save regardless
       if (t.symbol === "BTC") {
         return true;
       }
-
-      // 1. If USD value < 1, consider it sold out, set amount and value to 0
-      const isCurrentSoldOut = t.usdValue < 1;
-
-      // Handle wallet comparison: lastAssets contains MD5 hashed wallet (no prefix)
-      // Current wallet might have "md5:" prefix, so we need to normalize it
+      if (t.amount > 0) return true;
       const lastAsset = lastAssets.find(
         (a) =>
           a.symbol === t.symbol &&
           getAssetType(a) === getAssetType(t) &&
           isSameWallet(a.wallet ?? "", t.wallet),
       );
-
-      // If last asset not found, it's a new asset
-      if (!lastAsset) {
-        // New asset and < 1 USD, drop it directly
-        return !isCurrentSoldOut;
-      }
-
-      // Last time amount was 0, means it was sold out
-      const wasLastSoldOut = lastAsset.amount === 0;
-
-      // 2.1 If last time was 0, this time is also 0 or < 1, then drop this time
-      if (wasLastSoldOut && isCurrentSoldOut) {
-        return false;
-      }
-
-      // 2.2 Last time was 0, this time >= 1, save it
-      if (wasLastSoldOut && !isCurrentSoldOut) {
-        return true;
-      }
-
-      // 2.3 If last time was not 0, this time is 0 or < 1, then save it
-      if (!wasLastSoldOut && isCurrentSoldOut) {
-        return true;
-      }
-
-      // 2.4 If last time was not 0, this time > 1, then save it
-      if (!wasLastSoldOut && !isCurrentSoldOut) {
-        return true;
-      }
-
-      return true;
-    })
-    .map((t) => ({
-      ...t,
-      // If USD value < 1, consider it sold out, set amount and value to 0
-      usdValue: t.usdValue >= 1 || isStaleWallet(t.wallet) ? t.usdValue : 0,
-      amount: t.usdValue >= 1 || isStaleWallet(t.wallet) ? t.amount : 0,
-    }));
+      return !!lastAsset && lastAsset.amount > 0;
+    });
 
   if (addProgress) {
     addProgress(5);

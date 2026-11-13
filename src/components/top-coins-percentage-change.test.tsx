@@ -33,6 +33,45 @@ beforeEach(() => {
 });
 
 describe("TopCoinsPercentageChange", () => {
+  it("labels a coin with no meaningful opening value as new", async () => {
+    vi.mocked(queryTopCoinsPercentageChangeData).mockResolvedValue({
+      timestamps: [1713158400000, 1713244800000],
+      coins: [{
+        coin: "BTC", assetType: "crypto", lineColor: "rgba(1, 2, 3, 1)",
+        percentageData: [
+          { timestamp: 1713158400000, value: null, price: null },
+          { timestamp: 1713244800000, value: 0, price: 0 },
+        ],
+      }],
+    } as never);
+
+    const { getByTestId } = renderChart();
+    await waitFor(() => expect(getByTestId("tcpc-row")).toBeInTheDocument());
+    expect(getByTestId("tcpc-value")).toHaveTextContent("New");
+    expect(getByTestId("tcpc-price")).toHaveTextContent("New");
+    expect(getByTestId("tcpc-row")).not.toHaveTextContent("e+");
+  });
+
+  it("does not call a new coin the top loser when its change is unknown", async () => {
+    vi.mocked(queryTopCoinsPercentageChangeData).mockResolvedValue({
+      timestamps: [1713158400000, 1713244800000],
+      coins: [
+        { coin: "BTC", assetType: "crypto", lineColor: "rgba(1, 2, 3, 1)", percentageData: [
+          { timestamp: 1713158400000, value: null, price: null },
+          { timestamp: 1713244800000, value: 0, price: 0 },
+        ] },
+        { coin: "ETH", assetType: "crypto", lineColor: "rgba(1, 2, 3, 1)", percentageData: [
+          { timestamp: 1713158400000, value: 0, price: 0 },
+          { timestamp: 1713244800000, value: 5, price: 5 },
+        ] },
+      ],
+    });
+    const { getAllByTestId } = renderChart();
+    await waitFor(() => expect(getAllByTestId("tcpc-row")).toHaveLength(2));
+    expect(getAllByTestId("tcpc-row")[1]).toHaveTextContent("New");
+    expect(getAllByTestId("tcpc-row")[1]).not.toHaveTextContent("Top Loser");
+  });
+
   it("renders one row per coin sorted by current value % descending", async () => {
     vi.mocked(queryTopCoinsPercentageChangeData).mockResolvedValue({
       timestamps: [1713158400000, 1713244800000, 1713331200000],

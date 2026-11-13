@@ -22,6 +22,19 @@ it("filters disposals by the user's local tax date", () => {
   expect(serializeRealizedGains(report, "csv")).toContain("2025-01-01");
 });
 
+it.each([
+  ["Asia/Shanghai", "2024-03-09T18:00:00Z", "2025-03-10T01:00:00Z"],
+  ["America/Los_Angeles", "2024-03-09T08:00:00Z", "2025-03-10T06:00:00Z"],
+] as const)("uses printed local dates for the holding term in %s", (zone, bought, sold) => {
+  vi.stubEnv("TZ", zone);
+  const report = buildCostBasisReport([
+    { ...events[0], date: bought, amount: 1 },
+    { ...events[2], date: sold, amount: 1 },
+  ], { method: "FIFO" });
+  expect(report.disposals[0].term).toBe("short");
+  expect(serializeRealizedGains(report, "csv")).toContain("short,FIFO");
+});
+
 it("keeps invalid events as warnings when an end date is selected", () => {
   const report = buildCostBasisReport([
     { ...events[0], date: "invalid" },

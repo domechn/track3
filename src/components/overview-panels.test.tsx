@@ -133,6 +133,14 @@ describe("overview panels", () => {
     expect(screen.getByTestId("overview-coin-row")).toHaveTextContent("+5.0%");
   });
 
+  it("does not show a numeric price change without a meaningful opening quote", () => {
+    render(<MemoryRouter><TopCoinsCard currency={usd} rows={[
+      { symbol: "BTC", assetType: "crypto", value: 100, amount: 1, priceChange: null },
+    ]} /></MemoryRouter>);
+    expect(screen.getByTestId("overview-coin-row")).toHaveTextContent("—");
+    expect(screen.getByTestId("overview-coin-row")).not.toHaveTextContent("0.0%");
+  });
+
   it("converts daily changes, contributions, and coin values to the selected currency", () => {
     render(<MemoryRouter>
       <DailyChangeCard currency={eur} daily={[{ timestamp: Date.parse("2026-10-30"), value: 10 }]} />

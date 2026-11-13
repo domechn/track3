@@ -31,7 +31,7 @@ type Change = { timestamp: number; value: number };
 type Contribution = { symbol: string; assetType: AssetType; value: number };
 type CoinRow = {
   symbol: string; assetType: AssetType; value: number; amount: number;
-  rank?: number; priceChange?: number; dayChange?: number; weekChange?: number;
+  rank?: number; priceChange?: number | null; dayChange?: number; weekChange?: number;
 };
 
 export function useOverviewPanelsData(dateRange: TDateRange, allTimeRange: TDateRange) {
@@ -99,7 +99,10 @@ export function useOverviewPanelsData(dateRange: TDateRange, allTimeRange: TDate
           loadDates(),
         ]);
         const byRank = new Map(ranks.coins.map((coin) => [`${coin.assetType}:${coin.coin}`, coin.rankData.at(-1)?.rank]));
-        const byChange = new Map(changes.coins.map((coin) => [`${coin.assetType}:${coin.coin}`, coin.percentageData.at(-1)?.price]));
+        const byChange = new Map(changes.coins.map((coin) => [
+          `${coin.assetType}:${coin.coin}`,
+          coin.percentageData[0]?.price === null ? null : coin.percentageData.at(-1)?.price,
+        ]));
         const selected = dates.filter((row) => {
           const time = new Date(row.createdAt).getTime();
           return time >= dateRange.start.getTime() && time <= dateRange.end.getTime();
@@ -378,7 +381,7 @@ export function TopCoinsCard({ currency, rows, compact = false, overviewFidelity
           <span>{row.amount ? money(row.value / row.amount, currency) : "—"}</span>
           {overviewFidelity && <span className={tone(row.dayChange)}>{percent(row.dayChange)}</span>}
           <span className={overviewFidelity ? tone(row.weekChange) : directionClass(row.priceChange, quoteColor)}>
-            {overviewFidelity ? percent(row.weekChange) : row.priceChange === undefined ? "—"
+            {overviewFidelity ? percent(row.weekChange) : row.priceChange == null ? "—"
               : `${row.priceChange > 0 ? "+" : row.priceChange < 0 ? "−" : ""}${Math.abs(row.priceChange).toFixed(1)}%`}
           </span>
           <span>{money(row.value, currency)}</span>

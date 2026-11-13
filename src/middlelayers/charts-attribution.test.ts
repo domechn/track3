@@ -164,12 +164,12 @@ describe("attribution from consecutive snapshots", () => {
     expect(result.totals).toEqual({ priceEffect: -100, flowEffect: 0, residual: 240, totalChange: 140 });
   });
 
-  it("attributes the rise from a zero starting value to market effect", () => {
+  it("leaves a rise from an unquoted opening value unexplained", () => {
     const result = attributeSnapshots([
       snapshot(1, [asset(1, "w", "BTC", 1, 0)]),
       snapshot(2, [asset(2, "w", "BTC", 1, 100)]),
     ]);
-    expect(result.totals).toEqual({ priceEffect: 100, flowEffect: 0, residual: 0, totalChange: 100 });
+    expect(result.totals).toEqual({ priceEffect: 0, flowEffect: 0, residual: 100, totalChange: 100 });
   });
 
   it("matches transaction and asset symbols regardless of case", () => {

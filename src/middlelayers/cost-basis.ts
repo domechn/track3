@@ -1,4 +1,5 @@
 import type { AssetType } from "./datafetch/types";
+import { addYears, format } from "date-fns";
 
 export type CostBasisMethod = "FIFO" | "LIFO" | "HIFO" | "AVERAGE";
 export type CostBasisEvent = {
@@ -64,12 +65,9 @@ function sortableTimestamp(date: string): number {
 }
 
 function heldMoreThanOneCalendarYear(acquiredAt: string, disposedAt: string): boolean {
-  const acquired = new Date(acquiredAt);
-  const anniversary = new Date(acquired);
-  anniversary.setUTCFullYear(acquired.getUTCFullYear() + 1);
-  if (anniversary.getUTCMonth() !== acquired.getUTCMonth()) anniversary.setUTCDate(0);
   // "Held more than one year" means the sale date is after the acquisition date plus one calendar year.
-  return new Date(disposedAt).toISOString().slice(0, 10) > anniversary.toISOString().slice(0, 10);
+  return format(new Date(disposedAt), "yyyy-MM-dd") >
+    format(addYears(new Date(acquiredAt), 1), "yyyy-MM-dd");
 }
 
 const lotOrders = new WeakMap<CostBasisLot, number>();

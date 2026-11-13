@@ -87,6 +87,20 @@ describe("computeInsights", () => {
     expect(result.some((item) => item.id === "drift")).toBe(false);
   });
 
+  it("uses the Rebalance stablecoin cash switch for drift", () => {
+    const input = {
+      snapshots: [snapshot("latest", at, { BTC: 500, USDC: 500 })],
+      stablecoinSymbols: ["USDC"],
+      rebalanceProfile: { targets: [
+        { kind: "asset" as const, assetType: "crypto" as const, symbol: "BTC", percent: 50 },
+        { kind: "cash" as const, percent: 50 },
+      ], tolerancePercent: 5 },
+    };
+    expect(computeInsights(input).find((item) => item.id === "drift")).toBeUndefined();
+    expect(computeInsights({ ...input, stablecoinsAsCash: false }).find((item) => item.id === "drift")?.data)
+      .toMatchObject({ symbol: "USDC", deviationPercent: 50 });
+  });
+
   it("detects a new holding on the next same-day refresh", () => {
     const latest = snapshot("latest", at, { BTC: 900, SOL: 100 });
     const prior = snapshot("prior", "2024-02-01T11:00:00.000Z", { BTC: 1000 });

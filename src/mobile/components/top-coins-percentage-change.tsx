@@ -18,8 +18,10 @@ const SPARKLINE_WIDTH = 96;
 type RowData = {
   coin: string;
   assetType: AssetType;
-  valueEnd: number;
-  priceEnd: number;
+  valueEnd: number | null;
+  priceEnd: number | null;
+  valueNew: boolean;
+  priceNew: boolean;
   valuePath: number[];
   pricePath: number[];
   valueMin: number;
@@ -136,27 +138,33 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
     const mapped = data.coins
       .map<RowData | null>((coin) => {
         if (coin.percentageData.length === 0) return null;
-        const valuePath = coin.percentageData.map((p) => p.value);
-        const pricePath = coin.percentageData.map((p) => p.price);
+        const valuePath = coin.percentageData.map((p) => p.value).filter((value): value is number => value !== null);
+        const pricePath = coin.percentageData.map((p) => p.price).filter((price): price is number => price !== null);
+        const valueNew = coin.percentageData[0].value === null && valuePath.length > 0;
+        const priceNew = coin.percentageData[0].price === null && pricePath.length > 0;
         return {
           coin: coin.coin,
           assetType: coin.assetType,
-          valueEnd: valuePath[valuePath.length - 1] ?? 0,
-          priceEnd: pricePath[pricePath.length - 1] ?? 0,
+          valueEnd: valueNew ? null : valuePath.at(-1) ?? null,
+          priceEnd: priceNew ? null : pricePath.at(-1) ?? null,
+          valueNew,
+          priceNew,
           valuePath,
           pricePath,
-          valueMin: Math.min(...valuePath) ?? 0,
-          valueMax: Math.max(...valuePath) ?? 0,
-          priceMin: Math.min(...pricePath) ?? 0,
-          priceMax: Math.max(...pricePath) ?? 0,
+          valueMin: valuePath.length ? Math.min(...valuePath) : 0,
+          valueMax: valuePath.length ? Math.max(...valuePath) : 0,
+          priceMin: pricePath.length ? Math.min(...pricePath) : 0,
+          priceMax: pricePath.length ? Math.max(...pricePath) : 0,
         };
       })
       .filter((r): r is RowData => r !== null);
     const key = sortBy === "value" ? "valueEnd" : "priceEnd";
-    return mapped.sort((a, b) => b[key] - a[key]);
+    return mapped.sort((a, b) => (b[key] ?? -Infinity) - (a[key] ?? -Infinity));
   }, [data, sortBy]);
 
   const isValueActive = sortBy === "value";
+  const comparableCount = rows.filter((row) =>
+    (isValueActive ? row.valueEnd : row.priceEnd) !== null).length;
 
   return (
     <Card>
@@ -235,8 +243,8 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
 
             {rows.map((row, idx) => {
               const isTop = idx === 0;
-              const isBot = idx === rows.length - 1;
-              const showBadges = rows.length >= 2;
+              const isBot = idx === comparableCount - 1;
+              const showBadges = comparableCount >= 2;
               const valueIsActive = isValueActive;
               const priceIsActive = !isValueActive;
               // Sparkline + min/max follow the active sort.
@@ -298,7 +306,8 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                         : "text-[10px] text-muted-foreground"
                     }`}
                   >
-                    {formatPercent(row.valueEnd)}
+                    {row.valueNew ? t("topCoinsPercentage.new") :
+                      row.valueEnd === null ? t("topCoinsPercentage.notAvailable") : formatPercent(row.valueEnd)}
                   </div>
                   <div
                     data-testid="tcpc-price"
@@ -309,7 +318,8 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                         : "text-[10px] text-muted-foreground"
                     }`}
                   >
-                    {formatPercent(row.priceEnd)}
+                    {row.priceNew ? t("topCoinsPercentage.new") :
+                      row.priceEnd === null ? t("topCoinsPercentage.notAvailable") : formatPercent(row.priceEnd)}
                   </div>
                   <div className="hidden font-mono text-[10px] leading-tight tabular-nums text-muted-foreground sm:block">
                     <div
@@ -320,7 +330,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                         {t("topCoinsPercentage.maxLabel")}
                       </span>
                       <span className="text-right">
-                        {formatRange(activeMax)}
+                        {activePath.length ? formatRange(activeMax) : t("topCoinsPercentage.notAvailable")}
                       </span>
                     </div>
                     <div
@@ -331,7 +341,7 @@ const App = ({ dateRange }: { dateRange: TDateRange }) => {
                         {t("topCoinsPercentage.minLabel")}
                       </span>
                       <span className="text-right">
-                        {formatRange(activeMin)}
+                        {activePath.length ? formatRange(activeMin) : t("topCoinsPercentage.notAvailable")}
                       </span>
                     </div>
                   </div>

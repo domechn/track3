@@ -142,7 +142,8 @@ export function calculateSnapshotProfit(
         coin.unrecordedChange += residualQuantity * p1;
       }
       const unpairedWithdrawal = transactions.some((txn) => txn.txnType === "withdraw" && !paired.has(txn.id));
-      if (unpairedWithdrawal) {
+      const unknownOpeningPrice = q0 > 0 && (!Number.isFinite(p0) || p0 <= 0) && p1 > 0;
+      if (unpairedWithdrawal || unknownOpeningPrice) {
         const affected = unknown.get(key) ?? { symbol: source.symbol, assetType: getAssetType(source), intervals: [], months: 0 };
         affected.intervals.push(snapshot.createdAt);
         const month = `${new Date(snapshot.createdAt).getFullYear()}-${new Date(snapshot.createdAt).getMonth()}`;
