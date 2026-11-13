@@ -3330,5 +3330,14 @@
   "sync.details.kindPlural.session": "chat sessions",
   "sync.details.kindPlural.tombstone": "deletion markers",
   "sync.details.kindPlural.session-delete": "session deletions",
-  "sync.details.kindPlural.edit": "edits"
+  "sync.details.kindPlural.edit": "edits",
+  "sync.status.partial": "Synced with {count} items skipped",
+  "sync.status.partialOne": "Synced with 1 item skipped",
+  "sync.control.partial": "Synced with {count} items skipped - open Backup & sync",
+  "sync.control.partialOne": "Synced with 1 item skipped - open Backup & sync",
+  "sync.status.nextRetryAt": "Next automatic retry at {time}",
+  "sync.status.retryPaused": "Automatic retry paused after {count} attempts",
+  "sync.status.retryPausedOne": "Automatic retry paused after 1 attempt",
+  "sync.details.failures.invalidSnapshots": "{count} {kind} could not be imported, dated {dates}, written by device {devices}",
+  "sync.details.failures.invalidSnapshotsUndated": "{count} {kind} could not be imported, written by device {devices}"
 }

@@ -513,4 +513,68 @@ describe("SyncRuntime", () => {
     await running;
     runtime.stop();
   });
+
+  it("persists the retry backoff so a restart waits instead of starting a new burst", async () => {
+    vi.useFakeTimers();
+    const s3 = new FakeS3();
+    await writeSyncHeader(s3, (await createSyncHeader("correct horse battery staple")).header);
+    let saved: SyncSettings = { ...configured, enabled: true };
+    let rounds = 0;
+    let offline = true;
+    const deps = {
+      load: async () => saved,
+      save: async (next: SyncSettings) => { saved = next; },
+      store: () => s3,
+      engine: () => ({ engine: { syncOnce: async () => {
+        rounds++;
+        if (offline) throw new Error("offline");
+        return { pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] };
+      } }, unregister: () => {} }),
+    };
+    const first = new SyncRuntime(deps);
+    await first.initialize();
+    await first.unlock("correct horse battery staple");
+    await vi.advanceTimersByTimeAsync(400);
+    expect(rounds).toBe(1);
+    expect(saved.retry).toMatchObject({ failures: 1, error: "network" });
+    expect(saved.secretAccessKey).toBe(configured.secretAccessKey);
+    const nextRetryAt = saved.retry!.nextRetryAt!;
+    expect(nextRetryAt - Date.now()).toBeGreaterThanOrEqual(4_000);
+    expect(nextRetryAt - Date.now()).toBeLessThanOrEqual(6_000);
+    first.stop();
+
+    const second = new SyncRuntime(deps);
+    await second.initialize();
+    await second.unlock("correct horse battery staple");
+    expect(second.status().sync).toMatchObject({ phase: "error", error: "network", failures: 1, nextRetryAt });
+    second.trigger("refresh");
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(rounds).toBe(1);
+    offline = false;
+    await vi.advanceTimersByTimeAsync(3_500);
+    expect(rounds).toBe(2);
+    expect(second.status().sync.phase).toBe("idle");
+    expect(saved.retry).toBeUndefined();
+    second.stop();
+  });
+
+  it("clears a saved retry state when sync settings are saved again", async () => {
+    vi.useFakeTimers();
+    const s3 = new FakeS3();
+    let saved: SyncSettings = {
+      ...configured, enabled: true,
+      retry: { failures: 5, lastFailureAt: Date.now(), stopped: true, error: "network" },
+    };
+    const syncOnce = vi.fn(async () => ({ pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] }));
+    const runtime = new SyncRuntime({
+      load: async () => saved, save: async (next) => { saved = next; }, store: () => s3,
+      engine: () => ({ engine: { syncOnce }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    expect(await runtime.configure({ ...saved }, "correct horse battery staple")).toBe("ok");
+    expect(saved.retry).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(400);
+    expect(syncOnce).toHaveBeenCalledTimes(1);
+    runtime.stop();
+  });
 });

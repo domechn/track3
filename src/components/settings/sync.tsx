@@ -10,7 +10,7 @@ import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
 import { ConfigConflictChoices } from "@/components/sync-conflict-choices";
 import { SyncActionButton } from "@/components/settings/sync-action-button";
 import { SyncRecoveryUnlock } from "@/components/settings/sync-recovery";
-import { SyncStatusCard } from "@/components/settings/sync-status-card";
+import { SyncStatusCard, syncSkippedCount, syncSkippedLabel } from "@/components/settings/sync-status-card";
 import { useSyncFeedback, waitForSyncResult } from "@/components/settings/use-sync-feedback";
 import { useTranslation } from "@/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
@@ -197,7 +197,8 @@ export default function SyncSettingsPage() {
       } else if (latest.phase === "idle") {
         const pulled = latest.report?.pulled ?? 0;
         const pushed = latest.report?.pushed ?? 0;
-        success(pulled === 0 && pushed === 0 ? t("sync.nowUpToDate")
+        const skipped = syncSkippedCount(latest);
+        success(skipped ? syncSkippedLabel(skipped, t) : pulled === 0 && pushed === 0 ? t("sync.nowUpToDate")
           : wide ? t("fidelity.settingsB.sync.toastDescription").replace("{pushed}", String(pushed)).replace("{pulled}", String(pulled))
           : pulled === 0 ? t("sync.nowPushed").replace("{pushed}", String(pushed))
             : pushed === 0 ? t("sync.nowPulled").replace("{pulled}", String(pulled))

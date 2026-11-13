@@ -3417,5 +3417,14 @@
   "sync.details.kindPlural.session": "聊天会话",
   "sync.details.kindPlural.tombstone": "删除标记",
   "sync.details.kindPlural.session-delete": "会话删除",
-  "sync.details.kindPlural.edit": "编辑"
+  "sync.details.kindPlural.edit": "编辑",
+  "sync.status.partial": "已同步，跳过 {count} 项",
+  "sync.status.partialOne": "已同步，跳过 1 项",
+  "sync.control.partial": "已同步，跳过 {count} 项 - 打开备份与同步",
+  "sync.control.partialOne": "已同步，跳过 1 项 - 打开备份与同步",
+  "sync.status.nextRetryAt": "下次自动重试时间：{time}",
+  "sync.status.retryPaused": "已尝试 {count} 次，自动重试已暂停",
+  "sync.status.retryPausedOne": "已尝试 1 次，自动重试已暂停",
+  "sync.details.failures.invalidSnapshots": "{count} 个{kind}无法导入，日期 {dates}，写入设备 {devices}",
+  "sync.details.failures.invalidSnapshotsUndated": "{count} 个{kind}无法导入，写入设备 {devices}"
 }

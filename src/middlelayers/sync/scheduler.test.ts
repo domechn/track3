@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SyncScheduler } from "./scheduler";
+import type { SyncRetryState } from "./settings";
+import { createSyncDiagnostics } from "./diagnostics";
 import type { SyncReport } from "./engine";
 import { FakeS3, S3Error } from "./object-store";
 
 const success: SyncReport = { pulled: 1, pushed: 2, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] };
+const nothing: SyncReport = { ...success, pulled: 0, pushed: 0 };
+const random = () => 0.5;
 
 afterEach(() => vi.useRealTimers());
 
@@ -13,7 +17,7 @@ describe("SyncScheduler", () => {
     const scheduler = new SyncScheduler(async (_signal, _activity, onDiagnostics) => {
       onDiagnostics(diagnostics);
       throw new S3Error("private object name", 503);
-    }, { retryBaseMs: 60_000 });
+    }, { retryDelaysMs: [60_000] });
     await scheduler.syncNow();
     expect(scheduler.status().phase).toBe("error");
     expect(scheduler.status().diagnostics).toBe(diagnostics);
@@ -59,11 +63,11 @@ describe("SyncScheduler", () => {
     scheduler.stop();
   });
 
-  it("keeps exponential backoff when refresh and focus arrive after an error", async () => {
+  it("keeps the backoff when refresh and focus arrive after an error", async () => {
     vi.useFakeTimers();
-    const run = vi.fn().mockResolvedValueOnce({ ...success, errors: ["Failed to read sync manifest"] })
+    const run = vi.fn().mockResolvedValueOnce({ ...nothing, errors: ["Failed to read sync manifest"] })
       .mockResolvedValueOnce(success).mockResolvedValueOnce(success);
-    const scheduler = new SyncScheduler(run, { debounceMs: 5, retryBaseMs: 100 });
+    const scheduler = new SyncScheduler(run, { debounceMs: 5, retryDelaysMs: [100], random });
     await scheduler.syncNow();
     expect(run).toHaveBeenCalledTimes(1);
     expect(scheduler.status().error).toBe("sync");
@@ -79,44 +83,174 @@ describe("SyncScheduler", () => {
     scheduler.stop();
   });
 
-  it("retries a partial round with exponential backoff without another trigger", async () => {
+  it("ends a partial round as a warning without retrying", async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-28T12:00:00Z"));
     const partial = { ...success, errors: ["Failed to push snapshot object"] };
-    const run = vi.fn().mockResolvedValueOnce(partial).mockResolvedValueOnce(partial).mockResolvedValue(success);
-    const scheduler = new SyncScheduler(run, { retryBaseMs: 10 });
+    const parked = { ...nothing, pushed: 1, skipped: 14 };
+    const run = vi.fn().mockResolvedValueOnce(success).mockResolvedValueOnce(partial).mockResolvedValue(parked);
+    const retryStates: Array<SyncRetryState | undefined> = [];
+    const scheduler = new SyncScheduler(run, { onRetryState: (retry) => retryStates.push(retry) });
     await scheduler.syncNow();
-    await vi.advanceTimersByTimeAsync(9);
-    expect(run).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(1);
+    const lastSync = scheduler.status().lastSync;
+    vi.setSystemTime(new Date("2026-10-28T13:00:00Z"));
+    await scheduler.syncNow();
+    expect(scheduler.status()).toMatchObject({ phase: "idle", partial: true, report: partial, lastSync });
+    expect(scheduler.status().error).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
     expect(run).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(19);
+    await scheduler.syncNow();
+    expect(scheduler.status()).toMatchObject({ phase: "idle", partial: true, report: parked, lastSync: Date.now() });
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(retryStates).toEqual([]);
+    scheduler.stop();
+  });
+
+  it("follows the transient backoff, stops, ignores triggers, and lets Sync now run once", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-28T12:00:00Z"));
+    const metrics = createSyncDiagnostics(new FakeS3());
+    const run = vi.fn(async () => {
+      await metrics.store.getObject("sync-header");
+      throw new S3Error("unavailable", 503);
+    });
+    const retryStates: Array<SyncRetryState | undefined> = [];
+    const scheduler = new SyncScheduler(run, { debounceMs: 5, random, onRetryState: (retry) => retryStates.push(retry) });
+    const started = Date.now();
+    await scheduler.syncNow();
+    expect(scheduler.status()).toMatchObject({ phase: "error", error: "network", failures: 1, nextRetryAt: started + 5_000 });
+    for (const [round, delay] of [5_000, 30_000, 120_000, 600_000, 1_800_000].entries()) {
+      for (let i = 0; i < 20; i++) scheduler.trigger("refresh");
+      scheduler.trigger("focus");
+      scheduler.trigger("start");
+      await vi.advanceTimersByTimeAsync(delay - 1);
+      expect(run).toHaveBeenCalledTimes(round + 1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(run).toHaveBeenCalledTimes(round + 2);
+    }
+    expect(scheduler.status()).toMatchObject({ phase: "error", retryStopped: true, failures: 6 });
+    expect(scheduler.status().nextRetryAt).toBeUndefined();
+    expect(retryStates.map((retry) => retry?.failures)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(retryStates[5]).toEqual({ failures: 6, lastFailureAt: Date.now(), error: "network", stopped: true });
+    for (let i = 0; i < 20; i++) scheduler.trigger("refresh");
+    scheduler.trigger("focus");
+    scheduler.trigger("start");
+    await vi.advanceTimersByTimeAsync(7 * 24 * 60 * 60_000);
+    expect(run).toHaveBeenCalledTimes(6);
+    // One round per backoff step: every round makes exactly one request here.
+    expect(metrics.diagnostics.requests.GET.count).toBe(6);
+    await scheduler.syncNow();
+    expect(run).toHaveBeenCalledTimes(7);
+    expect(scheduler.status()).toMatchObject({ phase: "error", retryStopped: false, failures: 1, nextRetryAt: Date.now() + 5_000 });
+    run.mockImplementation(async () => success as never);
+    await scheduler.syncNow();
+    expect(run).toHaveBeenCalledTimes(8);
+    expect(scheduler.status()).toMatchObject({ phase: "idle", report: success });
+    expect(scheduler.status().failures).toBeUndefined();
+    expect(retryStates.at(-1)).toBeUndefined();
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+    expect(run).toHaveBeenCalledTimes(8);
+    scheduler.stop();
+  });
+
+  it("keeps each retry delay within 20 percent of the step", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-28T12:00:00Z"));
+    for (const [value, delay] of [[0, 4_000], [1, 6_000]]) {
+      const scheduler = new SyncScheduler(async () => { throw new S3Error("unavailable", 503); }, { random: () => value });
+      await scheduler.syncNow();
+      expect(scheduler.status().nextRetryAt).toBe(Date.now() + delay);
+      scheduler.stop();
+    }
+  });
+
+  it("stops after two identical failed rounds that made no progress", async () => {
+    vi.useFakeTimers();
+    const failed = { ...nothing, errors: ["Failed to read sync manifest", "Failed to apply config object"] };
+    const run = vi.fn().mockResolvedValueOnce(failed)
+      .mockResolvedValue({ ...failed, errors: [...failed.errors].reverse() });
+    const scheduler = new SyncScheduler(run, { debounceMs: 5, random });
+    await scheduler.syncNow();
+    expect(scheduler.status()).toMatchObject({ phase: "error", error: "sync", retryStopped: false, failures: 1 });
+    await vi.advanceTimersByTimeAsync(5_000);
     expect(run).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(1);
+    expect(scheduler.status()).toMatchObject({ phase: "error", error: "sync", retryStopped: true, failures: 2 });
+    for (let i = 0; i < 20; i++) scheduler.trigger("refresh");
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+    expect(run).toHaveBeenCalledTimes(2);
+    scheduler.stop();
+  });
+
+  it("does not count a round that made progress toward the two identical failed rounds", async () => {
+    vi.useFakeTimers();
+    const errors = ["Failed to pull snapshot object"];
+    const run = vi.fn().mockResolvedValueOnce({ ...success, errors }).mockResolvedValue({ ...nothing, errors });
+    const scheduler = new SyncScheduler(run, { debounceMs: 5, random });
+    await scheduler.syncNow();
+    expect(scheduler.status()).toMatchObject({ phase: "idle", partial: true });
+    scheduler.trigger("refresh");
+    await vi.advanceTimersByTimeAsync(5);
+    expect(scheduler.status()).toMatchObject({ phase: "error", retryStopped: false, failures: 1, nextRetryAt: Date.now() + 5_000 });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(scheduler.status()).toMatchObject({ phase: "error", retryStopped: true, failures: 2 });
+    scheduler.stop();
+  });
+
+  it("keeps retrying when the failed rounds differ", async () => {
+    vi.useFakeTimers();
+    const run = vi.fn().mockResolvedValueOnce({ ...nothing, errors: ["Failed to read sync manifest"] })
+      .mockResolvedValueOnce({ ...nothing, errors: ["Failed to write sync manifest"] }).mockResolvedValue(success);
+    const scheduler = new SyncScheduler(run, { random });
+    await scheduler.syncNow();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(scheduler.status()).toMatchObject({ phase: "error", retryStopped: false, failures: 2 });
+    await vi.advanceTimersByTimeAsync(30_000);
     expect(run).toHaveBeenCalledTimes(3);
     expect(scheduler.status().phase).toBe("idle");
     scheduler.stop();
   });
 
-  it("stops automatic retries after repeated failures until a refresh", async () => {
+  it("waits for a restored retry time instead of running on start", async () => {
     vi.useFakeTimers();
-    const failed = { ...success, errors: ["Failed to read sync manifest"] };
-    const run = vi.fn(async () => failed);
-    const scheduler = new SyncScheduler(run, { debounceMs: 5, retryBaseMs: 10 });
-    await scheduler.syncNow();
-    await vi.advanceTimersByTimeAsync(300_000);
-    const exhausted = run.mock.calls.length;
-    expect(exhausted).toBeGreaterThan(1);
-    expect(exhausted).toBeLessThan(10);
-    expect(scheduler.status()).toMatchObject({ phase: "error", retryStopped: true });
-    await vi.advanceTimersByTimeAsync(300_000);
-    expect(run).toHaveBeenCalledTimes(exhausted);
-    scheduler.trigger("focus");
-    await vi.advanceTimersByTimeAsync(5);
-    expect(run).toHaveBeenCalledTimes(exhausted);
+    vi.setSystemTime(new Date("2026-10-28T12:00:00Z"));
+    const now = Date.now();
+    const run = vi.fn(async () => { throw new S3Error("unavailable", 503); });
+    const scheduler = new SyncScheduler(run, {
+      debounceMs: 5, random, retry: { failures: 2, lastFailureAt: now - 10_000, nextRetryAt: now + 20_000, error: "timeout" },
+    });
+    expect(scheduler.status()).toEqual({ phase: "error", error: "timeout", failures: 2, nextRetryAt: now + 20_000 });
+    scheduler.trigger("start");
     scheduler.trigger("refresh");
-    await vi.advanceTimersByTimeAsync(5);
-    expect(run).toHaveBeenCalledTimes(exhausted + 1);
+    await vi.advanceTimersByTimeAsync(19_999);
+    expect(run).toHaveBeenCalledTimes(0);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(scheduler.status()).toMatchObject({ failures: 3, nextRetryAt: Date.now() + 120_000 });
     scheduler.stop();
+  });
+
+  it("stays stopped after a restart and probes once when the pause is old", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-28T12:00:00Z"));
+    const now = Date.now();
+    const run = vi.fn(async () => { throw new S3Error("unavailable", 503); });
+    const recent = new SyncScheduler(run, { debounceMs: 5, random, retry: { failures: 6, lastFailureAt: now - 60_000, stopped: true } });
+    expect(recent.status()).toMatchObject({ phase: "error", retryStopped: true });
+    recent.trigger("start");
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+    expect(run).toHaveBeenCalledTimes(0);
+    recent.stop();
+    const old = new SyncScheduler(run, {
+      debounceMs: 5, random, retry: { failures: 6, lastFailureAt: Date.now() - 24 * 60 * 60_000, stopped: true },
+    });
+    expect(old.status()).toEqual({ phase: "idle" });
+    old.trigger("start");
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(old.status()).toMatchObject({ phase: "error", retryStopped: true, failures: 6 });
+    old.stop();
   });
 
   it.each(["bucket", "conditions"] as const)("retries %s errors with backoff", async (kind) => {
@@ -124,7 +258,7 @@ describe("SyncScheduler", () => {
     const run = vi.fn().mockRejectedValueOnce(
       kind === "bucket" ? new S3Error("bucket unavailable", 404) : new Error("Sync store does not enforce conditional writes"),
     ).mockResolvedValue(success);
-    const scheduler = new SyncScheduler(run, { retryBaseMs: 10 });
+    const scheduler = new SyncScheduler(run, { retryDelaysMs: [10], random });
     await scheduler.syncNow();
     await vi.advanceTimersByTimeAsync(10);
     expect(run).toHaveBeenCalledTimes(2);
@@ -135,7 +269,7 @@ describe("SyncScheduler", () => {
   it("reports a missing header without retrying it as a network failure", async () => {
     vi.useFakeTimers();
     const run = vi.fn(async () => { throw new Error("Sync has not been initialized"); });
-    const scheduler = new SyncScheduler(run, { retryBaseMs: 10 });
+    const scheduler = new SyncScheduler(run, { retryDelaysMs: [10] });
     await scheduler.syncNow();
     await vi.advanceTimersByTimeAsync(120_000);
     expect(run).toHaveBeenCalledTimes(1);
@@ -146,7 +280,7 @@ describe("SyncScheduler", () => {
   it("stops retrying when the remote header is malformed", async () => {
     vi.useFakeTimers();
     const run = vi.fn(async () => { throw new SyntaxError("secret header body"); });
-    const scheduler = new SyncScheduler(run, { retryBaseMs: 10 });
+    const scheduler = new SyncScheduler(run, { retryDelaysMs: [10] });
     await scheduler.syncNow();
     await vi.advanceTimersByTimeAsync(120_000);
     expect(run).toHaveBeenCalledTimes(1);
@@ -157,7 +291,7 @@ describe("SyncScheduler", () => {
   it("throttles focus and retries errors without throwing into callers", async () => {
     vi.useFakeTimers();
     const run = vi.fn().mockRejectedValueOnce(new Error("secret")).mockResolvedValue(success);
-    const scheduler = new SyncScheduler(run, { debounceMs: 10, focusThrottleMs: 100, retryBaseMs: 40 });
+    const scheduler = new SyncScheduler(run, { debounceMs: 10, focusThrottleMs: 100, retryDelaysMs: [40], random });
     scheduler.trigger("focus");
     scheduler.trigger("focus");
     await vi.advanceTimersByTimeAsync(10);
@@ -233,7 +367,7 @@ describe("SyncScheduler", () => {
         return { ...success, pulled: 99 };
       })
       .mockResolvedValueOnce(success);
-    const scheduler = new SyncScheduler(run, { retryBaseMs: 10 });
+    const scheduler = new SyncScheduler(run, { retryDelaysMs: [10], random });
     const first = scheduler.syncNow();
     expect(scheduler.status().phase).toBe("syncing");
     await vi.advanceTimersByTimeAsync(180_000);
@@ -299,7 +433,7 @@ describe("SyncScheduler", () => {
     const scheduler = new SyncScheduler((_signal, _activity, onDiagnostics) =>
       new Promise<SyncReport>((resolve) => {
         finish = () => { onDiagnostics(diagnostics); resolve(success); };
-      }), { retryBaseMs: 60_000 });
+      }), { retryDelaysMs: [60_000] });
     const round = scheduler.syncNow();
     await vi.advanceTimersByTimeAsync(180_000);
     await round;

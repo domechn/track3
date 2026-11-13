@@ -12,7 +12,7 @@ import {
 } from "./engine";
 import { SyncRuntime } from "./runtime";
 import { defaultSyncSettings, type SyncSettings } from "./settings";
-import { serializeSyncDiagnostics } from "./diagnostics";
+import { explainInvalidSnapshots, serializeSyncDiagnostics } from "./diagnostics";
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -278,12 +278,16 @@ describe("SyncEngine", () => {
       }
       return result;
     }) as FakeS3["getObject"];
-    expect((await engines[1].syncOnce()).errors).toContain("Failed to pull snapshot object");
-    expect((await engines[1].syncOnce()).errors).toEqual([]);
+    expect(await engines[1].syncOnce()).toMatchObject({ errors: [], skipped: 1 });
+    const second = await engines[1].syncOnce();
+    expect(second).toMatchObject({ errors: [], skipped: 1 });
+    expect(second.diagnostics?.failures).toEqual([{ phase: "pull", kind: "snapshot", reason: "read-failed:size", count: 1 }]);
     expect(downloads).toBe(1);
-    const later = new SyncEngine(s3, repos[1], "passphrase", { now: () => Date.parse("2026-01-03T00:00:00.101Z") + 1 });
-    expect((await later.syncOnce()).errors).toContain("Failed to pull snapshot object");
+    const laterAt = Date.parse("2026-01-03T00:00:00.101Z") + 1;
+    const later = new SyncEngine(s3, repos[1], "passphrase", { now: () => laterAt });
+    expect(await later.syncOnce()).toMatchObject({ errors: [], skipped: 1 });
     expect(downloads).toBe(2);
+    expect(Object.values(repos[1].state.failedPulls!)).toEqual([laterAt + 7 * 24 * 60 * 60_000]);
   });
   it("retries a transient pull failure on the next round", async () => {
     const { s3, repos, engines } = await devices(2);
@@ -1890,7 +1894,7 @@ describe("SyncEngine", () => {
     damaged[0] ^= 1;
     await s3.putObject(object, damaged);
     const report = await engines[1].syncOnce();
-    expect(report.errors).toContain("Failed to pull snapshot object");
+    expect(report).toMatchObject({ errors: [], skipped: 1 });
     expect(report.diagnostics?.failures).toEqual([
       { phase: "pull", kind: "snapshot", reason: "read-failed:hash", count: 1 },
     ]);
@@ -1913,10 +1917,7 @@ describe("SyncEngine", () => {
       })),
     ]);
     const report = await engines[1].syncOnce();
-    expect(report.errors).toEqual([
-      "Failed to pull edit object", "Failed to pull edit object", "Failed to pull edit object",
-      "Failed to pull snapshot object", "Failed to pull snapshot object",
-    ]);
+    expect(report).toMatchObject({ errors: [], skipped: 5 });
     expect(report.diagnostics?.failures).toEqual([
       { phase: "pull", kind: "edit", reason: "invalid-remote-entry:uuid", count: 3 },
       { phase: "pull", kind: "snapshot", reason: "invalid-remote-entry:uuid", count: 2 },
@@ -1929,26 +1930,45 @@ describe("SyncEngine", () => {
     });
   });
 
-  it("reports a sanitized snapshot import failure without quarantining it", async () => {
+  it("parks a sanitized snapshot import failure after one attempt", async () => {
     const { repos, engines } = await devices(2);
     repos[0].snapshots.set("one", snapshot("one"));
     await engines[0].syncOnce();
+    let imports = 0;
     repos[1].importSnapshot = async () => {
+      imports++;
       throw new Error("UNIQUE constraint failed: assets_v2.uuid; value 'private-name' 123456789 https://s3.example.com");
     };
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       const report = await engines[1].syncOnce();
-      expect(report.errors).toEqual(["Failed to pull snapshot object"]);
-      expect(report.diagnostics?.failures).toEqual([{
+      expect(report).toMatchObject({ errors: [], skipped: 1 });
+      const failures = [{
         phase: "pull", kind: "snapshot",
         reason: "import-failed: Error: UNIQUE constraint failed: assets_v2.<redacted>", count: 1,
-      }]);
-      expect(report.diagnostics?.failedPulls?.count).toBe(0);
+      }];
+      expect(report.diagnostics?.failures).toEqual(failures);
+      expect(report.diagnostics?.failedPulls?.count).toBe(1);
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn.mock.calls[0].join(" ")).not.toContain("private-name");
       expect(serializeSyncDiagnostics(report.diagnostics!)).not.toContain("s3.example.com");
-      expect((await engines[1].syncOnce()).errors).toEqual(["Failed to pull snapshot object"]);
+      const second = await engines[1].syncOnce({ manual: false });
+      expect(second).toMatchObject({ errors: [], skipped: 1 });
+      expect(second.diagnostics?.failures).toEqual(failures);
+      expect(imports).toBe(1);
+      // Sync now tries a parked import again, so a fixed importer does not wait out the park.
+      const manual = await engines[1].syncOnce({ manual: true });
+      expect(manual).toMatchObject({ errors: [], skipped: 1 });
+      expect(manual.diagnostics?.failures).toEqual(failures);
+      expect(imports).toBe(2);
+      expect(Object.values(repos[1].state.failedPulls!)).toEqual([Date.parse("2026-01-09T00:00:00.100Z")]);
+      repos[1].importSnapshot = async () => true;
+      expect(await engines[1].syncOnce({ manual: false })).toMatchObject({ errors: [], skipped: 1, pulled: 0 });
+      const fixed = await engines[1].syncOnce({ manual: true });
+      expect(fixed).toMatchObject({ errors: [], pulled: 1 });
+      expect(fixed.skipped).toBeUndefined();
+      expect(repos[1].state.failedPulls).toEqual({});
+      expect(repos[1].state.failedPullInfo).toEqual({});
     } finally {
       warn.mockRestore();
     }
@@ -1962,10 +1982,72 @@ describe("SyncEngine", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       const report = await engines[1].syncOnce();
-      expect(report.errors).toEqual(["Failed to pull snapshot object"]);
+      expect(report).toMatchObject({ errors: [], skipped: 1 });
       expect(report.diagnostics?.failures).toEqual([{
         phase: "pull", kind: "snapshot", reason: "import-failed: Error: Failed to insert sync asset", count: 1,
       }]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("ends a round with 14 parked invalid snapshots and a successful push without errors", async () => {
+    const { s3, repos, engines } = await devices(2);
+    for (let i = 0; i < 14; i++) repos[0].snapshots.set(`bad-${i}`, snapshot(`bad-${i}`));
+    await engines[0].syncOnce();
+    repos[1].snapshots.set("mine", snapshot("mine"));
+    let imports = 0;
+    repos[1].importSnapshot = async (value) => {
+      imports++;
+      throw Number(value.uuid.slice(4)) < 9
+        ? "Invalid sync snapshot: parse (assets[].price is null) at assets[3].price"
+        : "Invalid sync snapshot: asset id <= 0 at assets[0].id";
+    };
+    const owner = repos[0].state.deviceId!;
+    const remote = async () => (await s3.listObjectsV2({ prefix: `devices/${owner}/` })).objects.map((item) => `${item.key}:${item.etag}`);
+    const before = await remote();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const report = await engines[1].syncOnce();
+      expect(report).toMatchObject({ errors: [], skipped: 14, pulled: 0, pushed: 1 });
+      expect(report.diagnostics?.failures).toEqual([
+        { phase: "pull", kind: "snapshot", reason: "import-failed: Error: Invalid sync snapshot: parse (assets[].price is null)", count: 9 },
+        { phase: "pull", kind: "snapshot", reason: "import-failed: Error: Invalid sync snapshot: asset id <= 0", count: 5 },
+      ]);
+      expect(report.diagnostics?.invalidSnapshots).toHaveLength(14);
+      expect(report.diagnostics?.invalidSnapshots).toContainEqual({
+        device: owner.slice(0, 8), date: "2026-01-01", path: "assets[3].price",
+        reason: "import-failed: Error: Invalid sync snapshot: parse (assets[].price is null)",
+      });
+      expect(explainInvalidSnapshots(report.diagnostics!)).toEqual({
+        count: 14, from: "2026-01-01", to: "2026-01-01", devices: [owner.slice(0, 8)],
+        reasons: [{ reason: "assets[].price is null", count: 9 }, { reason: "asset id <= 0", count: 5 }],
+      });
+      expect(serializeSyncDiagnostics(report.diagnostics!)).toContain("assets[].price is null");
+      expect(repos[1].state.lastSync).toBeDefined();
+      const second = await engines[1].syncOnce({ manual: false });
+      expect(second).toMatchObject({ errors: [], skipped: 14, pushed: 0 });
+      expect(explainInvalidSnapshots(second.diagnostics!).count).toBe(14);
+      expect(second.diagnostics?.requests.GET.bytesReceived).toBeLessThan(report.diagnostics!.requests.GET.bytesReceived);
+      expect(imports).toBe(14);
+      expect(await remote()).toEqual(before);
+      expect((await engines[0].syncOnce()).pulled).toBe(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("keeps a locked local database as a retryable error instead of parking the snapshot", async () => {
+    const { repos, engines } = await devices(2);
+    repos[0].snapshots.set("one", snapshot("one"));
+    await engines[0].syncOnce();
+    repos[1].importSnapshot = async () => { throw new Error("database is locked"); };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const report = await engines[1].syncOnce();
+      expect(report.errors).toEqual(["Failed to pull snapshot object"]);
+      expect(report.skipped).toBeUndefined();
+      expect(report.diagnostics?.failedPulls?.count).toBe(0);
     } finally {
       warn.mockRestore();
     }

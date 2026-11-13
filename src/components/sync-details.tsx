@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
 import { ConfigConflictChoices } from "@/components/sync-conflict-choices";
 import { syncCategory } from "@/middlelayers/sync/config-keys";
-import { serializeSyncDiagnostics, syncPhases, type SyncDiagnostics } from "@/middlelayers/sync/diagnostics";
+import { explainInvalidSnapshots, serializeSyncDiagnostics, syncPhases, type SyncDiagnostics } from "@/middlelayers/sync/diagnostics";
 import type { SyncReport } from "@/middlelayers/sync/engine";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 
@@ -104,7 +104,8 @@ export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialo
       ? { label: t(`sync.details.conflict.${kind}`), id: shortId(id) }
       : { label: t("sync.details.conflict.other"), id: undefined };
   });
-  const issueCount = report ? report.errors.length + conflicts.length : 0;
+  const issueCount = report ? report.errors.length + (report.skipped ?? 0) + conflicts.length : 0;
+  const invalid = diagnostics?.invalidSnapshots?.length ? explainInvalidSnapshots(diagnostics) : undefined;
   const pullFailures = diagnostics?.failures?.filter((failure) => failure.phase === "pull") ?? [];
   const pullCount = pullFailures.reduce((sum, failure) => sum + failure.count, 0);
   const groupedKinds = (items: Array<{ kind: string; count: number }>) => {
@@ -179,6 +180,18 @@ export function SyncDetails({ report, diagnostics, t, summaryLabel, ConfirmDialo
               .replace("{reason}", reasonText(failure.reason))}
           </li>)}
         </ul>}
+        {invalid && <>
+          <p className="t3-sync-details-item">
+            {t(invalid.from ? "sync.details.failures.invalidSnapshots" : "sync.details.failures.invalidSnapshotsUndated")
+              .replace("{count}", number(invalid.count))
+              .replace("{kind}", t(`sync.details.kind${invalid.count === 1 ? "" : "Plural"}.snapshot`))
+              .replace("{dates}", invalid.from === invalid.to ? invalid.from ?? "" : `${invalid.from} .. ${invalid.to}`)
+              .replace("{devices}", invalid.devices.slice(0, 5).join(", ") + (invalid.devices.length > 5 ? ` +${invalid.devices.length - 5}` : ""))}
+          </p>
+          <p className="t3-sync-details-item">
+            {invalid.reasons.map(({ reason, count }) => `${number(count)} × ${reason}`).join(", ")}
+          </p>
+        </>}
         {errors.size ? <ul className="t3-sync-details-list">
           {[...errors].map(([text, count]) => <li key={text}>{safeError(text, t)} × {number(count)}</li>)}
         </ul> : !errorLabel && !pullCount && <p className="t3-sync-details-empty">{t("sync.details.none")}</p>}

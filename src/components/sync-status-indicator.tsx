@@ -12,6 +12,7 @@ import { SyncDetails } from "@/components/sync-details";
 import { useTranslation } from "@/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { SyncRecoveryExport, SyncRecoveryUnlock } from "@/components/settings/sync-recovery";
+import { syncRetryNote, syncSkippedCount, syncSkippedLabel } from "@/components/settings/sync-status-card";
 import { serializeSyncDiagnostics, type SyncDiagnostics } from "@/middlelayers/sync/diagnostics";
 import { useWideDesktop } from "@/components/use-wide-desktop";
 
@@ -159,19 +160,23 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
   const never = status.sync.phase === "idle" && status.sync.lastSync === undefined;
   const muted = status.mode === "locked" && status.skipped;
   const locked = status.mode === "locked";
+  const skippedCount = status.mode === "ready" ? syncSkippedCount(status.sync) : 0;
+  const retryNote = status.mode === "ready" ? syncRetryNote(status.sync, t) : undefined;
   const phase = status.mode === "unreadable" ? "unreadable" :
     status.mode === "locked" ? (muted ? "skipped" : "locked") :
       status.sync.phase === "idle" && report?.conflicts.length ? "conflict" :
-        status.sync.phase === "idle" && report?.errors.length ? "error" : status.sync.phase;
+        skippedCount ? "partial" :
+          status.sync.phase === "idle" && report?.errors.length ? "error" : status.sync.phase;
   const syncedAt = recordsStamp && phase === "idle" && status.sync.lastSync !== undefined
     ? t("sync.status.syncedAt").replace("{time}", new Date(status.sync.lastSync).toLocaleTimeString("en-GB", {
       hour: "2-digit", minute: "2-digit", hourCycle: "h23",
     })) : undefined;
-  const statusLabel = syncedAt ?? t(`sync.status.${phase}`);
+  const statusLabel = phase === "partial" ? syncSkippedLabel(skippedCount, t) : syncedAt ?? t(`sync.status.${phase}`);
   const syncState = status.mode === "disabled" ? "off"
     : !online ? "offline"
       : phase === "error" || phase === "unreadable" ? "error"
         : phase === "conflict" ? "conflict"
+          : phase === "partial" ? "partial"
           : locked || phase === "skipped" ? "locked"
             : phase === "syncing" ? "syncing"
               : status.sync.lastSync !== undefined ? "synced" : "ready";
@@ -182,13 +187,14 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
       : minutesSinceSync < 60 ? t("sync.control.syncedMinutes").replace("{count}", String(minutesSinceSync))
         : minutesSinceSync < 1440 ? t("sync.control.syncedHours").replace("{count}", String(Math.floor(minutesSinceSync / 60)))
           : t("sync.control.syncedDays").replace("{count}", String(Math.floor(minutesSinceSync / 1440)))
-    : t(`sync.control.${muted ? "skipped" : syncState}`);
+    : syncState === "partial" ? syncSkippedLabel(skippedCount, t, "sync.control")
+      : t(`sync.control.${muted ? "skipped" : syncState}`);
   const syncTone = syncState === "error" ? "text-destructive"
-    : syncState === "conflict" || syncState === "offline" || syncState === "locked" ? "text-warning"
+    : syncState === "conflict" || syncState === "partial" || syncState === "offline" || syncState === "locked" ? "text-warning"
       : "text-muted-foreground";
   const syncIcon = syncState === "synced" ? "check"
     : syncState === "syncing" || syncState === "ready" ? "sync"
-      : syncState === "error" || syncState === "conflict" ? "alert" : "off";
+      : syncState === "error" || syncState === "conflict" || syncState === "partial" ? "alert" : "off";
   const changed = !!report && (report.pulled > 0 || report.pushed > 0 || report.conflicts.length > 0 || report.errors.length > 0);
   const counts = report && t("sync.status.counts")
     .replace("{pulled}", String(report.pulled))
@@ -197,7 +203,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
     .replace("{errors}", String(report.errors.length));
   const fidelityLocked = locked && overviewFidelity && !mobile && window.innerWidth >= 1400;
   const fidelityReady = overviewFidelity && status.mode === "ready" && status.sync.phase === "idle" &&
-    !!report && !report.conflicts.length && !report.errors.length && status.sync.lastSync !== undefined;
+    !!report && !report.conflicts.length && !report.errors.length && !skippedCount && status.sync.lastSync !== undefined;
   const hasDetails = !!(report || status.sync.diagnostics);
   const settings = fidelityReady ? syncRuntime.getSettings() : undefined;
   const destination = settings?.endpoint.includes("r2.cloudflarestorage.com")
@@ -214,7 +220,7 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
     ? t("fidelity.settingsB.sync.syncedAt").replace("{time}", new Date(status.sync.lastSync).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }))
     : wide && status.sync.retryStopped ? t("fidelity.settingsB.sync.pop.stopped")
     : wide && phase === "error" ? t("fidelity.settingsB.sync.pop.failedTitle")
-    : t(`sync.status.${phase}`);
+    : statusLabel;
   const buttonStatusLabel = syncState === "offline" ? t("sync.control.shortOffline")
     : syncState === "off" ? t("sync.control.shortOff")
       : syncState === "ready" ? t("sync.control.shortReady")
@@ -384,12 +390,13 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
                 : status.sync.retryStopped ? t("fidelity.settingsB.sync.pop.stopped")
                   : status.sync.phase === "error" ? t("fidelity.settingsB.sync.pop.failedTitle")
                     : phase === "conflict" ? t("sync.status.conflictSummary").replace("{count}", String(report?.conflicts.length ?? 0))
+                    : phase === "partial" ? statusLabel
                     : report ? t("fidelity.settingsB.sync.pop.upToDate") : t("fidelity.settingsB.sync.pop.sync")}</h2>
-              <span className={`t3-b-sync-pop-badge ${status.sync.phase === "error" ? "negative" : phase === "conflict" ? "warning" : status.sync.phase === "syncing" ? "info" : report ? "positive" : ""}`}>
+              <span className={`t3-b-sync-pop-badge ${status.sync.phase === "error" ? "negative" : phase === "conflict" || phase === "partial" ? "warning" : status.sync.phase === "syncing" ? "info" : report ? "positive" : ""}`}>
                 {status.sync.phase === "syncing" ? t(status.sync.progress?.phase === "pull" ? "fidelity.settingsB.sync.pop.downloading" : "fidelity.settingsB.sync.pop.uploading")
                   : status.sync.retryStopped ? t("fidelity.settingsB.sync.pop.needsAttention")
                     : status.sync.phase === "error" ? t("fidelity.settingsB.sync.pop.retrying")
-                      : phase === "conflict" ? t("fidelity.settingsB.sync.pop.needsAttention")
+                      : phase === "conflict" || phase === "partial" ? t("fidelity.settingsB.sync.pop.needsAttention")
                       : report ? t("fidelity.settingsB.sync.pop.synced") : t("fidelity.settingsB.sync.pop.never")}
               </span>
             </div>
@@ -413,9 +420,10 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
                   .replace("{sent}", diagnostics.requests.PUT.outcomes.ok.count.toLocaleString())
                   .replace("{total}", diagnostics.entries.toLocaleString())}</p>
                 : <>
-                  <p className="t3-b-sync-pop-desc">{status.sync.retryStopped ? t("sync.status.retryStopped") : t("sync.status.errorsPresent")}</p>
+                  <p className="t3-b-sync-pop-desc">{status.sync.retryStopped ? retryNote ?? t("sync.status.retryStopped") : t("sync.status.errorsPresent")}</p>
                   {uploadTime && <p className="t3-b-sync-pop-desc">{t("fidelity.settingsB.sync.pop.lastUpload").replace("{time}", uploadTime)}</p>}
                 </>}
+              {retryNote && (diagnostics || !status.sync.retryStopped) && <p className="t3-b-sync-pop-desc">{retryNote}</p>}
               {diagnostics && <SyncWideDiagnostics diagnostics={diagnostics}
                 stopped={!!status.sync.retryStopped} t={t} />}
             </> : report ? <>
@@ -442,12 +450,12 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
           </div>
           </> : <>
           {fidelitySheet && (!locked || compactLocked) ? <div className="fidelity-sync-sheet-head">
-            <h2>{t(locked ? "fidelity.b.sync.sheetLocked" : status.sync.retryStopped ? "fidelity.b.sync.stopped" : phase === "error" || phase === "unreadable"
+            <h2>{phase === "partial" ? statusLabel : t(locked ? "fidelity.b.sync.sheetLocked" : status.sync.retryStopped ? "fidelity.b.sync.stopped" : phase === "error" || phase === "unreadable"
               ? "fidelity.b.sync.sheetFailed" : phase === "syncing" ? "fidelity.b.sync.syncing"
                 : never ? "settings.tab.sync" : "fidelity.b.sync.sheetUpToDate")}</h2>
-            <span className={`fidelity-sync-sheet-pill${locked ? " is-warning" : phase === "error" || phase === "unreadable"
+            <span className={`fidelity-sync-sheet-pill${locked || phase === "partial" ? " is-warning" : phase === "error" || phase === "unreadable"
               ? " is-error" : report && status.sync.phase === "idle" ? " is-positive" : ""}`}>
-              {t(locked ? "fidelity.b.sync.sheetPassphraseNeeded" : status.sync.retryStopped
+              {t(locked ? "fidelity.b.sync.sheetPassphraseNeeded" : status.sync.retryStopped || phase === "partial"
                 ? "fidelity.b.sync.sheetNeedsAttention" : phase === "error" || phase === "unreadable"
                   ? "fidelity.b.sync.sheetRetrying"
                 : phase === "syncing" ? status.sync.progress?.phase === "pull" ? "fidelity.b.sync.sheetDownloading" : "fidelity.b.sync.sheetUploading"
@@ -583,16 +591,18 @@ export function SyncStatusIndicatorView({ t, mobile = false, recordsStamp = fals
               </div>}
             </> : <>
               {status.sync.retryStopped
-                ? <p className={fidelitySheet ? "fidelity-sync-sheet-stopped-warning" : "text-destructive"}>{t("sync.status.retryStopped")}</p>
+                ? <p className={fidelitySheet ? "fidelity-sync-sheet-stopped-warning" : "text-destructive"}>{retryNote ?? t("sync.status.retryStopped")}</p>
                 : report?.errors.length && status.sync.phase === "error"
                   ? <p className="text-destructive">{t("sync.status.errorsPresent")}</p>
                   : null}
+              {retryNote && !status.sync.retryStopped && <p className="text-muted-foreground">{retryNote}</p>}
+              {phase === "partial" && <p className="text-warning">{statusLabel}</p>}
               {status.sync.error && status.sync.error !== "sync" &&
                 <p className="text-destructive">{t(`sync.connection.${status.sync.error}`)}</p>}
               {status.sync.phase === "idle" && (fidelitySheet ? never : !report) && (fidelitySheet
                 ? <p className="fidelity-sync-sheet-description">{t("fidelity.b.sync.sheetNeverBody")}<span className="sr-only">{t("sync.status.never")}</span></p>
                 : <p>{t("sync.status.never")}</p>)}
-              {status.sync.phase === "idle" && report && !changed && !fidelitySheet && <p>{t("sync.status.upToDate")}</p>}
+              {status.sync.phase === "idle" && report && !changed && phase !== "partial" && !fidelitySheet && <p>{t("sync.status.upToDate")}</p>}
               {report && changed && (status.sync.phase === "idle" || report.errors.length > 0) && !fidelitySheet && <p>{counts}</p>}
               {status.sync.phase === "error" && status.sync.lastSync === undefined && <p>{t("sync.status.never")}</p>}
               {status.sync.lastSync !== undefined && (fidelitySheet

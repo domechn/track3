@@ -40,6 +40,9 @@ describe("SyncStatusIndicator", () => {
       report: { pulled: 2, pushed: 1, conflicts: ["a"], errors: ["read failed"], tombstonesApplied: 0, configChanges: 0 },
       retryStopped: false,
       lastSync: undefined,
+      failures: undefined,
+      nextRetryAt: undefined,
+      partial: undefined,
     });
     vi.mocked(syncRuntime.unlock).mockResolvedValue("ok");
     vi.clearAllMocks();
@@ -99,6 +102,42 @@ describe("SyncStatusIndicator", () => {
     render(<SyncStatusIndicator />);
     fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
     expect(await screen.findByText(/retry.*stopped/i)).toBeInTheDocument();
+  });
+
+  it("says when the next automatic retry runs and keeps Sync now available", async () => {
+    state.current.sync.error = "network";
+    Object.assign(state.current.sync, { report: undefined, failures: 2, nextRetryAt: new Date(2026, 10, 13, 9, 41).getTime() });
+    render(<SyncStatusIndicator />);
+    fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
+    expect(await screen.findByText("Next automatic retry at 09:41")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Sync now" }));
+    expect(syncRuntime.syncNow).toHaveBeenCalledTimes(1);
+  });
+
+  it("says after how many attempts automatic retry paused", async () => {
+    state.current.sync.error = "network";
+    Object.assign(state.current.sync, { report: undefined, retryStopped: true, failures: 6 });
+    render(<SyncStatusIndicator />);
+    fireEvent.click(screen.getByRole("button", { name: /Sync failed - open Backup & sync/ }));
+    expect(await screen.findByText("Automatic retry paused after 5 attempts")).toBeInTheDocument();
+    expect(screen.queryByText(/refresh to try again/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sync now" })).toBeEnabled();
+  });
+
+  it("ends a round with parked objects as a warning with Details", async () => {
+    state.current.sync.phase = "idle";
+    state.current.sync.error = undefined as unknown as string;
+    Object.assign(state.current.sync, {
+      partial: true, lastSync: Date.now(),
+      report: { pulled: 0, pushed: 1, conflicts: [], errors: [], skipped: 14, tombstonesApplied: 0, configChanges: 0 },
+    });
+    render(<SyncStatusIndicator />);
+    const button = screen.getByRole("button", { name: "Synced with 14 items skipped - open Backup & sync" });
+    expect(button).toHaveClass("text-warning");
+    fireEvent.click(button);
+    expect(await screen.findByRole("button", { name: "Details, 14 issues" })).toBeInTheDocument();
+    expect(screen.getByText("Synced with 14 items skipped", { selector: "p" })).toHaveClass("text-warning");
+    expect(screen.queryByText(/Track3 will retry automatically/)).not.toBeInTheDocument();
   });
 
   it("shows a distinct conflict state with a translated summary", async () => {

@@ -6,7 +6,7 @@ import { SyncScheduler, type SyncStatus } from "./scheduler";
 import {
   classifySyncError, createSyncStore, defaultSyncSettings, loadSyncSettings,
   saveSyncSettings, testSyncConnection, validateSyncSettings,
-  type SyncConnectionResult, type SyncSettings,
+  type SyncConnectionResult, type SyncRetryState, type SyncSettings,
 } from "./settings";
 import type { SyncOptions, SyncProgress, SyncReport } from "./engine";
 import { resetSyncState } from "./engine";
@@ -60,6 +60,8 @@ export class SyncRuntime {
   private handle?: EngineHandle;
   private lockedPromptClaimed = false;
   private skipped = false;
+  private retry?: SyncRetryState;
+  private settingsWrite: Promise<void> = Promise.resolve();
   private listeners = new Set<() => void>();
   private snapshot: RuntimeStatus = { mode: "loading", sync: { phase: "idle" } };
 
@@ -92,9 +94,22 @@ export class SyncRuntime {
     for (const listener of this.listeners) listener();
   }
 
+  // One queue: a retry-state write reads the settings when it runs, so it cannot undo a newer settings write.
+  private writeSettings(next?: SyncSettings): Promise<void> {
+    const write = this.settingsWrite.then(async () => {
+      const settings = next ?? this.settings;
+      await this.deps.save(this.retry ? { ...settings, retry: this.retry } : settings);
+      this.settings = settings;
+    });
+    this.settingsWrite = write.catch(() => {});
+    return write;
+  }
+
   async initialize(): Promise<void> {
     try {
-      this.settings = await this.deps.load();
+      const { retry, ...settings } = await this.deps.load();
+      this.settings = settings;
+      this.retry = retry;
       this.publish(this.settings.enabled ? "locked" : "disabled");
     } catch {
       this.publish("unreadable");
@@ -144,15 +159,17 @@ export class SyncRuntime {
         }
       } else key = recoveredKey ? await unlockSyncHeaderWithKey(header, recoveredKey) : await unlockSyncHeader(header, secret || "");
       const next = { ...settings, enabled: true };
+      delete next.retry;
       if (this.scheduler && !await this.scheduler.stop()) {
         this.publish("ready", { ...this.snapshot.sync, phase: "error", startedAt: undefined, error: "timeout" });
         return "timeout";
       }
-      await this.deps.save(next);
-      if ((["endpoint", "region", "bucket", "prefix", "pathStyle"] as const).some((key) =>
-        this.settings[key] !== next[key])) {
-        await this.deps.resetState?.();
-      }
+      // New settings or passphrase start with a clean retry state.
+      this.retry = undefined;
+      const moved = (["endpoint", "region", "bucket", "prefix", "pathStyle"] as const).some((key) =>
+        this.settings[key] !== next[key]);
+      await this.writeSettings(next);
+      if (moved) await this.deps.resetState?.();
       this.settings = next;
       this.activate(store, secret || "", header, key, !!recoveredKey);
       return "ok";
@@ -265,6 +282,13 @@ export class SyncRuntime {
         signal, onProgress: reportActivity, onDiagnostics, categories: this.settings.categories,
         deviceName: this.settings.deviceNames[currentId ?? ""], manual,
       });
+    }, {
+      retry: this.retry,
+      onRetryState: (retry) => {
+        this.retry = retry;
+        // Losing this write only means a restart retries sooner.
+        void this.writeSettings().catch(() => {});
+      },
     });
     this.scheduler.subscribe(() => this.publish("ready", this.scheduler!.status()));
     this.publish("ready", this.scheduler.status());
@@ -297,7 +321,8 @@ export class SyncRuntime {
     const next = clearSettings
       ? { ...defaultSyncSettings, categories: { ...defaultSyncSettings.categories }, deviceNames: {} }
       : { ...this.settings, enabled: false };
-    await this.deps.save(next);
+    this.retry = undefined;
+    await this.writeSettings(next);
     this.settings = next;
     const scheduler = this.scheduler;
     const settled = (await scheduler?.stop()) ?? true;
@@ -347,7 +372,7 @@ export class SyncRuntime {
 
   async renameDevice(id: string, name: string): Promise<void> {
     const next = { ...this.settings, deviceNames: { ...this.settings.deviceNames, [id]: name.trim() || id.slice(0, 8) } };
-    await this.deps.save(next);
+    await this.writeSettings(next);
     this.settings = next;
     this.publish(this.snapshot.mode);
     if (id === await this.deps.deviceId?.()) this.scheduler?.trigger("refresh");
