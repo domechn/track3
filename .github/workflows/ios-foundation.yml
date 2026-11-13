@@ -22,6 +22,10 @@ on:
       - "vite.config.ts"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   web:
     runs-on: ubuntu-24.04
@@ -75,11 +79,18 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-chromium-${{ hashFiles('yarn.lock') }}
+      - name: Cache apt packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/apt-archives
+          key: ${{ runner.os }}-apt-ios-${{ hashFiles('.github/workflows/ios-foundation.yml') }}
+          restore-keys: ${{ runner.os }}-apt-ios-
       - name: Install Playwright and desktop Rust system packages
         timeout-minutes: 25
         run: |
-          sudo apt-get -o Acquire::Retries=3 update
-          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+          mkdir -p "$HOME/.cache/apt-archives/partial"
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends \
             xvfb fonts-noto-color-emoji fonts-unifont libfontconfig1 libfreetype6 \
             xfonts-cyrillic xfonts-scalable fonts-liberation fonts-ipafont-gothic \
             fonts-wqy-zenhei fonts-tlwg-loma-otf fonts-freefont-ttf \
@@ -89,6 +100,7 @@ jobs:
             libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 \
             libxfixes3 libxkbcommon0 libxrandr2 \
             libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo chown -R "$USER:$USER" "$HOME/.cache/apt-archives"
       - name: Install Playwright Chromium
         timeout-minutes: 10
         run: corepack yarn playwright install chromium
