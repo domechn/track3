@@ -1,9 +1,17 @@
 name: "test-on-pr"
 on: [pull_request]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-22.04
+    timeout-minutes: 90
     permissions:
       contents: read
       issues: read
@@ -43,12 +51,25 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+      - name: cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/apt-archives
+          key: ${{ runner.os }}-apt-tauri-${{ hashFiles('.github/workflows/test-on-pr.yaml') }}
+          restore-keys: ${{ runner.os }}-apt-tauri-
       - name: install system dependencies
+        timeout-minutes: 15
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          mkdir -p "$HOME/.cache/apt-archives/partial"
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo chown -R "$USER:$USER" "$HOME/.cache/apt-archives"
       - name: install frontend dependencies
         run: corepack yarn install --immutable
+      - name: lint workflow signing secrets
+        run: |
+          node --test scripts/workflow-secrets-lint.test.mjs
+          node scripts/workflow-secrets-lint.mjs
       - name: test frontend
         run: corepack yarn test
       - name: check frontend coverage
@@ -67,6 +88,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: setup node
@@ -79,7 +101,13 @@ jobs:
           corepack prepare yarn@4.9.2 --activate
       - name: install frontend dependencies
         run: corepack yarn install --immutable
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-chromium-${{ hashFiles('yarn.lock') }}
       - name: install Chromium
+        timeout-minutes: 15
         run: corepack yarn playwright install --with-deps chromium
       - name: Check generated brand icons
         run: node --test scripts/brand-export.test.mjs
@@ -90,6 +118,7 @@ jobs:
 
   compat-094:
     runs-on: ubuntu-22.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -117,6 +146,7 @@ jobs:
 
   test-tauri:
     needs: quality
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -158,11 +188,21 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+      - name: cache apt packages (ubuntu only)
+        if: matrix.os == 'ubuntu-22.04'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/apt-archives
+          key: ${{ runner.os }}-apt-tauri-${{ hashFiles('.github/workflows/test-on-pr.yaml') }}
+          restore-keys: ${{ runner.os }}-apt-tauri-
       - name: install dependencies (ubuntu only)
         if: matrix.os == 'ubuntu-22.04'
+        timeout-minutes: 15
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          mkdir -p "$HOME/.cache/apt-archives/partial"
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo chown -R "$USER:$USER" "$HOME/.cache/apt-archives"
       - name: install target (mac only)
         if: matrix.os == 'macos-latest'
         run: |
@@ -173,8 +213,6 @@ jobs:
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_PRIVATE_KEY_PASSWORD }}
         with:
           tauriScript: corepack yarn tauri
           args: ${{ matrix.args }}
