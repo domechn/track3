@@ -7,7 +7,7 @@ vi.mock("../utils/http", () => ({
   sendHttpRequest: vi.fn(),
 }));
 
-const TON_ADDRESS = `U${"A".repeat(47)}`;
+const TON_ADDRESS = "UQDKbjIcfM6ezt8KjKJJLshZJJSqX7XOA4ff-W72r5gqPuwA";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -27,6 +27,17 @@ describe("TonAnalyzer", () => {
     await expect(
       new TonAnalyzer({ ton: { addresses: ["invalid"] } }).verifyConfigs(),
     ).resolves.toBe(false);
+  });
+
+  it("accepts official raw, bounceable and non-bounceable TON forms and rejects a bad checksum", async () => {
+    const raw = "0:ca6e321c7cce9ecedf0a8ca2492ec8592494aa5fb5ce0387dff96ef6af982a3e";
+    const bounceable = "EQDKbjIcfM6ezt8KjKJJLshZJJSqX7XOA4ff-W72r5gqPrHF";
+    const nonBounceable = "UQDKbjIcfM6ezt8KjKJJLshZJJSqX7XOA4ff-W72r5gqPuwA";
+    const urlAlphabet = "EQAGBwoPFh8qN0ZXan-Wr8rnBidKb5a_6hdGd6rfFk-KxxK2";
+    await expect(new TonAnalyzer({ ton: { addresses: [raw, bounceable, nonBounceable, urlAlphabet] } }).verifyConfigs())
+      .resolves.toBe(true);
+    await expect(new TonAnalyzer({ ton: { addresses: [bounceable.slice(0, -1) + "G"] } }).verifyConfigs())
+      .resolves.toBe(false);
   });
 
   it("returns an empty portfolio without making a request", async () => {

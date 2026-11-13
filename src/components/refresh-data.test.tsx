@@ -723,6 +723,18 @@ describe("RefreshData — currency rates refresh ordering", () => {
     expect(JSON.parse(localStorage.getItem("track3-refresh-source-statuses") ?? "[]")[0].status).toBe("partial");
   });
 
+  it("shows an omitted exchange debt as an incomplete source in the status dialog", async () => {
+    writeStoredStatuses([
+      { sourceId: "cex:0", label: "OKX", kind: "exchange", provider: "OKX",
+        status: "partial", partial: { category: "other", endpoints: ["Some assets"] } },
+    ]);
+    render(<RefreshData loading={false} />);
+    fireEvent.click(screen.getByRole("button", { name: "Source status" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent("OKX");
+    expect(dialog).toHaveTextContent("Some assets could not be read this time");
+  });
+
   it("shows a quiet warning and one toast for a partial-only refresh without opening the dialog", async () => {
     vi.mocked(refreshAllData).mockResolvedValue({
       ...partialResult, failedSources: [], usedLastKnownData: false,

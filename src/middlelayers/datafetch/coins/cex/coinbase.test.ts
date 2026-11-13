@@ -10,6 +10,7 @@ import {
 import CryptoJS from "crypto-js";
 import { sendHttpRequest } from "../../utils/http";
 import { CoinbaseExchange } from "./coinbase";
+import { takeOptionalSourceFailures } from "../../utils/source-failure";
 
 vi.mock("../../utils/http", async () => ({
   ...await vi.importActual<typeof import("../../utils/http")>("../../utils/http"),
@@ -137,5 +138,38 @@ describe("CoinbaseExchange", () => {
     await expect(exchange.verifyConfig()).resolves.toBe(false);
     expect(exchange.getIdentity()).toBe("coinbase-bad-key");
     expect(exchange.getIdentity()).not.toContain("PRIVATE KEY");
+  });
+
+  it("includes a user-created CONSUMER portfolio with DEFAULT holdings", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.endsWith("/portfolios")) return { portfolios: [
+        { name: "Default", uuid: "default", type: "DEFAULT", deleted: false },
+        { name: "Named", uuid: "named", type: "CONSUMER", deleted: false },
+      ] } as never;
+      if (url.endsWith("/portfolios/default") || url.endsWith("/portfolios/named")) {
+        return { breakdown: { spot_positions: [{ asset: "BTC", total_balance_crypto: 1 }] } } as never;
+      }
+      throw new Error(`Unexpected Coinbase request: ${url}`);
+    });
+    await expect(new CoinbaseExchange("key", PRIVATE_KEY).fetchTotalBalance())
+      .resolves.toEqual({ BTC: 2 });
+  });
+
+  it("flags an unhandled active portfolio type as partial", async () => {
+    vi.mocked(sendHttpRequest).mockImplementation(async (_method, url) => {
+      if (url.endsWith("/portfolios")) return { portfolios: [
+        { name: "Default", uuid: "default", type: "DEFAULT", deleted: false },
+        { name: "Other", uuid: "other", type: "UNDEFINED", deleted: false },
+      ] } as never;
+      if (url.endsWith("/portfolios/default")) {
+        return { breakdown: { spot_positions: [{ asset: "BTC", total_balance_crypto: 1 }] } } as never;
+      }
+      throw new Error(`Unexpected Coinbase request: ${url}`);
+    });
+    const exchange = new CoinbaseExchange("key", PRIVATE_KEY);
+    await expect(exchange.fetchTotalBalance()).resolves.toEqual({ BTC: 1 });
+    expect(takeOptionalSourceFailures(exchange)).toEqual({
+      category: "unsupported", endpoints: ["Portfolio UNDEFINED"],
+    });
   });
 });

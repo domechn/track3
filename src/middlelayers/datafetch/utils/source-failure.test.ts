@@ -71,10 +71,16 @@ describe("source error categories", () => {
     expect(takeSourceFailure(source)?.message).not.toContain("sk-abcdefghijklmnop1234567890");
   });
 
-  it("ignores endpoint labels outside the approved catalog", () => {
+  it("uses a safe generic endpoint for labels outside the approved catalog", () => {
     const source = {};
     recordOptionalSourceFailure(source, new Error("network error"), "constructor");
-    expect(takeOptionalSourceFailures(source)).toBeUndefined();
+    expect(takeOptionalSourceFailures(source)).toEqual({ category: "network", endpoints: ["Some assets"] });
+  });
+
+  it("marks an unknown optional endpoint as Some assets without exposing its label", () => {
+    const source = {};
+    recordOptionalSourceFailure(source, new Error("network error"), "TYPO-secret-url");
+    expect(takeOptionalSourceFailures(source)).toEqual({ category: "network", endpoints: ["Some assets"] });
   });
 
   it("ignores HTTP permission errors for ordinary optional products", () => {

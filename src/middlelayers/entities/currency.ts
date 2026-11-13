@@ -244,3 +244,7 @@ const CURRENCY_DETAILS: { [k: string]: (string | number)[] } = {
   ZMW: ["Zambian kwacha", "ZK", "ZMW", 99],
   ZWL: ["Zimbabwean dollar", "$", "ZWL", 99],
 };
+
+export function isSupportedCurrencyCode(symbol: string): boolean {
+  return Object.prototype.hasOwnProperty.call(CURRENCY_DETAILS, symbol.toUpperCase());
+}

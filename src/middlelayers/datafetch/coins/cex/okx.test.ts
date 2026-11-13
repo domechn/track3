@@ -19,6 +19,10 @@ afterEach(() => {
 });
 
 describe("OkxExchange", () => {
+  it("rejects an HTTP 200 response carrying a nonzero OKX error code", async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValue({ code: "50001", msg: "API error", data: [] });
+    await expect(new OkxExchange("key", "secret", "pass").fetchTotalBalance()).rejects.toThrow("OKX API error");
+  });
   it("signs private paths and merges normalized non-zero balances", async () => {
     vi.mocked(sendHttpRequest)
       .mockResolvedValueOnce({

@@ -2,6 +2,7 @@ import { Analyzer, TokenConfig, WalletCoin } from "../types";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
 import { asyncMap } from "../utils/async";
+import { isTonAddress } from "../utils/address-validation";
 
 export class TonAnalyzer implements Analyzer {
   private readonly config: Pick<TokenConfig, "ton">;
@@ -21,9 +22,7 @@ export class TonAnalyzer implements Analyzer {
   async postLoad(): Promise<void> {}
 
   async verifyConfigs(): Promise<boolean> {
-    const regex = /^(E|U)[1-9A-Za-z-]{47}$/;
-
-    const valid = getAddressList(this.config.ton).every((address) => regex.test(address));
+    const valid = getAddressList(this.config.ton).every(isTonAddress);
     return valid;
   }
 

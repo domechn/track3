@@ -86,6 +86,24 @@ describe("market_price skill", () => {
     expect(data.prices.AAPL.type).toBe("stock");
   });
 
+  it("does not return an unrelated stock quote for held broker cash in auto mode", async () => {
+    vi.mocked(ASSET_HANDLER.listAllSymbols).mockResolvedValue(["NOK"]);
+    vi.mocked(ASSET_HANDLER.listAssetsAfterCreatedAt).mockResolvedValue([
+      { id: 1, uuid: "u", createdAt: "2026-01-01T00:00:00.000Z",
+        assetType: "stock", wallet: "ibkr:one", symbol: "NOK",
+        amount: 1000, value: 90, price: 0.09 },
+    ] as any);
+    vi.mocked(invoke).mockResolvedValue({ NOK: 6 });
+    vi.mocked(fetchStockPrices).mockResolvedValue({ NOK: 5 });
+
+    const result = await skill.run(
+      { symbols: ["NOK"], type: "auto" },
+      { baseCurrency },
+    );
+
+    expect((result.data as any).prices).toEqual({});
+  });
+
   it("converts USD prices into the base currency", async () => {
     vi.mocked(invoke).mockResolvedValue({ BTC: 1000 });
     vi.mocked(listAllCurrencyRates).mockResolvedValue([

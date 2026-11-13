@@ -43,27 +43,7 @@ export async function fetchStockPrices(
     return {};
   }
 
-  // Currency symbols represent broker cash; asking for stock quotes can return
-  // an unrelated ticker or currency index.
-  const candidates = normalizedSymbols.filter((s) => /^[A-Z]{3}$/.test(s) && s !== "USD");
-  const currencyRates = candidates.length
-    ? await listAllCurrencyRates().catch(() => []) : [];
-  const cashPrices: Record<string, number> = {};
-  if (normalizedSymbols.includes("USD")) cashPrices.USD = 1;
-  for (const rate of currencyRates) {
-    const symbol = rate.currency.toUpperCase();
-    if (candidates.includes(symbol) && Number.isFinite(rate.rate) && rate.rate > 0) {
-      cashPrices[symbol] = 1 / rate.rate;
-    }
-  }
-  const fetchableSymbols = normalizedSymbols.filter((s) => cashPrices[s] === undefined);
-
-  const entries =
-    fetchableSymbols.length > 0
-      ? await fetchStockPriceEntries(fetchableSymbols)
-      : [];
-
-  return { ...await convertEntriesToUsd(entries), ...cashPrices };
+  return convertEntriesToUsd(await fetchStockPriceEntries(normalizedSymbols));
 }
 
 async function convertEntriesToUsd(

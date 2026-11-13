@@ -2,6 +2,7 @@ import { Exchanger } from './cex'
 import CryptoJS from 'crypto-js'
 import qs from 'qs'
 import { sendHttpRequest } from '../../utils/http'
+import { recordOptionalSourceFailure } from '../../utils/source-failure'
 import bluebird from 'bluebird'
 
 type AccountBalanceResp = {
@@ -16,6 +17,7 @@ type AccountBalanceResp = {
 }
 
 export class KrakenExchange implements Exchanger {
+	private static lastNonce = 0n
 
 	private readonly apiKey: string
 	private readonly secret: string
@@ -67,12 +69,17 @@ export class KrakenExchange implements Exchanger {
 					break
 				}
 			}
+			const rawSymbol = symbol
 			symbol = normalizeKrakenSymbol(symbol)
 
 			const amount = parseFloat(v.balance) || 0
 
 			const lastValue = res[symbol] ?? 0
 			if (amount > 0) {
+				if (symbol === rawSymbol && /^[XZ][A-Z0-9]{3,4}$/.test(rawSymbol) &&
+					!knownKrakenZAssets.has(rawSymbol)) {
+					recordOptionalSourceFailure(this, new Error("Unknown Kraken asset code"), "Some assets")
+				}
 				res[symbol] = lastValue + amount
 			}
 		})
@@ -117,8 +124,10 @@ export class KrakenExchange implements Exchanger {
   private static nonceSeq: number = 0;
 
   private async fetch<T>(method: "GET" | "POST", path: string, postData: {} = {}): Promise<T> {
-    KrakenExchange.nonceSeq++;
-    const nonce = `${Date.now()}${String(KrakenExchange.nonceSeq).padStart(4, "0")}`
+    KrakenExchange.nonceSeq = (KrakenExchange.nonceSeq % 9999) + 1;
+    const candidate = BigInt(`${Date.now()}${String(KrakenExchange.nonceSeq).padStart(4, "0")}`);
+    KrakenExchange.lastNonce = candidate > KrakenExchange.lastNonce ? candidate : KrakenExchange.lastNonce + 1n;
+    const nonce = KrakenExchange.lastNonce.toString()
 		const param = {
 			nonce,
 			...(postData || {})
@@ -148,13 +157,24 @@ export class KrakenExchange implements Exchanger {
 	}
 }
 
+const krakenAliases: Record<string, string> = {
+	XBT: "BTC", XXBT: "BTC", XETH: "ETH", XXRP: "XRP", XLTC: "LTC",
+	XXLM: "XLM", XXDG: "DOGE", XDG: "DOGE", XXMR: "XMR", XZEC: "ZEC",
+	XETC: "ETC", XREP: "REP", XMLN: "MLN",
+	ZUSD: "USD", ZEUR: "EUR", ZGBP: "GBP", ZCAD: "CAD", ZJPY: "JPY", ZAUD: "AUD",
+}
+const knownKrakenZAssets = new Set(["ZEUS", "ZETA", "ZORA"])
+const krakenFiat = new Set([
+	"ARS", "AUD", "CAD", "CHF", "CLP", "COP", "DKK", "EUR", "GBP", "GEL",
+	"GHS", "JPY", "LKR", "MXN", "NOK", "PLN", "SEK", "UGX", "USD", "VND", "XOF",
+])
+const krakenCrypto = new Set(["ADA", "BCH", "EOS", "TRX", "LTC", "XRP", "ETH", "XLM", "XMR", "ZEC", "ETC"])
+
 function normalizeKrakenSymbol(symbol: string): string {
 	const normalized = symbol.trim().toUpperCase()
-	if (normalized === "XBT" || normalized === "XXBT") {
-		return "BTC"
-	}
-	if (normalized === "XETH") {
-		return "ETH"
-	}
+	if (krakenAliases[normalized]) return krakenAliases[normalized]
+	const generic = /^([XZ])([A-Z]{3})$/.exec(normalized)
+	if (generic?.[1] === "Z" && krakenFiat.has(generic[2])) return generic[2]
+	if (generic?.[1] === "X" && krakenCrypto.has(generic[2])) return generic[2]
 	return normalized
 }

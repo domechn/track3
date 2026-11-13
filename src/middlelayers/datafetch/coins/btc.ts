@@ -2,6 +2,7 @@ import { Analyzer, TokenConfig, WalletCoin } from "../types";
 import { asyncMap } from "../utils/async";
 import { sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
+import { isBitcoinAddress } from "../utils/address-validation";
 
 interface BTCQuerier {
   query(address: string): Promise<number>;
@@ -22,9 +23,7 @@ export class BTCAnalyzer implements Analyzer {
   async postLoad(): Promise<void> {}
 
   async verifyConfigs(): Promise<boolean> {
-    const regex = /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/;
-
-    const valid = getAddressList(this.config.btc).every((address) => regex.test(address));
+    const valid = getAddressList(this.config.btc).every(isBitcoinAddress);
     return valid;
   }
 

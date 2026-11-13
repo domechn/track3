@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendHttpRequest } from "../../utils/http";
 import { HtxExchange } from "./htx";
 import { takeOptionalSourceFailures } from "../../utils/source-failure";
+import { classifySourceError } from "../../utils/source-failure";
 
 vi.mock("../../utils/http", () => ({
   sendHttpRequest: vi.fn(),
@@ -20,6 +21,11 @@ afterEach(() => {
 });
 
 describe("HtxExchange", () => {
+  it("classifies an HTX account signature error as authentication", async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValue({ status: "error", err_code: "api-signature-not-valid", data: [] });
+    const error = await new HtxExchange("key", "secret").fetchTotalBalance().catch((cause: unknown) => cause);
+    expect(classifySourceError(error)).toBe("auth");
+  });
   const fixture = (
     accounts: { id: number; type: string; state: string; subtype?: string }[],
     balances: Record<number, { currency: string; type: string; balance: string }[]> = {},

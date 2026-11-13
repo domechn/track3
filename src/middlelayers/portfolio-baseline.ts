@@ -4,6 +4,7 @@ import {
   normalizeWalletToMD5,
 } from "../lib/utils";
 import { getAssetType } from "./datafetch/utils/coins";
+import { isSupportedCurrencyCode } from "./entities/currency";
 import type { WalletCoin } from "./datafetch/types";
 import type { AssetModel } from "./types";
 
@@ -206,11 +207,16 @@ function isFailedWallet(
 }
 
 function assetModelToLastKnownWalletCoin(asset: AssetModel): WalletCoin {
+  // A saved currency-named stock row may be broker cash; keep its price while its source is stale.
+  const savedPrice = getAssetType(asset) === "stock" && isSupportedCurrencyCode(asset.symbol) &&
+    Number.isFinite(asset.price) && asset.price > 0
+    ? { base: "usd" as const, value: asset.price } : undefined;
   return {
     symbol: asset.symbol,
     assetType: getAssetType(asset),
     amount: asset.amount,
     wallet: addMD5PrefixToWallet(asset.wallet || ""),
+    ...(savedPrice ? { price: savedPrice } : {}),
   };
 }
 
@@ -246,7 +252,8 @@ export function mergePortfoliosWithBaseline(
         // The stored row aggregates attached sources. Their old contributions
         // cannot be separated, so retain the exact aggregate until retry.
         current.amount = lastKnown.amount;
-        delete current.price;
+        if (lastKnown.price) current.price = lastKnown.price;
+        else delete current.price;
         return;
       }
       lastKnownCoins.push(lastKnown);

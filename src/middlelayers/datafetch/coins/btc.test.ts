@@ -37,6 +37,21 @@ describe("BTCAnalyzer", () => {
     await expect(invalid.verifyConfigs()).resolves.toBe(false);
   });
 
+  it("accepts BIP173 and BIP350 mainnet vectors, P2PKH and P2SH, but rejects bad checksums", async () => {
+    const valid = [
+      "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
+      "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy",
+      "BC1QW508D6QEJXTDG4Y5R3ZARVARY0C5XW7KV8F3T4",
+      "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0",
+      "bc1pw508d6qejxtdg4y5r3zarvary0c5xw7kw508d6qejxtdg4y5r3zarvary0c5xw7kt5nd6y",
+    ];
+    await expect(new BTCAnalyzer({ btc: { addresses: valid } }).verifyConfigs()).resolves.toBe(true);
+    await expect(new BTCAnalyzer({ btc: { addresses: [
+      "bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqh2y7hd",
+      "1BoatSLRHtKNngkdXEeobR76b53LETtpyU",
+    ] } }).verifyConfigs()).resolves.toBe(false);
+  });
+
   it("returns an empty portfolio without making a request", async () => {
     const analyzer = new BTCAnalyzer({ btc: { addresses: [] } });
 

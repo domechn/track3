@@ -88,10 +88,12 @@ export class CoinbaseExchange implements Exchanger {
 		await Promise.all(
 			activePortfolios.map(async (portfolio) => {
 				try {
-					if (portfolio.type === 'DEFAULT') {
+					if (portfolio.type === 'DEFAULT' || portfolio.type === 'CONSUMER') {
 						await this.addDefaultPortfolioBalances(portfolio.uuid, balances)
 					} else if (portfolio.type === 'INTX') {
 						await this.addPerpPortfolioBalances(portfolio.uuid, balances)
+					} else {
+						recordOptionalSourceFailure(this, new Error("Unsupported portfolio type"), `Portfolio ${portfolio.type}`)
 					}
 				} catch (error) {
 					if (portfolio.type === "INTX" &&

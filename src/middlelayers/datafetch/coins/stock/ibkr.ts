@@ -309,8 +309,15 @@ export class IbkrBroker implements StockBroker {
     const cashCurrencies = report.positions.filter((position) => position.kind === "cash" && position.currency !== "USD");
     const rates = cashCurrencies.length ? await listAllCurrencyRates().catch(() => []) : [];
     const rateMap = Object.fromEntries(rates.map((rate) => [rate.currency.toUpperCase(), rate.rate]));
+    const securitySymbols = new Set(report.positions
+      .filter((position) => position.kind === "stock" || position.kind === "fund")
+      .map((position) => applyMarketSuffix(position.symbol, position.market, position.currency)));
     const coins: WalletCoin[] = [];
     for (const position of report.positions) {
+      if (position.kind === "cash" && securitySymbols.has(position.symbol)) {
+        recordOptionalSourceFailure(this, new Error("IBKR cash conflicts with security ticker"), "IBKR cash");
+        continue;
+      }
       const symbol = position.kind === "stock" || position.kind === "fund"
         ? applyMarketSuffix(position.symbol, position.market, position.currency) : position.symbol;
       if (position.kind === "fund" && !(Number.isFinite(fundPrices[symbol]) && fundPrices[symbol] > 0)) {
