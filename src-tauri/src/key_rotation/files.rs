@@ -402,14 +402,19 @@ pub(super) fn write_random_restricted(
 }
 
 fn write_restricted_new(path: &Path, data: &[u8]) -> Result<(), std::io::Error> {
-    let mut options = OpenOptions::new();
-    options.create_new(true).write(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.custom_flags(libc::O_NOFOLLOW).mode(0o600);
-    }
-    let mut file = options.open(path)?;
+    #[cfg(not(windows))]
+    let mut file = {
+        let mut options = OpenOptions::new();
+        options.create_new(true).write(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.custom_flags(libc::O_NOFOLLOW).mode(0o600);
+        }
+        options.open(path)?
+    };
+    #[cfg(windows)]
+    let mut file = create_restricted_windows_file(path)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -419,6 +424,69 @@ fn write_restricted_new(path: &Path, data: &[u8]) -> Result<(), std::io::Error> 
     file.flush()?;
     file.sync_all()?;
     sync_parent(path).map_err(std::io::Error::other)
+}
+
+#[cfg(windows)]
+fn create_restricted_windows_file(path: &Path) -> Result<File, std::io::Error> {
+    use std::os::windows::{ffi::OsStrExt, io::FromRawHandle};
+    use windows_sys::Win32::{
+        Foundation::{LocalFree, GENERIC_WRITE, INVALID_HANDLE_VALUE},
+        Security::{
+            Authorization::ConvertStringSecurityDescriptorToSecurityDescriptorW,
+            PSECURITY_DESCRIPTOR, SECURITY_ATTRIBUTES,
+        },
+        Storage::FileSystem::{
+            CreateFileW, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, FILE_FLAG_OPEN_REPARSE_POINT,
+        },
+    };
+
+    // Attach the protected owner-only DACL before writing any key material.
+    let sddl = "D:P(A;;FA;;;OW)(A;;FA;;;SY)\0"
+        .encode_utf16()
+        .collect::<Vec<_>>();
+    let mut descriptor: PSECURITY_DESCRIPTOR = std::ptr::null_mut();
+    if unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            sddl.as_ptr(),
+            1,
+            &mut descriptor,
+            std::ptr::null_mut(),
+        )
+    } == 0
+    {
+        return Err(std::io::Error::last_os_error());
+    }
+    let name = path
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    let attributes = SECURITY_ATTRIBUTES {
+        nLength: std::mem::size_of::<SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: descriptor,
+        bInheritHandle: 0,
+    };
+    let handle = unsafe {
+        CreateFileW(
+            name.as_ptr(),
+            GENERIC_WRITE,
+            0,
+            &attributes,
+            CREATE_NEW,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
+            std::ptr::null_mut(),
+        )
+    };
+    let error = if handle == INVALID_HANDLE_VALUE {
+        Some(std::io::Error::last_os_error())
+    } else {
+        None
+    };
+    unsafe { LocalFree(descriptor) };
+    if let Some(error) = error {
+        return Err(error);
+    }
+    Ok(unsafe { File::from_raw_handle(handle) })
 }
 
 pub(super) fn read_optional_string(path: &Path) -> Result<Option<String>, String> {

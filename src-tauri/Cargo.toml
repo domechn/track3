@@ -16,6 +16,12 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [workspace]
 members = ["pure-tests"]
 
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
@@ -24,6 +30,7 @@ tauri-build = {version = "=2.7.4", features = [] }
 [dependencies]
 aes = "=0.8.4"
 aes-gcm-siv = "0.11.1"
+argon2 = "=0.5.3"
 base64 = "0.22.1"
 cbc = "=0.1.2"
 coingecko = {git = "https://github.com/domechn/coingecko-rs.git", rev = "41e819e"}
@@ -41,6 +48,7 @@ tokio = {version = "=1.44.2", features = ["sync"] }
 uuid = {version = "=1.20.0", features = ["v4"] }
 # Keep native TLS enabled for tauri-plugin-http so HTTP uses the OS trust store.
 reqwest = "=0.12.28"
+ring = "=0.17.14"
 indexmap = "=2.11.4"
 tauri-plugin-dialog = "=2.8.3"
 tauri-plugin-fs = "=2.7.1"
@@ -63,7 +71,7 @@ tauri-plugin-process = "=2.4.0"
 tauri-plugin-shell = "=2.5.0"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem"] }
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_Security", "Win32_Security_Authorization"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "=0.2.186"

@@ -148,6 +148,23 @@ function grantsCommand(identifier: string, wanted: string, seen = new Set<string
 }
 
 describe("Tauri ACL", () => {
+  it("places the Windows GUI subsystem attribute on the binary crate", () => {
+    const main = readFileSync(join(root, "src-tauri/src/main.rs"), "utf8");
+    const app = readFileSync(join(root, "src-tauri/src/app.rs"), "utf8");
+    expect(main).toMatch(/^#!\[cfg_attr\(\s*all\(not\(debug_assertions\), target_os = "windows"\),\s*windows_subsystem = "windows"\s*\)\]/);
+    expect(app).not.toContain('windows_subsystem = "windows"');
+  });
+
+  it("keeps recursive picked backup directories writable beyond the static fs scope", () => {
+    const app = readFileSync(join(root, "src-tauri/src/app.rs"), "utf8");
+    const desktop = readFileSync(join(root, "src/components/data-management.tsx"), "utf8");
+    expect(desktop).toMatch(/directory: true,\s*recursive: true/);
+    expect(app).toContain("SELECT data FROM configuration WHERE id = 3");
+    expect(app).toContain("if path.is_dir()");
+    expect(app).toMatch(/\.fs_scope\(\)\s*\.allow_directory\(path, true\)/);
+    expect(app).toMatch(/run_migrations\([\s\S]*?grant_saved_backup_folder\(\s*app\.handle\(\),\s*&database_path/);
+  });
+
   it("targets a window or webview in every capability", () => {
     for (const capability of capabilities) {
       expect((capability.windows?.length ?? 0) + (capability.webviews?.length ?? 0),

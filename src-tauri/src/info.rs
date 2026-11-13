@@ -20,41 +20,33 @@ struct CoinGeckoCoin {
     symbol: String,
 }
 
-const MAX_PRICE_CANDIDATES_PER_SYMBOL: usize = 25;
 const MAX_PRICE_IDS_LENGTH: usize = 1800;
 
 fn select_price_coin<'a>(
     candidates: &'a [CoinGeckoCoin],
     caps: &HashMap<String, f64>,
-) -> &'a CoinGeckoCoin {
-    candidates
-        .iter()
-        .max_by(|left, right| {
-            let cap = |coin: &CoinGeckoCoin| {
-                caps.get(&coin.id)
-                    .copied()
-                    .filter(|cap| cap.is_finite() && *cap > 0.0)
-                    .unwrap_or(0.0)
-            };
-            let exact = |coin: &CoinGeckoCoin| coin.id.eq_ignore_ascii_case(&coin.symbol);
-            exact(left)
-                .cmp(&exact(right))
-                .then_with(|| cap(left).total_cmp(&cap(right)))
-                .then_with(|| right.id.cmp(&left.id))
+) -> Option<&'a CoinGeckoCoin> {
+    if candidates.len() > 1
+        && !candidates.iter().any(|coin| {
+            caps.get(&coin.id)
+                .is_some_and(|cap| cap.is_finite() && *cap > 0.0)
         })
-        .expect("coin group is nonempty")
-}
-
-fn limit_price_candidates(mut coins: Vec<CoinGeckoCoin>) -> Vec<CoinGeckoCoin> {
-    coins.sort_by(|left, right| left.id.cmp(&right.id));
-    if let Some(exact) = coins
-        .iter()
-        .position(|coin| coin.id.eq_ignore_ascii_case(&coin.symbol))
     {
-        return vec![coins.remove(exact)];
+        return None;
     }
-    coins.truncate(MAX_PRICE_CANDIDATES_PER_SYMBOL);
-    coins
+    candidates.iter().max_by(|left, right| {
+        let cap = |coin: &CoinGeckoCoin| {
+            caps.get(&coin.id)
+                .copied()
+                .filter(|cap| cap.is_finite() && *cap > 0.0)
+                .unwrap_or(0.0)
+        };
+        let exact = |coin: &CoinGeckoCoin| coin.id.eq_ignore_ascii_case(&coin.symbol);
+        cap(left)
+            .total_cmp(&cap(right))
+            .then_with(|| exact(left).cmp(&exact(right)))
+            .then_with(|| right.id.cmp(&left.id))
+    })
 }
 
 fn price_id_batches(ids: &[String]) -> Result<Vec<Vec<&str>>, Error> {
@@ -89,7 +81,11 @@ fn map_coin_prices(
 ) -> HashMap<String, f64> {
     coins
         .iter()
-        .filter_map(|coin| get_price(&coin.id).map(|price| (coin.symbol.clone(), price)))
+        .filter_map(|coin| {
+            get_price(&coin.id)
+                .filter(|price| price.is_finite() && *price > 0.0)
+                .map(|price| (coin.symbol.clone(), price))
+        })
         .collect()
 }
 
@@ -236,10 +232,7 @@ impl CoinGecko {
         for coin in all_coins {
             groups.entry(coin.symbol.clone()).or_default().push(coin);
         }
-        let groups = groups
-            .into_values()
-            .map(limit_price_candidates)
-            .collect::<Vec<_>>();
+        let groups = groups.into_values().collect::<Vec<_>>();
 
         // todo: if there are multi coins with same symbol, we should find by tokenAddress
         let all_ids = groups
@@ -260,7 +253,7 @@ impl CoinGecko {
             .collect();
         let selected = groups
             .iter()
-            .map(|coins| select_price_coin(coins, &caps).clone())
+            .filter_map(|coins| select_price_coin(coins, &caps).cloned())
             .collect::<Vec<_>>();
         let res = map_coin_prices(&selected, |id| {
             all_prices.get(id).and_then(|price| price.usd)
@@ -283,14 +276,28 @@ mod tests {
     }
 
     #[test]
-    fn exact_symbol_id_wins_even_with_a_smaller_market_cap() {
+    fn market_cap_winner_after_twenty_five_alphabetical_ids_is_selected() {
+        let coins = (0..30)
+            .map(|index| candidate(&format!("coin-{index:02}")))
+            .collect::<Vec<_>>();
+        let caps = HashMap::from([
+            ("coin-00".to_string(), 1.0),
+            ("coin-29".to_string(), 1_000_000.0),
+        ]);
+        assert_eq!(select_price_coin(&coins, &caps).unwrap().id, "coin-29");
+    }
+
+    #[test]
+    fn exact_symbol_id_does_not_override_market_cap() {
         let coins = vec![candidate("large"), candidate("dup")];
         let caps = HashMap::from([("large".to_string(), 100.0), ("dup".to_string(), 1.0)]);
 
-        assert_eq!(select_price_coin(&coins, &caps).id, "dup");
+        assert_eq!(select_price_coin(&coins, &caps).unwrap().id, "large");
         assert_eq!(
-            select_price_coin(&[coins[1].clone(), coins[0].clone()], &caps).id,
-            "dup"
+            select_price_coin(&[coins[1].clone(), coins[0].clone()], &caps)
+                .unwrap()
+                .id,
+            "large"
         );
     }
 
@@ -299,24 +306,33 @@ mod tests {
         let coins = vec![candidate("small"), candidate("large")];
         let caps = HashMap::from([("small".to_string(), 1.0), ("large".to_string(), 100.0)]);
 
-        assert_eq!(select_price_coin(&coins, &caps).id, "large");
+        assert_eq!(select_price_coin(&coins, &caps).unwrap().id, "large");
         assert_eq!(
-            select_price_coin(&[coins[1].clone(), coins[0].clone()], &caps).id,
+            select_price_coin(&[coins[1].clone(), coins[0].clone()], &caps)
+                .unwrap()
+                .id,
             "large"
         );
     }
 
     #[test]
-    fn tied_or_missing_market_caps_choose_the_lowest_id() {
+    fn tied_market_caps_choose_the_lowest_id() {
         let coins = vec![candidate("z"), candidate("a")];
         let caps = HashMap::from([("z".to_string(), 10.0), ("a".to_string(), 10.0)]);
 
-        assert_eq!(select_price_coin(&coins, &caps).id, "a");
-        assert_eq!(select_price_coin(&coins, &HashMap::new()).id, "a");
+        assert_eq!(select_price_coin(&coins, &caps).unwrap().id, "a");
         assert_eq!(
-            select_price_coin(&[coins[1].clone(), coins[0].clone()], &caps).id,
+            select_price_coin(&[coins[1].clone(), coins[0].clone()], &caps)
+                .unwrap()
+                .id,
             "a"
         );
+    }
+
+    #[test]
+    fn ambiguous_symbol_without_market_caps_has_no_trustworthy_price() {
+        let coins = vec![candidate("one"), candidate("two")];
+        assert!(select_price_coin(&coins, &HashMap::new()).is_none());
     }
 
     #[test]
@@ -336,9 +352,11 @@ mod tests {
             ("valid".to_string(), 2.0),
         ]);
 
-        assert_eq!(select_price_coin(&coins, &caps).id, "valid");
+        assert_eq!(select_price_coin(&coins, &caps).unwrap().id, "valid");
         assert_eq!(
-            select_price_coin(&[coins[4].clone(), coins[0].clone()], &caps).id,
+            select_price_coin(&[coins[4].clone(), coins[0].clone()], &caps)
+                .unwrap()
+                .id,
             "valid"
         );
     }
@@ -379,20 +397,39 @@ mod tests {
     }
 
     #[test]
-    fn limits_ambiguous_candidates_to_the_lowest_twenty_five_ids() {
-        let coins = (0..26)
-            .rev()
-            .map(|index| candidate(&format!("coin-{index:02}")))
-            .collect::<Vec<_>>();
-
-        let limited = limit_price_candidates(coins.clone());
-        assert_eq!(limited.len(), 25);
-        assert_eq!(limited.first().unwrap().id, "coin-00");
-        assert_eq!(limited.last().unwrap().id, "coin-24");
-
-        let mut with_exact = coins;
-        with_exact.push(candidate("dup"));
-        assert_eq!(limit_price_candidates(with_exact)[0].id, "dup");
+    fn queries_price_for_candidate_after_the_first_twenty_five_ids() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            for request_number in 0..2 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0; 4096];
+                let length = stream.read(&mut request).unwrap();
+                let request = String::from_utf8_lossy(&request[..length]);
+                let body = if request_number == 0 {
+                    assert!(request.contains("/coins/list"));
+                    serde_json::to_string(&(0..30).map(|index| serde_json::json!({
+                        "id": format!("coin-{index:02}"), "symbol": "dup", "name": "Coin",
+                    })).collect::<Vec<_>>()).unwrap()
+                } else {
+                    assert!(request.contains("coin-29"));
+                    assert!(request.contains("include_market_cap=true"));
+                    r#"{"coin-00":{"usd":1,"usd_market_cap":1},"coin-29":{"usd":99,"usd_market_cap":1000000}}"#.to_string()
+                };
+                write!(stream, "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}", body.len()).unwrap();
+            }
+        });
+        let host = Box::leak(format!("http://{address}").into_boxed_str());
+        let provider = CoinGecko {
+            client: CoinGeckoClient::new(host),
+        };
+        let prices = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(provider.query_coins_prices(vec!["DUP".into()]))
+            .unwrap();
+        server.join().unwrap();
+        assert_eq!(prices.get("DUP"), Some(&99.0));
     }
 
     #[test]
@@ -435,6 +472,19 @@ mod tests {
         assert_eq!(prices.get("BTC"), Some(&65000.0));
         assert_eq!(prices.get("ETH"), Some(&3500.0));
         assert!(!prices.contains_key("MISS"));
+    }
+
+    #[test]
+    fn omits_unusable_zero_and_nonfinite_prices_from_a_mixed_response() {
+        let coins = ["zero", "nan", "valid"].map(|id| CoinGeckoCoin {
+            id: id.to_string(),
+            symbol: id.to_uppercase(),
+        });
+        let prices = HashMap::from([("zero", 0.0), ("nan", f64::NAN), ("valid", 2.5)]);
+        assert_eq!(
+            map_coin_prices(&coins, |id| prices.get(id).copied()),
+            HashMap::from([("VALID".to_string(), 2.5)])
+        );
     }
 
     #[test]

@@ -22,6 +22,7 @@ import {
   saveLastAutoImportAt,
   saveLastAutoBackupAt,
 } from "./configuration";
+import type { RequestImportPassphrase } from "./configuration";
 import {
   CoinPriceQuerier,
   CoinPriceQuery,
@@ -342,13 +343,14 @@ export async function fetchPortfolios(
 
 export async function exportHistoricalData(
   exportConfiguration = false,
+  passphrase?: string,
 ): Promise<boolean> {
   return exportFile("track3-export-data.json", ["json"], (path) =>
-    DATA_MANAGER.exportHistoricalData(path, exportConfiguration));
+    DATA_MANAGER.exportHistoricalData(path, exportConfiguration, passphrase));
 }
 
-export async function shareHistoricalData(exportConfiguration = false): Promise<void> {
-  await shareExport((path) => DATA_MANAGER.exportHistoricalData(path, exportConfiguration));
+export async function shareHistoricalData(exportConfiguration = false, passphrase?: string): Promise<void> {
+  await shareExport((path) => DATA_MANAGER.exportHistoricalData(path, exportConfiguration, passphrase));
 }
 
 // return true if there are duplicated data in track3-export-data
@@ -397,8 +399,13 @@ export async function readHistoricalDataFromPath(path: string): Promise<ExportDa
 export async function importHistoricalData(
   conflictResolver: "REPLACE" | "IGNORE",
   ed: ExportData,
+  requestPassphrase?: RequestImportPassphrase,
 ): Promise<boolean> {
-  await DATA_MANAGER.importHistoricalData(conflictResolver, ed);
+  if (requestPassphrase) {
+    await DATA_MANAGER.importHistoricalData(conflictResolver, ed, undefined, requestPassphrase);
+  } else {
+    await DATA_MANAGER.importHistoricalData(conflictResolver, ed);
+  }
   return true;
 }
 

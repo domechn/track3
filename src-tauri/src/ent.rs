@@ -2,16 +2,61 @@ use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
 use aes::Aes256;
 use aes_gcm_siv::aead::{Aead, KeyInit};
 use aes_gcm_siv::{Aes256GcmSiv, Nonce};
+use argon2::{Algorithm, Argon2, Params, Version};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use ring::{
+    pbkdf2,
+    rand::{SecureRandom, SystemRandom},
+};
 use sha2::{Digest as _, Sha256};
-use std::sync::Mutex;
+use std::{num::NonZeroU32, sync::Mutex};
 use uuid::Uuid;
 
 const ENT_V2_PREFIX: &str = "!ent:v2:";
+const ENT_V3_PREFIX: &str = "!ent:v3:";
+const ENT_V4_PREFIX: &str = "!ent:v4:";
+const SALT_LEN: usize = 16;
+const EXPORT_KDF_ITERATIONS: u32 = 600_000;
 const LEGACY_IV_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 
 type LegacyAes256CbcDec = cbc::Decryptor<Aes256>;
+
+#[derive(Clone, Copy)]
+enum SaltedVersion {
+    ExportV3,
+    LocalV4,
+}
+
+impl SaltedVersion {
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::ExportV3 => ENT_V3_PREFIX,
+            Self::LocalV4 => ENT_V4_PREFIX,
+        }
+    }
+
+    fn key(self, passphrase: &str, salt: &[u8]) -> Result<[u8; 32], Box<dyn std::error::Error>> {
+        let mut key = [0u8; 32];
+        match self {
+            Self::ExportV3 => pbkdf2::derive(
+                pbkdf2::PBKDF2_HMAC_SHA256,
+                NonZeroU32::new(EXPORT_KDF_ITERATIONS).unwrap(),
+                salt,
+                passphrase.as_bytes(),
+                &mut key,
+            ),
+            Self::LocalV4 => {
+                let params = Params::new(19 * 1024, 2, 1, Some(32))
+                    .map_err(|_| "invalid local key parameters")?;
+                Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
+                    .hash_password_into(passphrase.as_bytes(), salt, &mut key)
+                    .map_err(|_| "key derivation failed")?
+            }
+        }
+        Ok(key)
+    }
+}
 
 pub struct Ent {
     salt: String,
@@ -83,6 +128,18 @@ impl Ent {
         data: String,
         key: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
+        if cfg!(target_os = "ios") || key == crate::startup_security::LEGACY_ENCRYPTION_KEY {
+            self.encrypt_v2_with_key(data, key)
+        } else {
+            self.encrypt_salted(data, key, SaltedVersion::LocalV4)
+        }
+    }
+
+    fn encrypt_v2_with_key(
+        &self,
+        data: String,
+        key: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let key = Self::key_hash(key);
         let cipher = Aes256GcmSiv::new_from_slice(&key)?;
         let nonce = self.get_nonce_bytes();
@@ -95,6 +152,74 @@ impl Ent {
         payload.extend_from_slice(&encrypted);
 
         Ok(format!("{ENT_V2_PREFIX}{}", STANDARD.encode(payload)))
+    }
+
+    pub fn encrypt_export_with_passphrase(
+        &self,
+        data: String,
+        passphrase: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        if passphrase.chars().count() < 8 {
+            return Err("export passphrase must be at least 8 characters".into());
+        }
+        self.encrypt_salted(data, passphrase, SaltedVersion::ExportV3)
+    }
+
+    fn encrypt_salted(
+        &self,
+        data: String,
+        passphrase: &str,
+        version: SaltedVersion,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        if passphrase.is_empty() {
+            return Err("passphrase is empty".into());
+        }
+        let mut salt = [0u8; SALT_LEN];
+        SystemRandom::new()
+            .fill(&mut salt)
+            .map_err(|_| "salt generation failed")?;
+        let key = version.key(passphrase, &salt)?;
+        let cipher = Aes256GcmSiv::new_from_slice(&key)?;
+        let nonce = self.get_nonce_bytes();
+        let ciphertext = cipher
+            .encrypt(Nonce::from_slice(&nonce), data.as_bytes())
+            .map_err(|_| "encrypt error")?;
+        let mut payload = Vec::with_capacity(SALT_LEN + NONCE_LEN + ciphertext.len());
+        payload.extend_from_slice(&salt);
+        payload.extend_from_slice(&nonce);
+        payload.extend_from_slice(&ciphertext);
+        Ok(format!("{}{}", version.prefix(), STANDARD.encode(payload)))
+    }
+
+    pub fn decrypt_export_with_passphrase(
+        &self,
+        data: &str,
+        passphrase: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        self.decrypt_salted(data, passphrase, SaltedVersion::ExportV3)
+    }
+
+    fn decrypt_salted(
+        &self,
+        data: &str,
+        passphrase: &str,
+        version: SaltedVersion,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let encoded = data
+            .strip_prefix(version.prefix())
+            .ok_or("not a salted payload")?;
+        let payload = STANDARD.decode(encoded)?;
+        if payload.len() <= SALT_LEN + NONCE_LEN {
+            return Err("invalid salted payload".into());
+        }
+        let (salt, rest) = payload.split_at(SALT_LEN);
+        let (nonce, ciphertext) = rest.split_at(NONCE_LEN);
+        let key = version.key(passphrase, salt)?;
+        let cipher = Aes256GcmSiv::new_from_slice(&key)?;
+        let plaintext = cipher
+            .decrypt(Nonce::from_slice(nonce), ciphertext)
+            .map_err(|_| "decrypt error")?;
+        Ok(String::from_utf8(plaintext)?)
     }
 
     fn decrypt_v2_with_key(
@@ -187,6 +312,12 @@ impl Ent {
         encrypted_data: String,
         key: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
+        if encrypted_data.starts_with(ENT_V4_PREFIX) {
+            return self.decrypt_salted(&encrypted_data, key, SaltedVersion::LocalV4);
+        }
+        if encrypted_data.starts_with(ENT_V3_PREFIX) {
+            return self.decrypt_export_with_passphrase(&encrypted_data, key);
+        }
         if encrypted_data.starts_with(ENT_V2_PREFIX) {
             return self.decrypt_v2_with_key(&encrypted_data, key);
         }
@@ -258,11 +389,92 @@ mod tests {
     }
 
     #[test]
+    fn passphrase_exports_round_trip_with_distinct_salts_and_reject_wrong_passphrase() {
+        let ent = make_ent();
+        let first = ent
+            .encrypt_export_with_passphrase("secret".into(), "export-passphrase")
+            .unwrap();
+        let second = ent
+            .encrypt_export_with_passphrase("secret".into(), "export-passphrase")
+            .unwrap();
+        assert!(first.starts_with("!ent:v3:"));
+        assert_ne!(first, second);
+        let first_payload = STANDARD
+            .decode(first.strip_prefix("!ent:v3:").unwrap())
+            .unwrap();
+        let second_payload = STANDARD
+            .decode(second.strip_prefix("!ent:v3:").unwrap())
+            .unwrap();
+        assert_ne!(
+            &first_payload[..super::SALT_LEN],
+            &second_payload[..super::SALT_LEN]
+        );
+        assert_eq!(
+            ent.decrypt_export_with_passphrase(&first, "export-passphrase")
+                .unwrap(),
+            "secret"
+        );
+        assert!(ent
+            .decrypt_export_with_passphrase(&first, "wrong-passphrase")
+            .is_err());
+    }
+
+    #[test]
+    fn portable_exports_refuse_short_passphrases() {
+        let ent = make_ent();
+        assert!(ent
+            .encrypt_export_with_passphrase("secret".into(), "short")
+            .is_err());
+    }
+
+    #[test]
+    fn old_device_key_exports_still_decrypt() {
+        let ent = make_ent();
+        let old_export = ent
+            .encrypt_v2_with_key("old export".into(), TEST_KEY)
+            .unwrap();
+        assert_eq!(ent.decrypt(old_export).unwrap(), "old export");
+    }
+
+    #[test]
+    fn shared_default_key_keeps_the_v2_ciphertext_format() {
+        let ent = super::Ent::new();
+        ent.set_key(crate::startup_security::LEGACY_ENCRYPTION_KEY.to_string())
+            .unwrap();
+        let encrypted = ent.encrypt("default install".into()).unwrap();
+        assert!(encrypted.starts_with("!ent:v2:"));
+        assert_eq!(ent.decrypt(encrypted).unwrap(), "default install");
+    }
+
+    #[test]
+    fn new_custom_key_ciphertext_uses_salted_v4_and_old_v2_remains_readable() {
+        let ent = make_ent();
+        let first = ent.encrypt("configuration".into()).unwrap();
+        let second = ent.encrypt("configuration".into()).unwrap();
+        assert!(first.starts_with("!ent:v4:"));
+        let first_salt = STANDARD
+            .decode(first.strip_prefix("!ent:v4:").unwrap())
+            .unwrap();
+        let second_salt = STANDARD
+            .decode(second.strip_prefix("!ent:v4:").unwrap())
+            .unwrap();
+        assert_ne!(
+            &first_salt[..super::SALT_LEN],
+            &second_salt[..super::SALT_LEN]
+        );
+        assert_eq!(ent.decrypt(first).unwrap(), "configuration");
+        let old = ent
+            .encrypt_v2_with_key("older configuration".into(), TEST_KEY)
+            .unwrap();
+        assert_eq!(ent.decrypt(old).unwrap(), "older configuration");
+    }
+
+    #[test]
     fn test_encrypt_and_decrypt() {
         let ent = make_ent();
         let encrypted = ent.encrypt("hello".to_string()).unwrap();
         assert_eq!(ent.is_ent(encrypted.as_str()), true);
-        assert!(encrypted.starts_with("!ent:v2:"));
+        assert!(encrypted.starts_with("!ent:v4:"));
 
         let decrypted = ent.decrypt(encrypted).unwrap();
         assert_eq!(decrypted, "hello".to_string());

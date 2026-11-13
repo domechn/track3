@@ -42,6 +42,10 @@ function detectInitialLocale(): Locale {
   return "en";
 }
 
+export function translateForCurrentLocale(key: string): string {
+  return dictionaries[detectInitialLocale()][key] ?? dictionaries.en[key] ?? key;
+}
+
 type I18nContextValue = {
   locale: Locale;
   setLocale: (locale: Locale) => void;

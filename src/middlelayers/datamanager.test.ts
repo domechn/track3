@@ -253,10 +253,10 @@ describe("DATA_MANAGER historical data import/export", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-04-16T13:00:00.000Z"));
 
-    await DATA_MANAGER.exportHistoricalData("/tmp/track3-export.json", true);
+    await DATA_MANAGER.exportHistoricalData("/tmp/track3-export.json", true, "export passphrase");
 
     expect(queryHistoricalData).toHaveBeenCalledWith(-1, false);
-    expect(exportConfigurationString).toHaveBeenCalledOnce();
+    expect(exportConfigurationString).toHaveBeenCalledWith("export passphrase");
     expect(getClientID).toHaveBeenCalledOnce();
     expect(getVersion).toHaveBeenCalledOnce();
     expect(writeTextFile).toHaveBeenCalledTimes(1);
@@ -287,6 +287,19 @@ describe("DATA_MANAGER historical data import/export", () => {
     );
   });
 
+  it("does not write a checked configuration export without a passphrase", async () => {
+    await expect(DATA_MANAGER.exportHistoricalData("/tmp/export-without-secrets.json", true))
+      .rejects.toThrow("Export passphrase");
+    expect(writeTextFile).not.toHaveBeenCalled();
+  });
+
+  it("does not write a checked configuration export when configuration is unavailable", async () => {
+    mocks.exportConfigurationString.mockResolvedValue(undefined);
+    await expect(DATA_MANAGER.exportHistoricalData("/tmp/export-without-secrets.json", true, "export passphrase"))
+      .rejects.toThrow("Configuration");
+    expect(writeTextFile).not.toHaveBeenCalled();
+  });
+
   it("imports valid historical assets, transactions, and exported configuration", async () => {
     const data = makeExportData();
 
@@ -303,7 +316,7 @@ describe("DATA_MANAGER historical data import/export", () => {
       mocks.writeDatabase,
     );
     expect(mocks.executeWriteWork).not.toHaveBeenCalled();
-    expect(parseRawConfiguration).toHaveBeenCalledWith("raw-config");
+    expect(parseRawConfiguration).toHaveBeenCalledWith("raw-config", undefined);
     expect(runWithPreparedConfigurationWrite).toHaveBeenCalledTimes(1);
     expect(mocks.writeConfiguration).toHaveBeenCalledWith(true);
   });

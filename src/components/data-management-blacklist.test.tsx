@@ -93,6 +93,7 @@ beforeEach(() => {
   mocks.getBlacklistCoins.mockResolvedValue(["BTC"]);
   mocks.queryBackupSummary.mockResolvedValue({ snapshots: 12, assets: 3, transactions: 9 });
   mocks.invoke.mockResolvedValue(undefined);
+  vi.spyOn(window, "confirm").mockReturnValue(Promise.resolve(true) as unknown as boolean);
   mocks.removeFromBlacklist.mockResolvedValue(undefined);
   mocks.addToBlacklist.mockResolvedValue(undefined);
   mocks.cleanAutoBackupDirectory.mockResolvedValue(undefined);
@@ -100,6 +101,40 @@ beforeEach(() => {
 });
 
 describe("Data Management", () => {
+  it("shows the shared default key warning and status in Settings Data", async () => {
+    mocks.invoke.mockImplementation(async (command: string) => command === "encryption_key_status" ? false : undefined);
+    render(<DataManagement />);
+    expect(await screen.findByText("Default key")).toBeInTheDocument();
+    expect(screen.getByText(/Default key is shared by all Track3 installs/)).toBeInTheDocument();
+  });
+
+  it("confirms removal of a custom key and shows the default status afterward", async () => {
+    mocks.invoke.mockImplementation(async (command: string) => command === "encryption_key_status" ? true : undefined);
+    render(<DataManagement />);
+    expect(await screen.findByText("Custom key")).toBeInTheDocument();
+    vi.mocked(window.confirm).mockReturnValueOnce(Promise.resolve(false) as unknown as boolean);
+    fireEvent.click(screen.getByRole("button", { name: "Remove custom key" }));
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledOnce());
+    expect(mocks.invoke).not.toHaveBeenCalledWith("reset_encryption_key");
+    fireEvent.click(screen.getByRole("button", { name: "Remove custom key" }));
+    await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("reset_encryption_key"));
+    expect(await screen.findByText("Default key")).toBeInTheDocument();
+  });
+
+  it("does not rotate a key when the asynchronous storage warning is cancelled", async () => {
+    vi.mocked(window.confirm).mockReturnValueOnce(Promise.resolve(false) as unknown as boolean);
+    render(<DataManagement />);
+    fireEvent.change(screen.getByPlaceholderText("New encryption key (min 8 chars)"), {
+      target: { value: "new-key-123" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Confirm new encryption key"), {
+      target: { value: "new-key-123" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Update Encryption Key" }));
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledOnce());
+    expect(mocks.invoke).not.toHaveBeenCalledWith("rotate_encryption_key", expect.anything());
+  });
+
   it("shows an empty restore list for a configured folder without backup copies", async () => {
     mocks.getAutoBackupDirectory.mockResolvedValue("/cloud");
     render(<DataManagement />);
@@ -125,6 +160,47 @@ describe("Data Management", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Export$/ }));
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
       description: "Export data successfully", tone: "success",
+    }));
+  });
+  it("reports an export failure without displaying sensitive error details", async () => {
+    mocks.exportHistoricalData.mockRejectedValue(new Error("secret export failure"));
+    render(<DataManagement />);
+    fireEvent.click(screen.getByRole("button", { name: /^Export$/ }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
+      description: "Could not export data. Please try again.", variant: "destructive",
+    }));
+  });
+  it("uses an in-app passphrase for a checked configuration export and stops on Cancel", async () => {
+    mocks.exportHistoricalData.mockResolvedValue(true);
+    render(<DataManagement />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Include configuration" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Export$/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(mocks.exportHistoricalData).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(mocks.exportHistoricalData).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /^Export$/ }));
+    fireEvent.change(within(await screen.findByRole("dialog")).getByLabelText("Passphrase"), {
+      target: { value: "export passphrase" },
+    });
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(mocks.exportHistoricalData).toHaveBeenCalledWith(true, "export passphrase"));
+  });
+  it("asks for an import passphrase inside the app", async () => {
+    const data = { configuration: "!ent:v3:encrypted", historicalData: [] };
+    mocks.readHistoricalDataFromFile.mockResolvedValue(data);
+    mocks.checkIfDuplicatedHistoricalData.mockResolvedValue(false);
+    mocks.importHistoricalData.mockImplementation(async (_mode, _data, request) =>
+      (await request("import")) === "import passphrase");
+    render(<DataManagement />);
+    fireEvent.click(screen.getByRole("button", { name: "Import" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Passphrase"), {
+      target: { value: "import passphrase" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
+      description: "Import data successfully", tone: "success",
     }));
   });
   it("shows local history counts and names the two export categories", async () => {
@@ -263,7 +339,7 @@ describe("Data Management", () => {
         expect.objectContaining({ variant: "destructive" }),
       );
     });
-    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalledWith("rotate_encryption_key", expect.anything());
   });
 
   it.each([" leading-key", "trailing-key "])(
@@ -290,7 +366,7 @@ describe("Data Management", () => {
           variant: "destructive",
         });
       });
-      expect(mocks.invoke).not.toHaveBeenCalled();
+      expect(mocks.invoke).not.toHaveBeenCalledWith("rotate_encryption_key", expect.anything());
     },
   );
 
@@ -326,7 +402,7 @@ describe("Data Management", () => {
         variant: "destructive",
       });
     });
-    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalledWith("rotate_encryption_key", expect.anything());
   });
 
   it("invokes the atomic rotation command and clears fields on success", async () => {
@@ -347,13 +423,14 @@ describe("Data Management", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.invoke).toHaveBeenCalledTimes(1);
+      expect(mocks.invoke.mock.calls.filter(([command]) => command === "rotate_encryption_key")).toHaveLength(1);
       expect(mocks.invoke).toHaveBeenCalledWith("rotate_encryption_key", {
         newKey: "new-key-123",
       });
       expect(keyInput).toHaveValue("");
       expect(confirmationInput).toHaveValue("");
     });
+    expect(await screen.findByText("Custom key")).toBeInTheDocument();
     expect(mocks.toast).toHaveBeenCalledWith({
       description:
         "Encryption key updated. Sensitive configuration and chat message content were re-encrypted; assets and transactions remain unchanged.",
@@ -368,12 +445,9 @@ describe("Data Management", () => {
     });
     const activeWrite = runWithEncryptionWriteGate(() => activeWriteBlocked);
     let releaseRotation: (() => void) | undefined;
-    mocks.invoke.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          releaseRotation = resolve;
-        }),
-    );
+    mocks.invoke.mockImplementation((command: string) => command === "rotate_encryption_key"
+      ? new Promise<void>((resolve) => { releaseRotation = resolve; })
+      : Promise.resolve(undefined));
 
     render(<DataManagement />);
     fireEvent.change(
@@ -387,13 +461,14 @@ describe("Data Management", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Update Encryption Key" }),
     );
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledOnce());
 
     const lateWriter = vi.fn();
     const lateWrite = runWithEncryptionWriteGate(async () => {
       lateWriter();
     });
     await Promise.resolve();
-    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalledWith("rotate_encryption_key", expect.anything());
     expect(lateWriter).not.toHaveBeenCalled();
 
     releaseActiveWrite?.();
@@ -411,7 +486,8 @@ describe("Data Management", () => {
   });
 
   it("retains fields and shows a destructive toast when rotation fails", async () => {
-    mocks.invoke.mockRejectedValueOnce(new Error("rotation failed"));
+    mocks.invoke.mockImplementation((command: string) => command === "rotate_encryption_key"
+      ? Promise.reject(new Error("rotation failed")) : Promise.resolve(undefined));
     render(<DataManagement />);
     const keyInput = screen.getByPlaceholderText(
       "New encryption key (min 8 chars)",
@@ -439,10 +515,10 @@ describe("Data Management", () => {
   });
 
   it("requires restart when rotation recovery cannot roll back", async () => {
-    mocks.invoke.mockRejectedValueOnce({
+    mocks.invoke.mockImplementation((command: string) => command === "rotate_encryption_key" ? Promise.reject({
       code: "recovery_required",
       message: "backend recovery message",
-    });
+    }) : Promise.resolve(undefined));
     render(<DataManagement />);
 
     fireEvent.change(
@@ -468,12 +544,9 @@ describe("Data Management", () => {
 
   it("disables repeat submission while rotation is saving", async () => {
     let resolveRotation: (() => void) | undefined;
-    mocks.invoke.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveRotation = resolve;
-        }),
-    );
+    mocks.invoke.mockImplementation((command: string) => command === "rotate_encryption_key"
+      ? new Promise<void>((resolve) => { resolveRotation = resolve; })
+      : Promise.resolve(undefined));
     render(<DataManagement />);
 
     fireEvent.change(
@@ -493,7 +566,7 @@ describe("Data Management", () => {
     });
     expect(savingButton).toBeDisabled();
     fireEvent.click(savingButton);
-    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    expect(mocks.invoke.mock.calls.filter(([command]) => command === "rotate_encryption_key")).toHaveLength(1);
 
     resolveRotation?.();
     await waitFor(() => {

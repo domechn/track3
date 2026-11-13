@@ -68,6 +68,7 @@ import { BlacklistDesign } from "@/components/blacklist-design";
 import { SecurityDesign } from "@/components/security-design";
 import { BackupDesign } from "@/components/backup-design";
 import { useWideDesktop } from "@/components/use-wide-desktop";
+import { usePassphraseRequest } from "@/components/common/use-passphrase-request";
 
 const App = ({ onDataImported, currency }: { onDataImported?: () => void; currency?: CurrencyRateDetail }) => {
   const { toast } = useToast();
@@ -79,6 +80,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   const showSecurity = !section || section === "security";
   const syncStatus = useSyncExternalStore(syncRuntime.subscribe, syncRuntime.status);
   const [exportConfiguration, setExportConfiguration] = useState(false);
+  const passphraseDialog = usePassphraseRequest();
   const [showConflictResolverDialog, setShowConflictResolverDialog] =
     useState(false);
   const [exportData, setExportData] = useState<ExportData | undefined>(
@@ -101,6 +103,11 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   const [encKeyConfirm, setEncKeyConfirm] = useState("");
   const [encKeySaving, setEncKeySaving] = useState(false);
   const [keyRotated, setKeyRotated] = useState(false);
+  const [customKey, setCustomKey] = useState<boolean>();
+  useEffect(() => {
+    if (!showSecurity) return;
+    void invoke<boolean>("encryption_key_status").then(setCustomKey).catch(() => undefined);
+  }, [showSecurity]);
   const [secretInventory, setSecretInventory] = useState<{ exchanges: string[]; brokers: string[]; assistant?: string; sync?: string }>();
   useEffect(() => {
     if (!showSecurity || !wide) return;
@@ -120,7 +127,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
     });
     return () => { active = false; };
   }, [showSecurity, wide]);
-  async function handleChangeEncryptionKey() {
+  async function handleChangeEncryptionKey(confirmStorage = true) {
     if (!encKeyInput || encKeyInput !== encKeyConfirm) {
       toast({
         description: t("data.encryption.key.mismatch"),
@@ -142,12 +149,14 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       });
       return;
     }
+    if (confirmStorage && !(await window.confirm(t("data.encryption.key.storageWarning")))) return;
     setEncKeySaving(true);
     try {
       await runEncryptionKeyRotation(() =>
         invoke("rotate_encryption_key", { newKey: encKeyInput }),
       );
       setKeyRotated(true);
+      setCustomKey(true);
       toast({ description: t("data.encryption.key.success"), tone: "success" });
       setEncKeyInput("");
       setEncKeyConfirm("");
@@ -158,6 +167,24 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
           ? e.message
           : String(e);
       toast({ description: redactSecrets(description, [encKeyInput]), variant: "destructive" });
+    } finally {
+      setEncKeySaving(false);
+    }
+  }
+
+  async function handleResetEncryptionKey() {
+    if (!(await window.confirm(t("data.encryption.key.removeConfirm")))) return;
+    setEncKeySaving(true);
+    try {
+      await runEncryptionKeyRotation(() => invoke("reset_encryption_key"));
+      setCustomKey(false);
+      setKeyRotated(true);
+      toast({ description: t("data.encryption.key.success"), tone: "success" });
+    } catch (error) {
+      const description = isRecoveryRequiredRotationError(error)
+        ? t("data.encryption.key.recovery.required")
+        : isRotationCommandError(error) ? error.message : String(error);
+      toast({ description: redactSecrets(description), variant: "destructive" });
     } finally {
       setEncKeySaving(false);
     }
@@ -191,9 +218,13 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   }
 
   async function onExportDataClick() {
-    const exported = await exportHistoricalData(exportConfiguration);
-    if (exported) {
-      toast({ description: t("data.exportSuccess"), tone: "success" });
+    const passphrase = exportConfiguration ? await passphraseDialog.ask("export") : undefined;
+    if (exportConfiguration && !passphrase) return;
+    try {
+      const exported = await exportHistoricalData(exportConfiguration, passphrase);
+      if (exported) toast({ description: t("data.exportSuccess"), tone: "success" });
+    } catch {
+      toast({ description: t("data.exportFailed"), variant: "destructive" });
     }
   }
 
@@ -207,7 +238,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
     if (hasConflicts) {
       setShowConflictResolverDialog(true);
     } else {
-      importData("IGNORE");
+      importData("IGNORE", ed);
     }
   }
 
@@ -248,15 +279,15 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
     }
   }
 
-  async function importData(cr: UniqueIndexConflictResolver) {
-    if (!exportData) {
+  async function importData(cr: UniqueIndexConflictResolver, selectedData = exportData) {
+    if (!selectedData) {
       toast({
         description: t("data.noDataToImport"),
         variant: "destructive",
       });
       return;
     }
-    return importHistoricalData(cr, exportData)
+    return importHistoricalData(cr, selectedData, passphraseDialog.ask)
       .then((imported) => {
         if (!imported) {
           return;
@@ -283,6 +314,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
     const selected = await open({
       multiple: false,
       directory: true,
+      recursive: true,
     });
     if (selected) {
       const path = selected as string;
@@ -338,11 +370,37 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   const backupDesign = section === "backup" && wide;
   return (
     <div className="space-y-6">
+      <Dialog open={!!passphraseDialog.request} onOpenChange={(open) => { if (!open) passphraseDialog.answer(); }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{t(passphraseDialog.request?.kind === "export" ? "data.export" : "data.import")}</DialogTitle>
+            <DialogDescription>{t(passphraseDialog.request?.kind === "export"
+              ? "data.encryption.key.exportPassphrase"
+              : passphraseDialog.request?.kind === "legacy"
+                ? "data.encryption.key.legacyImportKey"
+                : "data.encryption.key.importPassphrase")}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(event) => { event.preventDefault(); passphraseDialog.answer(passphraseDialog.passphrase); }} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="backup-passphrase">{t("data.encryption.key.passphraseLabel")}</Label>
+              <Input id="backup-passphrase" type="password" autoComplete="off" value={passphraseDialog.passphrase}
+                onChange={(event) => passphraseDialog.setPassphrase(event.target.value)} />
+              {passphraseDialog.request?.kind === "export" && passphraseDialog.passphrase.length > 0 && Array.from(passphraseDialog.passphrase).length < 8 &&
+                <p className="text-sm text-destructive">{t("data.encryption.key.exportPassphraseShort")}</p>}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => passphraseDialog.answer()}>{t("common.cancel")}</Button>
+              <Button type="submit" disabled={!passphraseDialog.passphrase.trim() ||
+                (passphraseDialog.request?.kind === "export" && Array.from(passphraseDialog.passphrase).length < 8)}>{t("common.confirm")}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       {securityDesign && <SecurityDesign
         syncReady={syncStatus.mode === "ready"} encKeyInput={encKeyInput} setEncKeyInput={setEncKeyInput}
         encKeyConfirm={encKeyConfirm} setEncKeyConfirm={setEncKeyConfirm}
-        encKeySaving={encKeySaving} keyRotated={keyRotated} secretInventory={secretInventory}
-        onRotate={() => { void handleChangeEncryptionKey(); }} />}
+        encKeySaving={encKeySaving} keyRotated={keyRotated} customKey={customKey} secretInventory={secretInventory}
+        onRotate={() => { void handleChangeEncryptionKey(false); }} onReset={() => { void handleResetEncryptionKey(); }} />}
       <Dialog open={!!itemPreview} onOpenChange={(open) => { if (!open && !itemBusy) setItemPreview(undefined); }}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[680px]">
           <DialogHeader><DialogTitle>{t("data.importPreview.title")}</DialogTitle></DialogHeader>
@@ -572,11 +630,14 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
           <CardTitle className="text-sm font-medium text-muted-foreground">
             {t("data.encryption.key.title")}
           </CardTitle>
+          {customKey !== undefined && <span className="w-fit rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{t(customKey ? "data.encryption.key.customStatus" : "data.encryption.key.defaultStatus")}</span>}
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
+          <p className="text-muted-foreground">{t("data.encryption.key.sharedDefault")}</p>
           <p className="text-muted-foreground">
             {t("data.encryption.key.description")}
           </p>
+          <p className="text-muted-foreground">{t("data.encryption.key.storageWarning")}</p>
           <Input
             type="password"
             placeholder={t("data.encryption.key.newPlaceholder")}
@@ -591,11 +652,12 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
             onChange={(e) => setEncKeyConfirm(e.target.value)}
             autoComplete="off"
           />
-          <Button onClick={handleChangeEncryptionKey} disabled={encKeySaving} size="sm">
+          <Button onClick={() => void handleChangeEncryptionKey()} disabled={encKeySaving} size="sm">
             {encKeySaving
               ? t("data.encryption.key.saving")
               : t("data.encryption.key.update")}
           </Button>
+          {customKey && <Button onClick={() => void handleResetEncryptionKey()} disabled={encKeySaving} size="sm" variant="outline">{t("data.encryption.key.remove")}</Button>}
         </CardContent>
       </Card>}
     </div>

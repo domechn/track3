@@ -9,6 +9,8 @@ use tokio::sync::Mutex;
 
 use crate::ent::Ent;
 use crate::startup_security::validate_encryption_key_material;
+#[cfg(not(target_os = "ios"))]
+use crate::startup_security::LEGACY_ENCRYPTION_KEY;
 
 use files::{
     cleanup_file_artifacts, install_contents, install_key_contents, read_optional_string,
@@ -24,7 +26,7 @@ pub const RECOVERY_REQUIRED_MESSAGE: &str =
 
 pub use journal::RotationPhase;
 
-#[derive(PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 #[serde(tag = "code", rename_all = "snake_case")]
 pub enum RotationCommandError {
     Failed { message: String },
@@ -149,6 +151,53 @@ pub async fn rotate_encryption_key_for_command(
     .map_err(RotationFailure::into_command_error)
 }
 
+#[cfg(not(target_os = "ios"))]
+pub async fn reset_encryption_key_for_command(
+    database_path: &Path,
+    app_data_dir: &Path,
+    ent: &Ent,
+) -> Result<(), RotationCommandError> {
+    let _rotation_guard = ROTATION_MUTEX.lock().await;
+    recover_locked(database_path, app_data_dir, ent)
+        .await
+        .map_err(|message| RotationCommandError::RecoveryRequired { message })?;
+    if journal::read(app_data_dir)
+        .map_err(|message| RotationCommandError::RecoveryRequired { message })?
+        .is_some()
+    {
+        return Err(RotationCommandError::RecoveryRequired {
+            message: RECOVERY_REQUIRED_MESSAGE.to_string(),
+        });
+    }
+    if ent
+        .current_key()
+        .map_err(|message| RotationCommandError::Failed { message })?
+        != LEGACY_ENCRYPTION_KEY
+    {
+        rotate_locked(
+            database_path,
+            app_data_dir,
+            ent,
+            LEGACY_ENCRYPTION_KEY.to_string(),
+            RotationFailpoint::None,
+        )
+        .await
+        .map_err(RotationFailure::into_command_error)?;
+    }
+    remove_default_key_file(app_data_dir)
+        .map_err(|message| RotationCommandError::Failed { message })
+}
+
+#[cfg(not(target_os = "ios"))]
+fn remove_default_key_file(app_data_dir: &Path) -> Result<(), String> {
+    let path = app_data_dir.join(KEY_FILE_NAME);
+    match read_optional_string(&path)? {
+        Some(key) if key == LEGACY_ENCRYPTION_KEY => remove_if_exists(&path),
+        Some(_) => Err("persisted encryption key changed unexpectedly".to_string()),
+        None => Ok(()),
+    }
+}
+
 pub async fn recover_pending_rotation(
     database_path: &Path,
     app_data_dir: &Path,
@@ -253,18 +302,26 @@ async fn recover_locked(
     validate_journal(&journal)?;
     align_active_key_for_recovery(app_data_dir, ent, &journal)?;
 
-    match execute_forward(
+    let execution = execute_forward(
         database_path,
         app_data_dir,
         ent,
         &mut journal,
         RotationFailpoint::None,
     )
-    .await
-    {
+    .await;
+    let completed = execution.is_ok();
+    let result = match execution {
         Ok(()) | Err(ExecutionError::CommittedWarning(_)) => Ok(()),
         Err(error) => Err(error.into_message()),
+    };
+    #[cfg(not(target_os = "ios"))]
+    if completed && journal.new_key == LEGACY_ENCRYPTION_KEY {
+        remove_default_key_file(app_data_dir)?;
     }
+    #[cfg(target_os = "ios")]
+    let _ = completed;
+    result
 }
 
 fn align_active_key_for_recovery(
