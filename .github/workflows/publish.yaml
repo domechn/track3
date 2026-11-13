@@ -11,6 +11,7 @@ concurrency:
 jobs:
   prepare-release:
     runs-on: ubuntu-22.04
+    timeout-minutes: 15
     permissions:
       contents: write
     outputs:
@@ -44,6 +45,7 @@ jobs:
 
   publish-tauri:
     needs: prepare-release
+    timeout-minutes: 120
     permissions:
       contents: write
     strategy:
@@ -91,11 +93,21 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+      - name: cache apt packages (ubuntu only)
+        if: matrix.os == 'ubuntu-22.04'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/apt-archives
+          key: ${{ runner.os }}-apt-tauri-${{ hashFiles('.github/workflows/publish.yaml') }}
+          restore-keys: ${{ runner.os }}-apt-tauri-
       - name: install dependencies (ubuntu only)
         if: matrix.os == 'ubuntu-22.04'
+        timeout-minutes: 15
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          mkdir -p "$HOME/.cache/apt-archives/partial"
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo chown -R "$USER:$USER" "$HOME/.cache/apt-archives"
       - name: install target
         if: matrix.target != ''
         run: rustup target add ${{ matrix.target }}
@@ -118,6 +130,7 @@ jobs:
   finalize-release:
     needs: [prepare-release, publish-tauri]
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
