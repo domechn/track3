@@ -39,6 +39,7 @@ import {
   getAssetType,
 } from "./datafetch/utils/coins";
 import { fetchStockPrices } from "./datafetch/utils/price";
+import { isSupportedCurrencyCode } from "./entities/currency";
 import { WalletAnalyzer } from "./wallet";
 import { OthersAnalyzer } from "./datafetch/coins/others";
 import { ASSET_HANDLER } from "./entities/assets";
@@ -501,8 +502,10 @@ export function generateTransactions(
 
   const makeVanishedDraft = (asset: AssetModel): RefreshTransactionDraft | undefined => {
     const identity = getAssetIdentity(asset);
-    const quotedPrice = currentPrices[identity];
-    const currentPrice = Number.isFinite(quotedPrice) && quotedPrice > 0
+    // Saved stock rows cannot distinguish broker cash from a currency-named ticker.
+    const quotedPrice = getAssetType(asset) === "stock" && isSupportedCurrencyCode(asset.symbol)
+      ? undefined : currentPrices[identity];
+    const currentPrice = quotedPrice !== undefined && Number.isFinite(quotedPrice) && quotedPrice > 0
       ? quotedPrice : undefined;
     const previousPrice = Number.isFinite(asset.price) && asset.price > 0
       ? asset.price : asset.value / asset.amount;
@@ -759,7 +762,9 @@ async function queryStalePrices(
     asset.amount > 0 && identities.some((identity) => isSameWallet(identity, asset.wallet ?? "")),
   );
   const cryptoSymbols = [...new Set(staleAssets.filter((asset) => getAssetType(asset) === "crypto").map((asset) => asset.symbol))];
-  const stockSymbols = [...new Set(staleAssets.filter((asset) => getAssetType(asset) === "stock").map((asset) => asset.symbol))];
+  const stockSymbols = [...new Set(staleAssets.filter((asset) =>
+    getAssetType(asset) === "stock" && !isSupportedCurrencyCode(asset.symbol)
+  ).map((asset) => asset.symbol))];
   const [crypto, stock] = await Promise.all([
     cryptoSymbols.length ? queryCoinPrices(cryptoSymbols, userInfo).catch(() => ({})) : Promise.resolve({}),
     stockSymbols.length ? fetchStockPrices(stockSymbols).catch(() => ({})) : Promise.resolve({}),
@@ -1070,7 +1075,8 @@ async function queryCoinsData(
   const cryptoSymbols = [...new Set(vanished.filter((asset) =>
     getAssetType(asset) === "crypto").map((asset) => asset.symbol))];
   const stockSymbols = [...new Set(vanished.filter((asset) =>
-    getAssetType(asset) === "stock").map((asset) => asset.symbol))];
+    getAssetType(asset) === "stock" && !isSupportedCurrencyCode(asset.symbol)
+  ).map((asset) => asset.symbol))];
   const [cryptoPrices, stockPrices] = await Promise.all([
     cryptoSymbols.length ? queryCoinPrices(cryptoSymbols, userProInfo).catch(() => ({})) : Promise.resolve({}),
     stockSymbols.length ? fetchStockPrices(stockSymbols).catch(() => ({})) : Promise.resolve({}),

@@ -6,6 +6,7 @@ import { addToBalanceMap, mergeBalances } from './balance-utils'
 
 type AccountResp = {
 	status: string
+	err_code?: number | string
 	data: {
 		id: number
 		type: string
@@ -16,6 +17,7 @@ type AccountResp = {
 
 type AccountBalanceResp = {
 	status: string
+	err_code?: number | string
 	data: {
 		id: number
 		type: string
@@ -217,7 +219,7 @@ export class HtxExchange implements Exchanger {
 	private async fetchAccounts(): Promise<AccountResp['data']> {
 		const resp = await this.fetchSpot<AccountResp>("GET", "/v1/account/accounts")
 		if (resp.status !== "ok") {
-			throw new Error(`HTX API error: ${resp.status}`)
+			throw new Error(`HTX API error: ${resp.err_code ?? resp.status}`)
 		}
 		return resp.data
 	}
@@ -230,7 +232,7 @@ export class HtxExchange implements Exchanger {
 
 		const resp = await this.fetchSpot<AccountBalanceResp>("GET", `/v1/account/accounts/${spotAccount.id}/balance`)
 		if (resp.status !== "ok") {
-			throw new Error(`HTX API error: ${resp.status}`)
+			throw new Error(`HTX API error: ${resp.err_code ?? resp.status}`)
 		}
 
 		const balances: { [k: string]: number } = {}

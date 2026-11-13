@@ -53,7 +53,7 @@ it("marks a Binance isolated margin debt that the portfolio cannot represent as 
   });
   const analyzer = new CexAnalyzer({ exchanges: [{ name: "binance", initParams: { apiKey: "key", secret: "secret" } }] });
   expect(await analyzer.loadPortfolio()).toEqual([]);
-  expect(takeOptionalSourceFailures(analyzer)).toEqual({ category: "other", endpoints: ["Isolated margin"] });
+  expect(takeOptionalSourceFailures(analyzer)).toEqual({ category: "other", endpoints: ["Isolated margin", "Some assets"] });
 });
 
 it("keeps Gate spot balances after a dual investment timeout", async () => {

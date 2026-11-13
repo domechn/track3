@@ -207,6 +207,47 @@ describe("IBKR Flex parser", () => {
     ]);
   });
 
+  it("prices explicit USD and EUR cash while leaving currency-named STK positions for stock quoting", async () => {
+    vi.mocked(sendHttpTextRequest).mockResolvedValueOnce(`<FlexQueryResponse><FlexStatements><FlexStatement>
+      <AccountInformation currency="USD"/><CashReport>
+        <CashReportCurrency currency="USD" endingCash="100"/>
+        <CashReportCurrency currency="EUR" endingCash="50"/>
+      </CashReport><OpenPositions>
+        <OpenPosition symbol="AMD" assetCategory="STK" position="2" currency="USD"/>
+        <OpenPosition symbol="COP" assetCategory="STK" position="3" currency="USD"/>
+        <OpenPosition symbol="NIO" assetCategory="STK" position="4" currency="USD"/>
+        <OpenPosition symbol="TTD" assetCategory="STK" position="5" currency="USD"/>
+      </OpenPositions>
+    </FlexStatement></FlexStatements></FlexQueryResponse>`);
+    vi.mocked(listAllCurrencyRates).mockResolvedValue([{ currency: "EUR", rate: 0.8 }] as never);
+    const coins = await new IbkrBroker("cash-and-stocks", "cash-and-stocks").loadPortfolio();
+    expect(coins.filter((coin) => ["AMD", "COP", "NIO", "TTD"].includes(coin.symbol)))
+      .toEqual(["AMD", "COP", "NIO", "TTD"].map((symbol, index) => ({
+        symbol, assetType: "stock", amount: index + 2, wallet: "ibkr:cash-and-stocks",
+      })));
+    expect(coins.filter((coin) => ["USD", "EUR"].includes(coin.symbol)))
+      .toEqual([
+        { symbol: "USD", assetType: "stock", amount: 100, wallet: "ibkr:cash-and-stocks", price: { base: "usd", value: 1 } },
+        { symbol: "EUR", assetType: "stock", amount: 50, wallet: "ibkr:cash-and-stocks", price: { base: "usd", value: 1.25 } },
+      ]);
+  });
+
+  it("omits cash when its code collides with an STK ticker in the same broker wallet", async () => {
+    vi.mocked(sendHttpTextRequest).mockResolvedValueOnce(`<FlexQueryResponse><FlexStatements><FlexStatement>
+      <AccountInformation currency="USD"/><CashReport>
+        <CashReportCurrency currency="EUR" endingCash="50"/>
+      </CashReport><OpenPositions>
+        <OpenPosition symbol="EUR" assetCategory="STK" position="2" currency="USD"/>
+      </OpenPositions>
+    </FlexStatement></FlexStatements></FlexQueryResponse>`);
+    vi.mocked(listAllCurrencyRates).mockResolvedValue([{ currency: "EUR", rate: 0.8 }] as never);
+    const broker = new IbkrBroker("collision", "collision");
+    await expect(broker.loadPortfolio()).resolves.toEqual([
+      { symbol: "EUR", assetType: "stock", amount: 2, wallet: "ibkr:collision" },
+    ]);
+    expect(takeOptionalSourceFailures(broker)).toEqual({ category: "other", endpoints: ["IBKR cash"] });
+  });
+
   it("does not infer USD when the cash summary has no account currency", () => {
     const xml = `<FlexQueryResponse><FlexStatements><FlexStatement accountId="U1">
       <CashReport><CashReportCurrency currency="BASE_SUMMARY" endingCash="780"/></CashReport>

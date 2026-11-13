@@ -3,6 +3,7 @@ import { Analyzer, TokenConfig, WalletCoin } from "../types";
 import { retryOnHttpStatus, sendHttpRequest } from "../utils/http";
 import { getAddressList } from "../utils/address";
 import { asyncMap } from "../utils/async";
+import { isSolanaAddress } from "../utils/address-validation";
 
 export class SOLAnalyzer implements Analyzer {
   private readonly config: Pick<TokenConfig, "sol">;
@@ -22,9 +23,7 @@ export class SOLAnalyzer implements Analyzer {
   async postLoad(): Promise<void> {}
 
   async verifyConfigs(): Promise<boolean> {
-    const regex = /^[1-9A-HJ-NP-Za-km-z]{44}$/;
-
-    const valid = getAddressList(this.config.sol).every((address) => regex.test(address));
+    const valid = getAddressList(this.config.sol).every(isSolanaAddress);
     return valid;
   }
 
@@ -71,6 +70,8 @@ export class SOLAnalyzer implements Analyzer {
 
     const tokens = await this.queryTokens(cas);
 
+    // Persisted assets have only wallet + symbol identity, so a mint collision must be partial.
+    const seenSymbols = new Map<string, string>();
     return newBalances
       .filter((b) => b.amount > 0)
       .map((b) => {
@@ -85,8 +86,16 @@ export class SOLAnalyzer implements Analyzer {
         }
         const token = tokens[b.ca];
         if (!token) {
+          recordOptionalSourceFailure(this, new Error("Unpriced or unverified Solana token"), "Some assets");
           return null;
         }
+        const symbolKey = `${b.address}:${token.symbol.trim().toUpperCase()}`;
+        const previousMint = seenSymbols.get(symbolKey);
+        if (previousMint && previousMint !== b.ca) {
+          recordOptionalSourceFailure(this, new Error("Solana token symbol collision"), "Some assets");
+          return null;
+        }
+        seenSymbols.set(symbolKey, b.ca);
         return {
           symbol: token.symbol,
           assetType: "crypto" as const,
@@ -126,12 +135,14 @@ export class SOLAnalyzer implements Analyzer {
             name: string;
             symbol: string;
             usdPrice: number;
+            isVerified?: boolean;
           }[]
         >("GET", url, 5000);
-        return resp.map((v) => ({
+        return resp.filter((v) => chunk.includes(v.id) && v.isVerified === true &&
+          !!v.symbol?.trim() && Number.isFinite(v.usdPrice) && v.usdPrice > 0).map((v) => ({
           ca: v.id,
           symbol: v.symbol,
-          price: v.usdPrice || 0,
+          price: v.usdPrice,
         }));
       },
       2,
@@ -192,7 +203,7 @@ export class SOLAnalyzer implements Analyzer {
       .map(([k, vs]) => ({
         address,
         ca: k,
-        amount: vs[0]?.uiAmount || 0,
+        amount: vs.reduce((sum, account) => sum + (account.uiAmount || 0), 0),
       }))
       .filter((c) => c.amount > 0);
 

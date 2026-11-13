@@ -128,8 +128,7 @@ export function recordSourceFailure(source: object, error: unknown): void {
 export function recordOptionalSourceFailure(
   source: object, error: unknown, label: string, includeAuth = false, reportUnavailable = false,
 ): void {
-  const endpoint = safePartialEndpoint(label);
-  if (!endpoint) return;
+  const endpoint = safePartialEndpoint(label) ?? "Some assets";
   const status = (error as { status?: number })?.status;
   const reportAuth = includeAuth && (status === 401 || status === 403);
   if ((status === 401 || status === 403) && !reportAuth) return;

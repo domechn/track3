@@ -1914,6 +1914,35 @@ describe("refreshAllData persistence", () => {
     ]);
     expect(fetchStockPrices).toHaveBeenCalledWith(["AAA", "BBB"]);
   });
+
+  it("withdraws vanished IBKR NOK cash at its saved price when NOK has an unrelated stock quote", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[
+      { id: 1, uuid: "before", createdAt: "2024-01-01T00:00:00.000Z",
+        assetType: "stock", wallet: md5("ibkr:one"), symbol: "NOK",
+        amount: 1000, value: 90, price: 0.09 },
+    ]] as never);
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [],
+      sourceResults: [
+        { sourceId: "stock:0", label: "IBKR 1", walletIdentities: ["ibkr:one"], status: "ok", coins: [] },
+      ],
+      failedSources: [],
+    } as never);
+    vi.mocked(fetchStockPrices).mockResolvedValue({ NOK: 5 });
+
+    await refreshAllData(vi.fn(), {}, operation);
+
+    const payload = vi.mocked(invoke).mock.calls[0][1] as {
+      assets: Array<{ symbol: string; wallet: string; price: number }>;
+      txns: Array<{ symbol: string; wallet: string; txnType: string; price: number }>;
+    };
+    expect(payload.txns).toContainEqual(expect.objectContaining({
+      symbol: "NOK", wallet: md5("ibkr:one"), txnType: "withdraw", price: 0.09,
+    }));
+    expect(payload.assets).toContainEqual(expect.objectContaining({
+      symbol: "NOK", wallet: md5("ibkr:one"), price: 0.09,
+    }));
+  });
 });
 
 describe("partial source snapshots", () => {
@@ -2211,6 +2240,61 @@ describe("partial source snapshots", () => {
       expect.objectContaining({ symbol: "AAPL", amount: 3, price: 200, value: 600 }),
       expect.objectContaining({ symbol: "BTC", amount: 2, price: 100, value: 200 }),
     ]));
+  });
+
+  it("uses a fresh quote for a stale three-letter stock that is not a currency code", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
+      id: 1, uuid: "previous", createdAt: "2026-07-13T01:02:03.000Z", assetType: "stock",
+      wallet: md5("ibkr:one"), symbol: "AAA", amount: 3, value: 300, price: 100,
+    }]] as never);
+    vi.mocked(fetchStockPrices).mockResolvedValue({ AAA: 150 });
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ symbol: "BTC", assetType: "crypto", amount: 2, wallet: "wallet-b", price: { base: "usd", value: 100 } }],
+      sourceResults: [
+        { sourceId: "stock:0", label: "IBKR 1", walletIdentities: ["ibkr:one"], status: "stale", coins: [], category: "network" },
+        { sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-b"], status: "ok", coins: [{ symbol: "BTC", assetType: "crypto", amount: 2, wallet: "wallet-b", price: { base: "usd", value: 100 } }] },
+      ],
+      failedSources: [{ sourceId: "stock:0", analyzerName: "IBKR 1", walletIdentities: ["ibkr:one"], error: "network", category: "network" }],
+    } as never);
+
+    await refreshAllData(vi.fn(), {}, operation);
+
+    const payload = vi.mocked(invoke).mock.calls[0][1] as {
+      assets: Array<{ symbol: string; wallet: string; price: number; value: number }>;
+    };
+    expect(payload.assets).toContainEqual(expect.objectContaining({
+      symbol: "AAA", wallet: md5("ibkr:one"), price: 150, value: 450,
+    }));
+  });
+
+  it("keeps a stale IBKR cash price instead of applying an unrelated stock quote", async () => {
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{
+      id: 1, uuid: "previous", createdAt: "2026-07-13T01:02:03.000Z", assetType: "stock",
+      wallet: md5("ibkr:one"), symbol: "EUR", amount: 50, value: 62.5, price: 1.25,
+    }]] as never);
+    vi.mocked(fetchStockPrices).mockResolvedValue({ EUR: 200 });
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [
+        { symbol: "BTC", assetType: "crypto", amount: 2, wallet: "wallet-b", price: { base: "usd", value: 100 } },
+        { symbol: "EUR", assetType: "stock", amount: 1, wallet: "ibkr:two", price: { base: "usd", value: 1.3 } },
+      ],
+      sourceResults: [
+        { sourceId: "stock:0", label: "IBKR 1", walletIdentities: ["ibkr:one"], status: "stale", coins: [], category: "network" },
+        { sourceId: "btc:0", label: "BTC wallet 1", walletIdentities: ["wallet-b"], status: "ok", coins: [{ symbol: "BTC", assetType: "crypto", amount: 2, wallet: "wallet-b", price: { base: "usd", value: 100 } }] },
+        { sourceId: "stock:1", label: "IBKR 2", walletIdentities: ["ibkr:two"], status: "ok", coins: [{ symbol: "EUR", assetType: "stock", amount: 1, wallet: "ibkr:two", price: { base: "usd", value: 1.3 } }] },
+      ],
+      failedSources: [{ sourceId: "stock:0", analyzerName: "IBKR 1", walletIdentities: ["ibkr:one"], error: "network", category: "network" }],
+    } as never);
+
+    await refreshAllData(vi.fn(), {}, operation);
+    const payload = vi.mocked(invoke).mock.calls[0][1] as { assets: Array<{ symbol: string; wallet: string; price: number; value: number }> };
+    expect(payload.assets).toContainEqual(expect.objectContaining({
+      symbol: "EUR", wallet: md5("ibkr:one"), price: 1.25, value: 62.5,
+    }));
+    expect(payload.assets).toContainEqual(expect.objectContaining({
+      symbol: "EUR", wallet: md5("ibkr:two"), price: 1.3, value: 1.3,
+    }));
+    expect(vi.mocked(fetchStockPrices).mock.calls.some(([symbols]) => symbols.includes("EUR"))).toBe(false);
   });
 
   it("does not use a stale stock quote for an unpriced crypto with the same ticker", async () => {

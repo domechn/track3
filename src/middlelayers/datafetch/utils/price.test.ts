@@ -101,13 +101,13 @@ describe("fetchStockPrices", () => {
     expect(listAllCurrencyRates).not.toHaveBeenCalled();
   });
 
-  it("anchors the USD cash symbol to 1 without querying the endpoint", async () => {
+  it("quotes a stock named USD through the endpoint", async () => {
     vi.mocked(sendHttpRequest).mockResolvedValueOnce({
-      data: { AAPL: { price: 200, currency: "USD" } },
+      data: { USD: { price: 12, currency: "USD" }, AAPL: { price: 200, currency: "USD" } },
     });
 
     await expect(fetchStockPrices(["USD", "AAPL"])).resolves.toEqual({
-      USD: 1,
+      USD: 12,
       AAPL: 200,
     });
     expect(sendHttpRequest).toHaveBeenCalledTimes(1);
@@ -116,20 +116,23 @@ describe("fetchStockPrices", () => {
       expect.stringContaining("/api/stock/price"),
       10000,
       expect.objectContaining({ "x-track3-client-id": "test-client-id" }),
-      { symbols: ["AAPL"] },
+      { symbols: ["USD", "AAPL"] },
     );
   });
 
-  it("prices supported non-USD cash from local currency rates instead of a stock quote", async () => {
+  it("does not infer cash from a three-letter stock symbol", async () => {
     vi.mocked(listAllCurrencyRates).mockResolvedValue([
       { currency: "USD", alias: "US dollar", symbol: "$", rate: 1 },
       { currency: "HKD", alias: "Hong Kong dollar", symbol: "$", rate: 7.8 },
     ] as never);
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({ data: {
+      HKD: { price: 7, currency: "USD" }, USD: { price: 12, currency: "USD" },
+    } });
     await expect(fetchStockPrices(["HKD", "USD"])).resolves.toEqual({
-      HKD: 1 / 7.8,
-      USD: 1,
+      HKD: 7,
+      USD: 12,
     });
-    expect(sendHttpRequest).not.toHaveBeenCalled();
+    expect(sendHttpRequest).toHaveBeenCalledTimes(1);
   });
 
   it("still quotes a three-letter stock when currency rates are unavailable", async () => {
@@ -138,5 +141,28 @@ describe("fetchStockPrices", () => {
       data: { IBM: { price: 180, currency: "USD" } },
     });
     await expect(fetchStockPrices(["IBM"])).resolves.toEqual({ IBM: 180 });
+  });
+
+  it("quotes IBKR STK tickers that also name currencies", async () => {
+    vi.mocked(listAllCurrencyRates).mockResolvedValue([
+      { currency: "AMD", rate: 387 },
+      { currency: "COP", rate: 4000 },
+      { currency: "NIO", rate: 37 },
+      { currency: "TTD", rate: 6.8 },
+    ] as never);
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({ data: {
+      AMD: { price: 250, currency: "USD" },
+      COP: { price: 110, currency: "USD" },
+      NIO: { price: 5, currency: "USD" },
+      TTD: { price: 600, currency: "USD" },
+    } });
+
+    await expect(fetchStockPrices(["AMD", "COP", "NIO", "TTD"])).resolves.toEqual({
+      AMD: 250, COP: 110, NIO: 5, TTD: 600,
+    });
+    expect(sendHttpRequest).toHaveBeenCalledWith(
+      "POST", expect.stringContaining("/api/stock/price"), 10000,
+      expect.anything(), { symbols: ["AMD", "COP", "NIO", "TTD"] },
+    );
   });
 });

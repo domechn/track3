@@ -12,7 +12,7 @@ import { BybitExchange } from "./bybit";
 import { HtxExchange } from "./htx";
 import { MexcExchange } from "./mexc";
 import { BackpackExchange } from "./backpack";
-import { takeSourceFailure, transferOptionalSourceFailures } from "../../utils/source-failure";
+import { recordOptionalSourceFailure, takeSourceFailure, transferOptionalSourceFailures } from "../../utils/source-failure";
 
 export interface Exchanger {
   getExchangeName(): string;
@@ -96,6 +96,9 @@ export class CexAnalyzer implements Analyzer {
     const portfolio = await ex.fetchTotalBalance();
     const primaryFailure = takeSourceFailure(ex);
     if (primaryFailure) throw primaryFailure;
+    if (Object.values(portfolio).some((amount) => amount < 0)) {
+      recordOptionalSourceFailure(ex, new Error("Negative balance omitted"), "Some assets");
+    }
     const partial = transferOptionalSourceFailures(ex, this);
     if (!partial) cc.setCache(cacheKey, portfolio, ttl, cacheGeneration);
     return portfolio;
@@ -120,7 +123,10 @@ export class CexAnalyzer implements Analyzer {
     );
     const priceEntries = await bluebird.map(uniqueExchanges, async (ex) => [
       ex.getExchangeName(),
-      await ex.fetchCoinsPrice(),
+      await ex.fetchCoinsPrice().catch((error) => {
+        recordOptionalSourceFailure(this, error, "Some assets", true, true);
+        return {};
+      }),
     ]);
     const cacheCoinPrices = Object.fromEntries(priceEntries);
 
@@ -152,7 +158,7 @@ export class CexAnalyzer implements Analyzer {
       const portfolio = await this.fetchTotalBalance(ex);
 
       // filter all keys are capital
-      const coins = filterCoinsInPortfolio(ex.getIdentity(), portfolio);
+      const coins = filterCoinsInPortfolio(ex.getIdentity(), portfolio, ex.getExchangeName());
       return coins.map(
         (c) =>
           ({
@@ -181,14 +187,15 @@ export class CexAnalyzer implements Analyzer {
 export function filterCoinsInPortfolio(
   wallet: string,
   portfolio: { [k: string]: number },
+  exchangeName: string,
 ): WalletCoin[] {
   return Object.keys(portfolio)
     .filter((k) => portfolio[k] > 0) // amount > 0
-    .filter((k) => !!coinSymbolHandler(k))
+    .filter((k) => !!coinSymbolHandler(k, exchangeName))
     .map(
       (k) =>
         ({
-          symbol: coinSymbolHandler(k),
+          symbol: coinSymbolHandler(k, exchangeName),
           assetType: "crypto" as const,
           amount: portfolio[k],
           wallet,
@@ -196,22 +203,23 @@ export function filterCoinsInPortfolio(
     );
 }
 
-function coinSymbolHandler(name: string): string | undefined {
+function coinSymbolHandler(name: string, exchangeName: string): string | undefined {
   const normalizedName = name.trim().toUpperCase();
   const ld = "LD";
   // LD in binance is for earn in spot, we can skip it
   if (
+    exchangeName === "Binance" &&
     normalizedName.startsWith(ld) &&
     normalizedName.length > ld.length + 1
   ) {
     return;
   }
   // for binance
-  if (normalizedName === "BETH" || normalizedName === "ETH2") {
+  if (exchangeName === "Binance" && (normalizedName === "BETH" || normalizedName === "ETH2")) {
     return "ETH";
   }
   // for bitget
-  if (normalizedName === "BGBTC") {
+  if (exchangeName === "Bitget" && normalizedName === "BGBTC") {
     return "BTC";
   }
   return normalizedName;

@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetchStockPrices } from "../../../datafetch/utils/price";
 import { ASSET_HANDLER } from "../../../entities/assets";
+import { isSupportedCurrencyCode } from "../../../entities/currency";
 import { trace } from "./trace";
 
 export interface PriceEntry {
@@ -109,12 +110,14 @@ export async function getPrices(
   }
 
   // auto mode
+  const autoSymbols = symbols.filter((symbol) => !isSupportedCurrencyCode(symbol));
+  if (autoSymbols.length === 0) return {};
   const knownCrypto = await knownCryptoSymbols();
   const knownStock = await knownStockSymbols();
 
-  const cryptoSyms = symbols.filter((s) => knownCrypto.has(s));
-  const stockSyms = symbols.filter((s) => knownStock.has(s) && !knownCrypto.has(s));
-  const leftover = symbols.filter(
+  const cryptoSyms = autoSymbols.filter((s) => knownCrypto.has(s));
+  const stockSyms = autoSymbols.filter((s) => knownStock.has(s) && !knownCrypto.has(s));
+  const leftover = autoSymbols.filter(
     (s) => !cryptoSyms.includes(s) && !stockSyms.includes(s),
   );
 

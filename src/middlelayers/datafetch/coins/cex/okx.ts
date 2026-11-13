@@ -313,6 +313,8 @@ export class OkxExchange implements Exchanger {
 		const headers = { 'Accept': 'application/json', 'Content-Type': 'application/json', ...sigHeader }
 
 		const resp = await sendHttpRequest<T>(method, url, 5000, headers)
+		const code = (resp as { code?: string | number }).code
+		if (code !== undefined && String(code) !== "0") throw new Error(`OKX API error: ${code}`)
 
 		return resp
 	}
