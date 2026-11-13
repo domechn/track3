@@ -191,7 +191,7 @@ export class SyncScheduler {
         if (this.stopped || runId !== this.runId) return;
         const errors = [...report.errors].sort().join("\n");
         const progress = report.pulled + report.pushed + report.tombstonesApplied + report.configChanges > 0;
-        if (errors && !progress) {
+        if (report.configDecisionDeferred || (errors && !progress)) {
           const persistent = errors === this.lastErrors;
           this.lastErrors = errors;
           this.fail("sync", report, persistent);

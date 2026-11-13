@@ -1328,6 +1328,7 @@
   "sync.devices.never": "从未同步",
   "sync.devices.localNames": "此设备的名称会在同步时共享。您给其他设备起的名称只保存在本设备上。",
   "sync.status.retryStopped": "连续出错后已停止自动重试。请立即同步或刷新后重试。",
+  "sync.status.configDecisionDeferred": "无法检查所有设备。本地设置尚未共享。请在读取成功后重试。",
   "sync.devices.lastUpload": "上次上传：{time}",
   "sync.devices.renameFailed": "无法保存设备名称。",
   "sync.connection.ok": "连接成功。",
