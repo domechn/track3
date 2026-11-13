@@ -457,6 +457,52 @@ describe("SyncEngine", () => {
     expect(second.pushed).toBe(0);
     expect(second.diagnostics?.requests.PUT.count).toBe(0);
   });
+  it("keeps a re-adopted session object after a lost manifest acknowledgement", async () => {
+    const { s3, repos, engines } = await devices(2);
+    await engines[0].syncOnce();
+    const id = "00000000-0000-4000-8000-000000000001";
+    repos[0].sessions.set(id, { id, title: "Chat", createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z", pinned: 0, messageCount: 0, preview: "", messages: [] });
+    const put = s3.putObject.bind(s3);
+    let lost = true;
+    s3.putObject = async (path, body, conditions, signal) => {
+      const result = await put(path, body, conditions, signal);
+      if (lost && path.endsWith("/manifest")) {
+        lost = false;
+        throw new Error("manifest acknowledgement lost");
+      }
+      return result;
+    };
+    expect((await engines[0].syncOnce()).errors).toContain("Failed to write sync manifest");
+    expect((await engines[0].syncOnce()).errors).toEqual([]);
+    const peer = await engines[1].syncOnce();
+    expect(peer.errors).toEqual([]);
+    expect(peer.skipped).toBeUndefined();
+    expect(repos[1].sessions.get(id)?.title).toBe("Chat");
+  });
+  it("keeps a re-adopted snapshot edit after a lost manifest acknowledgement", async () => {
+    const { s3, repos, engines } = await devices(2);
+    repos[0].snapshots.set("one", snapshot("one", 1));
+    await engines[0].syncOnce();
+    await engines[1].syncOnce();
+    repos[0].snapshots.set("one", snapshot("one", 7));
+    const put = s3.putObject.bind(s3);
+    let lost = true;
+    s3.putObject = async (path, body, conditions, signal) => {
+      const result = await put(path, body, conditions, signal);
+      if (lost && path.endsWith("/manifest")) {
+        lost = false;
+        throw new Error("manifest acknowledgement lost");
+      }
+      return result;
+    };
+    expect((await engines[0].syncOnce()).errors).toContain("Failed to write sync manifest");
+    expect((await engines[0].syncOnce()).errors).toEqual([]);
+    const peer = await engines[1].syncOnce();
+    expect(peer.errors).toEqual([]);
+    expect(peer.skipped).toBeUndefined();
+    expect(repos[1].snapshots.get("one")?.assets[0].amount).toBe(7);
+  });
   it("clears unfinished push after a checkpoint despite an unrelated round error", async () => {
     const { repos, engines } = await devices(1);
     repos[0].takeReadErrors = () => ({ configIds: ["7"], sessionIds: [] });
@@ -1060,6 +1106,63 @@ describe("SyncEngine", () => {
     expect(report.conflicts).toContain("7");
     expect(repos[1].config.get("7")).toBe("EUR");
     expect((await engines[1].configConflicts()).map((item) => item.id)).toContain("7");
+  });
+  it.each(["manifest", "config"] as const)(
+    "defers first-join config when a peer %s read fails, then prompts on retry",
+    async (failure) => {
+      const { s3, repos, engines } = await devices(2);
+      repos[0].config.set("10", "remote-exchanges");
+      repos[1].config.set("10", "local-exchanges");
+      await engines[0].syncOnce();
+      const owner = repos[0].state.deviceId!;
+      const get = s3.getObject.bind(s3);
+      let failed = false;
+      s3.getObject = (async (path, signal, ifNoneMatch) => {
+        if (!failed && path.startsWith(`devices/${owner}/`) &&
+            (failure === "manifest" ? path.endsWith("/manifest") : !path.endsWith("/manifest"))) {
+          failed = true;
+          throw new Error("read failed");
+        }
+        return get(path, signal, ifNoneMatch);
+      }) as FakeS3["getObject"];
+      const first = await engines[1].syncOnce();
+      expect(failed).toBe(true);
+      expect(first.configDecisionDeferred).toBe(true);
+      expect(first.pushed).toBe(0);
+      expect(repos[1].state.config?.["10"]).toBeUndefined();
+      expect(repos[0].config.get("10")).toBe("remote-exchanges");
+      const second = await engines[1].syncOnce();
+      expect(second.conflicts).toContain("10");
+      expect((await engines[1].configConflicts()).map(({ id }) => id)).toContain("10");
+      expect(repos[1].config.get("10")).toBe("local-exchanges");
+      expect(repos[0].config.get("10")).toBe("remote-exchanges");
+    },
+  );
+  it("keeps local first-join config when one peer reads and another peer manifest fails", async () => {
+    const { s3, repos, engines } = await devices(3);
+    repos[0].config.set("10", "remote-exchanges");
+    repos[1].config.set("10", "local-exchanges");
+    await engines[0].syncOnce();
+    await engines[2].syncOnce({ deviceName: "Third" });
+    const unreadableOwner = repos[2].state.deviceId!;
+    const get = s3.getObject.bind(s3);
+    let failed = false;
+    s3.getObject = (async (path, signal, ifNoneMatch) => {
+      if (!failed && path === `devices/${unreadableOwner}/manifest`) {
+        failed = true;
+        throw new Error("read failed");
+      }
+      return get(path, signal, ifNoneMatch);
+    }) as FakeS3["getObject"];
+    const first = await engines[1].syncOnce();
+    expect(failed).toBe(true);
+    expect(first.configDecisionDeferred).toBe(true);
+    expect(first.pushed).toBe(0);
+    expect(repos[1].config.get("10")).toBe("local-exchanges");
+    expect(repos[1].state.config?.["10"]).toBeUndefined();
+    const second = await engines[1].syncOnce();
+    expect(second.conflicts).toContain("10");
+    expect(repos[1].config.get("10")).toBe("local-exchanges");
   });
   it("clears a config conflict after its remote entry leaves the manifest", async () => {
     const { s3, repos, engines } = await devices(2);
