@@ -266,6 +266,32 @@ function renderApp() {
 }
 
 describe("App data-changed version bumps on refresh and soft refresh", () => {
+  it("shows a sanitized startup error, keeps settings reachable, and retries the load", async () => {
+    window.location.hash = "#/summary";
+    vi.mocked(autoBackupHistoricalData).mockClear();
+    vi.mocked(getAvailableDates).mockRejectedValueOnce(new Error("database $& unavailable; token=secretABC123xyz"));
+    const view = renderApp();
+
+    const alert = await view.findByRole("alert");
+    expect(alert).toHaveTextContent("Could not load portfolio data");
+    expect(alert).toHaveTextContent("database $& unavailable");
+    expect(alert).not.toHaveTextContent("secretABC123xyz");
+    expect(view.queryByTestId("summary-range")).not.toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(autoBackupHistoricalData).not.toHaveBeenCalled();
+
+    window.location.hash = "#/settings";
+    fireEvent(window, new HashChangeEvent("hashchange"));
+    expect(await view.findByText("settings")).toBeInTheDocument();
+    expect(view.getByRole("alert")).toHaveTextContent("Could not load portfolio data");
+
+    window.location.hash = "#/summary";
+    fireEvent(window, new HashChangeEvent("hashchange"));
+    fireEvent.click(await view.findByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(view.queryByRole("alert")).not.toBeInTheDocument());
+    expect(await view.findByTestId("summary-range")).toBeInTheDocument();
+  });
+
   it.each(["/rebalance", "/goals", "/goals/kinds"])("keeps sync status available in the wide dark rail on %s", async (route) => {
     vi.stubGlobal("innerWidth", 1600);
     vi.stubGlobal("innerHeight", 900);

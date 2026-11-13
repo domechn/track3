@@ -73,6 +73,7 @@ import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { toast } from "@/components/ui/use-toast";
 import { DisplayCurrencyContext, useDisplayCurrencyState } from "@/contexts/display-currency";
+import { sanitizeUntrustedText } from "@/middlelayers/security/redact";
 
 const Setting = React.lazy(() => import("../settings"));
 const HistoricalData = React.lazy(() => import("../historical-data"));
@@ -302,6 +303,8 @@ type LayoutProps = {
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
   initializing: boolean;
+  loadError: string | null;
+  onRetryDataLoad: () => void;
   isProUser: boolean;
   quoteColor: QuoteColor;
   currentCurrency: CurrencyRateDetail;
@@ -320,6 +323,8 @@ function Layout({
   sidebarCollapsed,
   onSidebarToggle,
   initializing,
+  loadError,
+  onRetryDataLoad,
   isProUser,
   quoteColor,
   currentCurrency,
@@ -395,7 +400,7 @@ function Layout({
         <SummaryFidelityRangeContext.Provider value={{ range: summaryRange, setRange: setSummaryRange,
           label: summaryRangeLabel, setLabel: setSummaryRangeLabel, availableDates }}>
         <SummaryLoadingContext.Provider value={setSummaryLoading}>
-        {!assistantPage && <TopBar
+        {!assistantPage && loadError === null && <TopBar
           isProUser={isProUser}
           railFidelityPage={railFidelityPage}
           pageOwnsSync={pageOwnsSync}
@@ -416,11 +421,26 @@ function Layout({
         <main ref={mainRef} id="app-main-content" tabIndex={0} className="mx-auto w-full max-w-[1560px] px-7 py-5">
           <div className="relative min-h-[400px]" aria-busy={initializing}>
             <div className="t3-desktop-loading-legacy">
+            {loadError !== null && (
+              <div className="flex min-h-[400px] items-center justify-center" role="alert">
+                <div className="t3-desktop-error-card">
+                  <h1>{t("startup.load.error.title")}</h1>
+                  <div className="t3-desktop-error-details">
+                    <span>{t("startup.load.error.reason").replace("{reason}", () => loadError)}</span>
+                  </div>
+                  <div className="t3-desktop-error-actions">
+                    <button type="button" onClick={onRetryDataLoad}>{t("startup.load.error.retry")}</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {(loadError === null || settingsPage || assistantPage) && (
             <React.Suspense
               fallback={<RouteLoadingFallback hidden={initializing} />}
             >
               <Outlet />
             </React.Suspense>
+            )}
             {initializing && (
               <PageLoadingOverlay
                 title={t("loading.portfolio")}
@@ -442,6 +462,8 @@ type AppRoutesProps = {
   sidebarCollapsed: boolean;
   onSidebarToggle: () => void;
   initializing: boolean;
+  loadError: string | null;
+  onRetryDataLoad: () => void;
   isProUser: boolean;
   setIsProUser: React.Dispatch<React.SetStateAction<boolean>>;
   quoteColor: QuoteColor;
@@ -465,6 +487,8 @@ function AppRoutes({
   sidebarCollapsed,
   onSidebarToggle,
   initializing,
+  loadError,
+  onRetryDataLoad,
   isProUser,
   setIsProUser,
   quoteColor,
@@ -490,6 +514,8 @@ function AppRoutes({
             sidebarCollapsed={sidebarCollapsed}
             onSidebarToggle={onSidebarToggle}
             initializing={initializing}
+            loadError={loadError}
+            onRetryDataLoad={onRetryDataLoad}
             isProUser={isProUser}
             quoteColor={quoteColor}
             currentCurrency={currentCurrency}
@@ -683,6 +709,8 @@ const App = () => {
   const [originalQuerySize, setOriginalQuerySize] = useState<number>(0);
   const [hasData, setHasData] = useState(true);
   const [initializing, setInitializing] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const retryLoad = useRef<(() => void) | null>(null);
   const [dataChangedVersion, setDataChangedVersion] = useState(0);
   const [autoBackupStatus, setAutoBackupStatus] = useState<
     "idle" | "running"
@@ -697,7 +725,7 @@ const App = () => {
   useEffect(() => {
     let active = true;
 
-    void Promise.all([
+    const loadStartupData = () => Promise.all([
       queryPreferCurrency().then((c) => {
         if (active) {
           setCurrentCurrency(c);
@@ -713,9 +741,14 @@ const App = () => {
           setQuoteColor(c);
         }
       }),
-    ])
-      .then(() => loadAllData(active))
-      .then(() => {
+    ]).then(() => loadAllData(active));
+
+    const start = () => {
+      if (!active) return;
+      let loadSucceeded = false;
+      setLoadError(null);
+      setInitializing(true);
+      void loadStartupData().then(() => {
         if (!active) return;
         void processAlerts().then((alerts) => deliverAlerts(alerts, (alert) => {
           const text = formatAlert(alert, t);
@@ -723,20 +756,32 @@ const App = () => {
         }, t)).catch(() => {
           console.warn("startup alert evaluation failed");
         });
+        loadSucceeded = true;
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        const reason = error instanceof Error && error.message
+          ? sanitizeUntrustedText(error.message).slice(0, 300)
+          : t("startup.load.error.unknown");
+        setLoadError(reason);
       })
       .finally(() => {
         if (active) {
           setInitializing(false);
           // Defer to the next tick so the boot overlay clears first;
           // auto backup is intentionally off the critical path.
-          window.setTimeout(() => {
+          if (loadSucceeded) window.setTimeout(() => {
             void runAutoBackupInBackground();
           }, 0);
         }
       });
+    };
+    retryLoad.current = start;
+    start();
 
     return () => {
       active = false;
+      retryLoad.current = null;
     };
   }, []);
 
@@ -1024,14 +1069,16 @@ const App = () => {
     <div className="t3-desktop-app">
       <AutoBackupIndicator status={autoBackupStatus} />
       <DataChangedContext.Provider value={dataChangedVersion}>
-        <LatestSourceNamesProvider ready={!initializing}>
+        <LatestSourceNamesProvider ready={!initializing && loadError === null}>
         <HashRouter>
           <DisplayCurrencyContext.Provider value={displayCurrencyState}>
-          <FirstRunOnboarding variant="desktop" ready={!initializing} />
+          <FirstRunOnboarding variant="desktop" ready={!initializing && loadError === null} />
           <DesktopErrorBoundary><AppRoutes
           sidebarCollapsed={sidebarCollapsed}
           onSidebarToggle={handleSidebarToggle}
           initializing={initializing}
+          loadError={loadError}
+          onRetryDataLoad={() => retryLoad.current?.()}
           isProUser={isProUser}
           setIsProUser={setIsProUser}
           quoteColor={quoteColor}
