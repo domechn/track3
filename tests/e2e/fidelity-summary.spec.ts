@@ -330,6 +330,13 @@ test("summary full state follows the approved card order and captures at 390px",
     expect(refresh?.x).toBe(330);
     expect((await page.locator(".fd-range").boundingBox())?.width).toBe(306);
     mkdirSync("/tmp/fidelity/summary", { recursive: true });
+    const openingUsdcPrice = await page.evaluate(async () => {
+      const rows = await (window as any).__e2eInvoke("plugin:sql|select", {
+        query: "SELECT price FROM assets_v2 WHERE uuid = 'fidelity-start' AND symbol = 'USDC'", values: [],
+      });
+      return rows[0].price as number;
+    });
+    expect(openingUsdcPrice).toBeGreaterThan(0);
     await expect(page.locator(".fd-primary-stat")).toContainText("+$188,809.27");
     await expect(page.locator(".fd-page-head p strong")).toHaveText("+$188,809");
     await page.evaluate(() => document.fonts.ready);
