@@ -248,3 +248,13 @@ const CURRENCY_DETAILS: { [k: string]: (string | number)[] } = {
 export function isSupportedCurrencyCode(symbol: string): boolean {
   return Object.prototype.hasOwnProperty.call(CURRENCY_DETAILS, symbol.toUpperCase());
 }
+
+// shortcut: Saved stock rows lack a cash flag; persist one if IBKR cash uses another currency.
+const BROKER_CASH_SYMBOLS = new Set([
+  "AUD", "CAD", "CHF", "CNH", "CZK", "DKK", "EUR", "GBP", "HKD", "HUF",
+  "ILS", "JPY", "MXN", "NOK", "NZD", "PLN", "SEK", "SGD", "USD", "ZAR",
+]);
+
+export function isBrokerCashSymbol(symbol: string): boolean {
+  return BROKER_CASH_SYMBOLS.has(symbol.toUpperCase());
+}
