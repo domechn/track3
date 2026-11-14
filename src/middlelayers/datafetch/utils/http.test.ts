@@ -56,11 +56,11 @@ describe("sendHttpRequest error details", () => {
   it("forwards an explicit User-Agent once to plugin-http", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response("ok"));
     await sendHttpTextRequest("GET", "https://example.test/report", 5000, {
-      "User-Agent": "Track3/0.9.15",
+      "User-Agent": "Track3/0.9.16",
     });
     const headers = vi.mocked(fetch).mock.calls[0][1]?.headers as Record<string, string>;
     expect(Object.entries(headers).filter(([key]) => key.toLowerCase() === "user-agent"))
-      .toEqual([["User-Agent", "Track3/0.9.15"]]);
+      .toEqual([["User-Agent", "Track3/0.9.16"]]);
   });
   it("keeps the safe endpoint and response detail separate from the display message", async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
