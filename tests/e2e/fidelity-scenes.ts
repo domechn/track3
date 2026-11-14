@@ -1168,7 +1168,9 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
         const value = Math.round(amount * price * 100) / 100;
         return { row, amount, value };
       });
-      rows[rows.length - 1].value = Math.round((rows[rows.length - 1].value +
+      const adjusted = uuid === "fidelity-start"
+        ? rows.find(({ row }) => row.symbol === "USDT")! : rows[rows.length - 1];
+      adjusted.value = Math.round((adjusted.value +
         targetCents / 100 - rows.reduce((sum, item) => sum + item.value, 0)) * 100) / 100;
       for (const { row, amount, value } of rows) {
         await db.run(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
@@ -1180,7 +1182,7 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
       const originalStart = scaleState(startState, sample.start);
       const quantityTargets: Record<string, number> = {
         BTC: 38_000, ETH: 25_000, SOL: 22_000, BNB: 6_000,
-        NVDA: 8_000, AAPL: 6_000, USDT: 120_000, USDC: 40_000,
+        NVDA: 8_000, AAPL: 6_000, USDT: 120_000, USDC: 39_996,
       };
       const targetStart: State = Object.fromEntries(symbols.map((symbol) => {
         const nextPrice = endStates.get("2025-07")![symbol].price;
@@ -1189,7 +1191,8 @@ export async function installTauriBridge(page: Page, options: BaseOptions & { fi
         const desiredValue = finalAmounts[symbol] * sample.prices[symbol][30]
           - (sample.marketTargets[symbol] ?? 0) / 100 - quantityTargets[symbol];
         // One cent offsets rounding across source rows while retaining the approved aggregate.
-        const amount = (desiredValue + firstMarketEffect - (symbol === "BTC" ? 0.01 : 0)) / nextPrice;
+        const amount = symbol === "USDC" ? desiredValue / nextPrice
+          : (desiredValue + firstMarketEffect - (symbol === "BTC" ? 0.01 : 0)) / nextPrice;
         return [symbol, { amount, price: desiredValue / amount }];
       }));
       await addSnapshot("fidelity-start", "2025-07-01T09:41:00.000Z", targetStart, sample.start);
