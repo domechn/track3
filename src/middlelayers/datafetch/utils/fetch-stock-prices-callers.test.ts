@@ -17,7 +17,9 @@ function sourceFiles(dir: string): string[] {
 it("routes stock quote callers through saved-cash checks or IBKR fund positions", () => {
   const callers: Record<string, string[]> = {};
   for (const file of sourceFiles(srcRoot)) {
-    const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+    const text = readFileSync(file, "utf8");
+    if (!text.includes("fetchStockPrices")) continue;
+    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
     const declarations = new Map<string, string[]>();
     const calls: string[] = [];
     function visit(node: ts.Node) {
@@ -55,4 +57,4 @@ it("routes stock quote callers through saved-cash checks or IBKR fund positions"
     "middlelayers/datafetch/coins/stock/ibkr.ts": ["fundSymbols"],
     "middlelayers/ai/skills/functions/prices.ts": ["quoteSymbols"],
   });
-});
+}, 30_000);

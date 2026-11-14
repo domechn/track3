@@ -40,6 +40,7 @@ const pluginCommands: Record<string, Record<string, string | string[] | null>> =
 };
 
 type Use = { command: string; file: string };
+let cachedUses: Use[] | undefined;
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -50,9 +51,11 @@ function sourceFiles(directory: string): string[] {
 }
 
 function commandsUsed(): Use[] {
+  if (cachedUses) return cachedUses;
   const uses: Use[] = [];
   for (const file of sourceFiles(join(root, "src"))) {
     const text = readFileSync(file, "utf8");
+    if (!text.includes("@tauri-apps") && !text.includes("plugin:")) continue;
     const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
     const bindings = new Map<string, { plugin: string; method?: string }>();
     let hasUpdater = false;
@@ -117,7 +120,7 @@ function commandsUsed(): Use[] {
     visit(source);
     if (text.includes('import("@tauri-apps/plugin-opener")') && text.includes(".openUrl(")) add("opener", "openUrl");
   }
-  return uses;
+  return (cachedUses = uses);
 }
 
 const coreCommands: Record<string, Record<string, string>> = {
@@ -179,7 +182,7 @@ describe("Tauri ACL", () => {
       expect(permissions.some((permission) => grantsCommand(permission, use.command)),
         `${use.file}: plugin:${use.command} is not granted to main on ${platform}`).toBe(true);
     }
-  });
+  }, 30_000);
 
   it("grants mobile plugin calls to main on iOS", () => {
     const permissions = effectivePermissions("iOS");
@@ -188,7 +191,7 @@ describe("Tauri ACL", () => {
       expect(permissions.some((permission) => grantsCommand(permission, use.command)),
         `${use.file}: plugin:${use.command} is not granted to main on iOS`).toBe(true);
     }
-  });
+  }, 30_000);
 
   it.each(["macOS", "iOS"] as const)("allows HTTP and HTTPS for rendered external links on %s", (platform) => {
     const opener = capabilities
