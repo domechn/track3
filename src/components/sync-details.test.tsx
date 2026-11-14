@@ -163,7 +163,7 @@ it("groups remote failures and conflicts while keeping config resolution and cop
   diagnostics.conflicts = { snapshot: 2, edit: 0, config: 1, session: 0, tombstone: 0 };
   diagnostics.failedPulls = { count: 3, earliestRetryAt: "2026-01-03T00:00:00.000Z" };
   diagnostics.perDevice = { abcdef12: { failed: 5, succeeded: 2, manifestVersion: 1, appVersion: "unknown" } };
-  diagnostics.appVersion = "0.9.14";
+  diagnostics.appVersion = "0.9.15";
   diagnostics.syncFormatVersion = 1;
   const report: SyncReport = {
     pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0,
@@ -176,7 +176,7 @@ it("groups remote failures and conflicts while keeping config resolution and cop
   expect(screen.getByText("Needs review 3 (config ×1, snapshot ×2)")).toBeInTheDocument();
   expect(await screen.findByRole("button", { name: "Use this device's value" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Use the other device's value" })).toBeInTheDocument();
-  expect(screen.getByText("Local app version").closest(".t3-sync-definition-row")).toHaveTextContent("0.9.14");
+  expect(screen.getByText("Local app version").closest(".t3-sync-definition-row")).toHaveTextContent("0.9.15");
   expect(screen.getByText("Sync format version").closest(".t3-sync-definition-row")).toHaveTextContent("1");
   fireEvent.click(screen.getByRole("button", { name: "Copy diagnostics" }));
   await waitFor(() => expect(JSON.parse(writeText.mock.calls[0][0]).failures).toHaveLength(2));
