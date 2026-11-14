@@ -90,6 +90,58 @@ describe("RealtimeTotalValue", () => {
     await act(async () => { finishBaseline([{ symbol: "BTC", value: 80, price: 80 }] as never); await Promise.resolve(); });
     expect(container.querySelector(".t3-live-popover")).toHaveTextContent("+25.00%");
   });
+  it("hides a cash row's saved-price change and shows a stock's signed change", async () => {
+    vi.mocked(queryRealTimeAssetsValue).mockResolvedValue([
+      { symbol: "USD", assetType: "stock", amount: 4, value: 4, price: 1 },
+      { symbol: "AAPL", assetType: "stock", amount: 1, value: 10, price: 10 },
+    ]);
+    vi.mocked(queryLatestAssets).mockResolvedValue([
+      { symbol: "USD", assetType: "stock", amount: 4, value: 0.0742, price: 0.01855 },
+      { symbol: "AAPL", assetType: "stock", amount: 1, value: 8, price: 8 },
+    ]);
+    const { container } = render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Live total" }));
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".t3-live-popover")).not.toHaveTextContent("+5389.00%");
+    expect(container.querySelector(".t3-live-popover")).toHaveTextContent("—");
+    expect(container.querySelector(".t3-live-popover")).toHaveTextContent("+25.00%");
+  });
+  it("shows a signed change for a stock ticker that is also a currency code", async () => {
+    vi.mocked(queryRealTimeAssetsValue).mockResolvedValue([
+      { symbol: "AMD", assetType: "stock", amount: 1, value: 10, price: 10 },
+    ]);
+    vi.mocked(queryLatestAssets).mockResolvedValue([
+      { symbol: "AMD", assetType: "stock", amount: 1, value: 8, price: 8 },
+    ]);
+    const { container } = render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Live total" }));
+      await Promise.resolve();
+    });
+    expect(container.querySelector(".t3-live-popover")).toHaveTextContent("+25.00%");
+    expect(container.querySelector(".t3-live-popover")).not.toHaveTextContent("—");
+  });
+  it.each([0, Number.NaN, Number.POSITIVE_INFINITY])(
+    "hides a noncash price change when the saved price is %s", async (savedPrice) => {
+      vi.mocked(queryRealTimeAssetsValue).mockResolvedValue([
+        { symbol: "AAPL", assetType: "stock", amount: 1, value: 10, price: 10 },
+      ]);
+      vi.mocked(queryLatestAssets).mockResolvedValue([
+        { symbol: "AAPL", assetType: "stock", amount: 1, value: 10, price: savedPrice },
+      ]);
+      const { container } = render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Live total" }));
+        await Promise.resolve();
+      });
+      expect(container.querySelector(".t3-live-popover")).toHaveTextContent("—");
+      expect(container.querySelector(".t3-live-popover")).not.toHaveTextContent("Infinity%");
+      expect(container.querySelector(".t3-live-popover")).not.toHaveTextContent("NaN%");
+    },
+  );
   it("initializes the vertical carousel with a compatible autoplay plugin", async () => {
     vi.mocked(queryRealTimeAssetsValue).mockResolvedValue([{ symbol: "BTC", value: 100, price: 100 }] as never);
     vi.mocked(queryLatestAssets).mockResolvedValue([]);

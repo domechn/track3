@@ -30,6 +30,7 @@ import {
   getConfiguration,
   getBlacklistCoins,
   getPortfolioInputGeneration,
+  listAllCurrencyRates,
   saveStableCoins,
 } from "./configuration";
 import {
@@ -39,7 +40,7 @@ import {
   getAssetType,
 } from "./datafetch/utils/coins";
 import { fetchStockPrices } from "./datafetch/utils/price";
-import { isSupportedCurrencyCode } from "./entities/currency";
+import { isBrokerCashSymbol } from "./entities/currency";
 import { WalletAnalyzer } from "./wallet";
 import { OthersAnalyzer } from "./datafetch/coins/others";
 import { ASSET_HANDLER } from "./entities/assets";
@@ -521,8 +522,7 @@ export function generateTransactions(
 
   const makeVanishedDraft = (asset: AssetModel): RefreshTransactionDraft | undefined => {
     const identity = getAssetIdentity(asset);
-    // Saved stock rows cannot distinguish broker cash from a currency-named ticker.
-    const quotedPrice = getAssetType(asset) === "stock" && isSupportedCurrencyCode(asset.symbol)
+    const quotedPrice = getAssetType(asset) === "stock" && isBrokerCashSymbol(asset.symbol)
       ? undefined : currentPrices[identity];
     const currentPrice = quotedPrice !== undefined && Number.isFinite(quotedPrice) && quotedPrice > 0
       ? quotedPrice : undefined;
@@ -684,6 +684,9 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
     config,
     lastAssets,
     userProInfo,
+    undefined,
+    undefined,
+    true,
   );
 
   const assetRes = walletCoins
@@ -717,6 +720,7 @@ async function queryWalletCoinValueContext(
   assets: WalletCoin[],
   userProInfo: UserLicenseInfo,
   addProgress?: AddProgressFunc,
+  savedStockRows = false,
 ): Promise<WalletCoinValueContext> {
   const needPriceAssets = assets.filter((a) => !a.price);
   const followTargets = customFollowTargets(assets);
@@ -736,12 +740,19 @@ async function queryWalletCoinValueContext(
         .map((a) => a.symbol)
         .concat(followTargets.filter((target) => target.assetType === "stock").map((target) => target.symbol)),
     ),
-  ).filter((x): x is string => !!x);
-  const [cryptoPriceMap, stockPriceMap] = await Promise.all([
+  ).filter((x): x is string => !!x && (!savedStockRows || !isBrokerCashSymbol(x)));
+  const cashSymbols = [...new Set(
+    needPriceAssets.filter((asset) => savedStockRows && getAssetType(asset) === "stock" && isBrokerCashSymbol(asset.symbol))
+      .map((asset) => asset.symbol.toUpperCase())
+  )];
+  const [cryptoPriceMap, stockPriceMap, currencyRates] = await Promise.all([
     cryptoPriceSymbols.length > 0
       ? queryCoinPrices(cryptoPriceSymbols, userProInfo)
       : Promise.resolve({}),
-    fetchStockPrices(stockPriceSymbols),
+    stockPriceSymbols.length ? fetchStockPrices(stockPriceSymbols) : Promise.resolve({}),
+    cashSymbols.some((symbol) => symbol !== "USD")
+      ? listAllCurrencyRates().catch(() => [])
+      : Promise.resolve([]),
   ]);
   const typedCryptoPriceMap: Record<string, number> = {};
   for (const symbol of Object.keys(cryptoPriceMap)) {
@@ -752,6 +763,12 @@ async function queryWalletCoinValueContext(
   for (const symbol of Object.keys(stockPriceMap)) {
     typedStockPriceMap[getAssetIdentity({ symbol, assetType: "stock" })] =
       stockPriceMap[symbol];
+  }
+  for (const symbol of cashSymbols) {
+    const rate = symbol === "USD" ? 1 : currencyRates.find((entry) => entry.currency.toUpperCase() === symbol)?.rate;
+    const price = rate && rate > 0 ? 1 / rate : undefined;
+    typedStockPriceMap[getAssetIdentity({ symbol, assetType: "stock" })] =
+      price !== undefined && Number.isFinite(price) ? price : Number.NaN;
   }
   const priceMap = {
     ...cryptoPriceMap,
@@ -784,7 +801,7 @@ async function queryStalePrices(
   );
   const cryptoSymbols = [...new Set(staleAssets.filter((asset) => getAssetType(asset) === "crypto").map((asset) => asset.symbol))];
   const stockSymbols = [...new Set(staleAssets.filter((asset) =>
-    getAssetType(asset) === "stock" && !isSupportedCurrencyCode(asset.symbol)
+    getAssetType(asset) === "stock" && !isBrokerCashSymbol(asset.symbol)
   ).map((asset) => asset.symbol))];
   const [crypto, stock] = await Promise.all([
     cryptoSymbols.length ? queryCoinPrices(cryptoSymbols, userInfo).catch(() => ({})) : Promise.resolve({}),
@@ -822,7 +839,7 @@ function updateStalePrices(
   for (const coin of coins) {
     if (!identities.some((identity) => isSameWallet(identity, coin.wallet))) continue;
     const key = getAssetIdentity(coin);
-    if (priceMap[key] === undefined) {
+    if (priceMap[key] === undefined || !Number.isFinite(priceMap[key]) || priceMap[key] <= 0) {
       const baseline = staleAssets.find((asset) =>
         asset.symbol === coin.symbol && getAssetType(asset) === getAssetType(coin) &&
         isSameWallet(asset.wallet ?? "", coin.wallet)
@@ -930,9 +947,10 @@ async function queryCoinsDataByWalletCoins(
   userProInfo: UserLicenseInfo,
   addProgress?: AddProgressFunc,
   knownBlacklistedSymbols?: string[],
+  savedStockRows = false,
 ): Promise<WalletCoinUSD[]> {
   const [valueContext, blacklistedSymbols] = await Promise.all([
-    queryWalletCoinValueContext(assets, userProInfo, addProgress),
+    queryWalletCoinValueContext(assets, userProInfo, addProgress, savedStockRows),
     knownBlacklistedSymbols
       ? Promise.resolve(knownBlacklistedSymbols)
       : getBlacklistCoins().then((symbols) =>
@@ -1067,7 +1085,7 @@ async function queryCoinsData(
   const cryptoSymbols = [...new Set(vanished.filter((asset) =>
     getAssetType(asset) === "crypto").map((asset) => asset.symbol))];
   const stockSymbols = [...new Set(vanished.filter((asset) =>
-    getAssetType(asset) === "stock" && !isSupportedCurrencyCode(asset.symbol)
+    getAssetType(asset) === "stock" && !isBrokerCashSymbol(asset.symbol)
   ).map((asset) => asset.symbol))];
   const [cryptoPrices, stockPrices] = await Promise.all([
     cryptoSymbols.length ? queryCoinPrices(cryptoSymbols, userProInfo).catch(() => ({})) : Promise.resolve({}),

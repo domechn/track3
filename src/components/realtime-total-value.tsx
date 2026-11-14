@@ -3,6 +3,8 @@ import {
   queryRealTimeAssetsValue,
 } from "@/middlelayers/charts";
 import { Asset, CurrencyRateDetail, QuoteColor } from "@/middlelayers/types";
+import { getAssetIdentity, getAssetType } from "@/middlelayers/datafetch/utils/coins";
+import { isBrokerCashSymbol } from "@/middlelayers/entities/currency";
 import { positiveNegativeTextClass } from "@/utils/color";
 import {
   currencyWrapper,
@@ -76,17 +78,19 @@ const App = ({
 
   function RealtimeView() {
     const basePriceMap = useMemo(() => {
-      return new Map(lastRefreshAssetValues.map((asset) => [asset.symbol, asset.price]));
+      return new Map(lastRefreshAssetValues.map((asset) => [getAssetIdentity(asset), asset.price]));
     }, [lastRefreshAssetValues]);
 
     const priceChangePercentageMap = useMemo(() => {
-      return Object.fromEntries(realtimeAssetValues.map((a) => [a.symbol, getPriceChangePercentage(a)]));
+      return Object.fromEntries(realtimeAssetValues.map((a) => [getAssetIdentity(a), getPriceChangePercentage(a)]));
     }, [realtimeAssetValues, basePriceMap]);
 
     function getPriceChangePercentage(asset: Asset) {
-      const basePrice = basePriceMap.get(asset.symbol);
+      const basePrice = basePriceMap.get(getAssetIdentity(asset));
 
-      if (!basePrice) {
+      if (getAssetType(asset) === "stock" && isBrokerCashSymbol(asset.symbol) ||
+        !Number.isFinite(asset.price) || asset.price <= 0 ||
+        basePrice === undefined || !Number.isFinite(basePrice) || basePrice <= 0) {
         return null;
       }
 
@@ -148,14 +152,14 @@ const App = ({
                   </div>
                   <div
                     className={`tabular-nums ${positiveNegativeTextClass(
-                      priceChangePercentageMap[asset.symbol] ?? 0,
+                      priceChangePercentageMap[getAssetIdentity(asset)] ?? 0,
                       quoteColor,
                       700
                     )}`}
                   >
-                    {priceChangePercentageMap[asset.symbol] === null ? "—" : <>
-                      {(priceChangePercentageMap[asset.symbol] ?? 0) > 0 ? "+" : ""}
-                      {priceChangePercentageMap[asset.symbol]?.toFixed(2)}%
+                    {priceChangePercentageMap[getAssetIdentity(asset)] === null ? "—" : <>
+                      {(priceChangePercentageMap[getAssetIdentity(asset)] ?? 0) > 0 ? "+" : ""}
+                      {priceChangePercentageMap[getAssetIdentity(asset)]?.toFixed(2)}%
                     </>}
                   </div>
                 </div>

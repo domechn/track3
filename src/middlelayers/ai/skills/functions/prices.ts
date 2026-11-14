@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fetchStockPrices } from "../../../datafetch/utils/price";
 import { ASSET_HANDLER } from "../../../entities/assets";
-import { isSupportedCurrencyCode } from "../../../entities/currency";
+import { isBrokerCashSymbol } from "../../../entities/currency";
 import { trace } from "./trace";
 
 export interface PriceEntry {
@@ -37,13 +37,14 @@ export async function getCryptoPrices(symbols: string[], signal?: AbortSignal): 
 /** Fetch stock prices from broker endpoint. */
 export async function getStockPrices(symbols: string[], signal?: AbortSignal): Promise<Record<string, number>> {
   trace("getStockPrices", symbols.join(","));
-  if (symbols.length === 0) return {};
+  const quoteSymbols = symbols.filter((symbol) => !isBrokerCashSymbol(symbol));
+  if (quoteSymbols.length === 0) return {};
   if (signal?.aborted) return {};
   try {
-    const usdPrices = await fetchStockPrices(symbols);
+    const usdPrices = await fetchStockPrices(quoteSymbols);
     trace("getStockPrices", "->", Object.keys(usdPrices).length, "prices from fetch");
     const result: Record<string, number> = {};
-    for (const sym of symbols) {
+    for (const sym of quoteSymbols) {
       const usd = usdPrices[sym] ?? usdPrices[sym.toUpperCase()] ?? 0;
       if (Number.isFinite(usd) && usd > 0) result[sym] = usd;
     }
@@ -110,7 +111,7 @@ export async function getPrices(
   }
 
   // auto mode
-  const autoSymbols = symbols.filter((symbol) => !isSupportedCurrencyCode(symbol));
+  const autoSymbols = symbols.filter((symbol) => !isBrokerCashSymbol(symbol));
   if (autoSymbols.length === 0) return {};
   const knownCrypto = await knownCryptoSymbols();
   const knownStock = await knownStockSymbols();

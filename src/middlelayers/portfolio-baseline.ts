@@ -4,7 +4,7 @@ import {
   normalizeWalletToMD5,
 } from "../lib/utils";
 import { getAssetType } from "./datafetch/utils/coins";
-import { isSupportedCurrencyCode } from "./entities/currency";
+import { isBrokerCashSymbol } from "./entities/currency";
 import type { WalletCoin } from "./datafetch/types";
 import type { AssetModel } from "./types";
 
@@ -207,8 +207,8 @@ function isFailedWallet(
 }
 
 function assetModelToLastKnownWalletCoin(asset: AssetModel): WalletCoin {
-  // A saved currency-named stock row may be broker cash; keep its price while its source is stale.
-  const savedPrice = getAssetType(asset) === "stock" && isSupportedCurrencyCode(asset.symbol) &&
+  // A saved broker cash row needs its last price while its source is stale.
+  const savedPrice = getAssetType(asset) === "stock" && isBrokerCashSymbol(asset.symbol) &&
     Number.isFinite(asset.price) && asset.price > 0
     ? { base: "usd" as const, value: asset.price } : undefined;
   return {
