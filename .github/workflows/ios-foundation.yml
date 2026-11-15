@@ -6,43 +6,50 @@ on:
   pull_request:
     paths:
       - ".env.production"
+      - ".github/actions/**"
       - ".github/workflows/ios-foundation.yml"
       - "docs/ios/**"
+      - "scripts/ci/**"
       - "scripts/ios/**"
       - "src/**"
       - "src-tauri/**"
-      - "tests/e2e/ios-*.spec.ts"
-      - "tests/e2e/mobile.spec.ts"
-      - "tests/e2e/tauri-bridge.ts"
+      - "tests/e2e/**"
       - "tests/production/**"
       - "index.html"
       - "package.json"
       - "yarn.lock"
       - "playwright*.config.ts"
       - "vite.config.ts"
+  # Pull requests can only restore caches saved from master, so a nightly master run saves them.
+  schedule:
+    - cron: "47 19 * * *"
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Release pull requests, nightly runs and manual runs always finish.
+  cancel-in-progress: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && !startsWith(github.head_ref, 'chore/release-') && !contains(github.head_ref, 'hotfix') && github.base_ref != 'release' }}
 
 jobs:
-  web:
+  # Cheap checks that every long job waits for, so an obvious error fails in minutes.
+  pre-check:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 15
     permissions:
       contents: read
       issues: read
       pull-requests: read
+    outputs:
+      ios: ${{ steps.changes.outputs.ios }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
+      - uses: ./.github/actions/setup-web
+        timeout-minutes: 10
       - name: Check owner-applied format exception
         if: github.event_name == 'pull_request'
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -55,30 +62,60 @@ jobs:
           fi
       - name: Check UI refactor boundaries
         if: github.event_name == 'pull_request'
+        timeout-minutes: 5
         run: node scripts/ui-refactor-guard.mjs "origin/${{ github.base_ref }}"
+      - name: Check app types
+        timeout-minutes: 5
+        run: corepack yarn tsc --noEmit
+      - name: Check browser tests
+        timeout-minutes: 5
+        run: corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit
+      - name: Load every browser spec
+        timeout-minutes: 5
+        run: |
+          # The mobile specs import desktop spec files, so each project is listed on its own.
+          corepack yarn playwright test --list --project=mobile > /dev/null
+          corepack yarn playwright test --list --project=desktop > /dev/null
+          corepack yarn playwright test -c playwright.preview.config.ts --list > /dev/null
+      - name: Decide whether the change can reach the iOS app
+        id: changes
+        timeout-minutes: 5
+        run: |
+          ios=true
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            changed="$(git diff --name-only "origin/$GITHUB_BASE_REF...HEAD")"
+            # Browser specs and unit tests are in neither the app bundle nor the Xcode project.
+            if [ -n "$changed" ] && ! grep -qvE '^(tests/(e2e|production)/|playwright[^/]*\.config\.ts$|src/.*\.test\.tsx?$)' <<< "$changed"; then
+              ios=false
+            fi
+          fi
+          echo "ios=$ios" >> "$GITHUB_OUTPUT"
+
+  web-checks:
+    name: web checks
+    needs: pre-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.94.1
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
-      - run: corepack enable
-      - name: Find Yarn cache
-        id: yarn-cache
-        run: echo "dir=$(corepack yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@v6
+          save-if: ${{ github.event_name != 'pull_request' }}
+          cache-on-failure: true
+      - uses: ./.github/actions/setup-web
+        timeout-minutes: 10
         with:
-          path: ${{ steps.yarn-cache.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
-      - run: corepack yarn install --immutable
-      - run: corepack yarn tsc --noEmit
-      - run: corepack yarn vitest run
-      - run: corepack yarn build
-      - name: Cache Playwright Chromium
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-chromium-${{ hashFiles('yarn.lock') }}
+          chromium: install
+      # The test-on-pr quality job runs every unit test for pull requests and nightly runs.
+      - if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        timeout-minutes: 20
+        run: corepack yarn vitest run
+      - timeout-minutes: 10
+        run: corepack yarn build
       - name: Cache apt packages
         uses: actions/cache@v6
         with:
@@ -86,11 +123,13 @@ jobs:
           key: ${{ runner.os }}-apt-ios-${{ hashFiles('.github/workflows/ios-foundation.yml') }}
           restore-keys: ${{ runner.os }}-apt-ios-
       - name: Install Playwright and desktop Rust system packages
-        timeout-minutes: 25
+        timeout-minutes: 10
         run: |
           mkdir -p "$HOME/.cache/apt-archives/partial"
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends \
+          apt_get() { sudo timeout -k 10 "$1" apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 "${@:2}"; }
+          # A hung apt is killed and retried once; the step timeout bounds both attempts.
+          for attempt in 1 2; do
+            if apt_get 90 update && apt_get 240 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends \
             xvfb fonts-noto-color-emoji fonts-unifont libfontconfig1 libfreetype6 \
             xfonts-cyrillic xfonts-scalable fonts-liberation fonts-ipafont-gothic \
             fonts-wqy-zenhei fonts-tlwg-loma-otf fonts-freefont-ttf \
@@ -99,47 +138,159 @@ jobs:
             libgbm1 libglib2.0-0t64 libnspr4 libnss3 libpango-1.0-0 \
             libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 \
             libxfixes3 libxkbcommon0 libxrandr2 \
-            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf; then break; fi
+            if [ "$attempt" -eq 2 ]; then exit 1; fi
+            sudo timeout -k 10 60 dpkg --configure -a || true
+          done
           sudo chown -R "$USER:$USER" "$HOME/.cache/apt-archives"
-      - name: Install Playwright Chromium
-        timeout-minutes: 10
-        run: corepack yarn playwright install chromium
       - name: Check generated brand icons
+        timeout-minutes: 5
         run: node --test scripts/brand-export.test.mjs
-      - name: Check browser tests
-        run: corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit
       - name: Test production startup
+        timeout-minutes: 10
         run: corepack yarn playwright test -c playwright.preview.config.ts --workers=2
-      - name: Test iPhone and iPad flows
-        run: corepack yarn playwright test --project=mobile --workers=2
-      - name: Upload iOS browser screenshots
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v7
-        with:
-          name: ios-browser-screenshots
-          path: test-results/mobile/*.png
-          retention-days: 1
-      - name: Test desktop browser flows
-        run: corepack yarn playwright test --project=desktop --workers=2
-      - name: Upload failed desktop browser results
-        if: failure()
-        continue-on-error: true
-        uses: actions/upload-artifact@v7
-        with:
-          name: desktop-browser-failure
-          path: test-results/
-          retention-days: 1
       - name: Check desktop Rust library and binaries
         timeout-minutes: 15
         run: cargo check --locked --lib --bins
         working-directory: src-tauri
-      - run: cargo test --locked -p track3-pure-tests --lib
+      - timeout-minutes: 15
+        run: cargo test --locked -p track3-pure-tests --lib
         working-directory: src-tauri
 
-  ios:
+  browser:
+    name: ${{ matrix.project }} browser flows (${{ matrix.shard }}/4)
+    needs: pre-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The test-on-pr e2e job runs the desktop project for pull requests and nightly runs.
+        project: ${{ fromJSON((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && '["mobile", "desktop"]' || '["mobile"]') }}
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-web
+        timeout-minutes: 10
+        with:
+          chromium: install
+      - name: Cache apt packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/apt-archives
+          key: ${{ runner.os }}-apt-playwright-${{ hashFiles('.github/workflows/ios-foundation.yml') }}
+          restore-keys: ${{ runner.os }}-apt-playwright-
+      - name: Install Playwright system packages
+        timeout-minutes: 10
+        run: |
+          mkdir -p "$HOME/.cache/apt-archives/partial"
+          apt_get() { sudo timeout -k 10 "$1" apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 "${@:2}"; }
+          # A hung apt is killed and retried once; the step timeout bounds both attempts.
+          for attempt in 1 2; do
+            if apt_get 90 update && apt_get 240 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends \
+            xvfb fonts-noto-color-emoji fonts-unifont libfontconfig1 libfreetype6 \
+            xfonts-cyrillic xfonts-scalable fonts-liberation fonts-ipafont-gothic \
+            fonts-wqy-zenhei fonts-tlwg-loma-otf fonts-freefont-ttf \
+            libasound2t64 libatk-bridge2.0-0t64 libatk1.0-0t64 \
+            libatspi2.0-0t64 libcairo2 libcups2t64 libdbus-1-3 libdrm2 \
+            libgbm1 libglib2.0-0t64 libnspr4 libnss3 libpango-1.0-0 \
+            libx11-6 libxcb1 libxcomposite1 libxdamage1 libxext6 \
+            libxfixes3 libxkbcommon0 libxrandr2; then break; fi
+            if [ "$attempt" -eq 2 ]; then exit 1; fi
+            sudo timeout -k 10 60 dpkg --configure -a || true
+          done
+          sudo chown -R "$USER:$USER" "$HOME/.cache/apt-archives"
+      - name: Test ${{ matrix.project }} browser flows
+        timeout-minutes: 25
+        run: corepack yarn playwright test --project=${{ matrix.project }} --workers=2 --shard=${{ matrix.shard }}/4 --reporter=list,blob
+      - name: Upload shard report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: blob-${{ matrix.project }}-${{ matrix.shard }}
+          overwrite: true
+          path: blob-report
+          retention-days: 1
+      - name: Upload iOS browser screenshots
+        if: always() && matrix.project == 'mobile'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-browser-screenshots-${{ matrix.shard }}
+          path: test-results/mobile/*.png
+          retention-days: 1
+      - name: Upload failed desktop browser results
+        if: failure() && matrix.project == 'desktop'
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-browser-failure-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 1
+
+  # Keeps the original check name: fails when the pre-check, the web checks or any shard did not pass.
+  web:
+    needs: [pre-check, web-checks, browser]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-web
+        if: needs.browser.result != 'skipped'
+        continue-on-error: true
+        timeout-minutes: 10
+      - uses: actions/download-artifact@v8
+        if: needs.browser.result != 'skipped'
+        continue-on-error: true
+        with:
+          path: all-blob-reports
+          pattern: blob-*
+          merge-multiple: true
+      - name: Merge shard reports and list failed and flaky tests
+        if: needs.browser.result != 'skipped'
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
+        run: |
+          corepack yarn playwright merge-reports --reporter=html,json all-blob-reports
+          node scripts/ci/playwright-summary.mjs playwright-report/results.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: needs.browser.result != 'skipped'
+        continue-on-error: true
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 3
+      - name: Collect iOS browser screenshots
+        if: needs.browser.result != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact/merge@v7
+        with:
+          name: ios-browser-screenshots
+          pattern: ios-browser-screenshots-*
+          delete-merged: true
+          retention-days: 1
+      - name: Require the pre-check, the web checks and every shard
+        if: always()
+        run: |
+          test "${{ needs.pre-check.result }}" = success
+          test "${{ needs.web-checks.result }}" = success
+          test "${{ needs.browser.result }}" = success
+
+  ios-leg:
+    name: ios ${{ matrix.leg }}
+    needs: pre-check
+    # Only an explicit "false" from the pre-check skips the app jobs.
+    if: needs.pre-check.outputs.ios != 'false'
     runs-on: macos-latest
-    timeout-minutes: 90
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        leg: [iphone, ipad, device]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -152,6 +303,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+          key: ${{ matrix.leg == 'device' && 'device' || 'simulator' }}
+          # The iPhone leg builds everything the iPad leg does, so it owns the simulator cache.
+          save-if: ${{ github.event_name != 'pull_request' && matrix.leg != 'ipad' }}
+          cache-on-failure: true
       - run: corepack enable
       - name: Find Yarn cache
         id: yarn-cache
@@ -160,9 +315,12 @@ jobs:
         with:
           path: ${{ steps.yarn-cache.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
-      - run: corepack yarn install --immutable
-      - run: corepack yarn build
+      - timeout-minutes: 10
+        run: corepack yarn install --immutable
+      - timeout-minutes: 10
+        run: corepack yarn build
       - name: Initialize the Xcode project when absent
+        timeout-minutes: 10
         run: |
           if [ ! -f src-tauri/gen/apple/project.yml ]; then
             corepack yarn tauri ios init --ci
@@ -172,14 +330,22 @@ jobs:
           cp generated-icons/ios/*.png src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/
           git diff --exit-code -- src-tauri/gen/apple
       - name: Check the device Rust target
+        if: matrix.leg == 'device'
+        timeout-minutes: 15
         run: cargo check --locked --target aarch64-apple-ios --lib
         working-directory: src-tauri
       - name: Check the simulator Rust target
+        if: matrix.leg == 'iphone'
+        timeout-minutes: 15
         run: cargo check --locked --target aarch64-apple-ios-sim --lib
         working-directory: src-tauri
       - name: Build unsigned simulator app
+        if: matrix.leg != 'device'
+        timeout-minutes: 20
         run: VITE_TRACK3_IOS_READY_PROBE=1 corepack yarn tauri ios build --target aarch64-sim --debug --no-sign --ci
       - name: Check native symbols in simulator app
+        if: matrix.leg == 'iphone'
+        timeout-minutes: 5
         run: |
           set -euo pipefail
           APP=$(find src-tauri -type d -name '*.app' -print -quit)
@@ -190,6 +356,8 @@ jobs:
             grep -Fq " _$symbol" "$RUNNER_TEMP/track3-native-symbols.txt"
           done
       - name: Launch in iPhone simulator
+        if: matrix.leg == 'iphone'
+        timeout-minutes: 15
         run: |
           set -euxo pipefail
           SIM_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next(d["udid"] for group in data["devices"].values() for d in group if d["name"].startswith("iPhone") and d["state"] == "Shutdown"))')
@@ -248,10 +416,13 @@ jobs:
           test ! -s artifacts/crash-reports.log
           ! grep -Eiq 'failed to read migration|error while running tauri application' artifacts/launch.log
       - name: Launch in iPad simulator in portrait and landscape
+        if: matrix.leg == 'ipad'
+        timeout-minutes: 15
         run: |
           set -euxo pipefail
           SIM_ID=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for group in data["devices"].values() for d in group if d["name"].startswith("iPad") and d["state"] == "Shutdown"]; devices.sort(key=lambda d: ("13-inch" not in d["name"], d["name"])); print(devices[0]["udid"])')
-          xcrun simctl shutdown all
+          xcrun simctl shutdown all || true
+          mkdir -p artifacts
           xcrun simctl boot "$SIM_ID"
           xcrun simctl bootstatus "$SIM_ID" -b
           APP=$(find src-tauri -type d -name '*.app' -print -quit)
@@ -319,8 +490,11 @@ jobs:
           swift scripts/ios/check-screenshot.swift artifacts/ipad-landscape.png
           xcrun simctl spawn "$SIM_ID" launchctl list | awk -v pid="$LANDSCAPE_PID" '$1 == pid {found=1} END {exit !found}'
       - name: Build unsigned device IPA
+        if: matrix.leg == 'device'
+        timeout-minutes: 20
         run: |
           set -euo pipefail
+          mkdir -p artifacts
           if ! corepack yarn tauri ios build --target aarch64 --debug --no-sign --ci; then
             echo "Tauri did not export an unsigned IPA; checking for a built device app"
           fi
@@ -338,11 +512,13 @@ jobs:
             rm -rf artifacts/ipa
           fi
       - name: Check committed Xcode project
+        timeout-minutes: 5
         run: |
           python3 scripts/ios/configure-project.py
           git diff --exit-code -- src-tauri/gen/apple
       - name: Print simulator crash reason
-        if: always()
+        if: always() && matrix.leg != 'device'
+        timeout-minutes: 5
         run: |
           python3 - <<'PY'
           import json
@@ -371,27 +547,59 @@ jobs:
               break
           PY
       - name: Upload simulator screenshots and launch logs
-        if: always()
+        if: always() && matrix.leg != 'device'
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: ios-simulator
+          name: ios-simulator-${{ matrix.leg }}
           path: |
             artifacts/*.png
             artifacts/*.log
           retention-days: 1
       - name: Upload unsigned iOS builds
-        if: always()
+        if: always() && matrix.leg != 'ipad'
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: ios-builds
+          name: ios-builds-${{ matrix.leg }}
           path: |
             artifacts/*.zip
             artifacts/*.ipa
           retention-days: 1
       - name: Typecheck iOS native bridge
-        if: always()
+        if: always() && matrix.leg == 'device'
+        timeout-minutes: 5
         run: |
           SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
           xcrun swiftc -typecheck -sdk "$SDK" -target arm64-apple-ios15.0-simulator src-tauri/gen/apple/Sources/track3/Track3Native.swift
+
+  # Keeps the original check name: fails when the pre-check or any leg that had to run did not pass.
+  ios:
+    needs: [pre-check, ios-leg]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Collect simulator screenshots and launch logs
+        if: needs.ios-leg.result != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact/merge@v7
+        with:
+          name: ios-simulator
+          pattern: ios-simulator-*
+          delete-merged: true
+          retention-days: 1
+      - name: Collect unsigned iOS builds
+        if: needs.ios-leg.result != 'skipped'
+        continue-on-error: true
+        uses: actions/upload-artifact/merge@v7
+        with:
+          name: ios-builds
+          pattern: ios-builds-*
+          delete-merged: true
+          retention-days: 1
+      - name: Require the pre-check and every leg
+        if: always()
+        run: |
+          test "${{ needs.pre-check.result }}" = success
+          test "${{ needs.pre-check.outputs.ios }}" = false || test "${{ needs.ios-leg.result }}" = success
