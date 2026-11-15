@@ -254,7 +254,7 @@ body:has(.sync-settings-page) .desktop-toast-viewport [toast-close] {
 .t3-desktop-column > :not(main) { flex: none; }
 .t3-desktop-column #app-main-content {
   flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden;
-  scrollbar-gutter: stable; overscroll-behavior: contain;
+  scrollbar-gutter: stable; overscroll-behavior: none;
 }
 .t3-desktop-column #app-main-content:has(.t3-settings) {
   scrollbar-gutter: auto;
