@@ -23,6 +23,7 @@ import {
 import Autoplay from "embla-carousel-autoplay";
 import { useTranslation } from "@/i18n";
 import { useLiveTotal } from "./use-live-total";
+import { LiveTotalDetails } from "./live-total-details";
 
 const App = ({
   currency,
@@ -46,9 +47,12 @@ const App = ({
     live: true,
     intervalMs: 60_000,
     load: async () => {
-      const assets = (await queryRealTimeAssetsValue()).sort((a, b) => b.value - a.value);
+      const result = await queryRealTimeAssetsValue();
+      const assets = [...result].sort((a, b) => b.value - a.value);
       setRealtimeAssetValues(assets);
-      return assets.reduce((sum, asset) => sum + asset.value, 0);
+      return { value: assets.reduce((sum, asset) => sum + asset.value, 0),
+        partial: result.partial, reason: result.reason === "pricesMissing"
+          ? `pricesMissing:${result.missingCount ?? 1}` : result.reason };
     },
   });
   const realtimeTotalValue = liveTotal.value ?? 0;
@@ -102,15 +106,15 @@ const App = ({
           {t("realtime.title")}
         </div>
         <div className="flex space-x-1 items-center justify-end">
-          <div className="text-xl font-semibold tracking-tight">
+          <div className="whitespace-nowrap text-xl font-semibold tracking-tight">
             ≈{" "}
             {currency.symbol +
               prettyNumberToLocaleString(
                 currencyWrapper(currency)(realtimeTotalValue)
               )}
           </div>
-          {changedPercentage !== null && <div
-            className={`text-sm font-semibold ${positiveNegativeTextClass(
+          {!liveTotal.partial && changedPercentage !== null && <div
+            className={`whitespace-nowrap text-sm font-semibold ${positiveNegativeTextClass(
               changedPercentage,
               quoteColor,
               700
@@ -144,14 +148,14 @@ const App = ({
                   <div className="flex items-center min-w-0">
                     <div className="truncate">{asset.symbol}</div>
                   </div>
-                  <div className="tabular-nums">
+                  <div className="whitespace-nowrap tabular-nums">
                     {currency.symbol +
                       prettyPriceNumberToLocaleString(
                         currencyWrapper(currency)(asset.price)
                       )}
                   </div>
                   <div
-                    className={`tabular-nums ${positiveNegativeTextClass(
+                    className={`whitespace-nowrap tabular-nums ${positiveNegativeTextClass(
                       priceChangePercentageMap[getAssetIdentity(asset)] ?? 0,
                       quoteColor,
                       700
@@ -192,6 +196,9 @@ const App = ({
               <i className="t3-live-dot" data-state={liveTotal.state} role="img"
                 aria-label={t(`realtime.price.${liveTotal.state}`)} title={t(`realtime.price.${liveTotal.state}`)} />
             </span>
+            {liveTotal.partial && <span className="whitespace-nowrap text-xs text-muted-foreground">
+              {t("realtime.state.partial")}
+            </span>}
           </button>
         </PopoverTrigger>
         <span role="status" aria-live="polite" className="sr-only"
@@ -203,15 +210,21 @@ const App = ({
           <p className="mb-2 text-xs text-muted-foreground">{t(`realtime.price.${liveTotal.state}`)}</p>
           <div className="relative min-h-[110px]" aria-busy={liveTotal.value === undefined && liveTotal.state !== "error"}>
             {liveTotal.value === undefined
-              ? liveTotal.state === "error" ? <div className="flex min-h-[110px] items-center justify-center text-sm text-muted-foreground">
-                  {t("realtime.state.error")}
+              ? liveTotal.state === "error" ? <div className="flex min-h-[110px] flex-col items-start justify-center gap-2">
+                  <span className="text-sm text-muted-foreground">{t("realtime.state.error")}</span>
+                  <LiveTotalDetails error={liveTotal.error} lastAt={liveTotal.lastAt}
+                    retryNow={liveTotal.retryNow} t={t} />
                 </div> : <div className="space-y-4 pt-2" aria-hidden="true">
                 <div className="t3-live-skeleton h-3 w-1/2" />
                 <div className="t3-live-skeleton ml-auto h-5 w-3/4" />
                 <Separator />
                 <div className="t3-live-skeleton h-3 w-full" />
               </div>
-              : <RealtimeView />}
+              : <div className="space-y-3">
+                  <RealtimeView />
+                  {(liveTotal.error || liveTotal.partial) && <LiveTotalDetails error={liveTotal.error}
+                    lastAt={liveTotal.lastAt} retryNow={liveTotal.retryNow} t={t} />}
+                </div>}
             {liveTotal.value !== undefined && <div
               className={`absolute inset-0 rounded-md backdrop-blur-md bg-background/60 transition-opacity duration-200 ${
                 liveTotal.state === "connecting" ? "opacity-100" : "opacity-0 pointer-events-none"

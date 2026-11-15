@@ -57,7 +57,27 @@ import {
 } from "./database";
 import { FullRefreshRequiredError } from "./refresh-error";
 import { partialFromSourceStatuses, validatePartialSnapshot, type PartialSnapshot } from "./snapshot-partial";
-import { customFollowTargets, resolveCustomPrices } from "./custom-price";
+import { customFollowTargets, resolveCustomPrices, validateCustomPrice } from "./custom-price";
+import { readStoredStatuses } from "./ui-state/source-status-store";
+
+export type LiveAssets = Asset[] & {
+  partial?: boolean;
+  reason?: "rateLimited" | "pricesMissing" | "stockPricesMissing" | "rateUnavailable" | "ibkrToken" | "partialSource" | "unknown";
+  missingCount?: number;
+};
+
+type LivePriceStatus = {
+  reason?: LiveAssets["reason"];
+  missingRateSymbols: Set<string>;
+  missingCount: number;
+};
+
+function liveQuoteReason(error: unknown, fallback: LiveAssets["reason"]): LiveAssets["reason"] {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/IBKR.*(?:1012|token expired)|(?:1012|token expired).*IBKR/i.test(message)) return "ibkrToken";
+  if (/(?:429|1018|rate.?limit|too many requests)/i.test(message)) return "rateLimited";
+  return fallback;
+}
 
 export const WALLET_ANALYZER = new WalletAnalyzer((size) =>
   ASSET_HANDLER.listAssets(size),
@@ -645,7 +665,7 @@ function getTransactionIdentity(transaction: RefreshTransactionDraft): string {
 }
 
 // query the real-time price of the last queried asset
-export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
+export async function queryRealTimeAssetsValue(): Promise<LiveAssets> {
   const cache = getMemoryCacheInstance(
     CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY,
   );
@@ -653,7 +673,7 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
     CACHE_GROUP_KEYS.REALTIME_ASSET_VALUES_CACHE_GROUP_KEY,
   );
   const cacheKey = `${cacheEpoch}-real-time-assets`;
-  const c = cache.getCache<Asset[]>(cacheKey);
+  const c = cache.getCache<LiveAssets>(cacheKey);
   if (c) {
     return c;
   }
@@ -671,25 +691,37 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
   // check if pro user
   const userProInfo = await isProVersion();
   const lastAssets = (await ASSET_HANDLER.listAssets(1)).flat();
+  const liveStatus: LivePriceStatus = { missingRateSymbols: new Set(), missingCount: 0 };
+  const customSymbols = config.others?.map((entry) => entry.symbol) ?? [];
 
   const walletCoins = await queryCoinsDataByWalletCoins(
     assets
-      .map((a) => ({
-        symbol: a.symbol,
-        assetType: getAssetType(a),
-        amount: a.amount,
-        // wallet here dose not matter
-        wallet: a.wallet ?? OthersAnalyzer.wallet,
-      })),
+      .map((a) => {
+        const custom = config.others?.find((entry) =>
+          !entry.attachTo && getAssetIdentity(entry) === getAssetIdentity(a) && entry.price &&
+          validateCustomPrice(entry.price, customSymbols, entry.symbol));
+        const customPrice = custom && isSameWallet(a.wallet ?? "", OthersAnalyzer.wallet) &&
+          lastAssets.filter((row) => getAssetIdentity(row) === getAssetIdentity(a))
+            .every((row) => isSameWallet(row.wallet ?? "", OthersAnalyzer.wallet))
+          ? custom.price : undefined;
+        return {
+          symbol: a.symbol,
+          assetType: getAssetType(a),
+          amount: a.amount,
+          wallet: customPrice ? OthersAnalyzer.wallet : a.wallet ?? OthersAnalyzer.wallet,
+          ...(customPrice ? { customPrice } : {}),
+        };
+      }),
     config,
     lastAssets,
     userProInfo,
     undefined,
     undefined,
     true,
+    liveStatus,
   );
 
-  const assetRes = walletCoins
+  const assetRes: LiveAssets = walletCoins
     .map((t) => {
       const ast = {
         symbol: t.symbol,
@@ -709,10 +741,23 @@ export async function queryRealTimeAssetsValue(): Promise<Asset[]> {
         ast.price = lastAst.price;
       }
       return ast;
-    });
+    }).filter((asset) => asset.amount > 0 && Number.isFinite(asset.price) && asset.price > 0 &&
+      Number.isFinite(asset.value) && asset.value >= 0);
+
+  const sourceProblems = readStoredStatuses().filter((status) => status.status !== "ok");
+  const ibkrProblem = sourceProblems.find((status) => status.detail === "IBKR token expired");
+  const limitedProblem = sourceProblems.find((status) => status.category === "rateLimit");
+  assetRes.partial = liveStatus.reason !== undefined || liveStatus.missingCount > 0 || sourceProblems.length > 0;
+  assetRes.missingCount = liveStatus.missingCount;
+  assetRes.reason = ibkrProblem ? "ibkrToken" : limitedProblem ? "rateLimited"
+    : liveStatus.reason ?? (sourceProblems.length ? "partialSource" : liveStatus.missingCount ? "pricesMissing" : undefined);
+  if (assets.some((asset) => asset.amount > 0) && assetRes.length === 0) {
+    throw new Error(assetRes.reason === "pricesMissing"
+      ? `pricesMissing:${liveStatus.missingCount}` : assetRes.reason ?? "pricesMissing");
+  }
 
   // 15 min ttl
-  cache.setCache(cacheKey, assetRes, 15 * 60);
+  if (!liveStatus.reason && !liveStatus.missingCount) cache.setCache(cacheKey, assetRes, 15 * 60);
   return assetRes;
 }
 
@@ -721,6 +766,7 @@ async function queryWalletCoinValueContext(
   userProInfo: UserLicenseInfo,
   addProgress?: AddProgressFunc,
   savedStockRows = false,
+  liveStatus?: LivePriceStatus,
 ): Promise<WalletCoinValueContext> {
   const needPriceAssets = assets.filter((a) => !a.price);
   const followTargets = customFollowTargets(assets);
@@ -745,13 +791,28 @@ async function queryWalletCoinValueContext(
     needPriceAssets.filter((asset) => savedStockRows && getAssetType(asset) === "stock" && isBrokerCashSymbol(asset.symbol))
       .map((asset) => asset.symbol.toUpperCase())
   )];
-  const [cryptoPriceMap, stockPriceMap, currencyRates] = await Promise.all([
+  const [cryptoPriceMap, stockPriceMap, currencyRates]: [
+    Record<string, number>, Record<string, number>, Awaited<ReturnType<typeof listAllCurrencyRates>>,
+  ] = await Promise.all([
     cryptoPriceSymbols.length > 0
-      ? queryCoinPrices(cryptoPriceSymbols, userProInfo)
+      ? queryCoinPrices(cryptoPriceSymbols, userProInfo).catch((error: unknown) => {
+        if (!liveStatus) throw error;
+        const reason = liveQuoteReason(error, "pricesMissing");
+        if (reason === "rateLimited" || !liveStatus.reason) liveStatus.reason = reason;
+        return {};
+      })
       : Promise.resolve({}),
-    stockPriceSymbols.length ? fetchStockPrices(stockPriceSymbols) : Promise.resolve({}),
+    stockPriceSymbols.length ? fetchStockPrices(stockPriceSymbols).catch((error: unknown) => {
+      if (!liveStatus) throw error;
+      const reason = liveQuoteReason(error, "stockPricesMissing");
+      if (reason === "rateLimited" || !liveStatus.reason) liveStatus.reason = reason;
+      return {};
+    }) : Promise.resolve({}),
     cashSymbols.some((symbol) => symbol !== "USD")
-      ? listAllCurrencyRates().catch(() => [])
+      ? listAllCurrencyRates().catch(() => {
+        if (liveStatus) liveStatus.reason = "rateUnavailable";
+        return [];
+      })
       : Promise.resolve([]),
   ]);
   const typedCryptoPriceMap: Record<string, number> = {};
@@ -769,12 +830,16 @@ async function queryWalletCoinValueContext(
     const price = rate && rate > 0 ? 1 / rate : undefined;
     typedStockPriceMap[getAssetIdentity({ symbol, assetType: "stock" })] =
       price !== undefined && Number.isFinite(price) ? price : Number.NaN;
+    if (liveStatus && !Number.isFinite(typedStockPriceMap[getAssetIdentity({ symbol, assetType: "stock" })])) {
+      liveStatus.missingRateSymbols.add(symbol);
+    }
   }
   const priceMap = {
     ...cryptoPriceMap,
     ...typedCryptoPriceMap,
     ...typedStockPriceMap,
   };
+  if (liveStatus && !Number.isFinite(priceMap.USDT)) priceMap.USDT = Number.NaN;
   if (addProgress) {
     addProgress(10);
   }
@@ -948,9 +1013,10 @@ async function queryCoinsDataByWalletCoins(
   addProgress?: AddProgressFunc,
   knownBlacklistedSymbols?: string[],
   savedStockRows = false,
+  liveStatus?: LivePriceStatus,
 ): Promise<WalletCoinUSD[]> {
   const [valueContext, blacklistedSymbols] = await Promise.all([
-    queryWalletCoinValueContext(assets, userProInfo, addProgress, savedStockRows),
+    queryWalletCoinValueContext(assets, userProInfo, addProgress, savedStockRows, liveStatus),
     knownBlacklistedSymbols
       ? Promise.resolve(knownBlacklistedSymbols)
       : getBlacklistCoins().then((symbols) =>
@@ -962,13 +1028,27 @@ async function queryCoinsDataByWalletCoins(
     valueContext,
     blacklistedSymbols,
   );
-  return resolveWalletCoins(
+  const resolved = resolveWalletCoins(
     assets,
     lastAssets,
     valueContext,
     canonicalization,
     addProgress,
   );
+  if (!liveStatus) return resolved;
+  liveStatus.missingCount = assets.filter((asset) => {
+    if (asset.amount <= 0 || blacklistedSymbols.includes(asset.symbol.toUpperCase())) return false;
+    const key = getAssetIdentity(asset);
+    const quote = asset.price?.value ?? valueContext.priceMap[key] ?? valueContext.priceMap[asset.symbol];
+    if (Number.isFinite(quote) && quote > 0) return false;
+    if (asset.customPrice && resolved.some((row) =>
+      row.symbol === asset.symbol && getAssetType(row) === getAssetType(asset) &&
+      Number.isFinite(row.price) && row.price > 0)) return false;
+    return true;
+  }).length;
+  if (liveStatus.missingRateSymbols.size) liveStatus.reason = "rateUnavailable";
+  else if (liveStatus.missingCount && !liveStatus.reason) liveStatus.reason = "pricesMissing";
+  return resolved;
 }
 
 // query all assets and calculate their value in USD

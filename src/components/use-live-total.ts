@@ -1,32 +1,65 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 
-export type LiveTotalState = "idle" | "connecting" | "live" | "stale" | "error" | "off";
+export type LiveTotalState = "idle" | "connecting" | "live" | "partial" | "stale" | "error" | "off";
 
-type Snapshot = { state: LiveTotalState; value?: number; lastAt?: number; firstReveal: boolean };
+type Snapshot = { state: LiveTotalState; value?: number; lastAt?: number; firstReveal: boolean;
+  partial?: boolean; error?: string };
 type Event =
-  | { type: "reset"; value?: number }
+  | { type: "reset"; value?: number; at?: number }
   | { type: "start" }
-  | { type: "success"; value: number; at: number; live: boolean; stale?: boolean }
+  | { type: "success"; value: number; at: number; live: boolean; stale?: boolean; partial?: boolean; reason?: string }
   | { type: "stale" }
-  | { type: "error" }
+  | { type: "error"; reason?: string }
   | { type: "off" };
 
 const sessionValues = new Map<string, number>();
+const sessionSuccessAt = new Map<string, number>();
+
+export function safeLiveTotalError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/^pricesMissing:[1-9]\d*$/.test(message)) return message;
+  if (/ibkrToken|IBKR.*(?:1012|token expired)|(?:1012|token expired).*IBKR/i.test(message)) return "ibkrToken";
+  if (/(?:429|1018|rate.?limit|too many requests|rateLimited)/i.test(message)) return "rateLimited";
+  if (/rateUnavailable|(?:exchange|currency|fx) rate/i.test(message)) return "rateUnavailable";
+  if (/partialSource/.test(message)) return "partialSource";
+  if (/stockPricesMissing|stock.*(?:quote|price)/i.test(message)) return "stockPricesMissing";
+  if (/pricesMissing|coin.*(?:quote|price)/i.test(message)) return "pricesMissing";
+  return "unknown";
+}
+
+export function safeLiveTotalLogMessage(error: unknown): string {
+  const kind = safeLiveTotalError(error).split(":")[0];
+  const description: Record<string, string> = {
+    rateLimited: "Price service rate limited",
+    pricesMissing: "Coin prices missing",
+    stockPricesMissing: "Stock prices missing",
+    rateUnavailable: "Currency rate unavailable",
+    ibkrToken: "IBKR token expired",
+    partialSource: "Portfolio source partial",
+    unknown: "Live price request failed",
+  };
+  const message = error instanceof Error ? error.message : String(error);
+  const status = message.match(/\b([1-5]\d{2})\b/)?.[1];
+  return `${description[kind] ?? description.unknown}${status ? ` (HTTP ${status})` : ""}`;
+}
 
 export function liveTotalTransition(snapshot: Snapshot, event: Event): Snapshot {
   switch (event.type) {
     case "reset":
-      return { state: "idle", value: event.value, firstReveal: false };
+      return { state: "idle", value: event.value, lastAt: event.at, firstReveal: false };
     case "start":
-      return { ...snapshot, state: snapshot.state === "live" ? "live" : "connecting", firstReveal: false };
+      return { ...snapshot, state: snapshot.state === "live" || snapshot.state === "partial"
+        ? snapshot.state : "connecting", firstReveal: false };
     case "success":
-      return { state: event.stale ? "stale" : event.live ? "live" : "off", value: event.value, lastAt: event.at,
-        firstReveal: snapshot.value === undefined };
+      return { state: event.stale ? "stale" : event.partial ? "partial" : event.live ? "live" : "off",
+        value: event.value, lastAt: event.stale || event.partial ? snapshot.lastAt : event.at,
+        firstReveal: snapshot.value === undefined, partial: event.partial, error: event.reason };
     case "stale":
-      return snapshot.state === "connecting" || snapshot.state === "live"
+      return snapshot.state === "connecting" || snapshot.state === "live" || snapshot.state === "partial"
         ? { ...snapshot, state: "stale", firstReveal: false } : snapshot;
     case "error":
-      return { ...snapshot, state: snapshot.value === undefined ? "error" : "stale", firstReveal: false };
+      return { ...snapshot, state: snapshot.value === undefined ? "error" : "stale",
+        error: event.reason, firstReveal: false };
     case "off":
       return { ...snapshot, state: "off", firstReveal: false };
   }
@@ -34,7 +67,7 @@ export function liveTotalTransition(snapshot: Snapshot, event: Event): Snapshot 
 
 export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues = false, refreshToken }: {
   key: string;
-  load: () => Promise<number | { value: number; stale: boolean }>;
+  load: () => Promise<number | { value: number; stale?: boolean; partial?: boolean; reason?: string }>;
   enabled: boolean;
   live: boolean;
   intervalMs: number;
@@ -42,12 +75,13 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
   refreshToken?: number;
 }) {
   const [snapshot, dispatch] = useReducer(liveTotalTransition, key, (cacheKey): Snapshot => ({
-    state: "idle", value: sessionValues.get(cacheKey), firstReveal: false,
+    state: "idle", value: sessionValues.get(cacheKey), lastAt: sessionSuccessAt.get(cacheKey), firstReveal: false,
   }));
   const [animatedValue, setAnimatedValue] = useState(snapshot.value);
   const [announcedValue, setAnnouncedValue] = useState(snapshot.value);
   const lastAnnouncedAt = useRef(0);
   const loadRef = useRef(load);
+  const refreshRef = useRef<() => void>(() => {});
   loadRef.current = load;
   const visible = () => document.visibilityState !== "hidden";
   const reducedMotion = typeof window.matchMedia === "function" &&
@@ -55,7 +89,7 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
   const animate = snapshot.value !== undefined && !hideValues && !reducedMotion && visible() && !snapshot.firstReveal;
 
   useLayoutEffect(() => {
-    dispatch({ type: "reset", value: sessionValues.get(key) });
+    dispatch({ type: "reset", value: sessionValues.get(key), at: sessionSuccessAt.get(key) });
     setAnimatedValue(sessionValues.get(key));
     setAnnouncedValue(sessionValues.get(key));
   }, [key]);
@@ -74,6 +108,8 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
     let lastAt = 0;
     const refresh = async () => {
       if (!visible() || pending) return;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      retryTimer = undefined;
       pending = true;
       dispatch({ type: "start" });
       try {
@@ -81,10 +117,13 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
         if (!active) return;
         const value = typeof result === "number" ? result : result.value;
         const stale = typeof result === "number" ? false : result.stale;
+        const partial = typeof result === "number" ? false : result.partial;
+        const reason = typeof result === "number" ? undefined : result.reason;
         failures = 0;
         lastAt = Date.now();
         if (live) sessionValues.set(key, value);
-        dispatch({ type: "success", value, at: lastAt, live, stale });
+        if (live && !stale && !partial) sessionSuccessAt.set(key, lastAt);
+        dispatch({ type: "success", value, at: lastAt, live, stale, partial, reason });
         if (lastAnnouncedAt.current === 0 || lastAt - lastAnnouncedAt.current >= 300_000) {
           lastAnnouncedAt.current = lastAt || 1;
           setAnnouncedValue(value);
@@ -93,20 +132,26 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
         if (live) staleTimer = window.setTimeout(() => {
           if (active && visible() && Date.now() - lastAt > intervalMs * 2) dispatch({ type: "stale" });
         }, intervalMs * 2 + 1);
-      } catch {
+      } catch (error) {
         if (!active) return;
-        dispatch({ type: "error" });
-        if (failures++ < 2) retryTimer = window.setTimeout(refresh, 1_000);
+        const reason = safeLiveTotalError(error);
+        console.error("Live total failed:", safeLiveTotalLogMessage(error));
+        dispatch({ type: "error", reason });
+        const delay = [5_000, 15_000, 60_000][Math.min(failures++, 2)];
+        retryTimer = window.setTimeout(refresh, delay);
       } finally {
         pending = false;
       }
     };
+    refreshRef.current = () => { void refresh(); };
     const onVisibility = () => {
       if (interval !== undefined) window.clearInterval(interval);
       interval = undefined;
       if (!visible()) return;
       void refresh();
-      if (live) interval = window.setInterval(refresh, intervalMs);
+      if (live) interval = window.setInterval(() => {
+        if (retryTimer === undefined) void refresh();
+      }, intervalMs);
     };
     onVisibility();
     document.addEventListener("visibilitychange", onVisibility);
@@ -142,5 +187,5 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
     return () => cancelAnimationFrame(frame);
   }, [snapshot.value, hideValues, reducedMotion]);
 
-  return { ...snapshot, animatedValue, announcedValue, animate };
+  return { ...snapshot, animatedValue, announcedValue, animate, retryNow: () => refreshRef.current() };
 }

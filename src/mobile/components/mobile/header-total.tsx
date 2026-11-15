@@ -4,7 +4,8 @@ import { currencyWrapper, prettyNumberToLocaleString } from "@/utils/currency";
 import type { CurrencyRateDetail, TDateRange } from "@/middlelayers/types";
 import { useTranslation } from "@/mobile/i18n";
 import { useIsMobile } from "@/mobile/components/mobile";
-import { useLiveTotal } from "@/components/use-live-total";
+import { safeLiveTotalError, safeLiveTotalLogMessage, useLiveTotal } from "@/components/use-live-total";
+import { LiveTotalDetails } from "@/components/live-total-details";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { LightningBoltIcon } from "@radix-ui/react-icons";
 
@@ -25,10 +26,16 @@ export function MobileHeaderTotal({ currency, live, range, fidelity = false }: {
       if (range) return (await queryTotalValue(range)).totalValue;
       if (live) {
         try {
-          return (await queryRealTimeAssetsValue()).reduce((sum, asset) => sum + asset.value, 0);
-        } catch {
+          const assets = await queryRealTimeAssetsValue();
+          return { value: assets.reduce((sum, asset) => sum + asset.value, 0),
+            partial: assets.partial, reason: assets.reason === "pricesMissing"
+              ? `pricesMissing:${assets.missingCount ?? 1}` : assets.reason };
+        } catch (error) {
+          const reason = safeLiveTotalError(error);
+          console.error("Live total failed:", safeLiveTotalLogMessage(error));
           const assets = await queryLatestAssets();
-          return { value: assets.reduce((sum, asset) => sum + asset.value, 0), stale: true };
+          if (!assets.length) throw new Error(reason);
+          return { value: assets.reduce((sum, asset) => sum + asset.value, 0), stale: true, reason };
         }
       }
       return (await queryLatestAssets()).reduce((sum, asset) => sum + asset.value, 0);
@@ -46,6 +53,9 @@ export function MobileHeaderTotal({ currency, live, range, fidelity = false }: {
       aria-hidden="true">
       {displayAmount ?? (current.state === "connecting" ? <span className="t3-live-skeleton" /> : "—")}
     </span>
+    {current.partial && <span className="whitespace-nowrap text-xs text-muted-foreground">
+      {t("realtime.state.partial")}
+    </span>}
     {live && <span className="mobile-header-live-dot t3-live-dot" data-state={current.state} role="img"
       aria-label={priceLabel} title={priceLabel} />}
   </>;
@@ -59,8 +69,10 @@ export function MobileHeaderTotal({ currency, live, range, fidelity = false }: {
         aria-label={`${label}, ${displayAmount ?? t(`realtime.state.${current.state}`)}, ${priceLabel}`}>
         {reading}
       </button></PopoverTrigger>
-      <PopoverContent align="start" sideOffset={4} aria-label={priceLabel} className="w-auto max-w-64 text-sm">
-        {priceLabel}
+      <PopoverContent align="start" sideOffset={4} aria-label={priceLabel} className="w-auto max-w-64 space-y-2 text-sm">
+        <p>{priceLabel}</p>
+        {(current.error || current.state === "error") && <LiveTotalDetails error={current.error}
+          lastAt={current.lastAt} retryNow={current.retryNow} t={t} />}
       </PopoverContent>
     </Popover> : <span className="mobile-header-total-reading">{reading}</span>}
     <span role="status" aria-live="polite" className="sr-only"

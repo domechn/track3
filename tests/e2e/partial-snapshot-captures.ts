@@ -32,7 +32,7 @@ export async function capturePartialScreens(page: Page, shell: "desktop" | "ios"
     expect(amount).not.toBeNull();
     expect(label!.y + label!.height + 4).toBeLessThanOrEqual(amount!.y);
     await expect(page.getByText("Insights", { exact: true })).toBeVisible();
-    await expect(page.getByText("Daily change", { exact: true })).toBeVisible();
+    await expect(page.getByText(width === 1440 ? "Weekly change" : "Daily change", { exact: true })).toBeVisible();
     await expect(page.getByText("Top coins", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Show More" })).toBeVisible();
     await capture("overview");
