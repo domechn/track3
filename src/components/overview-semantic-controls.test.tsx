@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import TotalValue from "@/components/total-value-and-change";
@@ -8,18 +8,25 @@ import LatestAssetsPercentage from "@/components/latest-assets-percentage";
 import { ChartResizeContext } from "@/App";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
 import { I18nProvider, localeLocalStorageKey } from "@/i18n";
+import { LinearScale, type Chart as ChartJS, type Plugin } from "chart.js";
 
 const chartData = vi.hoisted(() => ({
   datasets: [] as { label: string; data: number[] }[],
-  yScale: {} as { min?: number; max?: number },
+  yScale: {} as { min?: number; max?: number; ticks?: { includeBounds?: boolean; precision?: number; maxTicksLimit?: number } },
+  xScale: {} as { ticks?: { callback: (value: number, index: number) => string } },
+  firstPlugin: undefined as Plugin<"line"> | undefined,
 }));
 vi.mock("react-chartjs-2", async () => {
   const React = await import("react");
   return {
-    Line: ({ data, options }: { data: { datasets: { label: string; data: number[] }[] };
-      options: { scales?: { y?: { min?: number; max?: number } } } }) => {
+    Line: ({ data, options, plugins }: { data: { datasets: { label: string; data: number[] }[] };
+      plugins?: Plugin<"line">[];
+      options: { scales?: { x?: { ticks: { callback: (value: number, index: number) => string } };
+        y?: { min?: number; max?: number; ticks?: { includeBounds?: boolean; precision?: number; maxTicksLimit?: number } } } } }) => {
       chartData.datasets = data.datasets;
       chartData.yScale = options.scales?.y ?? {};
+      chartData.xScale = options.scales?.x ?? {};
+      chartData.firstPlugin ??= plugins?.[0];
       return <div data-testid="line-chart" />;
     },
     Bar: () => <div data-testid="bar-chart" />,
@@ -83,6 +90,7 @@ function renderWithProviders(node: React.ReactNode) {
 }
 
 beforeEach(() => {
+  chartData.firstPlugin = undefined;
   localStorage.removeItem(localeLocalStorageKey);
   vi.mocked(queryTotalValue).mockResolvedValue({ totalValue: 1250 });
   vi.mocked(queryAssetChange).mockResolvedValue({
@@ -220,6 +228,27 @@ beforeEach(() => {
 });
 
 describe("Overview semantic controls", () => {
+  it("fits 80 date labels to the overview plot width", async () => {
+    const start = Date.parse("2026-08-01T12:00:00Z");
+    vi.mocked(queryAssetChange).mockResolvedValue({
+      timestamps: Array.from({ length: 80 }, (_, index) => start + index * 86400000),
+      data: Array.from({ length: 80 }, (_, index) => ({ usdValue: 1000 + index })),
+    });
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date(start), end: new Date(start + 79 * 86400000) }}
+      quoteColor="green-up-red-down" metrics={<div>Metrics</div>} />);
+    await screen.findByText("$1,250.00");
+    const visible = Array.from({ length: 80 }, (_, index) => ({
+      index, label: chartData.xScale.ticks!.callback(index, index),
+    })).filter(({ label }) => label);
+    expect(visible[0].index).toBe(0);
+    expect(visible.at(-1)?.index).toBe(79);
+    for (let i = 1; i < visible.length; i++) {
+      const width = Math.max(visible[i - 1].label.length, visible[i].label.length) * 7 + 12;
+      expect((visible[i].index - visible[i - 1].index) / 79 * 450).toBeGreaterThanOrEqual(width + 16);
+    }
+  });
+
   it("places overview metrics ahead of the total value trend", async () => {
     renderWithProviders(<TotalValue currency={usdCurrency}
       dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
@@ -258,6 +287,118 @@ describe("Overview semantic controls", () => {
     await screen.findByText("$1,250.00");
     expect(chartData.yScale.min).toBeGreaterThan(0);
     expect(chartData.yScale.max).toBeLessThan(2_000);
+  });
+
+  it("keeps y-axis ticks round when best-day headroom has an exact fractional max", async () => {
+    vi.mocked(queryAssetChange).mockResolvedValue({
+      timestamps: [1713158400, 1713244800],
+      data: [{ usdValue: 9_012_345 }, { usdValue: 9_983_217.37 }],
+    });
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" metrics={<div>Metrics</div>}
+      bestDay={{ timestamp: Date.parse("2024-04-16"), value: 970_872.37 }} />);
+    await screen.findByTestId("line-chart");
+    const scale = new LinearScale({ id: "y", type: "linear", ctx: null!, chart: null! });
+    Object.assign(scale, {
+      options: { ...chartData.yScale, bounds: "ticks" },
+      min: chartData.yScale.min,
+      max: chartData.yScale.max,
+      computeTickLimit: () => 5,
+      _maxDigits: () => 10,
+    });
+    const ticks = scale.buildTicks().map(({ value }) => value);
+    expect(ticks).toEqual([8_500_000, 9_000_000, 9_500_000, 10_000_000]);
+  });
+
+  it("keeps the bounds as ticks when no best-day headroom is added", async () => {
+    vi.mocked(queryAssetChange).mockResolvedValue({
+      timestamps: [1713158400, 1713244800],
+      data: [{ usdValue: 1137 }, { usdValue: 2582 }],
+    });
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" metrics={<div>Metrics</div>} />);
+    await waitFor(() => expect(chartData.datasets[0]?.data).toEqual([1137, 2582]));
+    const scale = new LinearScale({ id: "y", type: "linear", ctx: null!, chart: null! });
+    Object.assign(scale, {
+      options: { ...chartData.yScale, bounds: "ticks" },
+      min: chartData.yScale.min,
+      max: chartData.yScale.max,
+      computeTickLimit: () => 5,
+      _maxDigits: () => 10,
+    });
+    const ticks = scale.buildTicks().map(({ value }) => value);
+    expect(ticks).toEqual([500, 1000, 2000, 3000]);
+  });
+
+  it("hides the y tick under the end tag when chart data arrives after the first plugin render", async () => {
+    let finishLoad!: (value: Awaited<ReturnType<typeof queryAssetChange>>) => void;
+    vi.mocked(queryAssetChange).mockReturnValue(new Promise((resolve) => { finishLoad = resolve; }));
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" metrics={<div>Metrics</div>} />);
+    const plugin = chartData.firstPlugin;
+    expect(plugin).toBeDefined();
+    finishLoad({
+      timestamps: [1713158400, 1713244800],
+      data: [{ usdValue: 1000 }, { usdValue: 1250 }],
+    });
+    await waitFor(() => expect(chartData.datasets[0]?.data).toEqual([1000, 1250]));
+    const wrapper = screen.getByTestId("line-chart").parentElement!;
+    const tag = wrapper.querySelector<HTMLElement>(".t3-chart-end-value")!;
+    Object.defineProperty(tag, "offsetHeight", { configurable: true, value: 16 });
+    const canvas = document.createElement("canvas");
+    wrapper.appendChild(canvas);
+    const ticks = [{ value: 1000, label: "1K" }, { value: 1250, label: "1.25K" }];
+    const chart = {
+      canvas,
+      data: { datasets: [{ data: [1000, 1250] }] },
+      scales: {
+        x: { left: 0, right: 300 },
+        y: { ticks, getPixelForValue: (value: number) => value === 1250 ? 100 : 20 },
+      },
+    } as unknown as ChartJS<"line">;
+    plugin!.afterLayout?.(chart, {}, { mode: "default" });
+    expect(ticks.map(({ label }) => label)).toEqual(["1K", ""]);
+  });
+
+  it("positions the best-day note when chart data arrives after the first plugin render", async () => {
+    let finishLoad!: (value: Awaited<ReturnType<typeof queryAssetChange>>) => void;
+    vi.mocked(queryAssetChange).mockReturnValue(new Promise((resolve) => { finishLoad = resolve; }));
+    renderWithProviders(<TotalValue currency={usdCurrency}
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }}
+      quoteColor="green-up-red-down" metrics={<div>Metrics</div>}
+      bestDay={{ timestamp: Date.parse("2024-04-16"), value: 250 }} />);
+    const plugin = chartData.firstPlugin;
+    finishLoad({
+      timestamps: [Date.parse("2024-04-15"), Date.parse("2024-04-16")],
+      data: [{ usdValue: 1000 }, { usdValue: 1250 }],
+    });
+    await waitFor(() => expect(chartData.datasets[0]?.data).toEqual([1000, 1250]));
+    const wrapper = screen.getByTestId("line-chart").parentElement!;
+    const note = wrapper.querySelector<HTMLElement>(".t3-chart-best-day")!;
+    Object.defineProperty(note, "scrollWidth", { configurable: true, value: 100 });
+    Object.defineProperty(note, "offsetHeight", { configurable: true, value: 16 });
+    const canvas = document.createElement("canvas");
+    wrapper.appendChild(canvas);
+    const points = [{ x: 50, y: 100 }, { x: 250, y: 80 }];
+    const chart = {
+      canvas,
+      data: { datasets: [{ data: [1000, 1250] }] },
+      chartArea: { left: 0, right: 300, top: 0, bottom: 200 },
+      scales: {
+        x: { getPixelForValue: (index: number) => points[index].x },
+        y: { getPixelForValue: (value: number) => value === 1250 ? 80 : 100 },
+      },
+      getDatasetMeta: () => ({ data: points }),
+      ctx: {
+        save: () => {}, restore: () => {}, setLineDash: () => {},
+        beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, stroke: () => {},
+      },
+    } as unknown as ChartJS<"line">;
+    plugin!.afterDatasetsDraw?.(chart, {}, { mode: "default" }, false);
+    expect(note.style.left).toBe("144px");
   });
 
   it("uses Chinese dates throughout the Overview value chart", async () => {
