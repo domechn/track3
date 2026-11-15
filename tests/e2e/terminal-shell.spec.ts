@@ -70,7 +70,16 @@ test("desktop source status keeps long rows separate inside its scroll area afte
 test("daily changes follow the selected overview range", async ({ page }) => {
   await installTauriBridge(page, { richPortfolio: true });
   await page.goto("/#/overview");
-  await expect(page.locator(".t3-daily-column")).toHaveCount(59);
+  const panel = page.locator(".t3-daily-panel");
+  await expect(panel.locator(".t3-daily-column")).not.toHaveCount(0);
+  const plotWidth = await panel.locator(".t3-daily-chart").evaluate((chart) => {
+    const style = getComputedStyle(chart);
+    return chart.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  });
+  expect(plotWidth).toBeGreaterThan(0);
+  const initialCount = Math.floor(plotWidth / 6) >= 59 ? 59 : 9;
+  await expect(panel).toContainText(initialCount === 59 ? "Last 59 changes" : "59 changes, grouped by week");
+  await expect(panel.locator(".t3-daily-column")).toHaveCount(initialCount);
   const changeHeader = page.locator(".t3-top-head").getByText("Change");
   await expect(changeHeader).toBeVisible();
   expect((await changeHeader.boundingBox())!.height).toBeLessThanOrEqual(18);
