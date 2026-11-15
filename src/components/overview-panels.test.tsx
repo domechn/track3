@@ -1,13 +1,108 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { DailyChangeCard, WhatMovedCard, SourceStatusCard, TopCoinsCard } from "./overview-panels";
+import { bucketDailyChanges, maxDailyBars } from "./overview-daily-buckets";
 
 const usd = { currency: "USD", rate: 1, alias: "US Dollar", symbol: "$" };
 const eur = { currency: "EUR", rate: 2, alias: "Euro", symbol: "€" };
 const cny = { currency: "CNY", rate: 1, alias: "Yuan", symbol: "¥" };
+const days = (count: number, start = new Date(2026, 0, 1)) => Array.from({ length: count }, (_, index) => ({
+  timestamp: new Date(start.getFullYear(), start.getMonth(), start.getDate() + index).getTime(),
+  value: index % 3 === 0 ? -2 : 3,
+}));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe("daily change buckets", () => {
+  it.each([1, 10, 30, 31, 90, 264, 1000])("preserves the total and caps %i changes", (count) => {
+    const daily = days(count);
+    const { buckets } = bucketDailyChanges(daily, 40);
+    expect(buckets.reduce((sum, bucket) => sum + bucket.value, 0))
+      .toBe(daily.reduce((sum, item) => sum + item.value, 0));
+    expect(buckets.length).toBeLessThanOrEqual(40);
+    expect(buckets.map((bucket) => bucket.start)).toEqual([...buckets.map((bucket) => bucket.start)].sort((a, b) => a - b));
+    if (count <= 30) expect(buckets).toHaveLength(count);
+  });
+
+  it("groups consecutive changes by Monday-start weeks across gaps", () => {
+    const daily = [
+      { timestamp: new Date(2026, 10, 1, 12).getTime(), value: 9 },
+      { timestamp: new Date(2026, 10, 2, 10).getTime(), value: -5 },
+      { timestamp: new Date(2026, 10, 2, 18).getTime(), value: 8 },
+      { timestamp: new Date(2026, 10, 9, 12).getTime(), value: -2 },
+      ...days(40, new Date(2026, 10, 10)),
+    ];
+    const result = bucketDailyChanges(daily, 20);
+    expect(result.period).toBe("week");
+    expect(result.buckets.slice(0, 3).map(({ start, value, count }) => [start, value, count]))
+      .toEqual([
+        [new Date(2026, 9, 26).getTime(), 9, 1],
+        [new Date(2026, 10, 2).getTime(), 3, 2],
+        [new Date(2026, 10, 9).getTime(), 6, 7],
+      ]);
+  });
+
+  it("uses monthly sums for long spans and daily sums for dense short spans", () => {
+    const monthly = bucketDailyChanges(days(264), 40);
+    expect(monthly.period).toBe("month");
+    expect(monthly.buckets[0]).toMatchObject({ start: new Date(2026, 0, 1).getTime(), count: 31 });
+    const dense = bucketDailyChanges(Array.from({ length: 31 }, (_, index) => ({
+      timestamp: new Date(2026, 10, 1 + Math.floor(index / 4), 12 + index % 4).getTime(),
+      value: 1,
+    })), 20);
+    expect(dense.period).toBe("day");
+    expect(dense.buckets).toHaveLength(8);
+    expect(dense.buckets[0]).toMatchObject({ value: 4, count: 4 });
+  });
+
+  it("derives desktop and phone limits from available pixels", () => {
+    expect(maxDailyBars(180, false)).toBe(30);
+    expect(maxDailyBars(600, false)).toBe(60);
+    expect(maxDailyBars(180, true)).toBe(36);
+    expect(maxDailyBars(600, true)).toBe(40);
+  });
+});
 
 describe("overview panels", () => {
+  it.each([
+    { desktopFidelity: true, count: 59 },
+    { desktopFidelity: false, count: 39 },
+  ])("measures the $desktopFidelity chart when data arrives and again on resize", ({ desktopFidelity, count }) => {
+    let width = 600;
+    let onResize: ResizeObserverCallback = () => {};
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("t3-daily-chart") ? width : 0;
+    });
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: ResizeObserverCallback) { onResize = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    const { rerender } = render(<DailyChangeCard currency={usd} daily={[]} desktopFidelity={desktopFidelity} />);
+    rerender(<DailyChangeCard currency={usd} daily={days(count)} desktopFidelity={desktopFidelity} />);
+    expect(document.querySelectorAll(".t3-daily-column")).toHaveLength(count);
+    width = 180;
+    act(() => onResize([], {} as ResizeObserver));
+    expect(document.querySelectorAll(".t3-daily-column").length).toBeLessThan(count);
+  });
+
+  it("positions interior month ticks over their bar centers", () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains("t3-daily-chart") ? 600 : 0;
+    });
+    render(<DailyChangeCard currency={usd} daily={days(264)} desktopFidelity />);
+    const tick = [...document.querySelectorAll<HTMLElement>(".t3-daily-x-axis span")]
+      .find((element) => [1, 2, 3, 5, 6, 7].includes(new Date(Number(element.dataset.start)).getMonth()));
+    expect(tick).toBeDefined();
+    const monthIndex = new Date(Number(tick!.dataset.start)).getMonth();
+    expect(parseFloat(tick!.style.left)).toBeCloseTo((monthIndex + 0.5) / 9 * 100);
+    expect(document.querySelector<HTMLElement>(".t3-daily-x-axis span")?.style.transform).toBe("translateX(-50%)");
+  });
+
   it("shows the best day and separates gain from loss in the daily chart", () => {
     render(<DailyChangeCard currency={usd} daily={[
       { timestamp: Date.parse("2026-10-29"), value: 120 },
@@ -28,6 +123,41 @@ describe("overview panels", () => {
     expect(screen.getByText("▼ Down")).toBeInTheDocument();
     expect(document.querySelector(".t3-daily-x-axis")).not.toHaveTextContent("Up");
     expect((document.querySelector(".t3-daily-up") as HTMLElement).style.height).toBe("48%");
+    expect(document.querySelectorAll(".t3-daily-column")).toHaveLength(30);
+    expect(screen.getByText("USD, last 30 days")).toBeInTheDocument();
+  });
+
+  it("renders weekly and monthly totals with bounded bars and truthful headings", () => {
+    const { rerender } = render(<DailyChangeCard currency={usd} daily={days(90)} desktopFidelity />);
+    expect(screen.getByText("Weekly change")).toBeInTheDocument();
+    expect(screen.getByText("90 changes, grouped by week")).toBeInTheDocument();
+    expect(document.querySelectorAll(".t3-daily-column").length).toBeLessThanOrEqual(60);
+    expect(document.querySelector(".t3-daily-column")).toHaveAttribute("title", expect.stringContaining("changes"));
+    expect(document.querySelector(".t3-daily-column > span")).toHaveAttribute("data-direction", "gain");
+    rerender(<DailyChangeCard currency={usd} daily={days(264)} desktopFidelity />);
+    expect(screen.getByText("Monthly change")).toBeInTheDocument();
+    expect(screen.getByText("264 changes, grouped by month")).toBeInTheDocument();
+    expect(document.querySelectorAll(".t3-daily-column").length).toBeLessThanOrEqual(60);
+    const summary = document.querySelector(".t3-daily-chart .sr-only")?.textContent ?? "";
+    expect(summary).toContain("264 changes, total");
+    expect(summary.length).toBeLessThan(2000);
+    expect(document.querySelector(".t3-daily-column")).toHaveAttribute("title", expect.stringContaining("best"));
+    const ticks = [...document.querySelectorAll<HTMLElement>(".t3-daily-x-axis span")].map((tick) => Number(tick.dataset.start));
+    expect(ticks[0]).toBe(new Date(2026, 0, 1).getTime());
+    expect(ticks.at(-1)).toBe(new Date(2026, 8, 1).getTime());
+  });
+
+  it("scales grouped bars by their sum while retaining the best single day", () => {
+    const daily = days(90).map((item) => ({ ...item, value: 100 }));
+    render(<DailyChangeCard currency={usd} daily={daily} bestDay={daily[0]} desktopFidelity />);
+    expect(document.querySelector(".t3-daily-y-axis")).toHaveTextContent("+1K");
+    expect(screen.getByText(/best day/)).toHaveTextContent("+$100.00");
+  });
+
+  it("uses the phone bar limit for the shared card", () => {
+    render(<DailyChangeCard currency={usd} daily={days(90)} />);
+    expect(screen.getByText("Weekly change")).toBeInTheDocument();
+    expect(document.querySelectorAll(".t3-daily-column").length).toBeLessThanOrEqual(40);
   });
 
   it("uses directional colours for daily bars and labels while keeping zero neutral", () => {

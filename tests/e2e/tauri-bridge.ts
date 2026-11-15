@@ -41,6 +41,7 @@ type BridgeOptions = {
   seedPartialSnapshot?: boolean;
   customPriceFixture?: boolean;
   summaryRangeFixture?: "many" | "one";
+  dailyChangesFixture?: 30 | 90 | 264;
   appVersion?: string;
   licenseDevices?: "absent" | "present" | "error";
 };
@@ -78,6 +79,7 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     seedPartialSnapshot = false,
     customPriceFixture = false,
     summaryRangeFixture,
+    dailyChangesFixture,
     appVersion = "0.8.2",
     licenseDevices = "absent",
   } = options;
@@ -118,6 +120,17 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
           add.run([`summary-${index}`, at, "owner-fixture", symbol, 100 + asset, 100 + asset]);
         }
       }
+    }
+    add.free();
+  }
+  if (dailyChangesFixture) {
+    db.run("DELETE FROM assets_v2");
+    db.run("INSERT INTO configuration (id, data) VALUES (6, ?)", [String(dailyChangesFixture + 1)]);
+    const add = db.prepare("INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price) VALUES (?, ?, 'daily-fixture', 'crypto', 'BTC', 1, ?, ?)");
+    for (let index = 0; index <= dailyChangesFixture; index++) {
+      const at = new Date(Date.UTC(2025, 0, 1 + index, 12)).toISOString();
+      const value = 50_000 + index * 120 + (index % 7 === 0 ? -800 : 0);
+      add.run([`daily-${index}`, at, value, value]);
     }
     add.free();
   }

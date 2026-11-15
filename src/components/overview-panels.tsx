@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { ChevronDownIcon, ExclamationTriangleIcon, UpdateIcon } from "@radix-ui/react-icons";
 import { Link } from "react-router-dom";
 import type { AssetType } from "@/middlelayers/datafetch/types";
@@ -23,7 +23,8 @@ import { formatSignedMoney } from "./signed-money";
 import { Card } from "./ui/card";
 import { deriveContributions, deriveOverviewSeries, selectBestDayContributionSnapshots, selectSevenDayContributionSnapshots, unavailableSources } from "./overview-derived";
 import { overviewRefreshRequestedEvent, sourceStatusesChangedEvent } from "./source-status-event";
-import { niceStep } from "./overview-chart-scale";
+import { formatOverviewDateTick, niceStep, pickDateTicks } from "./overview-chart-scale";
+import { bucketDailyChanges, maxDailyBars, type DailyBucket, type DailyPeriod } from "./overview-daily-buckets";
 import { directionClass, directionColorVar } from "@/utils/color";
 import type { QuoteColor } from "@/middlelayers/types";
 
@@ -140,6 +141,20 @@ const signedMoney0 = (value: number, currency: CurrencyRateDetail) =>
   `${value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${Math.abs(Math.round(currencyWrapper(currency)(value))).toLocaleString()}`;
 const dayLabel = (timestamp: number, locale: string) => new Date(timestamp).toLocaleDateString(
   locale === "zh" ? "zh-CN" : "en-GB", { month: "short", day: "numeric" });
+const bucketLabel = (bucket: DailyBucket, period: DailyPeriod, locale: string) => {
+  if (period === "snapshot" || period === "day") return dayLabel(bucket.start, locale);
+  const language = locale === "zh" ? "zh-CN" : "en-GB";
+  if (period === "month") {
+    const label = (timestamp: number) => new Date(timestamp).toLocaleDateString(language, { month: "short", year: "numeric" });
+    return bucket.start === bucket.end ? label(bucket.start) : `${label(bucket.start)}–${label(bucket.end)}`;
+  }
+  const end = new Date(bucket.start);
+  end.setDate(end.getDate() + 6);
+  const startDate = new Date(bucket.start);
+  return startDate.getMonth() === end.getMonth()
+    ? `${dayLabel(bucket.start, locale)}–${end.getDate()}`
+    : `${dayLabel(bucket.start, locale)}–${dayLabel(end.getTime(), locale)}`;
+};
 const sourceMonogram = (label: string) => {
   if (/^binance$/i.test(label)) return "BN";
   if (/^ledger\b/i.test(label)) return "LD";
@@ -152,19 +167,62 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
   currency: CurrencyRateDetail; daily: Change[]; bestDay?: Change; desktopFidelity?: boolean; quoteColor?: QuoteColor;
 }) {
   const { t, locale } = useTranslation();
+  const chartRef = useRef<HTMLDivElement>(null);
+  const [plotWidth, setPlotWidth] = useState(desktopFidelity ? 240 : 180);
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const measure = () => {
+      if (chart.clientWidth > 0) {
+        const style = getComputedStyle(chart);
+        setPlotWidth(Math.max(1, chart.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)));
+      }
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(chart);
+    return () => observer.disconnect();
+  }, [desktopFidelity, daily.length > 0]);
+  const { period, buckets } = useMemo(
+    () => bucketDailyChanges(daily, maxDailyBars(plotWidth, !desktopFidelity)),
+    [daily, plotWidth, desktopFidelity],
+  );
   const chartValue = desktopFidelity ? currencyWrapper(currency) : (value: number) => value;
-  const peak = Math.max(1, ...daily.map((item) => Math.abs(chartValue(item.value))));
+  const peak = Math.max(1, ...buckets.map((item) => Math.abs(chartValue(item.value))));
   const scale = niceStep(peak);
   const barScale = desktopFidelity ? scale : peak;
+  const grouped = period !== "snapshot";
+  const labelLocale = locale === "zh" ? "zh-CN" : "en-GB";
+  const dates = buckets.map((bucket) => bucket.start);
+  const textWidth = dates.reduce((width, _, index) =>
+    Math.max(width, formatOverviewDateTick(dates, index, labelLocale).length * 7), 0);
+  const ticks = pickDateTicks({ timestamps: dates, plotWidthPx: plotWidth, labelWidthPx: textWidth + 12, minGapPx: 16, locale: labelLocale });
+  const centerEdgeTicks = buckets.length <= 1 || plotWidth / buckets.length >= textWidth;
+  const tooltip = (bucket: DailyBucket) => grouped
+    ? t("overview.design.bucketTooltip")
+      .replace("{period}", bucketLabel(bucket, period, locale))
+      .replace("{sum}", signedMoney(bucket.value, currency))
+      .replace("{count}", String(bucket.count))
+      .replace("{best}", signedMoney(bucket.best, currency))
+      .replace("{worst}", signedMoney(bucket.worst, currency))
+    : `${dayLabel(bucket.start, locale)}: ${signedMoney(bucket.value, currency)}`;
+  const summary = grouped ? t("overview.design.bucketSummary")
+    .replace("{count}", String(daily.length))
+    .replace("{total}", signedMoney(buckets.reduce((sum, bucket) => sum + bucket.value, 0), currency))
+    .replace("{buckets}", buckets.map(tooltip).join(", ")) : "";
   return <Card className="t3-overview-panel t3-daily-panel">
     <header className="t3-overview-panel-heading">
-      <h2>{t("overview.design.dailyChange")}</h2>
-      <span>{desktopFidelity && daily.length === 30
+      <h2>{t(period === "week" ? "overview.design.weeklyChange" : period === "month" ? "overview.design.monthlyChange" : "overview.design.dailyChange")}</h2>
+      <span>{grouped
+        ? t(`overview.design.groupedBy${period[0].toUpperCase()}${period.slice(1)}`).replace("{count}", String(daily.length))
+        : desktopFidelity && daily.length === 30
         ? t("overview.fidelity.dailyWindow").replace("{currency}", currency.currency)
         : t("overview.design.lastSnapshots").replace("{count}", String(daily.length))}</span>
     </header>
     {daily.length ? <>
-      <div className="t3-daily-chart" role="img" aria-label={t("overview.design.dailyChart")}>
+      <div ref={chartRef} className={`t3-daily-chart${desktopFidelity ? " t3-daily-fidelity" : ""}`} role="img" aria-label={t("overview.design.dailyChart")}
+        aria-description={grouped ? summary : undefined}>
         <div className="t3-daily-zero" />
         {desktopFidelity && <div className="t3-daily-y-axis" aria-hidden="true">
           {[scale, scale / 2, 0, -scale / 2, -scale].map((value) =>
@@ -173,18 +231,19 @@ export function DailyChangeCard({ currency, daily, bestDay, desktopFidelity = fa
         {desktopFidelity && <div className="t3-daily-direction" aria-hidden="true">
           <span className={directionClass(1, quoteColor)}>▲ {t("overview.fidelity.up")}</span><span className={directionClass(-1, quoteColor)}>▼ {t("overview.fidelity.down")}</span>
         </div>}
-        {daily.map((item) => <div className="t3-daily-column" key={item.timestamp} title={`${dayLabel(item.timestamp, locale)}: ${signedMoney(item.value, currency)}`}>
-          <span className={item.value > 0 ? "t3-daily-up" : item.value < 0 ? "t3-daily-down" : "t3-daily-neutral"}
-            data-direction={item.value > 0 ? "gain" : item.value < 0 ? "loss" : "neutral"}
-            style={{ height: `${Math.max(2, Math.abs(chartValue(item.value)) / barScale * 48)}%`, backgroundColor: directionColorVar(item.value, quoteColor) }} />
+        {buckets.map((bucket, index) => <div className="t3-daily-column" key={`${bucket.start}-${index}`} title={tooltip(bucket)}>
+          <span className={bucket.value > 0 ? "t3-daily-up" : bucket.value < 0 ? "t3-daily-down" : "t3-daily-neutral"}
+            data-direction={bucket.value > 0 ? "gain" : bucket.value < 0 ? "loss" : "neutral"}
+            style={{ height: `${Math.max(2, Math.abs(chartValue(bucket.value)) / barScale * 48)}%`, backgroundColor: directionColorVar(bucket.value, quoteColor) }} />
         </div>)}
-        {desktopFidelity && <div className="t3-daily-x-axis" aria-hidden="true">
-          <span />
-          <span>{daily.length > 10 ? dayLabel(daily[9].timestamp, locale) : ""}</span>
-          <span>{daily.length > 20 ? dayLabel(daily[19].timestamp, locale) : ""}</span>
-          <span>{dayLabel(daily[daily.length - 1].timestamp, locale)}</span>
-        </div>}
-        <span className="sr-only">{daily.map((item) => `${dayLabel(item.timestamp, locale)} ${signedMoney(item.value, currency)}`).join(", ")}</span>
+        <div className="t3-daily-x-axis" aria-hidden="true">{ticks.map((index) =>
+          <span key={index} data-start={dates[index]} style={{ left: `${(index + 0.5) / buckets.length * 100}%`,
+            transform: centerEdgeTicks || index > 0 && index < buckets.length - 1 ? "translateX(-50%)"
+              : index === 0 ? "none" : "translateX(-100%)" }}>
+            {formatOverviewDateTick(dates, index, labelLocale)}
+          </span>)}</div>
+        <span className="sr-only">{grouped ? summary
+          : daily.map((item) => `${dayLabel(item.timestamp, locale)} ${signedMoney(item.value, currency)}`).join(", ")}</span>
       </div>
       <div className="t3-panel-footnote">{bestDay && t("overview.design.bestDay")
         .replace("{day}", dayLabel(bestDay.timestamp, locale))
