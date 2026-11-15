@@ -7,7 +7,7 @@ export default defineConfig({
   timeout: 60_000,
   projects: [
     { name: "desktop", testIgnore: /(?:^|\/)(?:mobile|ios-[^/]*)\.spec\.ts$/ },
-    { name: "mobile", testMatch: /(?:^|\/)(?:mobile|ios-[^/]*|source-logo-contrast)\.spec\.ts$/ },
+    { name: "mobile", testMatch: /(?:^|\/)(?:mobile|ios-[^/]*|source-logo-contrast|page-bottom-blank)\.spec\.ts$/ },
   ],
   use: { baseURL: `http://127.0.0.1:${port}`, headless: true },
   webServer: {
