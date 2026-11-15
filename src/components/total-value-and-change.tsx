@@ -37,7 +37,9 @@ import { useTranslation } from "@/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { downsampleIndices } from "@/middlelayers/chart-downsample";
 import { hasPartialGap } from "@/middlelayers/chart-gap";
-import { chartBounds, formatOverviewAxisTicks, shouldShowOverviewDateTick } from "./overview-chart-scale";
+import {
+  bestDayLabelPosition, chartBounds, formatOverviewAxisTicks, formatOverviewDateTick, overlapsEndValue, pickDateTicks,
+} from "./overview-chart-scale";
 import { overviewUseLastKnownEvent } from "./source-status-event";
 
 interface TotalValueShower {
@@ -230,6 +232,7 @@ const App = ({
 
   const [showValue, setShowValue] = useState(false);
   const [chartWidth, setChartWidth] = useState(600);
+  const [plotWidthPx, setPlotWidthPx] = useState(450);
   const loadGenRef = useRef(0);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
@@ -401,8 +404,37 @@ const App = ({
     () => plottedIndices.map((index) => assetChangeData.timestamps[index]),
     [plottedIndices, assetChangeData.timestamps],
   );
+  const latestChartRef = useRef({ bestDay, chartEnd, plottedTimestamps });
+  latestChartRef.current = { bestDay, chartEnd, plottedTimestamps };
+  const dateTicks = useMemo(() => {
+    if (!metrics || !plottedTimestamps.length) return new Set<number>();
+    const labelWidthPx = plottedTimestamps.reduce((widest, _, index) =>
+      Math.max(widest, formatOverviewDateTick(plottedTimestamps, index, dateLocale).length * 7 + 12), 0);
+    return new Set(pickDateTicks({
+      timestamps: plottedTimestamps,
+      plotWidthPx,
+      labelWidthPx,
+      minGapPx: 16,
+      locale: dateLocale,
+    }));
+  }, [metrics, plottedTimestamps, plotWidthPx, dateLocale]);
   const overviewBestDayMarker = useMemo<Plugin<"line">>(() => ({
     id: "overview-best-day-marker",
+    afterLayout(chart) {
+      setPlotWidthPx((previous) => {
+        const width = chart.scales.x.right - chart.scales.x.left;
+        return Math.abs(previous - width) < 1 ? previous : width;
+      });
+      const endLabel = chart.canvas.parentElement?.querySelector<HTMLSpanElement>(".t3-chart-end-value");
+      const end = chart.data.datasets[0]?.data.at(-1) as number | undefined;
+      if (!endLabel || end === undefined) return;
+      const endY = chart.scales.y.getPixelForValue(end);
+      for (const tick of chart.scales.y.ticks) {
+        if (overlapsEndValue(chart.scales.y.getPixelForValue(tick.value), endY, endLabel.offsetHeight)) {
+          tick.label = "";
+        }
+      }
+    },
     afterDraw(chart) {
       const { ctx, chartArea, scales } = chart;
       ctx.save();
@@ -418,6 +450,7 @@ const App = ({
       ctx.restore();
     },
     afterDatasetsDraw(chart) {
+      const { bestDay, chartEnd, plottedTimestamps } = latestChartRef.current;
       const endLabel = chart.canvas.parentElement?.querySelector<HTMLSpanElement>(".t3-chart-end-value");
       if (endLabel && chartEnd !== undefined) {
         endLabel.style.top = `${chart.scales.y.getPixelForValue(chartEnd) + chart.canvas.offsetTop}px`;
@@ -429,6 +462,20 @@ const App = ({
       if (index < 0) return;
       const { ctx, chartArea } = chart;
       const x = chart.scales.x.getPixelForValue(index);
+      const bestLabel = chart.canvas.parentElement?.querySelector<HTMLDivElement>(".t3-chart-best-day");
+      const peakY = chart.getDatasetMeta(0).data[index]?.y;
+      if (bestLabel && peakY !== undefined) {
+        const dashedY = chart.getDatasetMeta(1).data[index]?.y ?? peakY;
+        const position = bestDayLabelPosition({
+          left: chartArea.left, right: chartArea.right, top: chartArea.top, bottom: chartArea.bottom,
+          markerX: x, peakY, dashedY, labelWidth: bestLabel.scrollWidth, labelHeight: bestLabel.offsetHeight,
+          linePoints: chart.getDatasetMeta(0).data,
+        });
+        bestLabel.style.maxWidth = `${position.width}px`;
+        bestLabel.style.right = "auto";
+        bestLabel.style.left = `${position.x + chart.canvas.offsetLeft}px`;
+        bestLabel.style.top = `${position.y + chart.canvas.offsetTop}px`;
+      }
       ctx.save();
       ctx.strokeStyle = chartThemeColor("control");
       ctx.setLineDash([]);
@@ -438,7 +485,7 @@ const App = ({
       ctx.stroke();
       ctx.restore();
     },
-  }), [bestDay, chartEnd, plottedTimestamps]);
+  }), []);
 
   function changePercentageColorClass(
     ts: TotalValueShower,
@@ -448,6 +495,12 @@ const App = ({
     const pc = getPercentageChange(ts, totalValue, firstTotalValue);
     return positiveNegativeTextClass(pc, quoteColor, 500);
   }
+
+  const chartMax = useMemo(() => {
+    if (!metrics || !bestDay || !lineValues.length) return valueBounds.high;
+    const peak = lineValues.reduce((highest, value) => Math.max(highest, value), -Infinity);
+    return Math.max(valueBounds.high, peak + (valueBounds.high - valueBounds.low) * 0.06);
+  }, [metrics, bestDay, lineValues, valueBounds]);
 
   const options = useMemo(
     () => ({
@@ -509,14 +562,12 @@ const App = ({
             autoSkip: false,
             callback: function (val: number, index: number) {
               const data = plottedTimestamps;
+              if (metrics) return dateTicks.has(index) ? formatOverviewDateTick(data, index, dateLocale) : "";
 
               const size = data.length;
               const start = 0;
               const end = size - 1;
 
-              if (metrics && shouldShowOverviewDateTick(index, size)) {
-                return new Date(data[index]).toLocaleDateString(dateLocale, { day: "numeric", month: "short" });
-              }
               // only show start and end date
               if (index === start) {
                 return timeToDateStr(data[index]);
@@ -540,11 +591,12 @@ const App = ({
           },
           offset: !metrics,
           ...(metrics && !btcAsBase && !showPercentageInChart && lineValues.length
-            ? { min: valueBounds.low, max: valueBounds.high } : {}),
+            ? { min: valueBounds.low, max: chartMax } : {}),
           ticks: {
             ...glassScaleOptions.ticks,
             precision: 2,
             maxTicksLimit: metrics ? 5 : 4,
+            ...(metrics && chartMax !== valueBounds.high ? { includeBounds: false } : {}),
             callback: (value: number, index: number, ticks: { value: number }[]) => {
               return showPercentageInChart
                 ? `${value.toLocaleString()}%`
@@ -565,7 +617,9 @@ const App = ({
       plottedTimestamps,
       lineValues,
       valueBounds,
+      chartMax,
       dateLocale,
+      dateTicks,
       metrics,
     ],
   );
