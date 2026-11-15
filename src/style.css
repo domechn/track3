@@ -962,6 +962,7 @@ body:not(:has(.app-layout)) .t3-grid-moved .t3-moved-list { height: auto; align-
 .t3-live-dot { display: inline-block; flex: none; width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--muted-foreground)); }
 .t3-live-dot[data-state="connecting"] { background: hsl(var(--positive)); animation: t3-live-pulse 1.6s ease-in-out infinite; }
 .t3-live-dot[data-state="live"] { background: hsl(var(--positive)); }
+.t3-live-dot[data-state="partial"] { background: hsl(var(--warning)); }
 .t3-live-dot[data-state="stale"] { background: hsl(var(--warning)); }
 .t3-live-dot[data-state="error"] { background: hsl(var(--negative)); }
 @keyframes t3-live-reveal { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }

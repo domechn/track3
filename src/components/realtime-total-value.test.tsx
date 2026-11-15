@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 
 const carouselRender = vi.hoisted(() => vi.fn());
@@ -56,6 +56,12 @@ const currency: CurrencyRateDetail = {
   rate: 1,
   symbol: "$",
 };
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("RealtimeTotalValue", () => {
   it("labels the on-demand live total control without implying a value has already loaded", () => {
@@ -159,5 +165,68 @@ describe("RealtimeTotalValue", () => {
         init: expect.any(Function),
       }),
     );
+  });
+
+  it("shows a rate limit reason and retries immediately from the error popover", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    vi.mocked(queryLatestAssets).mockResolvedValue([]);
+    vi.mocked(queryRealTimeAssetsValue)
+      .mockRejectedValueOnce(new Error("CoinGecko 429 token=private123"))
+      .mockResolvedValueOnce([{ symbol: "ETH", assetType: "crypto", amount: 1, value: 120, price: 120 }]);
+    const { container } = render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Live total" }));
+      await Promise.resolve();
+    });
+    expect(container.querySelector(".t3-live-popover")).toHaveTextContent("Price service rate limited");
+    expect(container.querySelector(".t3-live-popover")).not.toHaveTextContent("private123");
+    const beforeRetry = vi.mocked(queryRealTimeAssetsValue).mock.calls.length;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Retry now" }));
+      await Promise.resolve();
+    });
+    expect(container.querySelector(".t3-live-amount")).toHaveTextContent("$120");
+    expect(queryRealTimeAssetsValue).toHaveBeenCalledTimes(beforeRetry + 1);
+  });
+
+  it("lets the price query reuse its cache on each desktop poll", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    vi.mocked(queryLatestAssets).mockResolvedValue([]);
+    vi.mocked(queryRealTimeAssetsValue).mockResolvedValue([{ symbol: "ETH", value: 100, price: 100 }] as never);
+    const callCount = vi.mocked(queryRealTimeAssetsValue).mock.calls.length;
+    render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Live total" }));
+      await Promise.resolve();
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    const calls = vi.mocked(queryRealTimeAssetsValue).mock.calls.slice(callCount);
+    expect(calls.length).toBeGreaterThanOrEqual(2);
+    expect(calls.every((args) => args.length === 0)).toBe(true);
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows a known partial amount without a misleading percentage", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    vi.mocked(queryLatestAssets).mockResolvedValue([
+      { symbol: "ETH", assetType: "crypto", amount: 1, value: 100, price: 100 },
+    ]);
+    const partial = Object.assign(
+      [{ symbol: "ETH", assetType: "crypto" as const, amount: 1, value: 120, price: 120 }],
+      { partial: true, reason: "pricesMissing" as const, missingCount: 2 },
+    );
+    vi.mocked(queryRealTimeAssetsValue).mockResolvedValue(partial);
+    const { container } = render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Live total" }));
+      await Promise.resolve();
+    });
+    expect(container.querySelector(".t3-live-trigger")).toHaveTextContent("$120");
+    expect(container.querySelector(".t3-live-trigger")).toHaveTextContent("Partial data");
+    expect(container.querySelector(".t3-live-popover")).toHaveTextContent("Prices for 2 coins missing");
+    expect(container.querySelector(".t3-live-popover")?.textContent?.match(/\+20\.00%/g)).toHaveLength(1);
   });
 });

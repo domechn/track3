@@ -31,6 +31,8 @@ import {
 } from "./charts-refresh";
 import { calculateCostBasis, fromStoredTransactions } from "./cost-basis";
 import { calculateSnapshotProfit } from "./charts-interval-profit";
+import { readStoredStatuses } from "./ui-state/source-status-store";
+import { getMemoryCacheInstance } from "./datafetch/utils/cache";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -71,6 +73,10 @@ vi.mock("./datafetch/utils/price", () => ({
 
 vi.mock("./license", () => ({
   isProVersion: vi.fn(),
+}));
+
+vi.mock("./ui-state/source-status-store", () => ({
+  readStoredStatuses: vi.fn(() => []),
 }));
 
 vi.mock("./datafetch/utils/cache", () => ({
@@ -210,6 +216,222 @@ beforeEach(() => {
   vi.mocked(queryCoinPrices).mockResolvedValue({ USDT: 1, BTC: 100 });
   vi.mocked(fetchStockPrices).mockResolvedValue({});
   vi.mocked(isProVersion).mockResolvedValue({ isPro: false });
+  vi.mocked(readStoredStatuses).mockReturnValue([]);
+});
+
+describe("live partial prices", () => {
+  function domSnapshot() {
+    vi.mocked(getConfiguration).mockResolvedValue({
+      configs: { groupUSD: false },
+      erc20: { addresses: [
+        { address: "0xMain1", alias: "Main(1)" },
+        { address: "0xMain2", alias: "Main(2)" },
+      ] },
+      exchanges: [{ name: "binance", alias: "Main CEX",
+        initParams: { apiKey: "fixture-key", secret: "fixture-secret" } }],
+      stockConfig: { brokers: [{ name: "ibkr", alias: "Main IBKR",
+        initParams: { token: "fixture-token", queryId: "fixture-query" } }] },
+      others: [{ symbol: "CUSTOM", amount: 1,
+        customPrice: { kind: "manual", usd: 3, setAt: "2026-11-15T00:00:00.000Z" } }],
+    } as never);
+    const rows = [
+      ["crypto", "Main(1)", "ETH", 2, 100],
+      ["crypto", "Main(2)", "PLUME", 3, 0],
+      ["crypto", "Main(2)", "KAT", 4, 0],
+      ["crypto", "binance", "USDT", 5, 1],
+      ["stock", "ibkr:one", "USD", 6, 1],
+      ["stock", "ibkr:one", "AAPL", 2, 10],
+      ["stock", "ibkr:one", "EUR", 8, 0],
+    ].map(([assetType, wallet, symbol, amount, price], index) => ({
+      id: index + 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+      assetType, wallet: md5(String(wallet)), symbol, amount, price,
+      value: Number(amount) * Number(price),
+    }));
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ ETH: 110, USDT: 1 });
+    vi.mocked(fetchStockPrices).mockResolvedValue({ AAPL: 12 });
+    vi.mocked(listAllCurrencyRates).mockResolvedValue([{ currency: "EUR", rate: 0.8 }] as never);
+    return rows;
+  }
+
+  it("keeps known cash and stocks when CoinGecko rejects the batch", async () => {
+    domSnapshot();
+    vi.mocked(queryCoinPrices).mockRejectedValue(new Error("CoinGecko 429"));
+    const live = await queryRealTimeAssetsValue();
+    expect(live.partial).toBe(true);
+    expect(live.reason).toBe("rateLimited");
+    expect(live).toEqual(expect.arrayContaining([
+      expect.objectContaining({ symbol: "USD", value: 6 }),
+      expect.objectContaining({ symbol: "AAPL", value: 24 }),
+    ]));
+    expect(live.every((asset) => Number.isFinite(asset.value))).toBe(true);
+  });
+
+  it("does not call a known stock total complete when the price service failed", async () => {
+    const saved = { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+      assetType: "stock", wallet: md5("ibkr:one"), symbol: "USD", amount: 6, price: 1, value: 6 };
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[saved]] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([[saved]] as never);
+    vi.mocked(queryCoinPrices).mockRejectedValue(new Error("CoinGecko 429"));
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "USD", value: 6 }));
+    expect(live.reason).toBe("rateLimited");
+    expect(live.partial).toBe(true);
+  });
+
+  it("shows missing PLUME and KAT without adding a zero or invented quote", async () => {
+    domSnapshot();
+    const live = await queryRealTimeAssetsValue();
+    expect(live.partial).toBe(true);
+    expect(live.missingCount).toBeGreaterThanOrEqual(2);
+    expect(live.some((asset) => ["PLUME", "KAT"].includes(asset.symbol))).toBe(false);
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "ETH", price: 110, value: 220 }));
+  });
+
+  it("uses a configured manual quote for an Others coin absent from market prices", async () => {
+    vi.mocked(getConfiguration).mockResolvedValue({ configs: { groupUSD: false },
+      others: [{ symbol: "NOVA", amount: 2,
+        price: { kind: "manual", usd: 3, setAt: "2026-11-15T00:00:00.000Z" } }] } as never);
+    const saved = { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+      assetType: "crypto", wallet: md5("others"), symbol: "NOVA", amount: 2, price: 2, value: 4 };
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[saved]] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([[saved]] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ USDT: 1, BTC: 100 });
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "NOVA", price: 3, value: 6 }));
+    expect(live.partial).toBe(false);
+    expect(live.missingCount).toBe(0);
+  });
+
+  it("uses a configured follow quote for an Others coin absent from market prices", async () => {
+    vi.mocked(getConfiguration).mockResolvedValue({ configs: { groupUSD: false },
+      others: [{ symbol: "NOVA", amount: 2,
+        price: { kind: "follow", assetType: "crypto", symbol: "BTC", ratio: 0.5 } }] } as never);
+    const saved = { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+      assetType: "crypto", wallet: md5("others"), symbol: "NOVA", amount: 2, price: 40, value: 80 };
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[saved]] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([[saved]] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ USDT: 1, BTC: 100 });
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "NOVA", price: 50, value: 100 }));
+    expect(live.partial).toBe(false);
+  });
+
+  it("does not apply an Others rule to a symbol shared with another wallet", async () => {
+    vi.mocked(getConfiguration).mockResolvedValue({ configs: { groupUSD: false },
+      others: [{ symbol: "NOVA", amount: 2,
+        price: { kind: "manual", usd: 3, setAt: "2026-11-15T00:00:00.000Z" } }] } as never);
+    const saved = [
+      { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "crypto", wallet: md5("others"), symbol: "NOVA", amount: 2, price: 2, value: 4 },
+      { id: 2, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "crypto", wallet: md5("wallet-a"), symbol: "NOVA", amount: 1, price: 4, value: 4 },
+    ];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([saved] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([[{
+      ...saved[0], amount: 3, value: 8,
+    }]] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ USDT: 1, BTC: 100 });
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.partial).toBe(true);
+    expect(live.missingCount).toBe(1);
+    expect(live).not.toContainEqual(expect.objectContaining({ symbol: "NOVA", price: 3 }));
+  });
+
+  it("keeps coin and cash values when a stock quote fails", async () => {
+    domSnapshot();
+    vi.mocked(fetchStockPrices).mockRejectedValue(new Error("stock service unavailable"));
+    const live = await queryRealTimeAssetsValue();
+    expect(live.partial).toBe(true);
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "ETH", value: 220 }));
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "USD", value: 6 }));
+  });
+
+  it("shows a stock rate limit when coin and stock price requests both fail", async () => {
+    domSnapshot();
+    vi.mocked(queryCoinPrices).mockRejectedValue(new Error("coin prices unavailable"));
+    vi.mocked(fetchStockPrices).mockRejectedValue(new Error("stock service 429"));
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.reason).toBe("rateLimited");
+    expect(live.partial).toBe(true);
+  });
+
+  it("excludes non-USD cash when exchange rates fail", async () => {
+    domSnapshot();
+    vi.mocked(listAllCurrencyRates).mockRejectedValue(new Error("rates unavailable"));
+    const live = await queryRealTimeAssetsValue();
+    expect(live.partial).toBe(true);
+    expect(live.reason).toBe("rateUnavailable");
+    expect(live.some((asset) => asset.symbol === "EUR")).toBe(false);
+    expect(live.every((asset) => Number.isFinite(asset.value))).toBe(true);
+  });
+
+  it.each(["IBKR token expired", "IBKR rate limited"])("marks a saved %s source partial", async (detail) => {
+    domSnapshot();
+    vi.mocked(readStoredStatuses).mockReturnValue([{
+      sourceId: "stock:0", label: "IBKR", status: "stale", kind: "broker", provider: "IBKR",
+      detail, category: detail.includes("expired") ? "auth" : "rateLimit",
+    }]);
+    const live = await queryRealTimeAssetsValue();
+    expect(live.partial).toBe(true);
+    expect(live.reason).toBe(detail.includes("expired") ? "ibkrToken" : "rateLimited");
+    expect(live.some((asset) => asset.symbol === "ETH")).toBe(true);
+  });
+
+  it("marks a partially reported exchange source partial", async () => {
+    domSnapshot();
+    vi.mocked(queryCoinPrices).mockResolvedValue({ ETH: 110, PLUME: 2, KAT: 3, USDT: 1 });
+    vi.mocked(readStoredStatuses).mockReturnValue([{
+      sourceId: "cex:0", label: "Binance", status: "partial", kind: "exchange", provider: "Binance",
+      partial: { category: "network", endpoints: ["Earn"] },
+    }]);
+    const live = await queryRealTimeAssetsValue();
+    expect(live.partial).toBe(true);
+    expect(live.reason).toBe("partialSource");
+  });
+
+  it("caches complete prices despite a stored source error", async () => {
+    domSnapshot();
+    vi.mocked(queryCoinPrices).mockResolvedValue({ ETH: 110, PLUME: 2, KAT: 3, USDT: 1 });
+    vi.mocked(readStoredStatuses).mockReturnValue([{
+      sourceId: "stock:0", label: "IBKR", status: "stale", kind: "broker", provider: "IBKR",
+      detail: "IBKR token expired", category: "auth",
+    }]);
+    const entries = new Map<string, unknown>();
+    vi.mocked(getMemoryCacheInstance).mockReturnValue({
+      getCache: (key: string) => entries.get(key),
+      setCache: (key: string, value: unknown) => { entries.set(key, value); },
+    } as never);
+
+    const first = await queryRealTimeAssetsValue();
+    const second = await queryRealTimeAssetsValue();
+
+    expect(first.partial).toBe(true);
+    expect(first.reason).toBe("ibkrToken");
+    expect(first.missingCount).toBe(0);
+    expect(second).toBe(first);
+    expect(queryCoinPrices).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not call a zero-value BTC placeholder a known portfolio price", async () => {
+    const rows = [{ id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+      assetType: "crypto", wallet: md5("Main(1)"), symbol: "PLUME", amount: 3, price: 0, value: 0 }];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 100, USDT: 1 });
+    await expect(queryRealTimeAssetsValue()).rejects.toThrow("pricesMissing");
+  });
 });
 
 describe("live broker cash prices", () => {
@@ -336,9 +558,7 @@ describe("live broker cash prices", () => {
     }]] as never);
     vi.mocked(fetchStockPrices).mockResolvedValue({ EUR: 200 });
 
-    const live = await queryRealTimeAssetsValue();
-
-    expect(live.some((asset) => asset.symbol === "EUR")).toBe(false);
+    await expect(queryRealTimeAssetsValue()).rejects.toThrow("rateUnavailable");
     expect(fetchStockPrices).not.toHaveBeenCalled();
   });
 });
