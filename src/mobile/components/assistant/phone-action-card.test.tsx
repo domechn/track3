@@ -99,3 +99,47 @@ it("disables approval when the pending action expires", () => {
     vi.useRealTimers();
   }
 });
+
+const phoneHead = () => document.querySelector(".fidelity-action-head");
+const renderPhoneAlert = (patch: Partial<PendingAction>) => render(<MemoryRouter>
+  <PhoneActionCard action={{ ...alertAction({ comparator: "gte" }), expiresAt: "2999-01-01T00:00:00.000Z", ...patch }}
+    onDecide={vi.fn()} /></MemoryRouter>);
+
+it("shows a pending phone alert as waiting for approval", () => {
+  renderPhoneAlert({ status: "pending" });
+  expect(phoneHead()).toHaveTextContent("Approval neededWaiting");
+  expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
+});
+
+it("shows an approved phone alert as created", () => {
+  renderPhoneAlert({ status: "approved" });
+  expect(phoneHead()).toHaveTextContent("Alert createdApproved");
+});
+
+it.each([
+  ["rejected", "Rejected"], ["expired", "Expired"], ["failed", "Failed"], ["executing", "Executing"],
+] as const)("shows a %s phone alert with its own status", (status, label) => {
+  renderPhoneAlert({ status });
+  expect(phoneHead()).toHaveTextContent(`Create an alert rule${label}`);
+  expect(phoneHead()).not.toHaveTextContent("Approval needed");
+  expect(screen.getByRole("status")).toHaveTextContent(label);
+  expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+  expect(screen.getByRole("region", { name: "Confirm assistant action" })).toHaveAttribute("data-state", status);
+});
+
+it("shows a pending phone alert past its expiry as expired in the head and the footer", () => {
+  renderPhoneAlert({ status: "pending", expiresAt: "2000-01-01T00:00:00.000Z" });
+  expect(phoneHead()).toHaveTextContent("Create an alert ruleExpired");
+  expect(screen.getByRole("status")).toHaveTextContent("Expired");
+  expect(screen.getByRole("region", { name: "Confirm assistant action" })).toHaveAttribute("data-state", "expired");
+});
+
+it("shows why a phone alert failed", () => {
+  renderPhoneAlert({ status: "failed", result: "The rule could not be stored" });
+  expect(screen.getByRole("status")).toHaveTextContent("Failed: The rule could not be stored");
+});
+
+it.each(["pending", "approved"] as const)("exposes a %s phone alert as data-state", (status) => {
+  renderPhoneAlert({ status });
+  expect(screen.getByRole("region", { name: "Confirm assistant action" })).toHaveAttribute("data-state", status);
+});

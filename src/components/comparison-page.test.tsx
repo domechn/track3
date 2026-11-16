@@ -43,8 +43,8 @@ vi.mock("@/middlelayers/charts", () => ({
 }));
 
 import { queryAllDataDates, queryCoinDataByUUID } from "@/middlelayers/charts";
-import { COMPARISON_DATES_KEY } from "@/middlelayers/ai/actions";
 import { DataChangedContext } from "@/contexts/data-changed";
+import { COMPARISON_DATES_KEY } from "@/middlelayers/ai/actions";
 
 const usdCurrency = { currency: "USD", symbol: "$", rate: 1, alias: "usd" };
 
@@ -314,6 +314,47 @@ describe("Comparison page", () => {
     expect(
       screen.getByRole("button", { name: /base date/i }),
     ).toHaveTextContent(`2024-04-16 ${older.time}`);
+  });
+
+  describe("data changes while the page is open", () => {
+    const twoDays = [
+      { id: "latest", date: "2024-04-16", createdAt: "2024-04-16T10:30:00" },
+      { id: "previous", date: "2024-04-15", createdAt: "2024-04-15T09:00:00" },
+    ];
+    const page = (version: number) => <DataChangedContext.Provider value={version}>
+      <Comparison currency={usdCurrency} quoteColor="green-up-red-down" />
+    </DataChangedContext.Provider>;
+    const firstLoad = async () => {
+      vi.mocked(queryAllDataDates).mockResolvedValue(twoDays as never);
+      vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+      const view = render(page(0));
+      await waitFor(() => expect(screen.getByRole("button", { name: /head date/i })).toHaveTextContent("2024-04-16"));
+      expect(screen.getByRole("button", { name: /base date/i })).toHaveTextContent("2024-04-15");
+      return view;
+    };
+
+    it("keeps the selected pair and reads it again", async () => {
+      const view = await firstLoad();
+      vi.mocked(queryCoinDataByUUID).mockClear();
+      view.rerender(page(1));
+      await waitFor(() => expect(queryCoinDataByUUID).toHaveBeenCalledWith("latest"));
+      expect(queryCoinDataByUUID).toHaveBeenCalledWith("previous");
+      expect(screen.getByRole("button", { name: /head date/i })).toHaveTextContent("2024-04-16");
+      expect(screen.getByRole("button", { name: /base date/i })).toHaveTextContent("2024-04-15");
+    });
+
+    it("lists a snapshot that arrived with the change", async () => {
+      const user = userEvent.setup();
+      const view = await firstLoad();
+      vi.mocked(queryAllDataDates).mockResolvedValue([
+        { id: "newest", date: "2024-04-16", createdAt: "2024-04-16T16:30:00" }, ...twoDays,
+      ] as never);
+      view.rerender(page(1));
+      await waitFor(() => expect(screen.getByRole("button", { name: /head date/i })).toHaveTextContent("2024-04-16 10:30:00"));
+      expect(screen.getByRole("button", { name: /base date/i })).toHaveTextContent("2024-04-15");
+      await user.click(screen.getByRole("button", { name: /head date/i }));
+      expect(screen.getByRole("button", { name: /select 2024-04-16 16:30:00 snapshot/i })).toBeInTheDocument();
+    });
   });
 
   const twoSnapshots = [

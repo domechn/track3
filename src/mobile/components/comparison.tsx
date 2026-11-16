@@ -80,6 +80,8 @@ const App = ({
   const initialHeadRef = useRef(new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("head"));
   const [pageLoading, setPageLoading] = useState(true);
   const loadGenRef = useRef(0);
+  // The dates loader has its own generation: sharing one with the pair loader dropped every dates response after a data change.
+  const datesGenRef = useRef(0);
 
   const [baseId, setBaseId] = useState<string>("");
   const [headId, setHeadId] = useState<string>("");
@@ -144,11 +146,11 @@ const App = ({
 
   useEffect(() => {
     let cancelled = false;
-    const gen = ++loadGenRef.current;
+    const gen = ++datesGenRef.current;
 
     (async () => {
       const data = await queryAllDataDates();
-      if (cancelled || gen !== loadGenRef.current) {
+      if (cancelled || gen !== datesGenRef.current) {
         return;
       }
 
@@ -216,7 +218,7 @@ const App = ({
         return options[0].value;
       });
     })().catch(() => {
-      if (!cancelled && gen === loadGenRef.current) {
+      if (!cancelled && gen === datesGenRef.current) {
         setDateOptions([]);
         setBaseData([]);
         setHeadData([]);

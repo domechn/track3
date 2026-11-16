@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import MessageBubble from "@/mobile/components/assistant/message-bubble";
 import type { ChatMessage } from "@/components/assistant/use-chat";
 import { isIOS } from "@/utils/platform";
@@ -227,5 +228,58 @@ describe("MessageBubble", () => {
     const { container } = render(<MessageBubble message={msg} isStreaming />);
     expect(screen.getByText("Calculating the change")).toBeTruthy();
     expect(container.querySelector('[data-testid="thinking-stream-indicator"]')).toBeTruthy();
+  });
+
+  describe("request errors on iPhone", () => {
+    const failed = (blocks: string[]) => {
+      vi.mocked(isIOS).mockReturnValue(true);
+      const view = render(<MemoryRouter><MessageBubble onRetry={vi.fn()}
+        message={{ role: "assistant", blocks: blocks.map((text) => ({ kind: "text" as const, text })) }} /></MemoryRouter>);
+      vi.mocked(isIOS).mockReturnValue(false);
+      return view;
+    };
+
+    it("renders the live shape as an error card and keeps the partial answer", () => {
+      failed(["BTC is up.", "\n\n[error] Request failed with status 429: slow down"]);
+      expect(screen.getByText("BTC is up.")).toBeTruthy();
+      expect(screen.getByRole("alert")).toHaveTextContent("fidelity.assistant.requestFailed");
+      expect(screen.getByRole("alert")).not.toHaveTextContent("BTC is up.");
+      expect(screen.getByRole("button", { name: "fidelity.assistant.retry" })).toBeTruthy();
+    });
+
+    it("renders a plain answer as markdown only", () => {
+      failed(["All good"]);
+      expect(screen.getByText("All good")).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.getByTestId("assistant-bubble")).not.toHaveAttribute("data-state");
+    });
+
+    it("marks a failed reply for tests and agents", () => {
+      failed(["\n\n[error] stream timed out"]);
+      expect(screen.getByTestId("assistant-bubble")).toHaveAttribute("data-state", "failed");
+    });
+
+    it("does not treat a marker inside the model's own sentence as a failure", () => {
+      failed(["Logs that contain [error] lines are skipped."]);
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+  });
+
+  describe("agent activity after the turn ended", () => {
+    const running = { role: "assistant" as const, blocks: [{ kind: "agent_activity" as const, activities: [
+      { taskId: "fetch", skillName: "portfolio", description: "Read portfolio", status: "running" as const },
+    ] }] };
+    const dot = () => screen.getByText("Read portfolio").previousElementSibling;
+
+    it("pulses a running row while the reply is streaming", () => {
+      render(<MessageBubble message={running} isStreaming />);
+      expect(dot()).toHaveClass("animate-pulse");
+    });
+
+    it("stops pulsing a running row once the turn was stopped", () => {
+      render(<MessageBubble message={running} />);
+      expect(dot()).not.toHaveClass("animate-pulse");
+      expect(dot()).toHaveClass("bg-yellow-500");
+    });
   });
 });

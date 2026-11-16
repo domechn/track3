@@ -2758,6 +2758,7 @@ body:has(.fidelity-history, .fidelity-history-detail) {
   .fidelity-action-card.is-approved .fidelity-action-head > svg { color: #5fc39c; }
   .fidelity-action-status { margin-left: auto; border-radius: 999px; background: #292316; color: #d9a441; padding: 1px 8px; font-size: 12px; line-height: 18px; white-space: nowrap; }
   .fidelity-action-status.is-approved { background: #17312a; color: #5fc39c; }
+  .fidelity-action-status.is-settled { background: #26262c; color: #b4b6bc; }
   .fidelity-action-card h3 { margin: 10px 0 12px; color: white; font-size: 16px; font-weight: 600; line-height: 22px; }
   .fidelity-action-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
   .fidelity-action-meta { display: flex; flex-wrap: nowrap; gap: 8px; margin: 0; color: #b4b6bc; font-size: 11px; line-height: 18px; white-space: nowrap; }

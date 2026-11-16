@@ -896,6 +896,9 @@ export function useChat(options: UseChatOptions): UseChatResult {
     decidingRef.current.add(id);
     inFlightRef.current = true;
     if (mountedRef.current) setIsStreaming(true);
+    // The approval owns the turn from here, so Stop and a session change can see it.
+    const controller = new AbortController();
+    abortRef.current = controller;
     const actionSessionId = sessionId;
     let continuationIndex: number | undefined;
     try {
@@ -911,15 +914,15 @@ export function useChat(options: UseChatOptions): UseChatResult {
       }));
       messagesRef.current = next;
       if (mountedRef.current) setMessages(next);
+      // Stop cannot cancel an action that is already executing; it only skips the follow-up reply.
+      if (controller.signal.aborted) return;
       if (updated.status === "approved" || updated.status === "failed" || updated.status === "rejected") {
         const continuation: ChatMessage = { role: "assistant", blocks: [] };
         const withContinuation = [...next, continuation];
         continuationIndex = withContinuation.length - 1;
         messagesRef.current = withContinuation;
         if (mountedRef.current) setMessages(withContinuation);
-        const controller = new AbortController();
-        abortRef.current = controller;
-        try {
+        {
           const continuationCurrency = action.name === "set_base_currency" && updated.status === "approved"
             ? await queryDisplayCurrency() : baseCurrency;
           const actionPrompt = buildSystemPrompt(continuationCurrency, true, false);
@@ -975,8 +978,6 @@ export function useChat(options: UseChatOptions): UseChatResult {
             }
             await onStreamCompleteRef.current?.(messagesRef.current, summaryRef.current);
           }
-        } finally {
-          if (abortRef.current === controller) abortRef.current = null;
         }
       }
     } catch (error) {
@@ -1002,7 +1003,9 @@ export function useChat(options: UseChatOptions): UseChatResult {
       }
     } finally {
       decidingRef.current.delete(id);
-      if (syncedSessionIdRef.current === actionSessionId) {
+      // Same ownership rule as send(): a stopped or replaced turn leaves the flags to their new owner.
+      if (abortRef.current === controller) {
+        abortRef.current = null;
         inFlightRef.current = false;
         if (mountedRef.current) setIsStreaming(false);
       }

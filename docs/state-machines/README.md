@@ -1,7 +1,17 @@
 # State machines
 
-One file per domain. Each machine in a file has a mermaid `stateDiagram-v2`, a short events table (event, from, to), the single place in the code that changes the state, and the `data-*` attributes a test can read instead of sleeping.
+One file per domain. Each machine has a mermaid `stateDiagram-v2`, a short events table, the DOM marker that exposes its state, and the tests that pin it.
 
+Conventions:
+
+- The element that owns a phase carries `data-state="<state>"` (or a named variant such as `data-boot-state`), using the literal state names from the doc.
+- Write the characterization test first; a defect test must fail before the fix.
+- Desktop and phone copies of a machine change together.
+
+Domains (one line each, append only):
+
+- [Assistant, phone shell, comparison, goals](assistant.md)
+One file per domain. Each machine in a file has a mermaid `stateDiagram-v2`, a short events table (event, from, to), the single place in the code that changes the state, and the `data-*` attributes a test can read instead of sleeping.
 - [Sync](sync.md): scheduler, runtime mode, badge, recovery unlock, config conflict
 Track3 has state machines that are spread over statics, files, flags and component state. Each file in this directory describes one of them so that a change to a transition is a change to a table, not a hunt through the code.
 Conventions for every file:

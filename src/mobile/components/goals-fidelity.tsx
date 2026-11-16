@@ -164,16 +164,18 @@ export default function GoalsFidelity({
     .sort((a, b) => b.progress - a.progress)[0];
   const moveKind = draft.kind === "asset_price_move" || draft.kind === "portfolio_value_change";
   const negativeThreshold = draft.threshold.startsWith("-");
+  // An empty threshold has no sign yet, so the comparator decides it ("falls" is negative).
+  const signFromDraft = draft.threshold ? negativeThreshold : draft.comparator === "lte";
   const wasEditorOpen = useRef(editorOpen);
   const editorReopened = editorOpen && !wasEditorOpen.current;
   wasEditorOpen.current = editorOpen;
-  const initialMoveSign = useRef({ id: draft.id, kind: draft.kind, comparator: draft.comparator, negative: negativeThreshold });
+  const initialMoveSign = useRef({ id: draft.id, kind: draft.kind, comparator: draft.comparator, negative: signFromDraft });
   if (editorReopened || initialMoveSign.current.id !== draft.id || initialMoveSign.current.kind !== draft.kind) {
-    initialMoveSign.current = { id: draft.id, kind: draft.kind, comparator: draft.comparator, negative: negativeThreshold };
+    initialMoveSign.current = { id: draft.id, kind: draft.kind, comparator: draft.comparator, negative: signFromDraft };
   }
-  const moveSign = useRef({ id: draft.id, kind: draft.kind, comparator: draft.comparator, negative: negativeThreshold });
+  const moveSign = useRef({ id: draft.id, kind: draft.kind, comparator: draft.comparator, negative: signFromDraft });
   if (editorReopened || moveSign.current.id !== draft.id || moveSign.current.kind !== draft.kind || moveSign.current.comparator !== draft.comparator) {
-    moveSign.current = { id: draft.id, kind: draft.kind, comparator: draft.comparator, negative: negativeThreshold };
+    moveSign.current = { id: draft.id, kind: draft.kind, comparator: draft.comparator, negative: signFromDraft };
   }
   const thresholdMagnitude = negativeThreshold ? draft.threshold.slice(1) : draft.threshold;
   const invalidThreshold = !draft.threshold || (moveKind && Number(thresholdMagnitude) <= 0);

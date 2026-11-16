@@ -135,3 +135,50 @@ it("uses each alert kind's unit when a threshold changes from percent to currenc
   }} />);
   expect(screen.getByText("-10% → -$50")).toBeVisible();
 });
+
+const priceAlert: PendingAction = {
+  ...action, name: "create_alert",
+  args: { kind: "asset_price_target", comparator: "gte", symbol: "BTC", threshold: 200 },
+};
+const designHead = () => document.querySelector(".t3-assistant-action-head");
+const renderPriceAlert = (patch: Partial<PendingAction>) => render(<MemoryRouter>
+  <ActionCard action={{ ...priceAlert, ...patch }} onDecide={vi.fn()} /></MemoryRouter>);
+
+it("shows a pending price alert as waiting for approval", () => {
+  renderPriceAlert({});
+  expect(designHead()).toHaveTextContent("Approval neededWaiting");
+  for (const button of screen.getAllByRole("button", { name: "Approve" })) expect(button).toBeEnabled();
+});
+
+it("shows an approved price alert as created", () => {
+  renderPriceAlert({ status: "approved" });
+  expect(designHead()).toHaveTextContent("Alert createdApproved");
+  expect(screen.getByRole("link", { name: "Open in Goals & alerts" })).toHaveAttribute("href", "/goals");
+});
+
+it.each([
+  ["rejected", "Rejected"], ["expired", "Expired"], ["failed", "Failed"], ["executing", "Executing"],
+] as const)("shows a %s price alert with its own status", (status, label) => {
+  renderPriceAlert({ status });
+  expect(designHead()).toHaveTextContent(`Create an alert rule${label}`);
+  expect(designHead()).not.toHaveTextContent("Waiting");
+  expect(designHead()).not.toHaveTextContent("Approval needed");
+  expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+  expect(screen.getByRole("region", { name: "Confirm assistant action" })).toHaveAttribute("data-state", status);
+});
+
+it("shows a pending price alert past its expiry as expired", () => {
+  renderPriceAlert({ expiresAt: "2000-01-01T00:00:00.000Z" });
+  expect(designHead()).toHaveTextContent("Create an alert ruleExpired");
+  expect(screen.getByRole("region", { name: "Confirm assistant action" })).toHaveAttribute("data-state", "expired");
+});
+
+it("shows why a price alert failed inside the design card", () => {
+  renderPriceAlert({ status: "failed", result: "The rule could not be stored" });
+  expect(document.querySelector(".t3-assistant-action-design")).toHaveTextContent("The rule could not be stored");
+});
+
+it.each(["pending", "approved"] as const)("exposes a %s price alert as data-state", (status) => {
+  renderPriceAlert({ status });
+  expect(screen.getByRole("region", { name: "Confirm assistant action" })).toHaveAttribute("data-state", status);
+});

@@ -48,6 +48,7 @@ import { configuredSecretValues, redactSecrets } from "@/middlelayers/security/r
 import type { ChatMessage, AssistantBlock } from "@/components/assistant/use-chat";
 import type { ConversationSummary } from "@/middlelayers/ai/history";
 import UsageLabel from "@/components/assistant/usage-label";
+import { isRequestError } from "@/components/assistant/request-error";
 import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions";
 import { takeInsightQuestion, persistedToRuntime, runtimeToPersisted } from "@/middlelayers/ui-state/chat-persist";
 export * from "@/middlelayers/ui-state/chat-persist";
@@ -273,6 +274,12 @@ function ReadyChat({
     }
   }, [sessionId, sessionVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A save or delete failure belongs to the chat it happened in.
+  useEffect(() => {
+    setSaveError(null);
+    setDeleteError(null);
+  }, [sessionId]);
+
   // Subscribe to session update notifications from orphaned background
   // streams (e.g. when the user navigated away mid-stream and an old
   // send() completed after the new component mounted). Bump sessionVersion
@@ -408,6 +415,8 @@ function ReadyChat({
       data-chat-session={sessionId && sessionId !== liveSessionIdRef.current && !startedHere ? "saved" : "new"}
       style={mobile && mobileHeight !== undefined ? { height: mobileHeight } : undefined}
       data-testid="chat-session-layout"
+      data-state={sessionLoadError ? "load-error" : !sessionId ? "blank"
+        : loadedSessionId !== sessionId && createdSessionIdRef.current !== sessionId ? "loading" : "ready"}
     >
       {deleteError && (
         <p role="alert" className="absolute right-4 top-4 z-10 rounded bg-card px-4 py-2 text-sm text-destructive">
@@ -564,11 +573,12 @@ function ChatContent({
   }, [chat.setInput, chat.send, sessionId, t]);
   const lastMessage = chat.messages.at(-1);
   const failed = lastMessage?.role === "assistant" &&
-    lastMessage.blocks.some((block) => block.kind === "text" && block.text.includes("[error]"));
+    lastMessage.blocks.some(isRequestError);
 
   return (
     <Card
       data-testid="chat-card"
+      data-state={chat.isStreaming ? "streaming" : "idle"}
       className="flex min-w-0 flex-1 flex-col overflow-hidden"
     >
       {mobileHeaderHost ? createPortal(<ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage}
@@ -748,7 +758,7 @@ function ChatHeader({
 
 function LoadingCard() {
   return (
-    <Card className="t3-manage-assistant flex h-[calc(100vh-88px)] min-h-0 flex-col overflow-hidden md:min-h-[560px]">
+    <Card data-testid="assistant-loading" className="t3-manage-assistant flex h-[calc(100vh-88px)] min-h-0 flex-col overflow-hidden md:min-h-[560px]">
       <div className="flex items-center gap-3 border-b border-[var(--glass-border)] bg-card/40 px-5 py-3">
         <Skeleton className="h-8 w-8 rounded-md" />
         <div className="space-y-1.5">

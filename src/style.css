@@ -2020,6 +2020,7 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
   .t3-assistant-action-head > span:last-child { padding: 2px 8px; border-radius: 999px; font-size: 12px; line-height: 16px; }
   .t3-assistant-action-head .waiting { background: hsl(var(--warning) / .16); color: hsl(var(--warning)); }
   .t3-assistant-action-head .approved { background: hsl(var(--positive) / .14); color: hsl(var(--positive)); }
+  .t3-assistant-action-head .settled { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
   .t3-assistant-action-design h3 { margin: 10px 0 12px; font-size: 16px; line-height: 22px; font-weight: 600; }
   .t3-assistant-action-design > p { margin: 0; color: hsl(var(--faint)); font-size: 12px; }
   .t3-assistant-action-design dl { margin: 0; }
