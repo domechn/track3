@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import MessageBubble from "./message-bubble";
 import type { ChatMessage } from "./use-chat";
 
@@ -177,5 +178,63 @@ describe("MessageBubble", () => {
     const { container } = render(<MessageBubble message={msg} isStreaming />);
     expect(screen.getByText("Calculating the change")).toBeTruthy();
     expect(container.querySelector('[data-testid="thinking-stream-indicator"]')).toBeTruthy();
+  });
+
+  describe("request errors", () => {
+    const failed = (text: string, onRetry = vi.fn()) => render(<MemoryRouter>
+      <MessageBubble message={{ role: "assistant", blocks: [{ kind: "text", text }] }} onRetry={onRetry} />
+    </MemoryRouter>);
+
+    it("renders the stored fixture shape as an error card with Retry and the rate-limit copy", async () => {
+      const onRetry = vi.fn();
+      failed("[error] HTTP 429, retry after 20 s", onRetry);
+      expect(screen.getByRole("alert")).toHaveTextContent("fidelity.assistant.rateLimitError");
+      await userEvent.click(screen.getByRole("button", { name: "fidelity.assistant.retry" }));
+      expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it("renders a plain answer as markdown only", () => {
+      failed("All good");
+      expect(screen.getByText("All good")).toBeTruthy();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.getByTestId("assistant-bubble")).not.toHaveAttribute("data-state");
+    });
+
+    it("renders the live shape as an error card with the rate-limit copy", () => {
+      failed("\n\n[error] Request failed with status 429: slow down");
+      expect(screen.getByRole("alert")).toHaveTextContent("fidelity.assistant.rateLimitError");
+      expect(screen.getByRole("button", { name: "fidelity.assistant.retry" })).toBeEnabled();
+      expect(screen.getByTestId("assistant-bubble")).toHaveAttribute("data-state", "failed");
+    });
+
+    it("keeps the partial answer above the error card", () => {
+      render(<MemoryRouter><MessageBubble message={{ role: "assistant", blocks: [
+        { kind: "text", text: "BTC is up." },
+        { kind: "text", text: "\n\n[error] stream timed out" },
+      ] }} onRetry={vi.fn()} /></MemoryRouter>);
+      expect(screen.getByText("BTC is up.")).toBeTruthy();
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent("fidelity.assistant.genericRequestError");
+      expect(alert).not.toHaveTextContent("BTC is up.");
+      expect(screen.queryByText(/\[error\]/)).toBeNull();
+    });
+  });
+
+  describe("agent activity after the turn ended", () => {
+    const running = { role: "assistant" as const, blocks: [{ kind: "agent_activity" as const, activities: [
+      { taskId: "fetch", skillName: "portfolio", description: "Read portfolio", status: "running" as const },
+    ] }] };
+    const dot = () => screen.getByText("Read portfolio").previousElementSibling;
+
+    it("pulses a running row while the reply is streaming", () => {
+      render(<MessageBubble message={running} isStreaming />);
+      expect(dot()).toHaveClass("animate-pulse");
+    });
+
+    it("stops pulsing a running row once the turn was stopped", () => {
+      render(<MessageBubble message={running} />);
+      expect(dot()).not.toHaveClass("animate-pulse");
+      expect(dot()).toHaveClass("bg-yellow-500");
+    });
   });
 });

@@ -49,6 +49,7 @@ import type { ChatMessage, AssistantBlock } from "./use-chat";
 import type { ConversationSummary } from "@/middlelayers/ai/history";
 import type { ChatSessionMeta } from "@/middlelayers/ai";
 import UsageLabel from "./usage-label";
+import { isRequestError } from "./request-error";
 import { ASSISTANT_APP_ACTION_EVENT } from "@/middlelayers/ai/actions";
 import { takeInsightQuestion, persistedToRuntime, runtimeToPersisted } from "@/middlelayers/ui-state/chat-persist";
 export * from "@/middlelayers/ui-state/chat-persist";
@@ -343,10 +344,17 @@ function ReadyChat({
       // session.  A new session is created lazily when the user sends
       // their first message (see handleStreamComplete).
       setInitialMsgs([]);
+      setInitialTimes([]);
       setInitialSummary(undefined);
       setLoadedSessionId(null);
     }
   }, [sessionId, sessionVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A save or delete failure belongs to the chat it happened in.
+  useEffect(() => {
+    setSaveError(null);
+    setDeleteError(null);
+  }, [sessionId]);
 
   // Subscribe to session update notifications from orphaned background
   // streams (e.g. when the user navigated away mid-stream and an old
@@ -475,6 +483,8 @@ function ReadyChat({
       ref={layoutRef}
       className="t3-manage-assistant relative flex h-[calc(100vh-88px)] min-h-[560px] gap-4 overflow-hidden"
       data-testid="chat-session-layout"
+      data-state={sessionLoadError ? "load-error" : !sessionId ? "blank"
+        : loadedSessionId !== sessionId && createdSessionIdRef.current !== sessionId ? "loading" : "ready"}
     >
       {deleteError && (
         <p role="alert" className="absolute right-4 top-4 z-10 rounded bg-card px-4 py-2 text-sm text-destructive">
@@ -611,17 +621,19 @@ function ChatContent({
       // Assistant remains usable when session storage is unavailable.
     }
   }, [chat.setInput, chat.send, sessionId, t]);
+  const lastMessage = chat.messages.at(-1);
 
   return (
     <Card
       data-testid="chat-card"
+      data-state={chat.isStreaming ? "streaming" : "idle"}
       data-approved-view={chat.messages.some((message) => message.role === "assistant"
         && message.blocks.some((block) => block.kind === "pending_action" && block.status === "approved"))
         && chat.messages.length > 2 ? "true" : undefined}
       className="flex min-w-0 flex-1 flex-col overflow-hidden"
     >
       <ChatHeader config={config} contextTokens={chat.contextTokens} sessionUsage={chat.sessionUsage} sessionTitle={sessionTitle} replyCount={chat.messages.filter((message) => message.role === "assistant").length}
-        requestFailed={chat.messages.some((message) => message.role === "assistant" && message.blocks.some((block) => block.kind === "text" && /^\[error\]/i.test(block.text)))}
+        requestFailed={lastMessage?.role === "assistant" && lastMessage.blocks.some(isRequestError)}
         sidebarOpen={sidebarOpen} onToggleSidebar={onToggleSidebar} />
       {saveError && (
         <p role="alert" className="px-4 py-2 text-sm text-destructive">
@@ -753,7 +765,7 @@ function ChatHeader({
 
 function LoadingCard() {
   return (
-    <Card className="t3-manage-assistant flex h-[calc(100vh-88px)] min-h-0 flex-col overflow-hidden md:min-h-[560px]">
+    <Card data-testid="assistant-loading" className="t3-manage-assistant flex h-[calc(100vh-88px)] min-h-0 flex-col overflow-hidden md:min-h-[560px]">
       <div className="flex items-center gap-3 border-b border-[var(--glass-border)] bg-card/40 px-5 py-3">
         <Skeleton className="h-8 w-8 rounded-md" />
         <div className="space-y-1.5">

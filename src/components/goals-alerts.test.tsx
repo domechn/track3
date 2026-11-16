@@ -378,3 +378,57 @@ it("shows the available P&L for a displayed period rule", async () => {
   render(<GoalsAlerts />);
   expect(await screen.findByText(/Current: 12.00/)).toBeInTheDocument();
 });
+
+it("saves an edit of an enabled rule as enabled", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([savedRule]);
+  render(<GoalsAlerts />);
+  await userEvent.click(await screen.findByRole("button", { name: "Edit" }));
+  await userEvent.click(within(screen.getByRole("dialog", { name: "Edit rule" })).getByRole("button", { name: "Save rule" }));
+  await waitFor(() => expect(saveAlertRule).toHaveBeenCalledWith(expect.objectContaining({ id: 7, enabled: true })));
+});
+
+it("writes a new rule once for one Save click", async () => {
+  const user = userEvent.setup();
+  render(<GoalsAlerts />);
+  await screen.findByText("Create your first rule");
+  await user.type(screen.getByRole("spinbutton", { name: "Threshold" }), "1000");
+  await user.click(screen.getByRole("button", { name: "Save rule" }));
+  await waitFor(() => expect(saveAlertRule).toHaveBeenCalledTimes(1));
+  expect(saveAlertRule).toHaveBeenCalledWith(expect.objectContaining({ id: 0, enabled: true }));
+});
+
+it("keeps a paused rule paused when its edit is saved", async () => {
+  vi.mocked(listAlertRules).mockResolvedValue([{ ...savedRule, enabled: false }]);
+  render(<GoalsAlerts />);
+  await userEvent.click(await screen.findByRole("button", { name: "Edit" }));
+  await userEvent.click(within(screen.getByRole("dialog", { name: "Edit rule" })).getByRole("button", { name: "Save rule" }));
+  await waitFor(() => expect(saveAlertRule).toHaveBeenCalledWith(expect.objectContaining({ id: 7, enabled: false })));
+});
+
+it("ignores a second Save click while the write is pending", async () => {
+  let finishWrite = () => {};
+  vi.mocked(saveAlertRule).mockReturnValue(new Promise<void>((resolve) => { finishWrite = resolve; }));
+  const user = userEvent.setup();
+  render(<GoalsAlerts />);
+  await screen.findByText("Create your first rule");
+  await user.type(screen.getByRole("spinbutton", { name: "Threshold" }), "1000");
+  await user.click(screen.getByRole("button", { name: "Save rule" }));
+  await user.click(screen.getByRole("button", { name: "Save rule" }));
+  expect(saveAlertRule).toHaveBeenCalledTimes(1);
+  finishWrite();
+  expect((await screen.findAllByText("Rule saved")).length).toBeGreaterThan(0);
+  expect(saveAlertRule).toHaveBeenCalledTimes(1);
+});
+
+it("accepts Save again after a failed write and keeps the draft", async () => {
+  vi.mocked(saveAlertRule).mockRejectedValueOnce(new Error("disk full"));
+  const user = userEvent.setup();
+  render(<GoalsAlerts />);
+  await screen.findByText("Create your first rule");
+  await user.type(screen.getByRole("spinbutton", { name: "Threshold" }), "1000");
+  await user.click(screen.getByRole("button", { name: "Save rule" }));
+  await waitFor(() => expect(saveAlertRule).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.getByRole("spinbutton", { name: "Threshold" })).toHaveValue(1000));
+  await user.click(screen.getByRole("button", { name: "Save rule" }));
+  await waitFor(() => expect(saveAlertRule).toHaveBeenCalledTimes(2));
+});

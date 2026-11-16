@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/i18n";
-import type { PendingAction } from "@/middlelayers/ai/actions/lifecycle";
+import type { ActionStatus, PendingAction } from "@/middlelayers/ai/actions/lifecycle";
 import { Link } from "react-router-dom";
 import { queryLastAssetsBySymbol } from "@/middlelayers/charts-assets";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
@@ -55,6 +55,24 @@ const actionPage: Record<string, { route: string; key: string }> = {
   clear_alert_history: { route: "/goals", key: "aiSetup.page.goals" },
 };
 
+// A proposal past its expiry reads as expired before the stored claim lands.
+export function displayStatus(action: Pick<PendingAction, "status">, expired: boolean): ActionStatus {
+  return action.status === "pending" && expired ? "expired" : action.status;
+}
+
+// Header copy of the price-alert cards. A Record, so a new status cannot be left without a label.
+const headerKeys: Record<ActionStatus, { title?: string; badge: string; tone: "waiting" | "approved" | "settled" }> = {
+  pending: { title: "fidelity.assistant.approvalNeeded", badge: "fidelity.assistant.waiting", tone: "waiting" },
+  approved: { title: "fidelity.assistant.alertCreated", badge: "assistant.action.status.approved", tone: "approved" },
+  executing: { badge: "assistant.action.status.executing", tone: "settled" },
+  rejected: { badge: "assistant.action.status.rejected", tone: "settled" },
+  expired: { badge: "assistant.action.status.expired", tone: "settled" },
+  failed: { badge: "assistant.action.status.failed", tone: "settled" },
+};
+export function actionHeader(status: ActionStatus, name: string) {
+  return { ...headerKeys[status], title: headerKeys[status].title ?? `assistant.action.name.${name}` };
+}
+
 export default function ActionCard({
   action, onDecide, canDecide = true, currency,
 }: {
@@ -81,8 +99,9 @@ export default function ActionCard({
     const timer = window.setTimeout(() => setExpired(true), remaining);
     return () => window.clearTimeout(timer);
   }, [action.expiresAt]);
-  const pending = action.status === "pending" && !expired;
-  const status = action.status === "pending" && expired ? "expired" : action.status;
+  const status = displayStatus(action, expired);
+  const pending = status === "pending";
+  const header = actionHeader(status, action.name);
   const alertThreshold = new Intl.NumberFormat("en-US", {
     style: "currency", currency: "USD", minimumFractionDigits: Number.isInteger(action.args.threshold) ? 0 : 2,
     maximumFractionDigits: 8,
@@ -123,11 +142,11 @@ export default function ActionCard({
     ? { route: "/cost-basis", key: "aiSetup.page.cost-basis" } : undefined);
 
   return (
-    <section aria-label={t("assistant.action.confirmation")} className="t3-action-confirmation rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+    <section aria-label={t("assistant.action.confirmation")} data-state={status} className="t3-action-confirmation rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
       {action.name === "create_alert" && action.args.kind === "asset_price_target" && (action.args.comparator === "gte" || action.args.comparator === "lte") && typeof action.args.symbol === "string" && typeof action.args.threshold === "number" && <div className="t3-assistant-action-design">
         <div className="t3-assistant-action-head">
-          <span>{status === "approved" ? <CheckIcon aria-hidden="true" /> : <BellIcon aria-hidden="true" />}{status === "approved" ? t("fidelity.assistant.alertCreated") : t("fidelity.assistant.approvalNeeded")}</span>
-          <span className={status === "approved" ? "approved" : "waiting"}>{status === "approved" ? t("assistant.action.status.approved") : t("fidelity.assistant.waiting")}</span>
+          <span>{status === "approved" ? <CheckIcon aria-hidden="true" /> : <BellIcon aria-hidden="true" />}{t(header.title)}</span>
+          <span className={header.tone}>{t(header.badge)}</span>
         </div>
         <h3>{t(action.args.comparator === "lte" ? "fidelity.assistant.createAlertBelow" : "fidelity.assistant.createAlert").replace("{symbol}", action.args.symbol).replace("{threshold}", alertThreshold)}</h3>
         <p>{t("fidelity.assistant.whatChanges")}</p>
@@ -137,6 +156,7 @@ export default function ActionCard({
           <div><dt>{t("fidelity.assistant.rightNow")}</dt><dd>{currentPrice === undefined ? "—" : `${new Intl.NumberFormat("en-US", { style: "currency", currency: currency?.currency ?? "USD" }).format(currentPrice * (currency?.rate ?? 1))}${action.args.comparator === "gte" ? `, ${(currentPrice / Number(action.args.threshold) * 100).toFixed(1)}% ${t("fidelity.assistant.ofWay")}` : ""}`}</dd></div>
         </dl>
         <p className="t3-assistant-action-note">{t("fidelity.assistant.noOtherChanges")}</p>
+        {status === "failed" && action.result && <p className="t3-assistant-action-note">{preview(action.result)}</p>}
         {pending ? <div className="t3-assistant-action-buttons">
           <Button type="button" size="sm" onClick={() => onDecide?.(action.id, "approve")} disabled={!canDecide || !onDecide}><CheckIcon aria-hidden="true" />{t("assistant.action.approve")}</Button>
           <Button type="button" size="sm" variant="outline" onClick={() => onDecide?.(action.id, "reject")} disabled={!canDecide || !onDecide}>{t("assistant.action.reject")}</Button>

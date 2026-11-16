@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   ChevronDownIcon,
   ExclamationTriangleIcon,
@@ -12,6 +12,7 @@ import MarkdownRenderer from "./markdown-renderer";
 import type { AssistantBlock, ChatMessage } from "./use-chat";
 import UsageLabel from "./usage-label";
 import ActionCard from "./action-card";
+import { isRequestError, splitRequestError } from "./request-error";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 
 function stripThinkTags(s: string): string {
@@ -139,7 +140,11 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
   }
   if (block.kind === "text") {
     if (!block.text) return null;
-    if (/^\[error\]/i.test(block.text)) return <AssistantRequestError key={idx} detail={block.text.replace(/^\[error\]\s*/i, "")} onRetry={onRetry} />;
+    const failure = splitRequestError(block.text);
+    if (failure) return <Fragment key={idx}>
+      {failure.before && <div className="markdown-content"><MarkdownRenderer content={stripThinkTags(failure.before)} /></div>}
+      <AssistantRequestError detail={failure.detail} status={failure.httpStatus} onRetry={onRetry} />
+    </Fragment>;
     return (
       <div key={idx} className="markdown-content">
         <MarkdownRenderer content={stripThinkTags(block.text)} />
@@ -156,7 +161,7 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
             <span className={`inline-block h-2 w-2 rounded-full ${
               a.status === "completed" ? "bg-green-500" :
               a.status === "failed" ? "bg-red-500" :
-              "bg-yellow-500 animate-pulse"
+              isStreaming ? "bg-yellow-500 animate-pulse" : "bg-yellow-500"
             }`} />
             <span className="flex-1 truncate">{a.description}</span>
             {a.status === "completed" && a.resultPreview && (
@@ -172,9 +177,8 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
   }
 }
 
-function AssistantRequestError({ detail, onRetry }: { detail: string; onRetry?: () => void }) {
+function AssistantRequestError({ detail, status, onRetry }: { detail: string; status?: string; onRetry?: () => void }) {
   const { t } = useTranslation();
-  const status = detail.match(/\bHTTP\s+(\d{3})\b/i)?.[1];
   return <div className="t3-assistant-request-error" role="alert">
     <ExclamationTriangleIcon aria-hidden="true" />
     <div>
@@ -225,6 +229,7 @@ export default function MessageBubble({
         isUser ? "justify-end" : "justify-start",
       )}
       data-testid={isUser ? "user-bubble" : "assistant-bubble"}
+      data-state={blocks.some(isRequestError) ? "failed" : undefined}
     >
       {!isUser && (
         <span

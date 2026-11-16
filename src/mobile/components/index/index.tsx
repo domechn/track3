@@ -279,6 +279,7 @@ type LayoutProps = {
   onLocalRefresh: () => Promise<void>;
   refreshAction: React.MutableRefObject<(() => Promise<void>) | null>;
   onRootTap: (tab: MobileTab) => void;
+  bootState: "booting" | "failed" | "ready" | "empty";
 };
 
 function Layout({
@@ -296,6 +297,7 @@ function Layout({
   onLocalRefresh,
   refreshAction,
   onRootTap,
+  bootState,
 }: LayoutProps) {
   const { t } = useTranslation();
   const mobile = useIsMobile();
@@ -474,7 +476,7 @@ function Layout({
             && <div className="mobile-route-heading">
             <MobilePage title={routeTitle(location.pathname, t)} />
           </div>}
-          <div className="relative min-h-[400px] min-w-0" aria-busy={initializing}>
+          <div className="relative min-h-[400px] min-w-0" aria-busy={initializing} data-boot-state={bootState}>
             {mobile && loadFailed && /^\/(overview|history|summary|wallets|comparison|cost-basis|coins)(\/|$)/.test(location.pathname) ? <div className="mobile-empty-state mobile-data-error" role="alert">
               <svg viewBox="0 0 112 112" fill="none" aria-hidden="true">
                 <circle cx="56" cy="56" r="48" fill="currentColor" opacity=".08" />
@@ -629,6 +631,7 @@ type AppRoutesProps = {
   ) => void;
   lastRefreshAt?: string;
   onDataChanged: () => void;
+  onLeaveSettings: () => void;
   onLocalRefresh: () => Promise<void>;
   handleConfigurationSave: (aliasChanged?: boolean) => void;
 };
@@ -652,6 +655,7 @@ function AppRoutes({
   onDatePickerValueChange,
   lastRefreshAt,
   onDataChanged,
+  onLeaveSettings,
   onLocalRefresh,
   handleConfigurationSave,
 }: AppRoutesProps) {
@@ -664,7 +668,8 @@ function AppRoutes({
     if (location.pathname !== "/history") {
       setRetainHistory(false);
     }
-  }, [location.pathname, setRetainHistory]);
+    if (!location.pathname.startsWith("/settings")) onLeaveSettings();
+  }, [location.pathname, setRetainHistory, onLeaveSettings]);
 
   return (
     <Routes>
@@ -688,6 +693,7 @@ function AppRoutes({
             }}
             onLocalRefresh={onLocalRefresh}
             refreshAction={refreshAction}
+            bootState={initializing ? "booting" : loadFailed ? "failed" : hasData ? "ready" : "empty"}
             onRootTap={(tab) => {
               if (tab === "overview") setOverviewExpanded(false);
             }}
@@ -1119,11 +1125,23 @@ const App = () => {
       ).catch(() => {
         console.warn("data reload failed");
       });
+    } else {
+      reloadOwed.current = true;
     }
     void autoBackupHistoricalData(true).catch(() => {
       console.warn("forced auto backup failed");
     });
   }
+
+  // A data change under Settings skips the reload above; run it once on the way out.
+  const reloadOwed = useRef(false);
+  const onLeaveSettings = useCallback(() => {
+    if (!reloadOwed.current) return;
+    reloadOwed.current = false;
+    void loadAllData(true).catch(() => {
+      console.warn("data reload failed");
+    });
+  }, []);
 
   async function refreshLocalView() {
     clearAllCache();
@@ -1211,6 +1229,9 @@ const App = () => {
           }
           return dr;
         });
+      } else {
+        // A preserving reload keeps a complete range and fills a missing one.
+        setDateRange((prev) => (prev?.from && prev.to ? prev : dr));
       }
       setOriginalQuerySize((prev) => (prev === size ? prev : size));
     });
@@ -1261,6 +1282,7 @@ const App = () => {
           onDatePickerValueChange={onDatePickerValueChange}
           lastRefreshAt={lastRefreshAt}
           onDataChanged={onDataChanged}
+          onLeaveSettings={onLeaveSettings}
           onLocalRefresh={refreshLocalView}
           handleConfigurationSave={handleConfigurationSave}
         />
