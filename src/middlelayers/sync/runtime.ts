@@ -58,6 +58,12 @@ export class SyncRuntime {
   private rootKey?: Uint8Array;
   private scheduler?: SyncScheduler;
   private handle?: EngineHandle;
+  // Set when a save or unlock left the scheduler stopped; Sync now builds a new one on the same engine.
+  private stalled = false;
+  // One per engine: its store's finished requests count as activity for that engine's round only.
+  private tracker: { activity: (progress?: SyncProgress) => void } = { activity: () => {} };
+  // The last published device list; a round that throws publishes no report and must not blank it.
+  private lastDevices: NonNullable<SyncReport["devices"]> = [];
   private lockedPromptClaimed = false;
   private skipped = false;
   private retry?: SyncRetryState;
@@ -90,8 +96,19 @@ export class SyncRuntime {
   }
 
   private publish(mode: RuntimeStatus["mode"], sync: SyncStatus = this.snapshot.sync): void {
+    if (sync.report?.devices) this.lastDevices = sync.report.devices;
     this.snapshot = { mode, sync, skipped: mode === "locked" && this.skipped };
     for (const listener of this.listeners) listener();
+  }
+
+  private stall(error: Exclude<SyncConnectionResult, "ok">): void {
+    // While sync is disabled the stopped scheduler is only draining; there is nothing to restart.
+    if (this.snapshot.mode !== "ready") return;
+    this.stalled = true;
+    this.publish("ready", {
+      ...this.snapshot.sync, phase: "error", startedAt: undefined, progress: undefined,
+      partial: undefined, nextRetryAt: undefined, error, retryStopped: true,
+    });
   }
 
   // One queue: a retry-state write reads the settings when it runs, so it cannot undo a newer settings write.
@@ -133,6 +150,7 @@ export class SyncRuntime {
     if (!recoveredKey && (!secret || secret.length < 16)) return "passphrase";
     const store = this.deps.store(settings);
     let key: Uint8Array | undefined;
+    let stopped = false;
     try {
       const result = await testSyncConnection(store, secret || "", recoveredKey);
       if (result !== "ok") return result;
@@ -161,9 +179,10 @@ export class SyncRuntime {
       const next = { ...settings, enabled: true };
       delete next.retry;
       if (this.scheduler && !await this.scheduler.stop()) {
-        this.publish("ready", { ...this.snapshot.sync, phase: "error", startedAt: undefined, error: "timeout" });
+        this.stall("timeout");
         return "timeout";
       }
+      stopped = !!this.scheduler;
       // New settings or passphrase start with a clean retry state.
       this.retry = undefined;
       const moved = (["endpoint", "region", "bucket", "prefix", "pathStyle"] as const).some((key) =>
@@ -174,7 +193,10 @@ export class SyncRuntime {
       this.activate(store, secret || "", header, key, !!recoveredKey);
       return "ok";
     } catch (error) {
-      return classifySyncError(error);
+      const result = classifySyncError(error);
+      // The old round is gone and nothing replaced it, so say so instead of leaving "syncing".
+      if (stopped) this.stall(result);
+      return result;
     } finally {
       key?.fill(0);
       recoveredKey?.fill(0);
@@ -194,7 +216,7 @@ export class SyncRuntime {
         return "passphrase";
       }
       if (this.scheduler && !await this.scheduler.stop()) {
-        this.publish("ready", { ...this.snapshot.sync, phase: "error", startedAt: undefined, error: "timeout" });
+        this.stall("timeout");
         return "timeout";
       }
       this.activate(store, passphrase, header, key);
@@ -236,7 +258,7 @@ export class SyncRuntime {
         return "passphrase";
       }
       if (this.scheduler && !await this.scheduler.stop()) {
-        this.publish("ready", { ...this.snapshot.sync, phase: "error", startedAt: undefined, error: "timeout" });
+        this.stall("timeout");
         return "timeout";
       }
       this.activate(store, "", header, key, true);
@@ -250,12 +272,13 @@ export class SyncRuntime {
 
   private activate(store: S3Store, passphrase: string, header?: SyncHeader, key?: Uint8Array, recovered = false): void {
     this.skipped = false;
+    this.lastDevices = [];
     this.handle?.unregister();
     this.passphrase = passphrase || undefined;
     this.rootKey?.fill(0);
     this.rootKey = recovered ? key?.slice() : undefined;
-    let activity: (progress?: SyncProgress) => void = () => {};
-    const completed = <T,>(request: Promise<T>): Promise<T> => request.finally(() => activity());
+    const tracker = this.tracker = { activity: () => {} };
+    const completed = <T,>(request: Promise<T>): Promise<T> => request.finally(() => tracker.activity());
     function getObject(key: string, signal?: AbortSignal): Promise<StoredObject | null>;
     function getObject(key: string, signal: AbortSignal | undefined, ifNoneMatch: string): Promise<StoredObject | NotModifiedObject | null>;
     function getObject(key: string, signal?: AbortSignal, ifNoneMatch?: string): Promise<StoredObject | NotModifiedObject | null> {
@@ -273,8 +296,16 @@ export class SyncRuntime {
       JSON.stringify([this.settings.endpoint, this.settings.bucket, this.settings.region, this.settings.prefix, this.settings.pathStyle]),
       recovered ? key : undefined);
     if (header && key && !recovered) this.handle.engine.primeKey?.(header, key);
-    this.scheduler = new SyncScheduler(async (signal, reportActivity, onDiagnostics) => {
-      activity = reportActivity;
+    const scheduler = this.startScheduler();
+    this.publish("ready", scheduler.status());
+    scheduler.trigger("start");
+  }
+
+  private startScheduler(): SyncScheduler {
+    this.stalled = false;
+    const tracker = this.tracker;
+    const scheduler = new SyncScheduler(async (signal, reportActivity, onDiagnostics) => {
+      tracker.activity = reportActivity;
       const currentId = await this.deps.deviceId?.();
       const manual = this.manualDiscovery;
       this.manualDiscovery = false;
@@ -290,9 +321,9 @@ export class SyncRuntime {
         void this.writeSettings().catch(() => {});
       },
     });
-    this.scheduler.subscribe(() => this.publish("ready", this.scheduler!.status()));
-    this.publish("ready", this.scheduler.status());
-    this.scheduler.trigger("start");
+    scheduler.subscribe(() => this.publish("ready", scheduler.status()));
+    this.scheduler = scheduler;
+    return scheduler;
   }
 
   trigger(kind: "refresh" | "focus"): void { this.scheduler?.trigger(kind); }
@@ -300,10 +331,13 @@ export class SyncRuntime {
   private manualDiscovery = false;
 
   async syncNow(): Promise<void> {
+    if (this.stalled) this.startScheduler();
     if (!this.scheduler) return;
     this.manualDiscovery = true;
     await this.scheduler.syncNow();
-    if (this.manualDiscovery) await this.scheduler.syncNow();
+    // Disable or stop may have removed the scheduler while the round ran.
+    if (this.manualDiscovery) await this.scheduler?.syncNow();
+    if (!this.scheduler) this.manualDiscovery = false;
   }
 
   async configConflicts(): Promise<Array<{ id: string }>> {
@@ -325,6 +359,9 @@ export class SyncRuntime {
     await this.writeSettings(next);
     this.settings = next;
     const scheduler = this.scheduler;
+    this.stalled = false;
+    this.manualDiscovery = false;
+    this.lastDevices = [];
     const settled = (await scheduler?.stop()) ?? true;
     const handle = this.handle;
     if (settled) {
@@ -364,7 +401,7 @@ export class SyncRuntime {
 
   async devices(): Promise<Array<{ id: string; name: string; lastUpload?: string; current: boolean }>> {
     const currentId = await this.deps.deviceId?.();
-    return (this.snapshot.sync.report?.devices ?? []).map(({ id, name, lastUpload }) => ({
+    return this.lastDevices.map(({ id, name, lastUpload }) => ({
       id, name: this.settings.deviceNames[id] ?? name ?? id.slice(0, 8),
       lastUpload, current: id === currentId,
     }));
@@ -388,6 +425,7 @@ export class SyncRuntime {
     else handle?.unregister();
     this.scheduler = undefined;
     this.handle = undefined;
+    this.stalled = false;
     this.passphrase = undefined;
     this.rootKey?.fill(0);
     this.rootKey = undefined;

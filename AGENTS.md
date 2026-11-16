@@ -125,6 +125,7 @@ Assistant prompt, skill, orchestrator, provider, and chat-loop changes should ru
 - Sync settings live in `src/components/settings/sync.tsx`; `src/middlelayers/sync/runtime.ts` owns the in-memory passphrase and scheduler. Encrypted local configuration ID `991` holds S3 credentials and is never synced.
 - The app starts sync only after the user unlocks each session. A successful refresh schedules background sync; sync pulls use the existing soft refresh event. Keep delete/undo wired through `sync/delete-hook.ts`.
 - Conditional S3 writes depend on both HTTP 409 and 412 conflict handling. Never retry a conditional PUT without disambiguating the outcome, and keep encryption and naming HKDF contexts separate.
+- Sync state machines (scheduler, runtime mode, badge, config conflict) are documented in `docs/state-machines/sync.md` with their transition tables and the `data-mode`, `data-busy`, `data-sync-state` and `data-sync-retry` test attributes. Every sync surface derives its state from `syncBadge()` in `src/middlelayers/ui-state/sync-badge.ts`; do not derive it again in a component.
 
 ## Internationalization (i18n)
 
