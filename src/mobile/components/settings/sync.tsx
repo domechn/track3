@@ -14,6 +14,7 @@ import { SyncStatusCard, syncSkippedCount, syncSkippedLabel } from "@/components
 import { useSyncFeedback, waitForSyncResult } from "@/components/settings/use-sync-feedback";
 import { useTranslation } from "@/mobile/i18n";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
+import { syncBadge } from "@/middlelayers/ui-state/sync-badge";
 import { syncCategories as categories, syncFields as fields, invalidConfigurationFields, syncFormWithField, syncFormWithCategory, syncFormWithPathStyle, type SyncField as Field } from "@/middlelayers/ui-state/config-form";
 import {
   validateSyncSettings, type SyncConnectionResult, type SyncSettings,
@@ -42,14 +43,24 @@ export default function SyncSettingsPage() {
       setForm(syncRuntime.getSettings());
       awaitingSettings.current = false;
     }
-    if (status.mode === "ready" || status.mode === "locked") {
-      void syncRuntime.devices().then(setDevices).catch(() => setDevices([]));
-    }
   }, [status.mode]);
 
   useEffect(() => {
-    if (status.sync.report?.devices) void syncRuntime.devices().then(setDevices).catch(() => {});
-    if (status.mode === "ready") void syncRuntime.configConflicts().then(setConfigConflicts).catch(() => {});
+    if (status.mode !== "ready" && status.mode !== "locked") {
+      setDevices([]);
+      setConfigConflicts([]);
+      return;
+    }
+    let active = true;
+    void Promise.all([
+      syncRuntime.devices().catch(() => []),
+      status.mode === "ready" ? syncRuntime.configConflicts().catch(() => []) : Promise.resolve([]),
+    ]).then(([nextDevices, nextConflicts]) => {
+      if (!active) return;
+      setDevices(nextDevices);
+      setConfigConflicts(nextConflicts);
+    });
+    return () => { active = false; };
   }, [status.mode, status.sync.report]);
 
   useEffect(() => {
@@ -179,16 +190,16 @@ export default function SyncSettingsPage() {
   }
 
   const phone = isIOS();
+  const badge = syncBadge(status);
   return (
-    <div className={`sync-settings-page space-y-5 ${phone ? "ios-d3-sync-settings fidelity-b fidelity-b-sync" : ""}`} data-mode={status.mode}>
+    <div className={`sync-settings-page space-y-5 ${phone ? "ios-d3-sync-settings fidelity-b fidelity-b-sync" : ""}`} data-mode={status.mode} data-busy={busy ?? ""}>
       {phone && <><p className="fidelity-b-subtitle">{t("fidelity.b.sync.subtitle")}</p>
         <button type="button" className="fidelity-b-sync-status"
           onClick={() => document.querySelector<HTMLButtonElement>(".ios-d3-sync-indicator button")?.click()}>
-          <span className={status.mode === "locked" || status.sync.partial ? "is-warning" : status.sync.phase === "error" ? "is-error" : ""} />
-          {status.mode === "locked" ? t("fidelity.b.sync.locked")
-            : status.sync.retryStopped ? t("fidelity.b.sync.stopped")
-            : status.sync.phase === "error" ? t("fidelity.b.sync.failed")
-              : status.sync.phase === "syncing" ? `${t("fidelity.b.sync.syncing")}${status.sync.progress?.total
+          <span className={badge.state === "locked" || status.sync.partial ? "is-warning" : badge.state === "error" ? "is-error" : ""} />
+          {badge.state === "locked" ? t("fidelity.b.sync.locked")
+            : badge.state === "error" ? t(badge.retry === "stopped" ? "fidelity.b.sync.stopped" : "fidelity.b.sync.failed")
+              : badge.state === "syncing" ? `${t("fidelity.b.sync.syncing")}${status.sync.progress?.total
                 ? ` ${Math.floor(100 * Math.min(status.sync.progress.completed, status.sync.progress.total) / status.sync.progress.total)}%` : ""}`
                 : status.sync.lastSync ? t("fidelity.b.sync.syncedAt").replace("{time}",
                     new Date(status.sync.lastSync).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }))

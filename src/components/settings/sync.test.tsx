@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import SyncSettingsPage from "./sync";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { S3Error } from "@/middlelayers/sync/object-store";
@@ -324,6 +324,37 @@ describe("Sync settings page", () => {
     expect(syncRuntime.disable).toHaveBeenCalledTimes(1);
     finish();
     await waitFor(() => expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ description: "Sync disabled." })));
+  });
+
+  it("marks the page with the running action so a test can wait for it to finish", async () => {
+    status.mode = "ready";
+    let finish!: () => void;
+    vi.mocked(syncRuntime.disable).mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(true); }));
+    const { container } = render(<SyncSettingsPage />);
+    const page = container.querySelector(".sync-settings-page")!;
+    expect(page).toHaveAttribute("data-busy", "");
+    fireEvent.click(screen.getByRole("button", { name: "Disable sync" }));
+    expect(page).toHaveAttribute("data-busy", "disable");
+    finish();
+    await waitFor(() => expect(page).toHaveAttribute("data-busy", ""));
+  });
+
+  it("keeps the device rows when a round fails and its report is gone", async () => {
+    wide = true;
+    status.mode = "ready";
+    status.sync.report = { pulled: 0, pushed: 1 };
+    vi.mocked(syncRuntime.devices).mockResolvedValue([{ id: "local", name: "Laptop", current: true }]);
+    const view = render(<SyncSettingsPage />);
+    expect(await screen.findByText("Laptop")).toBeVisible();
+    const loads = vi.mocked(syncRuntime.devices).mock.calls.length;
+    status.sync.phase = "error";
+    status.sync.error = "network";
+    status.sync.report = undefined;
+    view.rerender(<SyncSettingsPage />);
+    await waitFor(() => expect(syncRuntime.devices).toHaveBeenCalledTimes(loads + 1));
+    await act(async () => {});
+    expect(screen.getByText("Laptop")).toBeVisible();
+    expect(screen.queryByText("No device has synced yet.")).not.toBeInTheDocument();
   });
 
   it("reports Sync now counts after the scheduler finishes", async () => {

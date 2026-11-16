@@ -5,6 +5,9 @@ import { SyncDetails } from "@/components/sync-details";
 import type { Locale } from "@/i18n";
 import type { RuntimeStatus } from "@/middlelayers/sync/runtime";
 import type { SyncStatus } from "@/middlelayers/sync/scheduler";
+import { syncBadge, syncSkippedCount } from "@/middlelayers/ui-state/sync-badge";
+
+export { syncSkippedCount };
 
 type Props = {
   status: RuntimeStatus;
@@ -13,12 +16,6 @@ type Props = {
   t: (key: string) => string;
   locale: Locale;
 };
-
-// Objects a finished round left behind: parked ones plus errors that did not stop the round.
-export function syncSkippedCount(sync: SyncStatus): number {
-  return sync.phase === "idle" && sync.partial && sync.report
-    ? (sync.report.skipped ?? 0) + sync.report.errors.length : 0;
-}
 
 export function syncSkippedLabel(count: number, t: (key: string) => string, prefix: "sync.status" | "sync.control" = "sync.status"): string {
   return t(`${prefix}.${count === 1 ? "partialOne" : "partial"}`).replace("{count}", count.toLocaleString());
@@ -43,9 +40,10 @@ export function SyncStatusCard({ status, busy, onSyncNow, t, locale }: Props) {
   const sync = status.sync;
   const skipped = syncSkippedCount(sync);
   const retryNote = syncRetryNote(sync, t);
-  const state = status.mode === "locked" ? t("sync.status.locked")
-    : sync.phase === "error" ? t("sync.status.error")
-      : sync.phase === "syncing" ? t("sync.status.syncing")
+  const badge = syncBadge(status);
+  const state = badge.state === "locked" ? t("sync.status.locked")
+    : badge.state === "error" ? t("sync.status.error")
+      : badge.state === "syncing" ? t("sync.status.syncing")
         : skipped ? syncSkippedLabel(skipped, t)
           : t("sync.status.connected");
 

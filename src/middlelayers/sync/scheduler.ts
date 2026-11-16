@@ -23,6 +23,8 @@ export type SyncStatus = {
 
 const RETRY_DELAYS_MS = [5_000, 30_000, 2 * 60_000, 10 * 60_000, 30 * 60_000];
 const HARD_ERRORS = ["header", "passphrase", "access", "configuration"];
+// Hard errors get no retry timer and ignore every trigger until Sync now or a settings change.
+export const isHardSyncError = (error?: string): boolean => HARD_ERRORS.includes(error ?? "");
 
 export class SyncScheduler {
   private controller?: AbortController;
