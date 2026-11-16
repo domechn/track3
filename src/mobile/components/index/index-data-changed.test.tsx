@@ -570,6 +570,133 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     await view.findByTestId("summary-range");
     expect(lastDataChangedVersion).toBe(1);
   });
+
+  describe("shell metadata after a data change", () => {
+    const reloads = () => vi.mocked(queryLastRefreshAt).mock.calls.length;
+    const forcedBackups = () => vi.mocked(autoBackupHistoricalData).mock.calls.filter(([forced]) => forced === true).length;
+    // The shell's own content area; other regions carry aria-busy too.
+    const booted = (view: ReturnType<typeof renderApp>) => waitFor(() => expect(
+      view.container.querySelector('div[aria-busy="false"][class~="min-h-[400px]"]')).not.toBeNull());
+
+    it("reloads when the soft refresh event fires on a page", async () => {
+      const view = renderApp();
+      await view.findByTestId("summary-range");
+      const before = reloads();
+      window.dispatchEvent(new Event(APP_SOFT_REFRESH_EVENT));
+      await waitFor(() => expect(reloads()).toBe(before + 1));
+    });
+
+    it("does not reload while Settings is open", async () => {
+      window.location.hash = "#/settings";
+      const view = renderApp();
+      await view.findByText("settings");
+      await booted(view);
+      const before = reloads();
+      const backups = forcedBackups();
+      window.dispatchEvent(new Event(APP_SOFT_REFRESH_EVENT));
+      await waitFor(() => expect(forcedBackups()).toBe(backups + 1));
+      expect(reloads()).toBe(before);
+    });
+
+    it("catches up once after leaving Settings when a change landed there", async () => {
+      window.location.hash = "#/settings";
+      const view = renderApp();
+      await view.findByText("settings");
+      await booted(view);
+      const before = reloads();
+      const backups = forcedBackups();
+      window.dispatchEvent(new Event(APP_SOFT_REFRESH_EVENT));
+      await waitFor(() => expect(forcedBackups()).toBe(backups + 1));
+
+      window.location.hash = "#/summary";
+      await view.findByTestId("summary-range");
+      await waitFor(() => expect(reloads()).toBe(before + 1));
+
+      window.location.hash = "#/settings";
+      await view.findByText("settings");
+      window.location.hash = "#/summary";
+      await view.findByTestId("summary-range");
+      expect(reloads()).toBe(before + 1);
+    });
+
+    it("does not reload on leaving Settings when nothing changed there", async () => {
+      window.location.hash = "#/settings";
+      const view = renderApp();
+      await view.findByText("settings");
+      await booted(view);
+      const before = reloads();
+      window.location.hash = "#/summary";
+      await view.findByTestId("summary-range");
+      expect(reloads()).toBe(before);
+    });
+
+    // History receives the selected range; Summary always shows the all-time range.
+    const historyRange = (view: ReturnType<typeof renderApp>) =>
+      view.queryByTestId("trigger-history-delete")?.getAttribute("data-range") ?? "";
+    const pullToRefresh = async (view: ReturnType<typeof renderApp>) => {
+      const area = view.getByTestId("pull-to-refresh");
+      fireEvent.touchStart(area, { touches: [{ clientX: 100, clientY: 20 }] });
+      fireEvent.touchEnd(area, { changedTouches: [{ clientX: 102, clientY: 110 }] });
+      expect(view.container.querySelector(".mobile-pull-indicator")).not.toBeNull();
+      await waitFor(() => expect(view.container.querySelector(".mobile-pull-indicator")).toBeNull());
+    };
+
+    it("fills a missing date range on pull to refresh", async () => {
+      window.location.hash = "#/history";
+      vi.mocked(getInitialQueryDateRange).mockResolvedValue({ dr: undefined, size: 1 } as never);
+      const view = renderApp();
+      await booted(view);
+      expect(historyRange(view)).not.toContain("2024-04-02");
+
+      vi.mocked(getInitialQueryDateRange).mockResolvedValue({
+        dr: { from: new Date("2024-04-02T00:00:00.000Z"), to: new Date("2024-04-03T00:00:00.000Z") }, size: 1,
+      });
+      await pullToRefresh(view);
+      await waitFor(() => expect(historyRange(view)).toBe("2024-04-02T00:00:00.000Z|2024-04-03T00:00:00.000Z"));
+    });
+
+    it("keeps a complete date range on pull to refresh", async () => {
+      window.location.hash = "#/history";
+      const view = renderApp();
+      await view.findByTestId("trigger-history-delete");
+      expect(historyRange(view)).toBe("2024-04-02T00:00:00.000Z|2024-04-03T00:00:00.000Z");
+      const before = reloads();
+      vi.mocked(getInitialQueryDateRange).mockResolvedValue({
+        dr: { from: new Date("2024-04-01T00:00:00.000Z"), to: new Date("2024-04-04T00:00:00.000Z") }, size: 1,
+      });
+      await pullToRefresh(view);
+      expect(reloads()).toBe(before + 1);
+      expect(historyRange(view)).toBe("2024-04-02T00:00:00.000Z|2024-04-03T00:00:00.000Z");
+    });
+  });
+
+  describe("boot state marker", () => {
+    const bootState = (view: ReturnType<typeof renderApp>) =>
+      view.container.querySelector("[data-boot-state]")?.getAttribute("data-boot-state");
+
+    it("goes from booting to ready when data exists", async () => {
+      const view = renderApp();
+      expect(bootState(view)).toBe("booting");
+      await waitFor(() => expect(bootState(view)).toBe("ready"));
+    });
+
+    it("is empty when there is no snapshot yet", async () => {
+      vi.mocked(queryLastRefreshAt).mockResolvedValue(undefined);
+      const view = renderApp();
+      await waitFor(() => expect(bootState(view)).toBe("empty"));
+    });
+
+    it("is failed when the startup reads reject", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.mocked(queryLastRefreshAt).mockRejectedValue(new Error("database is locked"));
+      try {
+        const view = renderApp();
+        await waitFor(() => expect(bootState(view)).toBe("failed"));
+      } finally {
+        warn.mockRestore();
+      }
+    });
+  });
 });
 
 describe("background auto backup observability", () => {

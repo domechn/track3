@@ -15,6 +15,11 @@ type Event =
   | { type: "error"; reason?: string }
   | { type: "off" };
 
+// The one list of Live total reasons: the parser, the log text and the details view all read it.
+export const LIVE_TOTAL_REASONS = ["rateLimited", "pricesMissing", "stockPricesMissing", "rateUnavailable",
+  "ibkrToken", "partialSource", "unknown"] as const;
+export type LiveTotalReason = typeof LIVE_TOTAL_REASONS[number];
+
 const sessionValues = new Map<string, number>();
 const sessionSuccessAt = new Map<string, number>();
 
@@ -31,8 +36,8 @@ export function safeLiveTotalError(error: unknown): string {
 }
 
 export function safeLiveTotalLogMessage(error: unknown): string {
-  const kind = safeLiveTotalError(error).split(":")[0];
-  const description: Record<string, string> = {
+  const kind = safeLiveTotalError(error).split(":")[0] as LiveTotalReason;
+  const description: Record<LiveTotalReason, string> = {
     rateLimited: "Price service rate limited",
     pricesMissing: "Coin prices missing",
     stockPricesMissing: "Stock prices missing",
@@ -70,13 +75,14 @@ export function liveTotalTransition(snapshot: Snapshot, event: Event): Snapshot 
   }
 }
 
-export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues = false, refreshToken }: {
+export function useLiveTotal({ key, load, enabled, live, intervalMs, timeoutMs = 30_000, hideValues = false, refreshToken }: {
   key: string;
   load: () => Promise<number | { value: number; stale?: boolean; partial?: boolean; reason?: string;
     missingSymbols?: LiveMissingSymbol[]; dustSymbols?: LiveMissingSymbol[]; missingShare?: number }>;
   enabled: boolean;
   live: boolean;
   intervalMs: number;
+  timeoutMs?: number;
   hideValues?: boolean;
   refreshToken?: number;
 }) {
@@ -110,6 +116,7 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
     let interval: number | undefined;
     let staleTimer: number | undefined;
     let retryTimer: number | undefined;
+    let watchdog: number | undefined;
     let failures = 0;
     let lastAt = 0;
     const refresh = async () => {
@@ -119,7 +126,11 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
       pending = true;
       dispatch({ type: "start" });
       try {
-        const result = await loadRef.current();
+        // A load that never answers must not hold `pending` forever: it fails like any other error.
+        const result = await new Promise<Awaited<ReturnType<typeof load>>>((resolve, reject) => {
+          watchdog = window.setTimeout(() => reject(new Error("Live total timed out")), timeoutMs);
+          loadRef.current().then(resolve, reject);
+        });
         if (!active) return;
         const value = typeof result === "number" ? result : result.value;
         const stale = typeof result === "number" ? false : result.stale;
@@ -150,6 +161,7 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
         const delay = [5_000, 15_000, 60_000][Math.min(failures++, 2)];
         retryTimer = window.setTimeout(refresh, delay);
       } finally {
+        window.clearTimeout(watchdog);
         pending = false;
       }
     };
@@ -158,6 +170,8 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
       if (interval !== undefined) window.clearInterval(interval);
       interval = undefined;
       if (!visible()) return;
+      // The stale timer does not fire in a hidden tab, so an old value is relabelled on return.
+      if (lastAt > 0 && Date.now() - lastAt > intervalMs * 2) dispatch({ type: "stale" });
       void refresh();
       if (live) interval = window.setInterval(() => {
         if (retryTimer === undefined) void refresh();
@@ -171,8 +185,9 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
       if (interval !== undefined) window.clearInterval(interval);
       if (staleTimer !== undefined) window.clearTimeout(staleTimer);
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      window.clearTimeout(watchdog);
     };
-  }, [key, enabled, live, intervalMs, refreshToken]);
+  }, [key, enabled, live, intervalMs, timeoutMs, refreshToken]);
 
   useEffect(() => {
     if (snapshot.value === undefined) return;

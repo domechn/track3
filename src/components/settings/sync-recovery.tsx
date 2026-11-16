@@ -101,8 +101,10 @@ export function SyncRecoveryUnlock({ t }: Props) {
     setBusy(true);
     setError("");
     try {
-      if (await syncRuntime.unlockRecoveryFile(file, passphrase) !== "ok") {
-        setError(t("sync.recovery.importFailed"));
+      const result = await syncRuntime.unlockRecoveryFile(file, passphrase);
+      if (result !== "ok") {
+        // Only a wrong file or passphrase is a mismatch; the other results name their own cause.
+        setError(t(result === "passphrase" ? "sync.recovery.importFailed" : `sync.connection.${result}`));
       } else {
         setFile(undefined);
         setPassphrase("");

@@ -331,3 +331,68 @@ it("can continue chatting while an earlier proposal awaits confirmation", async 
   expect(request.messages.filter((message) => message.tool_calls)).toHaveLength(0);
   expect(request.messages.some((message) => message.content?.includes("awaiting confirmation"))).toBe(true);
 });
+
+it("leaves the card approved and the chat idle when the follow-up reply is stopped", async () => {
+  let releaseFollowUp!: () => void;
+  const followUpGate = new Promise<void>((resolve) => { releaseFollowUp = resolve; });
+  vi.mocked(streamChatCompletion).mockImplementationOnce(async function* () {
+    yield { kind: "text", delta: "Blacklisted" } as StreamEvent;
+    await followUpGate;
+    yield { kind: "done" } as StreamEvent;
+  });
+  const initialMessages: ChatMessage[] = [{ role: "assistant", blocks: [pending] }];
+  const { result } = renderHook(() => useChat({ config, baseCurrency, sessionId: "s1", initialMessages }));
+  let decide!: Promise<void>;
+  act(() => { decide = result.current.decideAction("action-1", "approve"); });
+  await waitFor(() => expect(streamChatCompletion).toHaveBeenCalledOnce());
+  expect(result.current.isStreaming).toBe(true);
+  act(() => result.current.stop());
+  expect(result.current.isStreaming).toBe(false);
+  await act(async () => { releaseFollowUp(); await decide; });
+  expect(result.current.isStreaming).toBe(false);
+  expect((result.current.messages[0] as Extract<ChatMessage, { role: "assistant" }>).blocks[0]).toMatchObject({ status: "approved" });
+});
+
+it("keeps a question sent after Stop while an approved action is still executing", async () => {
+  const stored: ChatMessage[][] = [];
+  const onStreamComplete = vi.fn(async (messages: ChatMessage[]) => {
+    // Same selection as the chat page: only the last exchange is written.
+    const last = messages[messages.length - 1];
+    const before = messages[messages.length - 2];
+    stored.push(before?.role === "user" ? [before, last] : [last]);
+  });
+  let finishExecute!: (value: string) => void;
+  vi.mocked(executePreparedAction).mockReturnValue(new Promise((resolve) => { finishExecute = resolve; }));
+  const initialMessages: ChatMessage[] = [{ role: "assistant", blocks: [pending] }];
+  const { result } = renderHook(() => useChat({ config, baseCurrency, sessionId: "s1", onStreamComplete, initialMessages }));
+  let decide!: Promise<void>;
+  act(() => { decide = result.current.decideAction("action-1", "approve"); });
+  await waitFor(() => expect(executePreparedAction).toHaveBeenCalledOnce());
+  expect(result.current.isStreaming).toBe(true);
+
+  act(() => result.current.stop());
+  expect(result.current.isStreaming).toBe(false);
+
+  let releaseSend!: () => void;
+  const sendGate = new Promise<void>((resolve) => { releaseSend = resolve; });
+  vi.mocked(streamChatCompletion).mockImplementationOnce(async function* () {
+    yield { kind: "text", delta: "Second answer" } as StreamEvent;
+    await sendGate;
+    yield { kind: "done" } as StreamEvent;
+  });
+  let send!: Promise<void>;
+  act(() => { send = result.current.send("Second question"); });
+  await waitFor(() => expect(streamChatCompletion).toHaveBeenCalledOnce());
+
+  // The action cannot be cancelled once it runs: it finishes and marks its card.
+  await act(async () => { finishExecute("Done"); await decide; });
+  expect((result.current.messages[0] as Extract<ChatMessage, { role: "assistant" }>).blocks[0]).toMatchObject({ status: "approved" });
+  expect(result.current.isStreaming).toBe(true);
+  expect(streamChatCompletion).toHaveBeenCalledOnce();
+
+  await act(async () => { releaseSend(); await send; });
+  expect(result.current.isStreaming).toBe(false);
+  expect(result.current.messages.map((message) => message.role)).toEqual(["assistant", "user", "assistant"]);
+  expect(stored).toHaveLength(1);
+  expect(stored[0][0]).toEqual({ role: "user", content: "Second question" });
+});

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { LiveMissingSymbol } from "@/middlelayers/charts-refresh";
+import { LIVE_TOTAL_REASONS } from "./use-live-total";
 
 export function LiveTotalDetails({ error, lastAt, retryNow, t, missingSymbols, dustSymbols, missingShare }: {
   error?: string;
@@ -12,8 +13,7 @@ export function LiveTotalDetails({ error, lastAt, retryNow, t, missingSymbols, d
 }) {
   const [expanded, setExpanded] = useState(false);
   const [kind, count] = (error ?? "unknown").split(":");
-  const safeKind = ["rateLimited", "pricesMissing", "stockPricesMissing", "rateUnavailable", "ibkrToken", "partialSource"]
-    .includes(kind) && (kind !== "pricesMissing" || /^[1-9]\d*$/.test(count ?? "")) ? kind : "unknown";
+  const safeKind = (LIVE_TOTAL_REASONS as readonly string[]).includes(kind) && (kind !== "pricesMissing" || /^[1-9]\d*$/.test(count ?? "")) ? kind : "unknown";
   const showMissing = safeKind === "pricesMissing" && missingSymbols && missingSymbols.length > 0;
   const moreCount = Math.max(0, (missingSymbols?.length ?? 0) - 5);
   const showToggle = showMissing && (moreCount > 0 || (dustSymbols?.length ?? 0) > 0);

@@ -2,10 +2,17 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import RealtimeTotalValue from "./realtime-total-value";
 import { MobileHeaderTotal } from "@/mobile/components/mobile/header-total";
-import { useLiveTotal, type LiveTotalState } from "./use-live-total";
+import { LIVE_TOTAL_REASONS, safeLiveTotalError, useLiveTotal, type LiveTotalState } from "./use-live-total";
+import { LiveTotalDetails } from "./live-total-details";
 import { queryLatestAssets } from "@/middlelayers/charts";
+import desktopEn from "@/i18n/locales/en.json";
+import desktopZh from "@/i18n/locales/zh.json";
+import mobileEn from "@/mobile/en.json";
+import mobileZh from "@/mobile/zh.json";
 
-vi.mock("./use-live-total", () => ({ useLiveTotal: vi.fn() }));
+vi.mock("./use-live-total", async (original) => ({
+  ...await original<typeof import("./use-live-total")>(), useLiveTotal: vi.fn(),
+}));
 vi.mock("@/middlelayers/charts", () => ({
   queryLatestAssets: vi.fn().mockResolvedValue([]),
   queryRealTimeAssetsValue: vi.fn(),
@@ -156,4 +163,27 @@ it("shows a safe error reason, last success time and retry on both popovers", ()
   expect(screen.getByText("IBKR token expired")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Retry now" }));
   expect(retryNow).toHaveBeenCalledTimes(2);
+});
+
+it("uses one reason list for the parser, the details text and every catalog", () => {
+  expect(LIVE_TOTAL_REASONS).toEqual(["rateLimited", "pricesMissing", "stockPricesMissing", "rateUnavailable",
+    "ibkrToken", "partialSource", "unknown"]);
+  for (const reason of LIVE_TOTAL_REASONS) {
+    const encoded = reason === "pricesMissing" ? "pricesMissing:2" : reason;
+    expect(safeLiveTotalError(new Error(encoded))).toBe(encoded);
+    for (const catalog of [desktopEn, desktopZh, mobileEn, mobileZh]) {
+      expect(catalog).toHaveProperty([`realtime.error.${reason}`]);
+    }
+    const view = render(<LiveTotalDetails error={encoded} retryNow={() => {}} t={(key) => key} />);
+    expect(screen.getByText(`realtime.error.${reason}`)).toBeVisible();
+    view.unmount();
+  }
+});
+
+it("falls back to the unknown text for a reason outside the list or a missing-price count that is not positive", () => {
+  for (const error of ["somethingElse", "pricesMissing", "pricesMissing:0", undefined]) {
+    const view = render(<LiveTotalDetails error={error} retryNow={() => {}} t={(key) => key} />);
+    expect(screen.getByText("realtime.error.unknown")).toBeVisible();
+    view.unmount();
+  }
 });

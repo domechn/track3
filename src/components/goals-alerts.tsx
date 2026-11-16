@@ -79,6 +79,7 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [manualOpen, setManualOpen] = useState(true);
   const manualInitialized = useRef(false);
+  const savingRef = useRef(false);
   const newRuleButton = useRef<HTMLButtonElement>(null);
   const editorTrigger = useRef<HTMLButtonElement | null>(null);
   const rulePaging = useAttributionPage(rules, rules.map((rule) => rule.id).join(","), 20);
@@ -124,10 +125,13 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
   }, []);
 
   function toRule(): AlertRule {
-    return alertRuleFromDraft(draft);
+    // The draft has no enabled field: an edit keeps the rule's switch as it is.
+    return { ...alertRuleFromDraft(draft), enabled: rules.find((rule) => rule.id === draft.id)?.enabled ?? true };
   }
 
   async function save() {
+    if (savingRef.current) return;
+    savingRef.current = true;
     try {
       await saveAlertRule(toRule());
       setDraft(emptyDraft);
@@ -144,6 +148,8 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
             : cause.message === "Invalid asset" ? "symbol" : null : null);
       setStatus(cause instanceof Error && cause.message.startsWith("Invalid")
         ? t("goals.validation") : t("goals.saveError"));
+    } finally {
+      savingRef.current = false;
     }
   }
 

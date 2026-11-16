@@ -5,7 +5,7 @@ import { queryLastAssetsBySymbol } from "@/middlelayers/charts-assets";
 import type { PendingAction } from "@/middlelayers/ai/actions/lifecycle";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
 import { useTranslation } from "@/mobile/i18n";
-import ActionCard, { actionFieldKeys } from "@/components/assistant/action-card";
+import ActionCard, { actionFieldKeys, actionHeader, displayStatus } from "@/components/assistant/action-card";
 
 const usd = (value: number, fractionDigits = 2) => new Intl.NumberFormat("en-US", {
   style: "currency", currency: "USD", minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits,
@@ -45,16 +45,18 @@ export default function PhoneActionCard({ action, onDecide, canDecide = true }: 
     action.args.comparator !== "gte" || !symbol || !Number.isFinite(threshold) || threshold <= 0) {
     return <ActionCard action={action} onDecide={onDecide} canDecide={canDecide} />;
   }
-  const pending = action.status === "pending" && !expired;
-  const approved = action.status === "approved";
+  const status = displayStatus(action, expired);
+  const pending = status === "pending";
+  const approved = status === "approved";
+  const header = actionHeader(status, action.name);
   const currentPrice = price === undefined ? undefined : usd(price);
   const metadata = Object.entries(action.args).filter(([field]) => ["assetType", "enabled"].includes(field));
-  return <section aria-label={t("assistant.action.confirmation")} className={`fidelity-action-card${approved ? " is-approved" : ""}`}>
+  return <section aria-label={t("assistant.action.confirmation")} data-state={status} className={`fidelity-action-card${approved ? " is-approved" : ""}`}>
     <div className="fidelity-action-head">
       {approved ? <CheckIcon aria-hidden="true" /> : <BellIcon aria-hidden="true" />}
-      <span>{t(approved ? "fidelity.assistant.alertCreated" : "fidelity.assistant.approvalNeeded")}</span>
-      <span className={`fidelity-action-status${approved ? " is-approved" : ""}`}>
-        {t(approved ? "fidelity.assistant.approved" : pending ? "fidelity.assistant.waiting" : "assistant.action.status.expired")}
+      <span>{t(header.title)}</span>
+      <span className={`fidelity-action-status${header.tone === "waiting" ? "" : ` is-${header.tone}`}`}>
+        {t(approved ? "fidelity.assistant.approved" : header.badge)}
       </span>
     </div>
     <h3>{t("fidelity.assistant.createAlert").replace("{symbol}", symbol).replace("{threshold}", usd(threshold, Number.isInteger(threshold) ? 0 : 2))}</h3>
@@ -91,6 +93,7 @@ export default function PhoneActionCard({ action, onDecide, canDecide = true }: 
       </button>
     </div> : approved ? <Link to="/goals" className="fidelity-action-open">
       {t("fidelity.assistant.openGoals")} <ChevronRightIcon aria-hidden="true" />
-    </Link> : <p role="status">{t(`assistant.action.status.${action.status}`)}</p>}
+    </Link> : <p role="status">{t(header.badge)}{status === "failed" && action.result
+      ? `: ${action.result.startsWith("assistant.action.") ? t(action.result, action.result) : action.result}` : ""}</p>}
   </section>;
 }

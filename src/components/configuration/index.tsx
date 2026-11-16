@@ -122,7 +122,9 @@ const App = ({
   const [hideInactive, setHideInactive] = useState(false);
   const [querySize, setQuerySize] = useState(0);
   const [formChanged, setFormChanged] = useState(false);
-  const [configurationLoading, setConfigurationLoading] = useState(true);
+  // Autosave is allowed only in "ready": a form that never loaded holds empty lists, not the stored sources.
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "failed">("loading");
+  const [loadFailure, setLoadFailure] = useState("");
   const [preferCurrency, setPreferCurrency] = useState(
     warmStartPreferCurrency || defaultBaseCurrency,
   );
@@ -156,6 +158,8 @@ const App = ({
     { symbol: string; amount: number; assetType?: "crypto" | "stock" }[]
   >([]);
   const [quickLookTitle, setQuickLookTitle] = useState("");
+  // Identifies the quick look on screen; an answer to any earlier request is dropped.
+  const quickLookRequest = useRef(0);
 
   const [addExchangeConfig, setAddExchangeConfig] = useState<
     ExchangeDraft | undefined
@@ -331,6 +335,7 @@ const App = ({
   }
 
   function loadConfiguration() {
+    setLoadState("loading");
     queryQuerySize().then((s) => setQuerySize(s));
 
     const shouldSkipPreferCurrencyQuery =
@@ -365,10 +370,11 @@ const App = ({
         setStockBrokers(form.stockBrokers);
         setWallets(form.wallets);
         setOthers(form.others);
-        setConfigurationLoading(false);
+        setLoadState("ready");
       })
       .catch((e) => {
-        setConfigurationLoading(false);
+        setLoadFailure(safeError(e));
+        setLoadState("failed");
         toast({
           description: t("config.getConfigFailed") + safeError(e),
           variant: "destructive",
@@ -392,6 +398,7 @@ const App = ({
   }
 
   function submitConfiguration() {
+    if (loadState !== "ready") return;
     const globalConfig = configurationFromForm({ exchanges, stockBrokers, wallets, groupUSD, hideInactive, others });
     const rename = pendingRename.current;
     pendingRename.current = undefined;
@@ -477,6 +484,7 @@ const App = ({
     setQuickLookData([]);
     setQuickLookLoading(true);
     setQuickLookOpen(true);
+    const request = ++quickLookRequest.current;
 
     try {
       const ana = new CexAnalyzer({
@@ -494,6 +502,7 @@ const App = ({
       });
 
       const coins = await ana.loadPortfolio();
+      if (request !== quickLookRequest.current) return;
       const filtered = coins
         .filter((c) => c.amount > 0)
         .sort((a, b) => b.amount - a.amount)
@@ -504,13 +513,14 @@ const App = ({
         }));
       setQuickLookData(filtered);
     } catch (e: any) {
+      if (request !== quickLookRequest.current) return;
       toast({
         description: t("config.failedFetchBalances") + safeError(e),
         variant: "destructive",
       });
       setQuickLookOpen(false);
     } finally {
-      setQuickLookLoading(false);
+      if (request === quickLookRequest.current) setQuickLookLoading(false);
     }
   }
 
@@ -519,6 +529,7 @@ const App = ({
     setQuickLookData([]);
     setQuickLookLoading(true);
     setQuickLookOpen(true);
+    const request = ++quickLookRequest.current;
 
     try {
       const initPayload = { addresses: [wallet.address] };
@@ -554,12 +565,14 @@ const App = ({
       if (!ana) throw new Error("Unsupported wallet type");
 
       const coins = await ana.loadPortfolio();
+      if (request !== quickLookRequest.current) return;
       const filtered = coins
         .filter((c) => c.amount > 0)
         .sort((a, b) => b.amount - a.amount)
         .map((c) => ({ symbol: c.symbol, amount: c.amount }));
       setQuickLookData(filtered);
     } catch (e: any) {
+      if (request !== quickLookRequest.current) return;
       toast({
         description: classifySourceError(e) === "quota"
           ? t("refresh.reason.quota") : t("config.failedFetchBalances") + safeError(e),
@@ -568,7 +581,7 @@ const App = ({
       setQuickLookOpen(false);
     } finally {
       if (wallet.type === "erc20" || wallet.type === "trc20") await invalidateUsageCache();
-      setQuickLookLoading(false);
+      if (request === quickLookRequest.current) setQuickLookLoading(false);
     }
   }
 
@@ -577,6 +590,7 @@ const App = ({
     setQuickLookData([]);
     setQuickLookLoading(true);
     setQuickLookOpen(true);
+    const request = ++quickLookRequest.current;
 
     try {
       const ana = new StockAnalyzer({
@@ -596,19 +610,21 @@ const App = ({
       });
 
       const coins = await ana.loadPortfolio();
+      if (request !== quickLookRequest.current) return;
       const filtered = coins
         .filter((c) => c.amount > 0)
         .sort((a, b) => b.amount - a.amount)
         .map((c) => ({ symbol: c.symbol, amount: c.amount }));
       setQuickLookData(filtered);
     } catch (e: any) {
+      if (request !== quickLookRequest.current) return;
       toast({
         description: t("config.failedFetchPositions") + safeError(e),
         variant: "destructive",
       });
       setQuickLookOpen(false);
     } finally {
-      setQuickLookLoading(false);
+      if (request === quickLookRequest.current) setQuickLookLoading(false);
     }
   }
 
@@ -706,7 +722,7 @@ const App = ({
 
   // ---- Exchange handlers ----
   function handleExchangeChange(val: ExchangeDraft) {
-    setExchanges([...exchanges, val]);
+    setExchanges((current) => [...current, val]);
     markFormChanged();
   }
 
@@ -809,7 +825,7 @@ const App = ({
 
   // ---- StockBroker handlers ----
   function handleAddStockBroker(val: StockBrokerDraft) {
-    setStockBrokers([...stockBrokers, val]);
+    setStockBrokers((current) => [...current, val]);
     markFormChanged();
   }
 
@@ -896,7 +912,7 @@ const App = ({
 
   // ---- Wallet handlers ----
   function handleAddWallet(val: WalletDraft) {
-    setWallets([...wallets, val]);
+    setWallets((current) => [...current, val]);
     markFormChanged();
   }
 
@@ -1112,6 +1128,7 @@ const App = ({
   function handleQuickLookOpenChange(open: boolean) {
     setQuickLookOpen(open);
     if (!open) {
+      quickLookRequest.current += 1;
       setQuickLookData([]);
         setQuickLookTitle("");
     }
@@ -1137,8 +1154,27 @@ const App = ({
   // ==========================================================================
   // Render
   // ==========================================================================
+  const heading = (
+    <div>
+      <h3 className="text-lg font-medium tracking-tight">{t(section === "currency" ? "settings.phase6.currency" : "settings.phase6.sources")}</h3>
+      <p className="text-sm text-muted-foreground">{t("config.subtitle")}</p>
+    </div>
+  );
+  if (loadState === "failed") return (
+    <div className="space-y-6" data-state={loadState}>
+      {heading}
+      <div role="alert" className="t3-desktop-error-card">
+        <div className="t3-desktop-error-details">
+          <span>{t("config.getConfigFailed") + loadFailure}</span>
+        </div>
+        <div className="t3-desktop-error-actions">
+          <button type="button" onClick={loadConfiguration}>{t("startup.load.error.retry")}</button>
+        </div>
+      </div>
+    </div>
+  );
   return (
-    <div className="space-y-6" data-save-state={persist}>
+    <div className="space-y-6" data-state={loadState} data-save-state={persist}>
       <QuickLookDialog
         open={quickLookOpen}
         onOpenChange={handleQuickLookOpenChange}
@@ -1156,10 +1192,7 @@ const App = ({
         onSelect={handleAttachSelect}
       />
 
-      <div>
-        <h3 className="text-lg font-medium tracking-tight">{t(section === "currency" ? "settings.phase6.currency" : "settings.phase6.sources")}</h3>
-        <p className="text-sm text-muted-foreground">{t("config.subtitle")}</p>
-      </div>
+      {heading}
 
       {section === "currency" && <div className="t3-settings-legacy-currency"><GeneralSettings
         groupUSD={groupUSD}
@@ -1298,7 +1331,7 @@ const App = ({
         getAttachDisplayLabel={getAttachDisplayLabel}
       />}
       {section === "sources" && <SourceDesign
-        loading={configurationLoading}
+        loading={loadState !== "ready"}
         tab={sourceTab}
         setTab={setSourceTab}
         exchanges={exchanges}

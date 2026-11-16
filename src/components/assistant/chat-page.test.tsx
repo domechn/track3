@@ -7,11 +7,11 @@ import type { ChatSessionMeta } from "@/middlelayers/ai";
 
 // sendSpy is referenced from inside the hoisted vi.mock below; we declare
 // it via vi.hoisted so the factory closure can pick it up.
-const { sendSpy, inputSpy, chatOptions, chatStats, titleSpy, createNewSpy, removeSpy, refreshSpy, sessionList, useActualChat, liveChat } = vi.hoisted(() => ({
+const { sendSpy, inputSpy, chatOptions, chatStats, titleSpy, createNewSpy, removeSpy, refreshSpy, sessionList, useActualChat, liveChat, chatMessages } = vi.hoisted(() => ({
   sendSpy: vi.fn(),
   inputSpy: vi.fn(),
   chatOptions: { current: null as any },
-  chatStats: { contextTokens: 0, promptTokens: 0, completionTokens: 0 },
+  chatStats: { contextTokens: 0, promptTokens: 0, completionTokens: 0, streaming: false },
   titleSpy: vi.fn(),
   createNewSpy: vi.fn(),
   removeSpy: vi.fn(),
@@ -19,6 +19,7 @@ const { sendSpy, inputSpy, chatOptions, chatStats, titleSpy, createNewSpy, remov
   sessionList: { current: [] as any[] },
   useActualChat: { current: false },
   liveChat: { current: null as any },
+  chatMessages: { current: [] as any[] },
 }));
 
 vi.mock("./use-chat", async () => {
@@ -31,12 +32,12 @@ vi.mock("./use-chat", async () => {
       return liveChat.current;
     }
     return ({
-    messages: [],
+    messages: chatMessages.current,
     contextTokens: chatStats.contextTokens,
     sessionUsage: { promptTokens: chatStats.promptTokens, completionTokens: chatStats.completionTokens, source: "reported" },
     input: "",
     setInput: inputSpy,
-    isStreaming: false,
+    isStreaming: chatStats.streaming,
     send: sendSpy,
     stop: vi.fn(),
     runQuickAction: vi.fn().mockResolvedValue(undefined),
@@ -48,6 +49,13 @@ vi.mock("./use-chat", async () => {
 });
 
 vi.mock("@/middlelayers/ai/orchestrator/llm", () => ({ callLlm: vi.fn() }));
+
+// Passes through to the real thread and records the props the page gives it.
+const threadProps = vi.hoisted(() => ({ current: null as any }));
+vi.mock("./chat-thread", async () => {
+  const actual = await vi.importActual<typeof import("./chat-thread")>("./chat-thread");
+  return { default: (props: any) => { threadProps.current = props; return <actual.default {...props} />; } };
+});
 
 vi.mock("./use-chat-sessions", () => ({
   useChatSessions: () => ({
@@ -132,9 +140,11 @@ beforeEach(() => {
   chatOptions.current = null;
   useActualChat.current = false;
   liveChat.current = null;
+  chatMessages.current = [];
   chatStats.contextTokens = 0;
   chatStats.promptTokens = 0;
   chatStats.completionTokens = 0;
+  chatStats.streaming = false;
   sendSpy.mockReset();
   inputSpy.mockReset();
   sessionStorage.clear();
@@ -703,5 +713,136 @@ describe("ChatPage", () => {
     expect(screen.queryByTestId("chat-send")).toBeNull();
     finishLoad(null);
     expect(await screen.findByTestId("chat-send")).toBeTruthy();
+  });
+
+  describe("session-scoped errors and phases", () => {
+    const savedSessions = ["session-a", "session-b"].map((id) => ({
+      id, title: id, createdAt: "", updatedAt: "", pinned: 0, messageCount: 2, preview: "",
+    }));
+    const ready = async (path: string) => {
+      vi.mocked(loadAIConfig).mockResolvedValue(config);
+      vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+      sessionList.current = savedSessions;
+      renderAt(path, true);
+      await screen.findByTestId("chat-thread");
+    };
+    const selectSession = async (id: string) => {
+      if (!screen.queryByTestId(`session-select-${id}`)) await userEvent.click(screen.getByTestId("sidebar-toggle"));
+      await userEvent.click(screen.getByTestId(`session-select-${id}`));
+      await waitFor(() => expect(chatOptions.current.sessionId).toBe(id));
+    };
+
+    it("drops a persistence failure when another chat is selected", async () => {
+      vi.mocked(appendMessages).mockRejectedValueOnce(new Error("disk full"));
+      await ready("/assistant/session-a");
+      await act(async () => {
+        await chatOptions.current.onStreamComplete([
+          { role: "user", content: "Question" },
+          { role: "assistant", blocks: [{ kind: "text", text: "Answer" }] },
+        ]);
+      });
+      expect(await screen.findByRole("alert")).toHaveTextContent("disk full");
+      expect(threadProps.current.canDecideAction).toBe(false);
+      await selectSession("session-b");
+      await screen.findByTestId("chat-thread");
+      await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+      expect(threadProps.current.canDecideAction).toBe(true);
+    });
+
+    it("drops a delete failure when another chat is selected", async () => {
+      removeSpy.mockRejectedValueOnce(new Error("permission denied"));
+      await ready("/assistant/session-a");
+      if (!screen.queryByTestId("session-delete-session-a")) await userEvent.click(screen.getByTestId("sidebar-toggle"));
+      await userEvent.click(screen.getByTestId("session-delete-session-a"));
+      await userEvent.click(screen.getByRole("button", { name: "Delete" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("permission denied");
+      await selectSession("session-b");
+      await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    });
+
+    it("drops the previous chat's timestamps when returning to a blank chat", async () => {
+      vi.mocked(loadSession).mockResolvedValue({
+        id: "session-a", title: "A", createdAt: "", updatedAt: "", pinned: 0, messageCount: 2, preview: "",
+        messages: [
+          { role: "user", content: "Question A", at: "2020-01-01T10:00:00.000Z" },
+          { role: "assistant", blocks: [{ kind: "text", text: "Answer A" }], at: "2020-01-01T10:00:05.000Z" },
+        ],
+      });
+      await ready("/assistant/session-a");
+      await waitFor(() => expect(threadProps.current.messageTimes).toEqual(["2020-01-01T10:00:00.000Z", "2020-01-01T10:00:05.000Z"]));
+      await userEvent.click(screen.getByRole("link", { name: "Assistant route" }));
+      await waitFor(() => expect(chatOptions.current.sessionId).toBeNull());
+      await waitFor(() => expect(threadProps.current.messageTimes).toEqual([]));
+    });
+
+    it("exposes the session phase on the layout", async () => {
+      let finishLoad!: (session: null) => void;
+      vi.mocked(loadSession).mockImplementationOnce(() => new Promise((resolve) => { finishLoad = resolve; }));
+      vi.mocked(loadAIConfig).mockResolvedValue(config);
+      vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+      renderAt("/assistant/session-a", true);
+      const layout = await screen.findByTestId("chat-session-layout");
+      expect(layout).toHaveAttribute("data-state", "loading");
+      await act(async () => { finishLoad(null); });
+      await waitFor(() => expect(layout).toHaveAttribute("data-state", "ready"));
+      await userEvent.click(screen.getByRole("link", { name: "Assistant route" }));
+      await waitFor(() => expect(screen.getByTestId("chat-session-layout")).toHaveAttribute("data-state", "blank"));
+    });
+
+    it("exposes a session load failure on the layout", async () => {
+      vi.mocked(loadAIConfig).mockResolvedValue(config);
+      vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+      vi.mocked(loadSession).mockRejectedValueOnce(new Error("decrypt failed"));
+      renderAt("/assistant/session-a", true);
+      await screen.findByRole("alert");
+      expect(screen.getByTestId("chat-session-layout")).toHaveAttribute("data-state", "load-error");
+    });
+
+    it("gives the page loading card a stable test id", async () => {
+      vi.mocked(loadAIConfig).mockReturnValue(new Promise(() => {}));
+      vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+      renderAt("/assistant", true);
+      expect(await screen.findByTestId("assistant-loading")).toBeInTheDocument();
+    });
+  });
+
+  describe("request failure in the header", () => {
+    const question = { role: "user", content: "Question" };
+    const failedReply = { role: "assistant", blocks: [{ kind: "text", text: "\n\n[error] Request failed with status 500: boom" }] };
+    const goodReply = { role: "assistant", blocks: [{ kind: "text", text: "Answer" }] };
+    const headerFor = async (messages: unknown[]) => {
+      chatMessages.current = messages;
+      vi.mocked(loadAIConfig).mockResolvedValue(config);
+      vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+      renderAt("/assistant", true);
+      return (await screen.findByTestId("chat-card")).querySelector(".t3-assistant-thread-meta") as HTMLElement;
+    };
+
+    it("labels the chat as failed when the last reply failed", async () => {
+      expect(await headerFor([question, failedReply])).toHaveTextContent("Request failed");
+    });
+
+    it("does not label the chat as failed after a later reply succeeded", async () => {
+      const storedFailure = { role: "assistant", blocks: [{ kind: "text", text: "[error] HTTP 429, retry after 20 s" }] };
+      expect(await headerFor([question, storedFailure, question, goodReply])).not.toHaveTextContent("Request failed");
+    });
+  });
+
+  describe("chat card phase", () => {
+    const cardState = async (streaming: boolean) => {
+      chatStats.streaming = streaming;
+      vi.mocked(loadAIConfig).mockResolvedValue(config);
+      vi.mocked(queryPreferCurrency).mockResolvedValue(baseCurrency);
+      renderAt("/assistant", true);
+      return (await screen.findByTestId("chat-card")).getAttribute("data-state");
+    };
+
+    it("is idle between turns", async () => {
+      expect(await cardState(false)).toBe("idle");
+    });
+
+    it("is streaming while a turn is in flight", async () => {
+      expect(await cardState(true)).toBe("streaming");
+    });
   });
 });

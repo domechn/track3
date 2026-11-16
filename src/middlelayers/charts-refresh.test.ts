@@ -282,6 +282,39 @@ describe("live partial prices", () => {
     expect(live.partial).toBe(true);
   });
 
+  it("reports the missing coin count when the quote call fails for a crypto holding", async () => {
+    const saved = [
+      { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "crypto", wallet: md5("wallet-a"), symbol: "ETH", amount: 2, price: 100, value: 200 },
+      { id: 2, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "stock", wallet: md5("ibkr:one"), symbol: "USD", amount: 6, price: 1, value: 6 },
+    ];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([saved] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([saved] as never);
+    vi.mocked(queryCoinPrices).mockRejectedValue(new Error("coin prices unavailable"));
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.partial).toBe(true);
+    expect(live.reason).toBe("pricesMissing");
+    expect(live.missingCount).toBe(1);
+  });
+
+  it("keeps a fully priced stock total complete when the unused coin quote call fails", async () => {
+    const saved = { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+      assetType: "stock", wallet: md5("ibkr:one"), symbol: "USD", amount: 6, price: 1, value: 6 };
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[saved]] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([[saved]] as never);
+    vi.mocked(queryCoinPrices).mockRejectedValue(new Error("coin prices unavailable"));
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "USD", value: 6 }));
+    expect(live.partial).toBe(false);
+    expect(live.reason).toBeUndefined();
+    expect(live.missingCount).toBe(0);
+  });
+
   it("shows missing PLUME and KAT without adding a zero or invented quote", async () => {
     domSnapshot();
     const live = await queryRealTimeAssetsValue();

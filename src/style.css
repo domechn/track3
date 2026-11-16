@@ -2020,6 +2020,7 @@ body:has(.desktop-toast-viewport):not(:has(.desktop-toast-viewport > li[data-sta
   .t3-assistant-action-head > span:last-child { padding: 2px 8px; border-radius: 999px; font-size: 12px; line-height: 16px; }
   .t3-assistant-action-head .waiting { background: hsl(var(--warning) / .16); color: hsl(var(--warning)); }
   .t3-assistant-action-head .approved { background: hsl(var(--positive) / .14); color: hsl(var(--positive)); }
+  .t3-assistant-action-head .settled { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
   .t3-assistant-action-design h3 { margin: 10px 0 12px; font-size: 16px; line-height: 22px; font-weight: 600; }
   .t3-assistant-action-design > p { margin: 0; color: hsl(var(--faint)); font-size: 12px; }
   .t3-assistant-action-design dl { margin: 0; }
@@ -3192,6 +3193,9 @@ body:not(:has(.app-layout)):has(.t3-refresh-overview) .t3-fidelity-ranges { disp
 body:not(:has(.app-layout)) .t3-date-main { display: contents; }
 body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has(.app-layout)) .t3-date-fields, body:not(:has(.app-layout)) .t3-date-fidelity-footer { display: none; }
 @media (min-width: 1400px) {
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-topbar-sync-button[data-sync-state="ready"] {
+    width: 87px; padding-inline: 2px; gap: 2px; font-size: 11px;
+  }
   body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-date-popover {
     width: 560px; max-width: 560px; min-height: 427px;
     margin-top: 4px; transform: translateX(108px);

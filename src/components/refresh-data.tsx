@@ -10,7 +10,7 @@ import { trackRefreshEvent } from "@/middlelayers/ui-state/telemetry";
 import { retries, retryInterval, readStoredStatuses, writeStoredStatuses, retryRefresh, desktopRefreshOptions } from "@/middlelayers/ui-state/source-status-store";
 import { bindRefreshRetry, refreshRetryScheduler } from "@/middlelayers/refresh-retry-scheduler";
 import { useToast } from "@/components/ui/use-toast";
-import { overviewRefreshActivityEvent, overviewRefreshRequestedEvent, overviewUseLastKnownEvent, publishSourceStatuses } from "./source-status-event";
+import { overviewRefreshActivityEvent, overviewRefreshRequestedEvent, overviewUseLastKnownEvent, publishSourceStatuses, sourceStatusesChangedEvent } from "./source-status-event";
 import { Button } from "./ui/button";
 import { ToastAction } from "./ui/toast";
 import {
@@ -99,6 +99,17 @@ const App = ({
     window.dispatchEvent(new CustomEvent(overviewRefreshActivityEvent, { detail: refreshLoading }));
     return () => { window.dispatchEvent(new CustomEvent(overviewRefreshActivityEvent, { detail: false })); };
   }, [refreshLoading]);
+  // A refresh started by an earlier instance (the top bar unmounts on the Assistant page) reports here.
+  useEffect(() => {
+    const adopt = (event: Event) => setSourceStatuses((event as CustomEvent<PortfolioSourceStatus[]>).detail);
+    window.addEventListener(sourceStatusesChangedEvent, adopt);
+    return () => window.removeEventListener(sourceStatusesChangedEvent, adopt);
+  }, []);
+  useEffect(() => {
+    if (refreshLoading) return;
+    lastResultRef.current = lastRetryResult;
+    setLastResult(lastRetryResult);
+  }, [refreshLoading]);
   const retrySchedule = useSyncExternalStore(refreshRetryScheduler.subscribe, refreshRetryScheduler.status);
 
   const {
@@ -119,7 +130,10 @@ const App = ({
 
   const runRefresh = async (sourceId?: string, automatic = false, nearQuota?: NearQuota): Promise<PortfolioSourceStatus[] | null | undefined> => {
     if (refreshInProgress.current) return;
-    if (sourceId && !lastResultRef.current?.sourceResults) return null;
+    if (sourceId && !lastResultRef.current?.sourceResults) {
+      if (automatic) return null;
+      sourceId = undefined; // single-source inputs are gone: a manual retry runs a full refresh
+    }
     if (!automatic) refreshRetryScheduler.manualStart();
     refreshInProgress.current = true;
     setRunning(true);
@@ -254,7 +268,13 @@ const App = ({
           .map((source) => source.sourceId).join(",") ?? "",
       });
     } catch (error) {
-      if (error instanceof FullRefreshRequiredError) refreshRetryScheduler.stop();
+      if (error instanceof FullRefreshRequiredError) {
+        refreshRetryScheduler.stop();
+        // The single-source inputs are out of date, so every retry control falls back to a full refresh.
+        lastRetryResult = lastRetryResult && { ...lastRetryResult, sourceResults: undefined };
+        lastResultRef.current = lastRetryResult;
+        setLastResult(lastRetryResult);
+      }
       const messageKey = error instanceof FullRefreshRequiredError
         ? "refresh.runFullRefresh"
         : error instanceof Error && error.message.startsWith("no configuration found")
@@ -303,6 +323,8 @@ const App = ({
 
   const requestRefresh = async (sourceId?: string) => {
     if (refreshLoading || preflight || preflightPendingRef.current || refreshInProgress.current) return;
+    // The run falls back to a full refresh, so the quota check must cover every source.
+    if (!lastResultRef.current?.sourceResults) sourceId = undefined;
     preflightPendingRef.current = true;
     setPreflightPending(true);
     let nearQuota: NearQuota | undefined;
@@ -424,6 +446,9 @@ const App = ({
     ? t("refresh.autoRetry.next").replace("{time}", new Date(nextRetryAt).toLocaleTimeString(
       locale === "zh" ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false }))
     : retrySchedule.stopped ? t("refresh.autoRetry.stopped") : "";
+  const refreshState = refreshing ? "running" : preflight ? "confirm" : preflightPending ? "preflight" : "idle";
+  const retryState = !retrySchedule.enabled ? "off" : retrySchedule.stopped ? "stopped"
+    : Number.isFinite(nextRetryAt) ? "waiting" : "idle";
   const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
   const statusStyle = {
     ok: "t3-pill t3-refresh-status-pill",
@@ -462,16 +487,16 @@ const App = ({
 
   return (
     <div className="t3-refresh-controls flex items-center gap-2">
-      <span role="status" className="sr-only">{refreshLoading || preflightPending ? t("refresh.inProgress") : ""}</span>
+      <span role="status" className="sr-only" data-retry-state={retryState}>{refreshLoading || preflightPending ? t("refresh.inProgress") : ""}</span>
       {refreshing && sourceStatuses.length > 0 && wideStatusFlow
-        ? <Button variant="outline" className="t3-refresh-progress-pill" onClick={() => setStatusDialogOpen(true)}
+        ? <Button variant="outline" className="t3-refresh-progress-pill" data-state={refreshState} onClick={() => setStatusDialogOpen(true)}
           aria-label={progress > 0 ? t("refresh.fidelity.refreshingCount").replace("{count}", String(finishedCount)).replace("{total}", String(sourceStatuses.length))
             : t("refresh.fidelity.refreshingSources")}>
           <ReloadIcon aria-hidden="true" className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" />
           {progress > 0 ? t("refresh.fidelity.refreshingCount").replace("{count}", String(finishedCount)).replace("{total}", String(sourceStatuses.length))
             : t("refresh.fidelity.refreshingSources")}
         </Button>
-        : <Button variant="outline" className="t3-refresh-button" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
+        : <Button variant="outline" className="t3-refresh-button" data-state={refreshState} aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
           {fidelity ? <svg aria-hidden="true" className={`h-[14px] w-[14px] ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 9a5.5 5.5 0 1 1-1.6-3.9M14.5 3v3h-3" /></svg>
             : overviewFlow ? <ReloadIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />
               : <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />}

@@ -10,7 +10,7 @@ import {
   QuoteColor,
   TDateRange,
 } from "../middlelayers/types";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import {
   Collapsible,
@@ -29,6 +29,7 @@ import { DailyChangeCard, SourceStatusCard, TopCoinsCard, WhatMovedCard, useOver
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import PartialOverview, { usePartialOverview } from "./partial-overview";
 import { overviewRefreshActivityEvent } from "./source-status-event";
+import { useSectionLoadGate } from "./use-section-load-gate";
 
 const MAIN_COMPONENT_COUNT = 3;
 
@@ -55,19 +56,19 @@ const App = ({
       .replace("{conflicts}", String(syncStatus.sync.report?.conflicts.length ?? 0))
     : t("overview.fidelity.footerLocal");
   const [isShowMore, setIsShowMore] = useState<boolean>(false);
-  const [pageLoading, setPageLoading] = useState(true);
   const [refreshRunning, setRefreshRunning] = useState(false);
   useEffect(() => {
     const onActivity = (event: Event) => setRefreshRunning((event as CustomEvent<boolean>).detail);
     window.addEventListener(overviewRefreshActivityEvent, onActivity);
     return () => window.removeEventListener(overviewRefreshActivityEvent, onActivity);
   }, []);
-  const loadedCountRef = useRef(0);
   const rangeKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.start, dateRange.end],
   );
   const dataChangedVersion = useDataChangedVersion();
+  const { loading: pageLoading, state: loadState, reportLoaded } =
+    useSectionLoadGate(MAIN_COMPONENT_COUNT, `${rangeKey}:${dataChangedVersion}`);
   const { series, bestDayContribution, contributions, contributionCount, weekBased, coins, statuses, sources } = useOverviewPanelsData(dateRange, allTimeRange ?? dateRange);
   const partialView = usePartialOverview(dateRange);
   const positive = contributions.filter((row) => row.value > 0).sort((a, b) => b.value - a.value);
@@ -82,23 +83,11 @@ const App = ({
       .replace("{down}", negative[0].symbol)
     : t("overview.design.summary");
   const weekValueAt = summary.indexOf(weekValue);
-  useLayoutEffect(() => {
-    setPageLoading(true);
-    loadedCountRef.current = 0;
-  }, [rangeKey, dataChangedVersion]);
-
-  const reportLoaded = useCallback(() => {
-    loadedCountRef.current += 1;
-    if (loadedCountRef.current >= MAIN_COMPONENT_COUNT) {
-      setPageLoading(false);
-    }
-  }, []);
-
   const loadingContextValue = useMemo(() => ({ reportLoaded }), [reportLoaded]);
 
   return (
     <OverviewLoadingContext.Provider value={loadingContextValue}>
-      <div className="relative min-h-[400px]" aria-busy={pageLoading}>
+      <div className="relative min-h-[400px]" aria-busy={pageLoading} data-state={loadState}>
         <div className="t3-overview-heading">
           <h1>{t("overview.h1")}</h1>
           <p>{refreshRunning ? t("refresh.fidelity.progressHeading").replace("{total}", String(statuses.length))

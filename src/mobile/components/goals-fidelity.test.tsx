@@ -442,6 +442,26 @@ it("types a falling move as negative after changing the comparator with an empty
   expect(saved[0]).toMatchObject({ comparator: "lte", threshold: -5 });
 });
 
+it("types a falling move as negative when the comparator was chosen before the move kind", async () => {
+  const saved: AlertRule[] = [];
+  function Editor() {
+    const [value, setValue] = useState<AlertDraft>({ ...draft, comparator: "gte", threshold: "" });
+    return <MemoryRouter><GoalsFidelity
+      rules={[]} history={[]} unreadCount={0} snapshots={[]} prices={{}}
+      loading={false} error="" status="" draft={value} editorOpen
+      onDraft={setValue} onOpenEditor={vi.fn()} onCloseEditor={vi.fn()}
+      onSave={async () => { saved.push(alertRuleFromDraft(value)); }}
+      onToggle={vi.fn()} onDelete={vi.fn()} onAck={vi.fn()} onAckAll={vi.fn()} onClear={vi.fn()}
+    /></MemoryRouter>;
+  }
+  render(<Editor />);
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: "Comparator" }), "lte");
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: "Kind" }), "portfolio_value_change");
+  await userEvent.type(screen.getByRole("spinbutton", { name: "Threshold" }), "5");
+  await userEvent.click(within(document.querySelector(".pf-editor-footer") as HTMLElement).getByRole("button", { name: "Add rule" }));
+  expect(saved[0]).toMatchObject({ kind: "portfolio_value_change", comparator: "lte", threshold: -5 });
+});
+
 it("saves the selected asset type when stock and crypto share a symbol", async () => {
   const saved: AlertRule[] = [];
   function Editor() {

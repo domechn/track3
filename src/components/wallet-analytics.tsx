@@ -6,7 +6,7 @@ import {
   TDateRange,
 } from "@/middlelayers/types";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { StaggerContainer, FadeUp } from "./motion";
 import PageLoadingOverlay from "./page-loading-overlay";
@@ -20,6 +20,7 @@ import type { PortfolioSourceStatus } from "@/middlelayers/portfolio-baseline";
 import { useCurrentSourceStatuses } from "./use-current-source-statuses";
 import WalletsFidelity from "./wallets-fidelity";
 import { useWindowSize } from "@/utils/hook";
+import { useSectionLoadGate } from "./use-section-load-gate";
 
 const App = ({
   currency,
@@ -38,7 +39,6 @@ const App = ({
   const windowSize = useWindowSize();
   const wide = (windowSize.width ?? window.innerWidth) >= 1400;
   const LOAD_COUNT = 2;
-  const [pageLoading, setPageLoading] = useState(true);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<PortfolioSourceStatus[]>(readStoredStatuses);
   const currentStatuses = useCurrentSourceStatuses(statuses);
@@ -48,29 +48,18 @@ const App = ({
     window.addEventListener(sourceStatusesChangedEvent, onChanged);
     return () => window.removeEventListener(sourceStatusesChangedEvent, onChanged);
   }, []);
-  const loadedCountRef = useRef(0);
   const queryKey = useMemo(
     () => `${dateRange.start.getTime()}-${dateRange.end.getTime()}`,
     [dateRange.end, dateRange.start]
   );
   const dataChangedVersion = useDataChangedVersion();
-
-  useLayoutEffect(() => {
-    loadedCountRef.current = 0;
-    setPageLoading(true);
-  }, [queryKey, dataChangedVersion]);
-
-  const reportLoaded = useCallback(() => {
-    loadedCountRef.current += 1;
-    if (loadedCountRef.current >= LOAD_COUNT) {
-      setPageLoading(false);
-    }
-  }, []);
-  const onFidelityLoaded = useCallback(() => setPageLoading(false), []);
+  // The wide layout loads as one unit and opens the gate itself (markLoaded) instead of counting sections.
+  const { loading: pageLoading, state: loadState, reportLoaded, markLoaded: onFidelityLoaded } =
+    useSectionLoadGate(LOAD_COUNT, `${queryKey}:${dataChangedVersion}`);
 
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
-      <div className="analyze-wallets relative min-h-[400px]" aria-busy={pageLoading}>
+      <div className="analyze-wallets relative min-h-[400px]" aria-busy={pageLoading} data-state={loadState}>
         {wide && <WalletsFidelity currency={currency} dateRange={dateRange} quoteColor={quoteColor}
           selectedSource={selectedSource} onSelectSource={setSelectedSource} statuses={currentStatuses}
           nextBySource={retrySchedule.nextBySource} availableDates={availableDates}

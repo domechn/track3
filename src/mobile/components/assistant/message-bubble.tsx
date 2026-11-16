@@ -17,6 +17,7 @@ import PhoneActionCard from "@/mobile/components/assistant/phone-action-card";
 import { isIOS } from "@/utils/platform";
 import { FidelityIcon } from "@/mobile/components/fidelity-icon";
 import type { CurrencyRateDetail } from "@/middlelayers/types";
+import { isRequestError, splitRequestError } from "@/components/assistant/request-error";
 
 function stripThinkTags(s: string): string {
   return s.replace(/<\/?think\s*>/gi, "").trim();
@@ -143,10 +144,9 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
   }
   if (block.kind === "text") {
     if (!block.text) return null;
-    const errorAt = isIOS() ? block.text.indexOf("[error]") : -1;
-    if (errorAt >= 0) {
-      const before = block.text.slice(0, errorAt).trim();
-      const detail = block.text.slice(errorAt + 7).trim();
+    const failure = isIOS() ? splitRequestError(block.text) : null;
+    if (failure) {
+      const { before, detail } = failure;
       return <div key={idx}>
         {before && <MarkdownRenderer content={stripThinkTags(before)} signedValues />}
         <div className="fidelity-chat-error" role="alert">
@@ -181,7 +181,7 @@ function renderAssistantBlock(block: AssistantBlock, idx: number, isStreaming?: 
             <span className={`inline-block h-2 w-2 rounded-full ${
               a.status === "completed" ? "bg-green-500" :
               a.status === "failed" ? "bg-red-500" :
-              "bg-yellow-500 animate-pulse"
+              isStreaming ? "bg-yellow-500 animate-pulse" : "bg-yellow-500"
             }`} />
             <span className="flex-1 truncate">{a.description}</span>
             {a.status === "completed" && a.resultPreview && (
@@ -259,6 +259,7 @@ export default function MessageBubble({
         isUser ? "justify-end" : "justify-start",
       )}
       data-testid={isUser ? "user-bubble" : "assistant-bubble"}
+      data-state={blocks.some(isRequestError) ? "failed" : undefined}
       data-streaming={!isUser && Boolean(isStreaming)}
     >
       {!isUser && (
