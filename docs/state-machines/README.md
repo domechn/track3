@@ -18,3 +18,4 @@ Machines (one line per file, append only):
 - [iOS privacy lock](ios-privacy-lock.md)
 - [iOS backup-folder access and folder picker](ios-backup-folder.md)
 - [Desktop UI: app boot, section load gate, configuration form, Quick Look, legacy import, comparison, coin page](ui.md)
+- [App domain: updater, Pro checkout, key rotation dialog, sources auto-save, alert rules, background auto backup](app.md)

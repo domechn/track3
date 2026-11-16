@@ -623,3 +623,25 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     expect(lastDataChangedVersion).toBe(1);
   });
 });
+
+describe("background auto backup observability", () => {
+  it("shows the running state, logs the redacted import and backup reasons, and returns to idle", async () => {
+    window.location.hash = "#/summary";
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    let failImport!: (error: Error) => void;
+    vi.mocked(autoImportHistoricalData).mockReturnValueOnce(new Promise((_, reject) => { failImport = reject; }));
+    vi.mocked(autoBackupHistoricalData).mockRejectedValueOnce(new Error("backup folder is gone; token=secretABC123xyz"));
+    try {
+      renderApp();
+      const running = () => document.querySelector('[role="status"][data-state="running"]');
+      await waitFor(() => expect(running()).toHaveAccessibleName("Backing up data"));
+      await act(async () => { failImport(new Error("import file unreadable; token=secretDEF456uvw")); });
+      await waitFor(() => expect(running()).not.toBeInTheDocument());
+      expect(consoleError).toHaveBeenCalledWith("auto import failed", "Error: import file unreadable; token=<REDACTED>");
+      expect(consoleError).toHaveBeenCalledWith("auto backup failed", "Error: backup folder is gone; token=<REDACTED>");
+      expect(consoleError.mock.calls.flat().join(" ")).not.toMatch(/secretABC123xyz|secretDEF456uvw/);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+});

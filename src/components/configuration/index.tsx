@@ -132,6 +132,10 @@ const App = ({
     !warmStartPreferCurrency,
   );
 
+  // Auto-save state, exposed as data-save-state on the page root (docs/state-machines/app.md).
+  const [persist, setPersist] = useState<"clean" | "saving" | "saved" | "error">("clean");
+  const savesInFlight = useRef(0);
+
   const [addExchangeDialogOpen, setAddExchangeDialogOpen] = useState(false);
   const [addStockBrokerDialogOpen, setAddStockBrokerDialogOpen] =
     useState(false);
@@ -401,6 +405,8 @@ const App = ({
     const aliasChanged = !!rename || aliasUndoPending.current;
     aliasUndoPending.current = false;
     let saveError: Error | undefined;
+    savesInFlight.current++;
+    setPersist("saving");
     saveConfiguration(globalConfig)
       .then(() => {
         notifyConfigurationSaved(aliasChanged);
@@ -418,6 +424,7 @@ const App = ({
       })
       .catch((e) => (saveError = e))
       .finally(() => {
+        if (--savesInFlight.current === 0) setPersist(saveError ? "error" : "saved");
         if (saveError) {
           toast({
             description: safeError(saveError),
@@ -1167,7 +1174,7 @@ const App = ({
     </div>
   );
   return (
-    <div className="space-y-6" data-state={loadState}>
+    <div className="space-y-6" data-state={loadState} data-save-state={persist}>
       <QuickLookDialog
         open={quickLookOpen}
         onOpenChange={handleQuickLookOpenChange}
