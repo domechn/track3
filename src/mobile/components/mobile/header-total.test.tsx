@@ -143,6 +143,22 @@ it("marks a phone total partial while preserving its known amount", async () => 
   expect(screen.getByLabelText("Live total")).toHaveTextContent("Partial data");
 });
 
+it("passes structured missing symbols and snapshot share to the phone popover", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: true }));
+  vi.mocked(queryRealTimeAssetsValue).mockResolvedValue(Object.assign(
+    [{ symbol: "BTC", assetType: "crypto" as const, amount: 1, price: 100, value: 100 }],
+    { partial: true, reason: "pricesMissing" as const, missingCount: 1,
+      missingSymbols: [{ symbol: "PLUME", assetType: "crypto" as const, lastValue: 25 }],
+      dustSymbols: [], missingShare: 0.2 },
+  ));
+  render(<MobileHeaderTotal live fidelity
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }} />);
+  await act(async () => { await Promise.resolve(); });
+  fireEvent.click(screen.getByRole("button", { name: /Live total.*Live prices/ }));
+  expect(screen.getByTestId("live-missing-list")).toHaveTextContent("PLUME");
+  expect(screen.getByText("about 20% of the last snapshot value is not live-priced")).toBeVisible();
+});
+
 it("does not turn a failed live quote into zero when no snapshot exists", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: true }));
   vi.spyOn(console, "error").mockImplementation(() => {});

@@ -64,12 +64,20 @@ export type LiveAssets = Asset[] & {
   partial?: boolean;
   reason?: "rateLimited" | "pricesMissing" | "stockPricesMissing" | "rateUnavailable" | "ibkrToken" | "partialSource" | "unknown";
   missingCount?: number;
+  missingSymbols?: LiveMissingSymbol[];
+  dustSymbols?: LiveMissingSymbol[];
+  missingShare?: number;
 };
+
+export type LiveMissingSymbol = Pick<AssetModel, "symbol" | "assetType"> & { lastValue: number };
 
 type LivePriceStatus = {
   reason?: LiveAssets["reason"];
   missingRateSymbols: Set<string>;
   missingCount: number;
+  missingSymbols: LiveMissingSymbol[];
+  dustSymbols: LiveMissingSymbol[];
+  missingShare?: number;
 };
 
 function liveQuoteReason(error: unknown, fallback: LiveAssets["reason"]): LiveAssets["reason"] {
@@ -690,8 +698,12 @@ export async function queryRealTimeAssetsValue(): Promise<LiveAssets> {
   }
   // check if pro user
   const userProInfo = await isProVersion();
-  const lastAssets = (await ASSET_HANDLER.listAssets(1)).flat();
-  const liveStatus: LivePriceStatus = { missingRateSymbols: new Set(), missingCount: 0 };
+  const lastAssets = (await ASSET_HANDLER.listAssets(1)).flat()
+    .filter((row) => row.uuid === assets[0]?.uuid);
+  const liveStatus: LivePriceStatus = {
+    missingRateSymbols: new Set(), missingCount: 0,
+    missingSymbols: [], dustSymbols: [], missingShare: 0,
+  };
   const customSymbols = config.others?.map((entry) => entry.symbol) ?? [];
 
   const walletCoins = await queryCoinsDataByWalletCoins(
@@ -749,6 +761,9 @@ export async function queryRealTimeAssetsValue(): Promise<LiveAssets> {
   const limitedProblem = sourceProblems.find((status) => status.category === "rateLimit");
   assetRes.partial = liveStatus.reason !== undefined || liveStatus.missingCount > 0 || sourceProblems.length > 0;
   assetRes.missingCount = liveStatus.missingCount;
+  assetRes.missingSymbols = liveStatus.missingSymbols;
+  assetRes.dustSymbols = liveStatus.dustSymbols;
+  assetRes.missingShare = liveStatus.missingShare;
   assetRes.reason = ibkrProblem ? "ibkrToken" : limitedProblem ? "rateLimited"
     : liveStatus.reason ?? (sourceProblems.length ? "partialSource" : liveStatus.missingCount ? "pricesMissing" : undefined);
   if (assets.some((asset) => asset.amount > 0) && assetRes.length === 0) {
@@ -926,6 +941,7 @@ function resolveWalletCoins(
   staleWalletIdentities: string[] = [],
   missingQuoteWallets: string[] = [],
   missingQuoteAssets: Set<string> = new Set(),
+  allowWalletFallback = true,
 ): WalletCoinUSD[] {
   const { priceMap } = valueContext;
   const latestAssets = canonicalizePortfolioCoins(
@@ -946,6 +962,7 @@ function resolveWalletCoins(
   }
   const totals = calculateTotalValue(latestAssets, priceMap);
   for (const total of totals) {
+    if (!allowWalletFallback) continue;
     if (total.amount <= 0 || Number.isFinite(total.price) && total.price > 0) continue;
     const previous = lastAssets.find((asset) =>
       asset.symbol === total.symbol && getAssetType(asset) === getAssetType(total) &&
@@ -1031,24 +1048,79 @@ async function queryCoinsDataByWalletCoins(
     valueContext,
     blacklistedSymbols,
   );
+  if (liveStatus) {
+    const savedByIdentity = new Map<string, { amount: number; quotedValue: number; valid: boolean }>();
+    for (const row of lastAssets) {
+      if (row.amount <= 0) continue;
+      const identity = getAssetIdentity(row);
+      const saved = savedByIdentity.get(identity) ?? { amount: 0, quotedValue: 0, valid: true };
+      saved.amount += row.amount;
+      saved.quotedValue += row.price * row.amount;
+      saved.valid &&= Number.isFinite(row.price) && row.price > 0;
+      savedByIdentity.set(identity, saved);
+    }
+    for (const asset of assets) {
+      const identity = getAssetIdentity(asset);
+      const saved = savedByIdentity.get(identity);
+      const current = valueContext.priceMap[identity] ?? valueContext.priceMap[asset.symbol];
+      if ((!Number.isFinite(current) || current <= 0) && !asset.customPrice &&
+        saved?.valid && saved.amount > 0 && saved.quotedValue > 0) {
+        valueContext.priceMap[identity] = saved.quotedValue / saved.amount;
+      }
+    }
+  }
   const resolved = resolveWalletCoins(
     assets,
     lastAssets,
     valueContext,
     canonicalization,
     addProgress,
+    [],
+    [],
+    new Set(),
+    !liveStatus,
   );
   if (!liveStatus) return resolved;
-  liveStatus.missingCount = assets.filter((asset) => {
-    if (asset.amount <= 0 || blacklistedSymbols.includes(asset.symbol.toUpperCase())) return false;
-    const key = getAssetIdentity(asset);
-    const quote = asset.price?.value ?? valueContext.priceMap[key] ?? valueContext.priceMap[asset.symbol];
-    if (Number.isFinite(quote) && quote > 0) return false;
-    if (asset.customPrice && resolved.some((row) =>
-      row.symbol === asset.symbol && getAssetType(row) === getAssetType(asset) &&
-      Number.isFinite(row.price) && row.price > 0)) return false;
-    return true;
-  }).length;
+  const pricedIdentities = new Set(resolved
+    .filter((row) => Number.isFinite(row.price) && row.price > 0)
+    .map((row) => getAssetIdentity(row)));
+  const lastValueByIdentity = new Map<string, number>();
+  const lastTotal = lastAssets.reduce((sum, asset) => {
+    if (!Number.isFinite(asset.value) || asset.value <= 0 ||
+      blacklistedSymbols.includes(asset.symbol.toUpperCase())) return sum;
+    const identity = getAssetIdentity(asset);
+    lastValueByIdentity.set(identity, (lastValueByIdentity.get(identity) ?? 0) + asset.value);
+    return sum + asset.value;
+  }, 0);
+  const unresolved = new Map<string, LiveMissingSymbol>();
+  for (const asset of assets) {
+    if (asset.amount <= 0 || blacklistedSymbols.includes(asset.symbol.toUpperCase())) continue;
+    const identity = getAssetIdentity(asset);
+    if (pricedIdentities.has(identity)) continue;
+    unresolved.set(identity, {
+      symbol: asset.symbol, assetType: getAssetType(asset),
+      lastValue: lastValueByIdentity.get(identity) ?? 0,
+    });
+  }
+  const byLastValue = (left: LiveMissingSymbol, right: LiveMissingSymbol) =>
+    right.lastValue - left.lastValue || left.symbol.localeCompare(right.symbol);
+  for (const item of unresolved.values()) {
+    if (item.lastValue > 0 && item.lastValue < lastTotal * 0.0001 && item.lastValue < 1) {
+      liveStatus.dustSymbols.push(item);
+    } else {
+      liveStatus.missingSymbols.push(item);
+    }
+  }
+  liveStatus.missingSymbols.sort(byLastValue);
+  liveStatus.dustSymbols.sort(byLastValue);
+  liveStatus.missingCount = liveStatus.missingSymbols.length;
+  liveStatus.missingShare = lastTotal > 0 && liveStatus.missingSymbols.every((item) => item.lastValue > 0)
+    ? liveStatus.missingSymbols.reduce((sum, item) => sum + item.lastValue, 0) / lastTotal : undefined;
+  if (unresolved.size) {
+    console.debug("Live missing price symbols:", [
+      ...liveStatus.missingSymbols, ...liveStatus.dustSymbols,
+    ].map((item) => item.symbol));
+  }
   if (liveStatus.missingRateSymbols.size) liveStatus.reason = "rateUnavailable";
   else if (liveStatus.missingCount && !liveStatus.reason) liveStatus.reason = "pricesMissing";
   return resolved;

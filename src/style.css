@@ -3193,6 +3193,9 @@ body:not(:has(.app-layout)):has(.t3-refresh-overview) .t3-fidelity-ranges { disp
 body:not(:has(.app-layout)) .t3-date-main { display: contents; }
 body:not(:has(.app-layout)) .t3-date-popover .t3-fidelity-presets, body:not(:has(.app-layout)) .t3-date-fields, body:not(:has(.app-layout)) .t3-date-fidelity-footer { display: none; }
 @media (min-width: 1400px) {
+  body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-topbar-sync-button[data-sync-state="ready"] {
+    width: 87px; padding-inline: 2px; gap: 2px; font-size: 11px;
+  }
   body:not(:has(.app-layout)):has(.t3-overview-grid) .t3-date-popover {
     width: 560px; max-width: 560px; min-height: 427px;
     margin-top: 4px; transform: translateX(108px);

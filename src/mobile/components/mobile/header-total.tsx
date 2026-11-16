@@ -29,7 +29,9 @@ export function MobileHeaderTotal({ currency, live, range, fidelity = false }: {
           const assets = await queryRealTimeAssetsValue();
           return { value: assets.reduce((sum, asset) => sum + asset.value, 0),
             partial: assets.partial, reason: assets.reason === "pricesMissing"
-              ? `pricesMissing:${assets.missingCount ?? 1}` : assets.reason };
+              ? `pricesMissing:${assets.missingCount ?? 1}` : assets.reason,
+            missingSymbols: assets.missingSymbols, dustSymbols: assets.dustSymbols,
+            missingShare: assets.missingShare };
         } catch (error) {
           const reason = safeLiveTotalError(error);
           console.error("Live total failed:", safeLiveTotalLogMessage(error));
@@ -72,7 +74,9 @@ export function MobileHeaderTotal({ currency, live, range, fidelity = false }: {
       <PopoverContent align="start" sideOffset={4} aria-label={priceLabel} className="w-auto max-w-64 space-y-2 text-sm">
         <p>{priceLabel}</p>
         {(current.error || current.state === "error") && <LiveTotalDetails error={current.error}
-          lastAt={current.lastAt} retryNow={current.retryNow} t={t} />}
+          lastAt={current.lastAt} retryNow={current.retryNow} t={t}
+          missingSymbols={current.missingSymbols} dustSymbols={current.dustSymbols}
+          missingShare={current.missingShare} />}
       </PopoverContent>
     </Popover> : <span className="mobile-header-total-reading">{reading}</span>}
     <span role="status" aria-live="polite" className="sr-only"

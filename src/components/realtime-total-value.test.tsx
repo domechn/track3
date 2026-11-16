@@ -229,4 +229,22 @@ describe("RealtimeTotalValue", () => {
     expect(container.querySelector(".t3-live-popover")).toHaveTextContent("Prices for 2 coins missing");
     expect(container.querySelector(".t3-live-popover")?.textContent?.match(/\+20\.00%/g)).toHaveLength(1);
   });
+
+  it("passes structured missing symbols and snapshot share to the desktop popover", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    vi.mocked(queryLatestAssets).mockResolvedValue([]);
+    vi.mocked(queryRealTimeAssetsValue).mockResolvedValue(Object.assign(
+      [{ symbol: "BTC", assetType: "crypto" as const, amount: 1, value: 100, price: 100 }],
+      { partial: true, reason: "pricesMissing" as const, missingCount: 1,
+        missingSymbols: [{ symbol: "PLUME", assetType: "crypto" as const, lastValue: 25 }],
+        dustSymbols: [], missingShare: 0.2 },
+    ));
+    render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Live total" }));
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("live-missing-list")).toHaveTextContent("PLUME");
+    expect(screen.getByText("about 20% of the last snapshot value is not live-priced")).toBeVisible();
+  });
 });
