@@ -205,3 +205,84 @@ it("remembers the last successful time when the live display remounts", async ()
   }));
   expect(second.result.current.lastAt).toBe(Date.parse("2026-11-15T12:00:00Z"));
 });
+
+const setVisibility = (state: "visible" | "hidden") => {
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue(state);
+  document.dispatchEvent(new Event("visibilitychange"));
+};
+
+it("waits for a load that is slower than the interval but faster than the time limit", async () => {
+  vi.useFakeTimers();
+  const load = vi.fn(() => new Promise<number>((done) => { setTimeout(() => done(100), 5_000); }));
+  const { result } = renderHook(() => useLiveTotal({ key: "slow-load-test", load, enabled: true, live: true, intervalMs: 1000 }));
+  await act(async () => { await vi.advanceTimersByTimeAsync(4_999); });
+  expect(result.current.state).toBe("connecting");
+  expect(load).toHaveBeenCalledTimes(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(result.current.state).toBe("live");
+  expect(result.current.value).toBe(100);
+});
+
+it("gives up on a first load that never answers and lets Retry now start another", async () => {
+  vi.useFakeTimers();
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const load = vi.fn(() => new Promise<number>(() => {}));
+  const { result } = renderHook(() => useLiveTotal({ key: "hung-first-test", load, enabled: true, live: true, intervalMs: 1000 }));
+  await act(async () => { await vi.advanceTimersByTimeAsync(29_999); });
+  expect(result.current.state).toBe("connecting");
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(result.current.state).toBe("error");
+  expect(result.current.error).toBe("unknown");
+  expect(load).toHaveBeenCalledTimes(1);
+  await act(async () => { result.current.retryNow(); });
+  expect(load).toHaveBeenCalledTimes(2);
+  expect(result.current.state).toBe("connecting");
+});
+
+it("marks a known value stale and retries when a later load never answers", async () => {
+  vi.useFakeTimers();
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const load = vi.fn().mockResolvedValueOnce(100).mockImplementation(() => new Promise<number>(() => {}));
+  const { result } = renderHook(() => useLiveTotal({
+    key: "hung-later-test", load, enabled: true, live: true, intervalMs: 1000, timeoutMs: 10_000,
+  }));
+  await act(async () => { await Promise.resolve(); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(11_000); });
+  expect(load).toHaveBeenCalledTimes(2);
+  expect(result.current.state).toBe("stale");
+  expect(result.current.error).toBe("unknown");
+  expect(result.current.value).toBe(100);
+  await act(async () => { await vi.advanceTimersByTimeAsync(5_000); });
+  expect(load).toHaveBeenCalledTimes(3);
+});
+
+it("does not call an old value live when the tab returns after a long hidden period", async () => {
+  vi.useFakeTimers();
+  let resolve!: (value: number) => void;
+  const load = vi.fn().mockResolvedValueOnce(100)
+    .mockImplementationOnce(() => new Promise<number>((done) => { resolve = done; }));
+  const { result } = renderHook(() => useLiveTotal({ key: "resume-test", load, enabled: true, live: true, intervalMs: 1000 }));
+  await act(async () => { await Promise.resolve(); });
+  expect(result.current.state).toBe("live");
+  act(() => setVisibility("hidden"));
+  await act(async () => { await vi.advanceTimersByTimeAsync(3_600_000); });
+  expect(result.current.state).toBe("live");
+  act(() => setVisibility("visible"));
+  expect(load).toHaveBeenCalledTimes(2);
+  expect(result.current.state).toBe("connecting");
+  expect(result.current.value).toBe(100);
+  await act(async () => { resolve(120); await Promise.resolve(); });
+  expect(result.current.state).toBe("live");
+});
+
+it("keeps a recent value live when the tab returns within two intervals", async () => {
+  vi.useFakeTimers();
+  const load = vi.fn().mockResolvedValueOnce(100).mockImplementation(() => new Promise<number>(() => {}));
+  const { result } = renderHook(() => useLiveTotal({ key: "short-hide-test", load, enabled: true, live: true, intervalMs: 1000 }));
+  await act(async () => { await Promise.resolve(); });
+  act(() => setVisibility("hidden"));
+  await act(async () => { await vi.advanceTimersByTimeAsync(1_500); });
+  act(() => setVisibility("visible"));
+  expect(load).toHaveBeenCalledTimes(2);
+  expect(result.current.state).toBe("live");
+});

@@ -22,6 +22,7 @@ type IbkrBrokerOptions = {
   statementPollDelayMs?: number;
   maxStatementPollAttempts?: number;
   initialStatementDelayMs?: number;
+  flowBudgetMs?: number;
 };
 
 const flexServiceEndpoint =
@@ -31,6 +32,8 @@ const getStatementEndpoint = `${flexServiceEndpoint}/GetStatement`;
 const defaultStatementPollDelayMs = 1000;
 const defaultMaxStatementPollAttempts = 6;
 const defaultInitialStatementDelayMs = 5000;
+// Below the 120 s that fetchPortfolios gives a stock source, so the flow can report its own reason.
+const defaultFlowBudgetMs = 110_000;
 const requestTimes = new Map<string, { times: number[]; tail: Promise<void> }>();
 
 async function limitFlexRequest(token: string): Promise<void> {
@@ -266,6 +269,8 @@ export class IbkrBroker implements StockBroker {
   private readonly statementPollDelayMs: number;
   private readonly maxStatementPollAttempts: number;
   private readonly initialStatementDelayMs: number;
+  private readonly flowBudgetMs: number;
+  private flowStartedAt = 0;
   private flexXml?: string;
 
   constructor(
@@ -283,6 +288,7 @@ export class IbkrBroker implements StockBroker {
       options.maxStatementPollAttempts ?? defaultMaxStatementPollAttempts;
     this.initialStatementDelayMs =
       options.initialStatementDelayMs ?? defaultInitialStatementDelayMs;
+    this.flowBudgetMs = options.flowBudgetMs ?? defaultFlowBudgetMs;
   }
 
   getBrokerName(): string {
@@ -378,8 +384,11 @@ export class IbkrBroker implements StockBroker {
       });
       if (getFlexResponseError(xml)?.errorCode !== "1018") return xml;
       console.warn("IBKR Flex error code", redactSecrets("1018", [this.token]));
-      if (attempt === 0) await wait(60_000);
-      else assertSuccessfulFlexResponse(xml, this.token);
+      if (attempt === 0) {
+        // A wait that cannot finish inside the source budget would end as "Source timed out".
+        if (Date.now() - this.flowStartedAt + 60_000 + timeout > this.flowBudgetMs) break;
+        await wait(60_000);
+      } else assertSuccessfulFlexResponse(xml, this.token);
     }
     throw new SourceStatusError("rateLimit", "IBKR rate limited");
   }
@@ -389,6 +398,7 @@ export class IbkrBroker implements StockBroker {
       return this.flexXml;
     }
 
+    this.flowStartedAt = Date.now();
     const requestUrl = `${sendRequestEndpoint}?t=${encodeURIComponent(this.token)}&q=${encodeURIComponent(this.queryId)}&v=3`;
 
     const sendXml = await this.requestFlex(requestUrl, 20000);

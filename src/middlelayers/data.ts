@@ -80,7 +80,8 @@ export async function queryCoinPrices(
   } else {
     cpq = new CoinPriceQuery();
   }
-  return cpq.listAllCoinPrices(symbols);
+  // The free path calls CoinGecko through Rust without a timeout; a stalled connection must not hang a refresh.
+  return withinSourceTimeout(() => cpq.listAllCoinPrices(symbols), 60_000, "Price query timed out");
 }
 
 function uniqueIdentities(identities: string[]): string[] {
@@ -106,13 +107,13 @@ function isValidHolding(value: unknown): value is WalletCoin {
     ));
 }
 
-async function withinSourceTimeout<T>(task: () => Promise<T>, timeoutMs: number): Promise<T> {
+async function withinSourceTimeout<T>(task: () => Promise<T>, timeoutMs: number, message = "Source timed out"): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       Promise.resolve().then(task),
       new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error("Source timed out")), timeoutMs);
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
       }),
     ]);
   } finally {
