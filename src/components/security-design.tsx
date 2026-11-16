@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CheckIcon, ExclamationTriangleIcon, LockClosedIcon, ReloadIcon } from "@radix-ui/react-icons";
 import { useTranslation } from "@/i18n";
 import ConfirmDeleteDialog from "@/components/common/confirm-delete-dialog";
@@ -15,7 +15,7 @@ type Props = {
   keyRotated: boolean;
   customKey: boolean | undefined;
   secretInventory?: { exchanges: string[]; brokers: string[]; assistant?: string; sync?: string };
-  onRotate: () => void;
+  onRotate: () => Promise<boolean>;
   onReset: () => void;
 };
 
@@ -23,9 +23,6 @@ export function SecurityDesign(p: Props) {
   const { t } = useTranslation();
   const [rotateOpen, setRotateOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
-  useEffect(() => {
-    if (p.keyRotated && !p.encKeySaving) setRotateOpen(false);
-  }, [p.keyRotated, p.encKeySaving]);
   return <div className="t3-b-security t3-b-grid">
     {p.keyRotated && <div className="t3-b-banner positive"><CheckIcon /><div><b>{t("fidelity.settingsB.security.rotated")}</b><span>{t("fidelity.settingsB.security.rotatedDesc")}</span></div></div>}
     <section className="t3-b-card t3-b-security-key">
@@ -57,7 +54,7 @@ export function SecurityDesign(p: Props) {
       <ConfirmDeleteDialog open={rotateOpen} onOpenChange={setRotateOpen}
         title={t("fidelity.settingsB.security.rotateTitle")} description={t("data.encryption.key.storageWarning")}
         cancelLabel={t("common.cancel")}
-        actions={[{ label: t("fidelity.settingsB.security.rotateAction"), onClick: p.onRotate, keepOpen: true, disabled: p.encKeySaving }]}>
+        actions={[{ label: t("fidelity.settingsB.security.rotateAction"), onClick: () => { void p.onRotate().then((ok) => { if (ok) setRotateOpen(false); }); }, keepOpen: true, disabled: p.encKeySaving }]}>
         <div className="t3-b-rotate-form">
           <label htmlFor="security-new-key">{t("data.encryption.key.newPlaceholder")}</label>
           <input id="security-new-key" className="t3-b-input" type="password" autoComplete="new-password" value={p.encKeyInput} onChange={(event) => p.setEncKeyInput(event.target.value)} />

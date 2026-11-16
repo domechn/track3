@@ -133,23 +133,23 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         description: t("data.encryption.key.mismatch"),
         variant: "destructive",
       });
-      return;
+      return false;
     }
     if (encKeyInput.length < 8) {
       toast({
         description: t("data.encryption.key.minLength"),
         variant: "destructive",
       });
-      return;
+      return false;
     }
     if (encKeyInput.trim() !== encKeyInput) {
       toast({
         description: t("data.encryption.key.whitespace"),
         variant: "destructive",
       });
-      return;
+      return false;
     }
-    if (confirmStorage && !(await window.confirm(t("data.encryption.key.storageWarning")))) return;
+    if (confirmStorage && !(await window.confirm(t("data.encryption.key.storageWarning")))) return false;
     setEncKeySaving(true);
     try {
       await runEncryptionKeyRotation(() =>
@@ -160,6 +160,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       toast({ description: t("data.encryption.key.success"), tone: "success" });
       setEncKeyInput("");
       setEncKeyConfirm("");
+      return true;
     } catch (e) {
       const description = isRecoveryRequiredRotationError(e)
         ? t("data.encryption.key.recovery.required")
@@ -167,6 +168,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
           ? e.message
           : String(e);
       toast({ description: redactSecrets(description, [encKeyInput]), variant: "destructive" });
+      return false;
     } finally {
       setEncKeySaving(false);
     }
@@ -229,16 +231,20 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   }
 
   async function onImportDataClick() {
-    const ed = await readHistoricalDataFromFile();
-    setExportData(ed);
-    if (!ed) {
-      return;
-    }
-    const hasConflicts = await checkIfDuplicatedHistoricalData(ed);
-    if (hasConflicts) {
-      setShowConflictResolverDialog(true);
-    } else {
-      importData("IGNORE", ed);
+    try {
+      const ed = await readHistoricalDataFromFile();
+      setExportData(ed);
+      if (!ed) {
+        return;
+      }
+      const hasConflicts = await checkIfDuplicatedHistoricalData(ed);
+      if (hasConflicts) {
+        setShowConflictResolverDialog(true);
+      } else {
+        importData("IGNORE", ed);
+      }
+    } catch (error) {
+      toast({ description: redactSecrets(String(error), [encKeyInput]), variant: "destructive" });
     }
   }
 
@@ -400,7 +406,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         syncReady={syncStatus.mode === "ready"} encKeyInput={encKeyInput} setEncKeyInput={setEncKeyInput}
         encKeyConfirm={encKeyConfirm} setEncKeyConfirm={setEncKeyConfirm}
         encKeySaving={encKeySaving} keyRotated={keyRotated} customKey={customKey} secretInventory={secretInventory}
-        onRotate={() => { void handleChangeEncryptionKey(false); }} onReset={() => { void handleResetEncryptionKey(); }} />}
+        onRotate={() => handleChangeEncryptionKey(false)} onReset={() => { void handleResetEncryptionKey(); }} />}
       <Dialog open={!!itemPreview} onOpenChange={(open) => { if (!open && !itemBusy) setItemPreview(undefined); }}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-[680px]">
           <DialogHeader><DialogTitle>{t("data.importPreview.title")}</DialogTitle></DialogHeader>

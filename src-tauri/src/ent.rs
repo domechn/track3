@@ -9,8 +9,17 @@ use ring::{
     rand::{SecureRandom, SystemRandom},
 };
 use sha2::{Digest as _, Sha256};
-use std::{num::NonZeroU32, sync::Mutex};
+use std::{
+    num::NonZeroU32,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
+};
 use uuid::Uuid;
+
+pub const RECOVERY_REQUIRED_MESSAGE: &str =
+    "Encryption key recovery is required. Restart Track3 before making further changes.";
 
 const ENT_V2_PREFIX: &str = "!ent:v2:";
 const ENT_V3_PREFIX: &str = "!ent:v3:";
@@ -62,6 +71,8 @@ pub struct Ent {
     salt: String,
     ent_prefix: String,
     key: Mutex<Option<String>>,
+    // Set while a key rotation journal is pending; see docs/state-machines/key-rotation.md.
+    writes_blocked: AtomicBool,
 }
 
 impl Ent {
@@ -73,7 +84,18 @@ impl Ent {
             .unwrap(),
             ent_prefix: String::from("!ent:"),
             key: Mutex::new(None),
+            writes_blocked: AtomicBool::new(false),
         }
+    }
+
+    /// Refuse `encrypt` until `unblock_writes`. Decryption and the
+    /// explicit-key helpers keep working so rotation recovery can finish.
+    pub fn block_writes(&self) {
+        self.writes_blocked.store(true, Ordering::SeqCst);
+    }
+
+    pub fn unblock_writes(&self) {
+        self.writes_blocked.store(false, Ordering::SeqCst);
     }
 
     /// Set the encryption key (first-time initialisation).  Returns an error
@@ -119,6 +141,9 @@ impl Ent {
     }
 
     pub fn encrypt(&self, data: String) -> Result<String, Box<dyn std::error::Error>> {
+        if self.writes_blocked.load(Ordering::SeqCst) {
+            return Err(RECOVERY_REQUIRED_MESSAGE.into());
+        }
         let key = self.get_key()?;
         self.encrypt_with_key(data, &key)
     }
@@ -519,6 +544,53 @@ mod tests {
                 .unwrap(),
             "current"
         );
+    }
+
+    #[test]
+    fn encrypt_succeeds_after_set_key_and_after_change_key() {
+        let ent = make_ent();
+        let first = ent.encrypt("before".to_string()).unwrap();
+        assert_eq!(ent.decrypt(first).unwrap(), "before");
+
+        assert_eq!(
+            ent.change_key("another-test-key".to_string()).unwrap(),
+            TEST_KEY
+        );
+        let second = ent.encrypt("after".to_string()).unwrap();
+        assert_eq!(
+            ent.decrypt_with_key(second, "another-test-key").unwrap(),
+            "after"
+        );
+    }
+
+    #[test]
+    fn encrypt_is_refused_while_writes_are_blocked_and_decrypt_still_works() {
+        let ent = make_ent();
+        let existing = ent.encrypt("existing".to_string()).unwrap();
+
+        ent.block_writes();
+        assert_eq!(
+            ent.encrypt("blocked".to_string()).unwrap_err().to_string(),
+            super::RECOVERY_REQUIRED_MESSAGE
+        );
+        assert_eq!(ent.decrypt(existing.clone()).unwrap(), "existing");
+        assert_eq!(
+            ent.decrypt_with_fallback(existing, "unused-fallback-key")
+                .unwrap(),
+            "existing"
+        );
+        // Rotation, rollback and recovery re-encrypt through the explicit-key path.
+        let rotated = ent
+            .encrypt_with_key("rotated".to_string(), "another-test-key")
+            .unwrap();
+        assert_eq!(
+            ent.decrypt_with_key(rotated, "another-test-key").unwrap(),
+            "rotated"
+        );
+
+        ent.unblock_writes();
+        let allowed = ent.encrypt("allowed".to_string()).unwrap();
+        assert_eq!(ent.decrypt(allowed).unwrap(), "allowed");
     }
 
     #[test]

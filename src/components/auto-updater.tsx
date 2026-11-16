@@ -21,8 +21,11 @@ const safeDetails = (error: unknown) => {
   const status = message.match(/\b(?:status:?\s*|HTTP\s+)([1-5]\d{2})\b/i)?.[1];
   return `${status ? `HTTP ${status}: ` : ""}${redactSecrets(hostOnly)}`;
 };
+const UPDATE_GONE = "Update is no longer available";
 const failureReason = (error: unknown): FailureReason => {
   const message = error instanceof Error ? error.message : String(error);
+  // Our own error, not a network failure: retrying would only ask the server again.
+  if (message === UPDATE_GONE) return "other";
   if (/signature|verification|verify|public key/i.test(message)) return "signature";
   if (/\b(403|404)\b/.test(message)) return "http";
   return "network";
@@ -129,7 +132,7 @@ const AutoUpdater = () => {
     try {
       if (!update) update = await check({ timeout: CHECK_TIMEOUT_MS });
       if (id !== attempt.current || !mounted.current) { close(update); return; }
-      if (!update) throw new Error("Update is no longer available");
+      if (!update) throw new Error(UPDATE_GONE);
       ownedUpdate.current = update;
       setMetadata(update);
       armWatchdog(id, 20_000, "No first byte within 20 seconds");
@@ -200,6 +203,7 @@ const AutoUpdater = () => {
     : state.reason === "install" ? t("update.fidelity.installError") : t("update.fidelity.unknownError");
 
   return <>
+    <span hidden data-testid="update-state" data-state={state.phase} data-visible={state.visible} />
     {state.phase === "checking" && <span className="sr-only" role="status" aria-live="polite">{t("update.fidelity.checking")}</span>}
     {state.phase === "available" && <div className="t3-update-fidelity-toast" role="status">
       <span className="t3-update-fidelity-toast-icon" aria-hidden="true">↓</span>

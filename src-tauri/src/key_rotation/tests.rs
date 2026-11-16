@@ -1000,6 +1000,86 @@ fn successful_rollback_returns_a_structured_non_poisoning_error() {
 }
 
 #[test]
+fn clean_rollback_leaves_encrypt_available() {
+    tauri::async_runtime::block_on(async {
+        let fixture = Fixture::new().await;
+
+        let error = rotate_for_command_with_failpoint(
+            &fixture.database_path,
+            &fixture.app_data_dir,
+            &fixture.ent,
+            NEW_KEY.to_string(),
+            RotationFailpoint::DuringDatabaseCommit,
+        )
+        .await
+        .unwrap_err();
+
+        assert!(matches!(error, RotationCommandError::Failed { .. }));
+        let ciphertext = fixture.ent.encrypt("after rollback".to_string()).unwrap();
+        assert_eq!(
+            fixture.ent.decrypt_with_key(ciphertext, OLD_KEY).unwrap(),
+            "after rollback"
+        );
+    });
+}
+
+#[test]
+fn recovery_required_blocks_encrypt_until_a_later_rotation_succeeds() {
+    tauri::async_runtime::block_on(async {
+        let fixture = Fixture::new().await;
+        let existing = fixture.ent.encrypt("existing".to_string()).unwrap();
+
+        let error = rotate_for_command_with_failpoint(
+            &fixture.database_path,
+            &fixture.app_data_dir,
+            &fixture.ent,
+            NEW_KEY.to_string(),
+            RotationFailpoint::DuringRollback,
+        )
+        .await
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            RotationCommandError::RecoveryRequired { .. }
+        ));
+        assert!(fixture.app_data_dir.join(JOURNAL_NAME).exists());
+        assert_eq!(
+            fixture
+                .ent
+                .encrypt("write while the journal is pending".to_string())
+                .unwrap_err()
+                .to_string(),
+            RECOVERY_REQUIRED_MESSAGE
+        );
+        assert_eq!(
+            fixture.ent.decrypt_with_key(existing, OLD_KEY).unwrap(),
+            "existing"
+        );
+
+        rotate_for_command_with_failpoint(
+            &fixture.database_path,
+            &fixture.app_data_dir,
+            &fixture.ent,
+            "third-key-for-tests".to_string(),
+            RotationFailpoint::None,
+        )
+        .await
+        .unwrap();
+
+        assert_no_rotation_artifacts(&fixture.app_data_dir);
+        let ciphertext = fixture.ent.encrypt("after recovery".to_string()).unwrap();
+        assert_eq!(
+            fixture
+                .ent
+                .decrypt_with_key(ciphertext, "third-key-for-tests")
+                .unwrap(),
+            "after recovery"
+        );
+    });
+}
+
+#[test]
 fn concurrent_rotations_are_serialized_to_one_consistent_key() {
     let fixture = tauri::async_runtime::block_on(Fixture::new());
     let barrier = Arc::new(Barrier::new(3));

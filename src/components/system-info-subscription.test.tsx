@@ -1,6 +1,7 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Outlet, Route, Routes } from "react-router-dom";
 import SystemInfo from "@/components/system-info";
 import { checkoutPendingKey } from "@/middlelayers/checkout";
 import { I18nProvider, useTranslation } from "@/i18n";
@@ -616,5 +617,62 @@ describe("System Info subscription management", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("checkout state on the wide Pro page", () => {
+  const narrowMatchMedia = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = ((query: string) => ({
+      ...narrowMatchMedia(query), matches: query === "(min-width: 1500px)",
+    })) as typeof window.matchMedia;
+  });
+  afterEach(() => { window.matchMedia = narrowMatchMedia; });
+
+  function renderWidePro() {
+    render(<MemoryRouter initialEntries={["/settings/systemInfo?section=pro"]}>
+      <Routes><Route element={<Outlet context="pro" />}>
+        <Route path="/settings/systemInfo" element={<SystemInfo onProStatusChange={vi.fn()} />} />
+      </Route></Routes>
+    </MemoryRouter>);
+  }
+  const subscribe = () => screen.findByRole("button", { name: "Subscribe" });
+
+  it("renders the Pro design without a checkout card while idle", async () => {
+    renderWidePro();
+    expect(await subscribe()).toBeEnabled();
+    expect(document.querySelector(".t3-b-pro")).toBeInTheDocument();
+    expect(screen.queryByTestId("checkout-status")).not.toBeInTheDocument();
+  });
+
+  it("shows the waiting state with Cancel and check again", async () => {
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "pending" });
+    renderWidePro();
+    fireEvent.click(await subscribe());
+    await waitFor(() => expect(screen.getByTestId("checkout-status")).toHaveAttribute("data-state", "waiting"));
+    const card = within(screen.getByTestId("checkout-status"));
+    expect(card.getByText(/waiting for payment/i)).toBeInTheDocument();
+    expect(card.getByRole("button", { name: /i've paid.*check again/i })).toBeInTheDocument();
+    expect(card.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
+    expect(mocks.createCheckoutSession).toHaveBeenCalledWith("yearly");
+  });
+
+  it("shows the error state when the session cannot be created", async () => {
+    mocks.createCheckoutSession.mockRejectedValue(new Error("offline"));
+    renderWidePro();
+    fireEvent.click(await subscribe());
+    await waitFor(() => expect(screen.getByTestId("checkout-status")).toHaveAttribute("data-state", "error"));
+    expect(screen.getByTestId("checkout-status")).toHaveTextContent(/could not finish payment verification/i);
+  });
+
+  it("disables Subscribe while waiting and enables it again after Cancel", async () => {
+    mocks.getCheckoutStatus.mockResolvedValue({ status: "pending" });
+    renderWidePro();
+    fireEvent.click(await subscribe());
+    await waitFor(() => expect(screen.getByTestId("checkout-status")).toHaveAttribute("data-state", "waiting"));
+    expect(await subscribe()).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+    expect(screen.queryByTestId("checkout-status")).not.toBeInTheDocument();
+    expect(await subscribe()).toBeEnabled();
   });
 });
