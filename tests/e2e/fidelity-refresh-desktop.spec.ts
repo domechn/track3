@@ -77,7 +77,7 @@ for (const state of states) test(`Refresh desktop captures ${state} with real so
         await expect(page.locator(".t3-hero-value")).toContainText("$621,333.50");
         await expect(page.getByRole("combobox", { name: "Total value view" })).toContainText("excluding okx");
         await expect(page.getByText("Insights", { exact: true })).toBeVisible();
-        await expect(page.getByText("Daily change", { exact: true })).toBeVisible();
+        await expect(page.locator(".t3-daily-panel h2")).toHaveText(/^(Daily|Weekly|Monthly) change$/);
         await expect(page.getByText("Top coins", { exact: true })).toBeVisible();
         await expect(page.locator(".t3-overview-more")).toBeVisible();
       }
@@ -95,7 +95,7 @@ for (const state of states) test(`Refresh desktop captures ${state} with real so
         await expect(page.locator(".t3-refresh-progress-pill")).toBeVisible({ timeout: 30_000 });
         await expect(page.locator(".t3-overview-grid")).toBeVisible();
         await expect(page.getByText("Insights", { exact: true })).toBeVisible();
-        await expect(page.getByText("Daily change", { exact: true })).toBeVisible();
+        await expect(page.locator(".t3-daily-panel h2")).toHaveText(/^(Daily|Weekly|Monthly) change$/);
         await expect(page.getByText("Top coins", { exact: true })).toBeVisible();
         await expect(page.locator(".t3-overview-more")).toBeVisible();
         await expect(page.getByRole("alertdialog")).toContainText("Done in 3.1 s");

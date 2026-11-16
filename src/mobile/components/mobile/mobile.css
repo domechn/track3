@@ -4120,7 +4120,6 @@ body:has(.fidelity-history, .fidelity-history-detail) {
     padding-bottom: calc(36px + var(--mobile-safe-bottom));
   }
   .app-layout #app-main-content:is([data-route="/overview"], [data-route="/summary"], [data-route="/comparison"], [data-route="/wallets"], [data-route="/cost-basis"], [data-route="/history"], [data-route="/rebalance"], [data-route="/goals"], [data-route^="/settings"]) {
-    padding-bottom: 48px !important;
+    padding-bottom: calc(60px + var(--mobile-safe-bottom)) !important;
   }
-  .app-layout #app-main-content[data-route="/summary"] { padding-bottom: 36px !important; }
 }
