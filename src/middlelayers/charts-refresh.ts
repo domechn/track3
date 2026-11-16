@@ -787,6 +787,8 @@ async function queryWalletCoinValueContext(
         .concat(followTargets.filter((target) => target.assetType === "stock").map((target) => target.symbol)),
     ),
   ).filter((x): x is string => !!x && (!savedStockRows || !isBrokerCashSymbol(x)));
+  const coinQuoteNeeded = needPriceAssets.some((a) => getAssetType(a) === "crypto") ||
+    followTargets.some((target) => target.assetType === "crypto");
   const cashSymbols = [...new Set(
     needPriceAssets.filter((asset) => savedStockRows && getAssetType(asset) === "stock" && isBrokerCashSymbol(asset.symbol))
       .map((asset) => asset.symbol.toUpperCase())
@@ -797,8 +799,9 @@ async function queryWalletCoinValueContext(
     cryptoPriceSymbols.length > 0
       ? queryCoinPrices(cryptoPriceSymbols, userProInfo).catch((error: unknown) => {
         if (!liveStatus) throw error;
-        const reason = liveQuoteReason(error, "pricesMissing");
-        if (reason === "rateLimited" || !liveStatus.reason) liveStatus.reason = reason;
+        // USDT and BTC are always requested, so the call also runs when no holding needs a coin quote.
+        const reason = liveQuoteReason(error, coinQuoteNeeded ? "pricesMissing" : undefined);
+        if (reason === "rateLimited" || (reason && !liveStatus.reason)) liveStatus.reason = reason;
         return {};
       })
       : Promise.resolve({}),
