@@ -1,17 +1,24 @@
 name: "test-on-pr"
-on: [pull_request]
+on:
+  pull_request:
+  # Pull requests can only restore caches saved from master, so a nightly master run saves them.
+  schedule:
+    - cron: "17 19 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Release pull requests, nightly runs and manual runs always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && !startsWith(github.head_ref, 'chore/release-') && !contains(github.head_ref, 'hotfix') && github.base_ref != 'release' }}
 
 jobs:
-  quality:
+  # Cheap checks that every long job waits for, so an obvious error fails in minutes.
+  pre-check:
     runs-on: ubuntu-22.04
-    timeout-minutes: 90
+    timeout-minutes: 15
     permissions:
       contents: read
       issues: read
@@ -20,11 +27,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
+      - uses: ./.github/actions/setup-web
+        timeout-minutes: 10
       - name: Check owner-applied format exception
+        if: github.event_name == 'pull_request'
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -36,9 +43,59 @@ jobs:
             echo "FORMAT_EXCEPTION_APPROVED=true" >> "$GITHUB_ENV"
           fi
       - name: Check UI refactor boundaries
+        if: github.event_name == 'pull_request'
+        timeout-minutes: 5
         run: |
           node --test scripts/ui-refactor-guard.test.mjs scripts/update-ui-goldens.test.mjs
           node scripts/ui-refactor-guard.mjs "origin/${{ github.base_ref }}"
+      - name: lint workflow signing secrets
+        timeout-minutes: 5
+        run: |
+          node --test scripts/workflow-secrets-lint.test.mjs
+          node scripts/workflow-secrets-lint.mjs
+      - name: test the browser report summary script
+        timeout-minutes: 5
+        run: node --test scripts/ci/playwright-summary.test.mjs
+      - name: type-check app
+        timeout-minutes: 5
+        run: corepack yarn tsc --noEmit
+      - name: type-check browser tests
+        timeout-minutes: 5
+        run: corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit
+      - name: load every browser spec
+        timeout-minutes: 5
+        run: |
+          # The mobile specs import desktop spec files, so each project is listed on its own.
+          corepack yarn playwright test --list --project=desktop > /dev/null
+          corepack yarn playwright test --list --project=mobile > /dev/null
+          corepack yarn playwright test -c playwright.preview.config.ts --list > /dev/null
+      - name: test files related to the change
+        if: github.event_name == 'pull_request'
+        timeout-minutes: 8
+        run: |
+          base="origin/${{ github.base_ref }}"
+          files="$(corepack yarn vitest list --filesOnly --changed "$base" | wc -l)"
+          # A wide change reaches most test files and the quality job runs them all, so only a narrow change runs here.
+          if [ "$files" -gt 80 ]; then
+            echo "::notice::$files test files depend on this change; the quality job runs them."
+          else
+            corepack yarn vitest run --changed "$base" --passWithNoTests
+          fi
+
+  quality:
+    needs: pre-check
+    # Run after a failed pre-check too: a skipped job would count as a passing required check.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - name: require the pre-check
+        run: test "${{ needs.pre-check.result }}" = success
+      - uses: actions/checkout@v4
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - name: enable corepack
         run: |
           corepack enable
@@ -51,6 +108,8 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+          save-if: ${{ github.event_name != 'pull_request' }}
+          cache-on-failure: true
       - name: cache apt packages
         uses: actions/cache@v4
         with:
@@ -58,68 +117,120 @@ jobs:
           key: ${{ runner.os }}-apt-tauri-${{ hashFiles('.github/workflows/test-on-pr.yaml') }}
           restore-keys: ${{ runner.os }}-apt-tauri-
       - name: install system dependencies
-        timeout-minutes: 15
+        timeout-minutes: 10
         run: |
           mkdir -p "$HOME/.cache/apt-archives/partial"
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          apt_get() { sudo timeout -k 10 "$1" apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 "${@:2}"; }
+          # A hung apt is killed and retried once; the step timeout bounds both attempts.
+          for attempt in 1 2; do
+            if apt_get 90 update && apt_get 240 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf; then break; fi
+            if [ "$attempt" -eq 2 ]; then exit 1; fi
+            sudo timeout -k 10 60 dpkg --configure -a || true
+          done
           sudo chown -R "$USER:$USER" "$HOME/.cache/apt-archives"
       - name: install frontend dependencies
+        timeout-minutes: 10
         run: corepack yarn install --immutable
-      - name: lint workflow signing secrets
-        run: |
-          node --test scripts/workflow-secrets-lint.test.mjs
-          node scripts/workflow-secrets-lint.mjs
-      - name: test frontend
-        run: corepack yarn test
       - name: check frontend coverage
+        timeout-minutes: 20
         run: corepack yarn test:coverage
       - name: build frontend
+        timeout-minutes: 10
         run: corepack yarn build
       - name: test Rust
+        timeout-minutes: 20
         run: cargo test --locked --all-targets
         working-directory: src-tauri
       - name: test Rust without GTK
+        timeout-minutes: 10
         run: cargo test --locked -p track3-pure-tests --lib
         working-directory: src-tauri
       - name: check Rust
+        timeout-minutes: 10
         run: cargo check --locked
         working-directory: src-tauri
 
-  e2e:
+  e2e-shard:
+    name: e2e desktop (${{ matrix.shard }}/4)
+    needs: pre-check
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
-      - name: setup node
-        uses: actions/setup-node@v4
+      - uses: ./.github/actions/setup-web
+        timeout-minutes: 10
         with:
-          node-version: 24
-      - name: enable corepack
-        run: |
-          corepack enable
-          corepack prepare yarn@4.9.2 --activate
-      - name: install frontend dependencies
-        run: corepack yarn install --immutable
-      - name: Cache Playwright Chromium
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-chromium-${{ hashFiles('yarn.lock') }}
-      - name: install Chromium
-        timeout-minutes: 15
-        run: corepack yarn playwright install --with-deps chromium
+          chromium: install-with-deps
       - name: Check generated brand icons
+        if: matrix.shard == 1
+        timeout-minutes: 5
         run: node --test scripts/brand-export.test.mjs
-      - name: type-check browser tests
-        run: corepack yarn tsc -p tests/e2e/tsconfig.json --noEmit
       - name: smoke test
-        run: corepack yarn test:e2e
+        timeout-minutes: 25
+        run: corepack yarn test:e2e --workers=2 --shard=${{ matrix.shard }}/4 --reporter=list,blob
+      - name: upload shard report
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: blob-desktop-${{ matrix.shard }}
+          overwrite: true
+          path: blob-report
+          retention-days: 1
+
+  # Keeps the original check name: fails when the pre-check or any shard did not pass.
+  e2e:
+    needs: [pre-check, e2e-shard]
+    if: always()
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-web
+        if: needs.e2e-shard.result != 'skipped'
+        continue-on-error: true
+        timeout-minutes: 10
+      - uses: actions/download-artifact@v8
+        if: needs.e2e-shard.result != 'skipped'
+        continue-on-error: true
+        with:
+          path: all-blob-reports
+          pattern: blob-desktop-*
+          merge-multiple: true
+      - name: merge shard reports and list failed and flaky tests
+        if: needs.e2e-shard.result != 'skipped'
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright-report/results.json
+        run: |
+          corepack yarn playwright merge-reports --reporter=html,json all-blob-reports
+          node scripts/ci/playwright-summary.mjs playwright-report/results.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: needs.e2e-shard.result != 'skipped'
+        continue-on-error: true
+        with:
+          name: playwright-report-desktop
+          path: playwright-report
+          retention-days: 3
+      - name: require the pre-check and every shard
+        if: always()
+        run: |
+          test "${{ needs.pre-check.result }}" = success
+          test "${{ needs.e2e-shard.result }}" = success
 
   compat-094:
+    needs: pre-check
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
+      - name: require the pre-check
+        run: test "${{ needs.pre-check.result }}" = success
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -139,14 +250,19 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+          save-if: ${{ github.event_name != 'pull_request' }}
+          cache-on-failure: true
       - name: install frontend dependencies
+        timeout-minutes: 10
         run: corepack yarn install --immutable
       - name: test released 0.9.4 compatibility
+        timeout-minutes: 12
         run: timeout 600 node scripts/compat/run-094.mjs
 
   test-tauri:
-    needs: quality
-    timeout-minutes: 120
+    needs: pre-check
+    if: ${{ !cancelled() }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -162,6 +278,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
+      - name: require the pre-check
+        shell: bash
+        run: test "${{ needs.pre-check.result }}" = success
       - uses: actions/checkout@v4
       - name: setup node
         uses: actions/setup-node@v4
@@ -188,6 +307,10 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+          # Both macOS legs run on the same runner type, so the target keeps their caches apart.
+          key: ${{ contains(matrix.args, 'x86_64') && 'x86_64' || 'host' }}
+          save-if: ${{ github.event_name != 'pull_request' }}
+          cache-on-failure: true
       - name: cache apt packages (ubuntu only)
         if: matrix.os == 'ubuntu-22.04'
         uses: actions/cache@v4
@@ -197,20 +320,28 @@ jobs:
           restore-keys: ${{ runner.os }}-apt-tauri-
       - name: install dependencies (ubuntu only)
         if: matrix.os == 'ubuntu-22.04'
-        timeout-minutes: 15
+        timeout-minutes: 10
         run: |
           mkdir -p "$HOME/.cache/apt-archives/partial"
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
-          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          apt_get() { sudo timeout -k 10 "$1" apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 "${@:2}"; }
+          # A hung apt is killed and retried once; the step timeout bounds both attempts.
+          for attempt in 1 2; do
+            if apt_get 90 update && apt_get 240 -o Dir::Cache::archives="$HOME/.cache/apt-archives" -o APT::Keep-Downloaded-Packages=true install -y --no-install-recommends libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf; then break; fi
+            if [ "$attempt" -eq 2 ]; then exit 1; fi
+            sudo timeout -k 10 60 dpkg --configure -a || true
+          done
           sudo chown -R "$USER:$USER" "$HOME/.cache/apt-archives"
       - name: install target (mac only)
         if: matrix.os == 'macos-latest'
+        timeout-minutes: 10
         run: |
           rustup target add x86_64-apple-darwin
       - name: install frontend dependencies
+        timeout-minutes: 10
         run: corepack yarn install --immutable
 
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5
+        timeout-minutes: 45
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -218,6 +349,7 @@ jobs:
           args: ${{ matrix.args }}
       - name: verify the macOS app is ad-hoc code signed (mac only)
         if: matrix.os == 'macos-latest'
+        timeout-minutes: 5
         run: |
           APP=$(find src-tauri/target -type d -name 'track3.app' -path '*release/bundle/macos*' | head -1)
           test -n "$APP"

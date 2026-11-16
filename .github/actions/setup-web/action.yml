@@ -1,0 +1,48 @@
+name: Set up Node, Yarn and Playwright Chromium
+description: Node 24, Corepack Yarn with its cache, an immutable install, and optionally Chromium for Playwright.
+
+inputs:
+  chromium:
+    description: "'' skips the browser, 'install' downloads Chromium, 'install-with-deps' also installs its apt packages"
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
+    - shell: bash
+      run: |
+        corepack enable
+        corepack prepare yarn@4.9.2 --activate
+    - id: yarn-cache
+      shell: bash
+      run: echo "dir=$(corepack yarn config get cacheFolder)" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache@v6
+      with:
+        path: ${{ steps.yarn-cache.outputs.dir }}
+        key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+    - shell: bash
+      run: timeout -k 10 300 corepack yarn install --immutable
+    - id: playwright
+      if: inputs.chromium != ''
+      shell: bash
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+    - if: inputs.chromium != ''
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-chromium-${{ steps.playwright.outputs.version }}
+    - if: inputs.chromium != ''
+      shell: bash
+      env:
+        WITH_DEPS: ${{ inputs.chromium == 'install-with-deps' && '--with-deps' || '' }}
+      run: |
+        # Composite steps cannot set timeout-minutes: bound each attempt here so a stuck apt or download is retried.
+        for attempt in 1 2 3; do
+          if timeout -k 10 170 corepack yarn playwright install $WITH_DEPS chromium; then exit 0; fi
+          sudo timeout -k 10 60 dpkg --configure -a || true
+          sleep 5
+        done
+        exit 1

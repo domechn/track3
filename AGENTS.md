@@ -205,7 +205,8 @@ The user-facing language switcher lives in the **Appearance** tab of Settings (`
 - CoinGecko price integration uses Rust (`query_coins_prices`); exchange integrations, including Binance, use TypeScript adapters.
 - Data persistence uses SQLite through `@tauri-apps/plugin-sql` in `src/middlelayers/database.ts`.
 - File import/export uses `@tauri-apps/plugin-fs` in `src/middlelayers/datamanager.ts`.
-- CI and release behavior are defined in `.github/workflows/`.
+- CI and release behavior are defined in `.github/workflows/`. Both pull request workflows start with a `pre-check` job (types, spec loading, unit tests related to the change) that every long job needs. Playwright runs in four shards per project, and `e2e`, `web` and `ios` are aggregate jobs that keep those check names. For pull requests `test-on-pr` runs the unit tests once (with coverage) and the desktop browser project, and `ios-foundation` runs the mobile project and the iOS app legs. Nightly master runs save the caches that pull requests restore.
+- Under `CI`, Vitest uses a 15 s test timeout and Playwright a 10 s expect timeout with one retry. A browser test that passes on its retry is listed as flaky in the job summary; fix it instead of relying on the retry.
 - Stock data from Interactive Brokers (`@stoqey/ibkr` via `stock/ibkr.ts`).
 - Chat sessions are stored in the `chat_sessions` table and managed through `src/components/assistant/use-chat-sessions.ts`.
 - Assistant writes are limited to `src/middlelayers/ai/actions/`. The model may call `propose_action`, but only the chat confirmation card may claim and execute a pending action. Action blocks and audit results live in the existing encrypted session file; the session claim must be persisted before execution. Do not add assistant paths to secrets, sync, history deletion, or refresh with new credentials. Date and comparison selections use the assistant action event and local storage.

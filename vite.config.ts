@@ -101,6 +101,8 @@ export default defineConfig({
     css: true,
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     exclude: [".agents/**", "**/.agents/**"],
+    // Coverage on a shared CI runner pushes slow tests past the 5 s default.
+    testTimeout: process.env.CI ? 15_000 : 5_000,
     coverage: {
       provider: "v8",
       include: ["src/middlelayers/datafetch/coins/**/*.{ts,tsx}"],

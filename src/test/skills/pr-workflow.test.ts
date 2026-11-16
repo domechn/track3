@@ -11,6 +11,7 @@ type WorkflowStep = {
 };
 
 type WorkflowJob = {
+  if?: string;
   needs?: string | string[];
   "runs-on"?: string;
   "timeout-minutes"?: number;
@@ -36,7 +37,8 @@ describe("pull request workflow", () => {
     const workflow = parse(await readFile(workflowPath, "utf8")) as Workflow;
     for (const job of Object.values(workflow.jobs)) {
       expect(job["timeout-minutes"]).toBeGreaterThan(0);
-      const aptStep = job.steps?.find(({ run }) => run?.includes("apt-get install"));
+      // Options sit between the command and "install", so match the pair, not the literal phrase.
+      const aptStep = job.steps?.find(({ run }) => /apt[-_]get\b[^\n]*\binstall\b/.test(run ?? ""));
       if (!aptStep) continue;
       expect(aptStep["timeout-minutes"]).toBeGreaterThan(0);
       expect(aptStep.run).toContain("Acquire::Retries=3");
@@ -47,7 +49,7 @@ describe("pull request workflow", () => {
     }
   });
 
-  it("runs a stable quality gate before every packaging matrix", async () => {
+  it("runs a stable quality gate and a pre-check before every packaging matrix", async () => {
     const workflow = parse(
       await readFile(workflowPath, "utf8"),
     ) as Workflow;
@@ -75,26 +77,36 @@ describe("pull request workflow", () => {
       .join("\n");
     expect(commands).toContain("corepack prepare yarn@4.9.2 --activate");
     expect(commands).toContain("corepack yarn install --immutable");
-    expect(commands).toContain("corepack yarn test");
+    // The coverage run executes every test file once and enforces the thresholds.
     expect(commands).toContain("corepack yarn test:coverage");
-    expect(commands.indexOf("corepack yarn test")).toBeLessThan(
-      commands.indexOf("corepack yarn test:coverage"),
-    );
+    expect(commands).not.toMatch(/corepack yarn test(?![:\w])/);
     expect(commands).toContain("corepack yarn build");
     expect(commands).toContain("cargo test --locked --all-targets");
     expect(commands).toContain("cargo check --locked");
 
-    const packagingJobs = Object.values(workflow.jobs).filter(
-      ({ strategy }) => strategy?.matrix !== undefined,
+    const packagingJobs = Object.values(workflow.jobs).filter(({ steps }) =>
+      steps?.some(({ uses }) => uses === pinnedTauriAction),
     );
     expect(packagingJobs.length).toBeGreaterThan(0);
     for (const job of packagingJobs) {
-      expect(job.needs).toBe("quality");
-      expect(job.steps).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ uses: pinnedTauriAction }),
-        ]),
-      );
+      expect(job.needs).toBe("pre-check");
+      expect(job.strategy?.matrix).toBeDefined();
     }
+  });
+
+  it("keeps the original check names and never reports them as skipped", async () => {
+    const workflow = parse(await readFile(workflowPath, "utf8")) as Workflow;
+    for (const name of ["quality", "e2e", "compat-094", "test-tauri"]) {
+      const job = workflow.jobs[name];
+      expect(job, name).toBeDefined();
+      expect([job.needs].flat(), name).toContain("pre-check");
+      // A job skipped by a failed dependency counts as a passing required check.
+      expect(job.if, name).toMatch(/always\(\)|!cancelled\(\)/);
+      expect(job.steps?.some(({ run }) => run?.includes("needs.pre-check.result")), name).toBe(true);
+    }
+    expect([workflow.jobs.e2e.needs].flat()).toContain("e2e-shard");
+    const shardCommands = (workflow.jobs["e2e-shard"].steps ?? []).map(({ run }) => run ?? "").join("\n");
+    expect(shardCommands).toContain("corepack yarn test:e2e");
+    expect(shardCommands).toContain("--shard=${{ matrix.shard }}/");
   });
 });
