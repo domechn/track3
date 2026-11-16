@@ -1,3 +1,5 @@
+import { LIVE_TOTAL_REASONS } from "./use-live-total";
+
 export function LiveTotalDetails({ error, lastAt, retryNow, t }: {
   error?: string;
   lastAt?: number;
@@ -5,8 +7,7 @@ export function LiveTotalDetails({ error, lastAt, retryNow, t }: {
   t: (key: string) => string;
 }) {
   const [kind, count] = (error ?? "unknown").split(":");
-  const safeKind = ["rateLimited", "pricesMissing", "stockPricesMissing", "rateUnavailable", "ibkrToken", "partialSource"]
-    .includes(kind) && (kind !== "pricesMissing" || /^[1-9]\d*$/.test(count ?? "")) ? kind : "unknown";
+  const safeKind = (LIVE_TOTAL_REASONS as readonly string[]).includes(kind) && (kind !== "pricesMissing" || /^[1-9]\d*$/.test(count ?? "")) ? kind : "unknown";
   return <div className="space-y-2 text-sm">
     <p className="text-muted-foreground">
       {t(`realtime.error.${safeKind}`).replace("{count}", count ?? "")}

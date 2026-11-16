@@ -92,7 +92,10 @@ const App = ({
 
   const runRefresh = async (sourceId?: string, automatic = false): Promise<PortfolioSourceStatus[] | null | undefined> => {
     if (refreshLoading || refreshInProgress.current) return;
-    if (sourceId && !lastResult?.sourceResults) return null;
+    if (sourceId && !lastResult?.sourceResults) {
+      if (automatic) return null;
+      sourceId = undefined; // single-source inputs are gone: a manual retry runs a full refresh
+    }
     if (!automatic) refreshRetryScheduler.manualStart();
     refreshInProgress.current = true;
     if (isIOS() && !automatic) setStatusDialogOpen(true);
@@ -184,7 +187,13 @@ const App = ({
           .map((source) => source.sourceId).join(",") ?? "",
       });
     } catch (error) {
-      if (error instanceof FullRefreshRequiredError) refreshRetryScheduler.stop();
+      const fullRefreshRequired = error instanceof FullRefreshRequiredError;
+      if (fullRefreshRequired) {
+        refreshRetryScheduler.stop();
+        // The single-source inputs are out of date, so every retry control falls back to a full refresh.
+        lastRetryResult = lastRetryResult && { ...lastRetryResult, sourceResults: undefined };
+        setLastResult(lastRetryResult);
+      }
       const messageKey = error instanceof FullRefreshRequiredError
         ? "refresh.runFullRefresh"
         : error instanceof Error && error.message.startsWith("no configuration found")
@@ -192,7 +201,7 @@ const App = ({
           : "refresh.unexpectedError";
       if (!automatic) toast({ description: t(messageKey), variant: "destructive",
         action: [
-          <ToastAction key="retry" altText={t("refresh.retryButton")} onClick={() => void requestRefresh(sourceId)}>{t("refresh.retryButton")}</ToastAction>,
+          <ToastAction key="retry" altText={t("refresh.retryButton")} onClick={() => void requestRefresh(fullRefreshRequired ? undefined : sourceId)}>{t("refresh.retryButton")}</ToastAction>,
           <ToastAction key="details" altText={t("refresh.details")} onClick={() => setStatusDialogOpen(true)}>{t("refresh.details")}</ToastAction>,
         ] });
       trackRefreshEvent({ failed: "true" });
@@ -236,6 +245,8 @@ const App = ({
 
   const requestRefresh = async (sourceId?: string) => {
     if (refreshLoading || preflight || preflightPendingRef.current || refreshInProgress.current) return;
+    // The run falls back to a full refresh, so the quota check must cover every source.
+    if (!lastResult?.sourceResults) sourceId = undefined;
     preflightPendingRef.current = true;
     setPreflightPending(true);
     try {
@@ -311,6 +322,9 @@ const App = ({
     ? t("refresh.autoRetry.next").replace("{time}", new Date(nextRetryAt).toLocaleTimeString(
       locale === "zh" ? "zh-CN" : "en-US", { hour: "2-digit", minute: "2-digit", hour12: false }))
     : retrySchedule.stopped ? t("refresh.autoRetry.stopped") : "";
+  const refreshState = refreshLoading || refreshing ? "running" : preflight ? "confirm" : preflightPending ? "preflight" : "idle";
+  const retryState = !retrySchedule.enabled ? "off" : retrySchedule.stopped ? "stopped"
+    : Number.isFinite(nextRetryAt) ? "waiting" : "idle";
   const kindIcon = { exchange: GlobeIcon, wallet: CubeIcon, broker: BackpackIcon, others: ArchiveIcon };
   const statusStyle = {
     ok: "t3-pill t3-refresh-status-pill",
@@ -349,8 +363,8 @@ const App = ({
 
   return (
     <div className="t3-refresh-controls flex items-center gap-2">
-      <span role="status" className="sr-only">{refreshLoading || preflightPending ? t("refresh.inProgress") : ""}</span>
-      <Button variant="outline" className="t3-refresh-button" aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
+      <span role="status" className="sr-only" data-retry-state={retryState}>{refreshLoading || preflightPending ? t("refresh.inProgress") : ""}</span>
+      <Button variant="outline" className="t3-refresh-button" data-state={refreshState} aria-label={t("common.refresh")} onClick={() => requestRefresh()} disabled={refreshLoading || preflightPending}>
         <UpdateIcon aria-hidden="true" className={`mr-2 h-4 w-4 ${refreshLoading || preflightPending ? "animate-spin motion-reduce:animate-none" : ""}`} />
         <p className="hidden sm:inline-block">{t("common.refresh")}</p>
       </Button>

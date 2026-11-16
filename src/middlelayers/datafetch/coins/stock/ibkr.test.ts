@@ -432,6 +432,58 @@ describe("IBKR Flex parser", () => {
     }
   });
 
+  it("backs off pending statement polls by 1, 2, 4, 8 and 10 seconds before reporting not ready", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(sendHttpTextRequest)
+        .mockResolvedValueOnce(`<FlexStatementResponse><Status>Success</Status><ReferenceCode>ref</ReferenceCode></FlexStatementResponse>`)
+        .mockResolvedValue(`<FlexStatementResponse><Status>Fail</Status>
+          <ErrorCode>1019</ErrorCode><ErrorMessage>Statement generation in progress</ErrorMessage></FlexStatementResponse>`);
+      const request = new IbkrBroker("pending-backoff-token", "q").fetchPositions();
+      const result = expect(request).rejects.toMatchObject({ category: "service", detail: "IBKR not ready" });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sendHttpTextRequest).toHaveBeenCalledTimes(1);
+      let elapsed = 0;
+      for (const [at, calls] of [[5_000, 2], [6_000, 3], [8_000, 4], [12_000, 5], [20_000, 6], [30_000, 7]]) {
+        await vi.advanceTimersByTimeAsync(at - elapsed - 1);
+        expect(sendHttpTextRequest).toHaveBeenCalledTimes(calls - 1);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(sendHttpTextRequest).toHaveBeenCalledTimes(calls);
+        elapsed = at;
+      }
+      await result;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports the rate limit at once when a second sixty-second wait would outlast the source budget", async () => {
+    vi.useFakeTimers();
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const rateLimitXml = `<FlexStatementResponse><Status>Fail</Status>
+        <ErrorCode>1018</ErrorCode><ErrorMessage>Too many requests</ErrorMessage></FlexStatementResponse>`;
+      vi.mocked(sendHttpTextRequest)
+        .mockResolvedValueOnce(rateLimitXml)
+        .mockResolvedValueOnce(`<FlexStatementResponse><Status>Success</Status><ReferenceCode>ref</ReferenceCode></FlexStatementResponse>`)
+        .mockResolvedValue(rateLimitXml);
+      const started = Date.now();
+      let settledAfter: number | undefined;
+      const request = new IbkrBroker("budget-token", "q").fetchPositions()
+        .finally(() => { settledAfter = Date.now() - started; });
+      const result = expect(request).rejects.toMatchObject({
+        category: "rateLimit", detail: "IBKR rate limited",
+      });
+      await vi.advanceTimersByTimeAsync(65_000);
+      await result;
+      expect(settledAfter).toBe(65_000);
+      expect(sendHttpTextRequest).toHaveBeenCalledTimes(3);
+    } finally {
+      log.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it("limits all brokers sharing a token to one request per second and ten per minute", async () => {
     vi.useFakeTimers();
     try {

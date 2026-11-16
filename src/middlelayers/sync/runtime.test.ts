@@ -3,6 +3,7 @@ import { createSyncHeader } from "./crypto";
 import { openRecoveryFile } from "./recovery-file";
 import { FakeS3, readSyncHeader, writeSyncHeader } from "./object-store";
 import { SyncRuntime } from "./runtime";
+import { SYNC_STOP_GRACE_MS } from "./scheduler";
 import { defaultSyncSettings, type SyncSettings } from "./settings";
 
 const configured: SyncSettings = {
@@ -487,6 +488,31 @@ describe("SyncRuntime", () => {
     runtime.stop();
   });
 
+  it("keeps the device list after a round fails by throwing and clears it on disable", async () => {
+    const s3 = new FakeS3();
+    await writeSyncHeader(s3, (await createSyncHeader("correct horse battery staple")).header);
+    let offline = false;
+    const runtime = new SyncRuntime({
+      load: async () => ({ ...configured, enabled: true }), save: async () => {}, store: () => s3,
+      engine: () => ({ engine: { syncOnce: async () => {
+        if (offline) throw new Error("offline");
+        return { ...emptyReport, devices: [{ id: "other", name: "Shared laptop" }] };
+      } }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.unlock("correct horse battery staple");
+    await runtime.syncNow();
+    const devices = [{ id: "other", name: "Shared laptop", current: false, lastUpload: undefined }];
+    expect(await runtime.devices()).toEqual(devices);
+    offline = true;
+    await runtime.syncNow();
+    expect(runtime.status().sync).toMatchObject({ phase: "error", error: "network" });
+    expect(runtime.status().sync.report).toBeUndefined();
+    expect(await runtime.devices()).toEqual(devices);
+    await runtime.disable();
+    expect(await runtime.devices()).toEqual([]);
+  });
+
   it("finishes the old bucket's round before clearing publication state", async () => {
     const first = new FakeS3();
     const second = new FakeS3();
@@ -577,4 +603,177 @@ describe("SyncRuntime", () => {
     expect(syncOnce).toHaveBeenCalledTimes(1);
     runtime.stop();
   });
+
+  it("publishes disabled and idle when sync is disabled during a running round", async () => {
+    const s3 = new FakeS3();
+    await writeSyncHeader(s3, (await createSyncHeader("correct horse battery staple")).header);
+    const runtime = new SyncRuntime({
+      load: async () => ({ ...configured, enabled: true }), save: async () => {}, store: () => s3,
+      engine: () => ({ engine: { syncOnce: abortable().syncOnce }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.unlock("correct horse battery staple");
+    const running = runtime.syncNow();
+    expect(runtime.status().sync.phase).toBe("syncing");
+    expect(await runtime.disable()).toBe(true);
+    await running;
+    expect(runtime.status()).toEqual({ mode: "disabled", sync: { phase: "idle" }, skipped: false });
+  });
+
+  it("Sync now restarts sync with the previous settings after a save timed out", async () => {
+    vi.useFakeTimers();
+    const s3 = new FakeS3();
+    await writeSyncHeader(s3, (await createSyncHeader("correct horse battery staple")).header);
+    let saved = { ...configured, enabled: true };
+    let engines = 0;
+    const round = hanging();
+    const runtime = new SyncRuntime({
+      load: async () => saved, save: async (next) => { saved = next; }, store: () => s3,
+      engine: () => {
+        engines++;
+        return { engine: { syncOnce: round.syncOnce }, unregister: () => {} };
+      },
+    });
+    await runtime.initialize();
+    await runtime.unlock("correct horse battery staple");
+    const running = runtime.syncNow();
+    expect(await afterStopGrace(runtime.configure({ ...configured, bucket: "other" }, "correct horse battery staple"))).toBe("timeout");
+    expect(runtime.status()).toMatchObject({ mode: "ready", sync: { phase: "error", error: "timeout", retryStopped: true } });
+    expect(runtime.status().sync.nextRetryAt).toBeUndefined();
+    round.finish();
+    await running;
+    await runtime.syncNow();
+    expect(round.rounds()).toBe(2);
+    expect(engines).toBe(1);
+    expect(saved.bucket).toBe(configured.bucket);
+    expect(runtime.status()).toMatchObject({ mode: "ready", sync: { phase: "idle" } });
+    runtime.stop();
+  });
+
+  it("a failed settings write after stopping the round ends in an error state, not syncing", async () => {
+    let saves = 0;
+    const round = abortable();
+    const runtime = new SyncRuntime({
+      load: async () => configured,
+      save: async () => { if (++saves > 1) throw new Error("disk full"); },
+      store: () => new FakeS3(),
+      engine: () => ({ engine: { syncOnce: round.syncOnce }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    expect(await runtime.configure(configured, "correct horse battery staple")).toBe("ok");
+    const running = runtime.syncNow();
+    expect(runtime.status().sync.phase).toBe("syncing");
+    expect(await runtime.configure({ ...configured, categories: { ...configured.categories, history: false } }, "")).toBe("network");
+    await running;
+    expect(runtime.status()).toMatchObject({ mode: "ready", sync: { phase: "error", error: "network", retryStopped: true } });
+    await runtime.syncNow();
+    expect(round.rounds()).toBe(2);
+    expect(runtime.status().sync.phase).toBe("idle");
+    runtime.stop();
+  });
+
+  it("a timed-out save while sync is disabled stays disabled", async () => {
+    vi.useFakeTimers();
+    const s3 = new FakeS3();
+    await writeSyncHeader(s3, (await createSyncHeader("correct horse battery staple")).header);
+    let saved = { ...configured, enabled: true };
+    const round = hanging();
+    const runtime = new SyncRuntime({
+      load: async () => saved, save: async (next) => { saved = next; }, store: () => s3,
+      engine: () => ({ engine: { syncOnce: round.syncOnce }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.unlock("correct horse battery staple");
+    const running = runtime.syncNow();
+    expect(await afterStopGrace(runtime.disable())).toBe(false);
+    expect(runtime.status().mode).toBe("disabled");
+    expect(await afterStopGrace(runtime.configure(configured, "correct horse battery staple"))).toBe("timeout");
+    expect(runtime.status()).toEqual({ mode: "disabled", sync: { phase: "idle" }, skipped: false });
+    expect(saved.enabled).toBe(false);
+    round.finish();
+    await running;
+  });
+
+  it("Sync now does not throw when sync is disabled during the round", async () => {
+    vi.useFakeTimers();
+    const s3 = new FakeS3();
+    await writeSyncHeader(s3, (await createSyncHeader("correct horse battery staple")).header);
+    const manual: Array<boolean | undefined> = [];
+    const round = abortable();
+    const runtime = new SyncRuntime({
+      load: async () => ({ ...configured, enabled: true }), save: async () => {}, store: () => s3,
+      engine: () => ({ engine: { syncOnce: (options) => {
+        manual.push(options?.manual);
+        return round.syncOnce(options);
+      } }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.unlock("correct horse battery staple");
+    await vi.advanceTimersByTimeAsync(400);
+    expect(manual).toEqual([false]);
+    const joined = expect(runtime.syncNow()).resolves.toBeUndefined();
+    await runtime.disable();
+    await joined;
+    // The press that never ran must not mark the next automatic round as manual.
+    expect(await runtime.configure(configured, "correct horse battery staple")).toBe("ok");
+    await vi.advanceTimersByTimeAsync(400);
+    expect(manual).toEqual([false, false]);
+    runtime.stop();
+  });
+
+  it("Sync now does not throw when the runtime stops during the round", async () => {
+    vi.useFakeTimers();
+    const s3 = new FakeS3();
+    await writeSyncHeader(s3, (await createSyncHeader("correct horse battery staple")).header);
+    const round = abortable();
+    const runtime = new SyncRuntime({
+      load: async () => ({ ...configured, enabled: true }), save: async () => {}, store: () => s3,
+      engine: () => ({ engine: { syncOnce: round.syncOnce }, unregister: () => {} }),
+    });
+    await runtime.initialize();
+    await runtime.unlock("correct horse battery staple");
+    await vi.advanceTimersByTimeAsync(400);
+    expect(round.rounds()).toBe(1);
+    const joined = expect(runtime.syncNow()).resolves.toBeUndefined();
+    runtime.stop();
+    await joined;
+  });
 });
+
+const emptyReport = { pulled: 0, pushed: 0, tombstonesApplied: 0, configChanges: 0, conflicts: [], errors: [] };
+type Round = { signal?: AbortSignal };
+
+// First round ends when its signal aborts; later rounds finish at once.
+function abortable() {
+  let rounds = 0;
+  return {
+    rounds: () => rounds,
+    syncOnce: async ({ signal }: Round = {}) => {
+      if (++rounds === 1) await new Promise<void>((resolve) => signal?.addEventListener("abort", () => resolve()));
+      return emptyReport;
+    },
+  };
+}
+
+// First round ignores abort until finish(); later rounds finish at once.
+function hanging() {
+  let rounds = 0;
+  let finish!: () => void;
+  const held = new Promise<void>((resolve) => { finish = resolve; });
+  return {
+    rounds: () => rounds,
+    finish,
+    syncOnce: async (_options: Round = {}) => {
+      if (++rounds === 1) await held;
+      return emptyReport;
+    },
+  };
+}
+
+// The 5 s stop grace starts only after async key work, so advance until the call returns.
+async function afterStopGrace<T>(call: Promise<T>): Promise<T> {
+  let done = false;
+  void call.then(() => { done = true; }, () => { done = true; });
+  while (!done) await vi.advanceTimersByTimeAsync(SYNC_STOP_GRACE_MS);
+  return call;
+}

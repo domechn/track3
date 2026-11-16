@@ -116,6 +116,14 @@ export const RefreshButtonLoadingContext = React.createContext<{
   setProgress: React.Dispatch<React.SetStateAction<number>>;
 }>(null as any);
 
+// Lives above the top bar, which unmounts on the Assistant page, so a running refresh keeps its state.
+function RefreshStateProvider({ children }: { children: React.ReactNode }) {
+  const [buttonLoading, setButtonLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const value = useMemo(() => ({ buttonLoading, setButtonLoading, progress, setProgress }), [buttonLoading, progress]);
+  return <RefreshButtonLoadingContext.Provider value={value}>{children}</RefreshButtonLoadingContext.Provider>;
+}
+
 function TopBar({
   isProUser,
   railFidelityPage,
@@ -156,8 +164,7 @@ function TopBar({
   const isOverview = pathname === "/overview";
   const recordsPage = pathname === "/history" || pathname === "/cost-basis";
   const { range: fidelityRange, setRange: setSummaryRange, label: selectedFidelityRange, setLabel: setSelectedFidelityRange } = React.useContext(SummaryFidelityRangeContext);
-  const [refreshButtonLoading, setRefreshButtonLoading] = useState(false);
-  const [refreshProgress, setRefreshProgress] = useState(0);
+  const { buttonLoading: refreshButtonLoading, progress: refreshProgress } = React.useContext(RefreshButtonLoadingContext);
   const selectedSnapshots = availableDates.filter((date) => dateRange?.from && dateRange.to && date >= dateRange.from && date <= dateRange.to).length;
   const fidelityDateRange = fidelityRange
     ? { from: fidelityRange.start, to: fidelityRange.end }
@@ -241,26 +248,17 @@ function TopBar({
             <Tooltip>
               <TooltipTrigger asChild>
                 <div>
-                  <RefreshButtonLoadingContext.Provider
-                    value={{
-                      buttonLoading: refreshButtonLoading,
-                      setButtonLoading: setRefreshButtonLoading,
-                      progress: refreshProgress,
-                      setProgress: setRefreshProgress,
+                  <RefreshData
+                    loading={refreshButtonLoading}
+                    fidelity={!!fidelityPage}
+                    overviewFlow={isOverview}
+                    liveTotalVisible={isProUser}
+                    afterRefresh={(success) => {
+                      if (success) {
+                        onRefreshSuccess();
+                      }
                     }}
-                  >
-                    <RefreshData
-                      loading={refreshButtonLoading}
-                      fidelity={!!fidelityPage}
-                      overviewFlow={isOverview}
-                      liveTotalVisible={isProUser}
-                      afterRefresh={(success) => {
-                        if (success) {
-                          onRefreshSuccess();
-                        }
-                      }}
-                    />
-                  </RefreshButtonLoadingContext.Provider>
+                  />
                 </div>
               </TooltipTrigger>
               <TooltipContent>
@@ -403,7 +401,7 @@ function Layout({
         <SummaryFidelityRangeContext.Provider value={{ range: summaryRange, setRange: setSummaryRange,
           label: summaryRangeLabel, setLabel: setSummaryRangeLabel, availableDates }}>
         <SummaryLoadingContext.Provider value={setSummaryLoading}>
-        {!assistantPage && loadError === null && <TopBar
+        <RefreshStateProvider>{!assistantPage && loadError === null && <TopBar
           isProUser={isProUser}
           railFidelityPage={railFidelityPage}
           pageOwnsSync={pageOwnsSync}
@@ -418,7 +416,7 @@ function Layout({
           fidelityBusy={fidelityPage === "summary" && summaryLoading}
           recordsToolsOpen={recordsToolsOpen}
           hideWide={settingsPage}
-        />}
+        />}</RefreshStateProvider>
 
         {/* Main content */}
         <main ref={mainRef} id="app-main-content" tabIndex={0} className="mx-auto w-full max-w-[1560px] px-7 py-5">

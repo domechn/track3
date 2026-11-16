@@ -1,5 +1,5 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import RefreshData from "@/mobile/components/refresh-data";
@@ -19,6 +19,7 @@ import { isProVersion } from "@/middlelayers/license";
 import { RefreshButtonLoadingContext } from "@/mobile/components/index";
 import { writeStoredStatuses } from "@/middlelayers/ui-state/source-status-store";
 import { invoke } from "@tauri-apps/api/core";
+import { requestRefreshSource } from "@/mobile/components/refresh-progress-event";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn().mockResolvedValue(true) }));
 vi.mock("@/utils/platform", async (original) => ({
   ...await original<typeof import("@/utils/platform")>(), isIOS: vi.fn(() => false),
@@ -535,6 +536,92 @@ describe("RefreshData — currency rates refresh ordering", () => {
     await user.click(screen.getByRole("button", { name: "Refresh" }));
     await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
     expect(await screen.findByRole("button", { name: "Run full refresh" })).toBeVisible();
+  });
+
+  it("reports the refresh and automatic retry states as data attributes", async () => {
+    let finish!: (result: never) => void;
+    vi.mocked(refreshAllData).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    refreshRetryScheduler.manualStart(); // earlier tests leave their schedule in the shared scheduler
+    render(<RefreshData loading={false} />);
+    const button = screen.getByRole("button", { name: "Refresh" });
+    expect(button).toHaveAttribute("data-state", "idle");
+    expect(screen.getByRole("status")).toHaveAttribute("data-retry-state", "idle");
+    fireEvent.click(button);
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(1));
+    expect(button).toHaveAttribute("data-state", "running");
+    await act(async () => { finish(partialResult as never); });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Refresh", hidden: true })).toHaveAttribute("data-state", "idle"));
+    expect(screen.getByRole("status", { hidden: true })).toHaveAttribute("data-retry-state", "waiting");
+    act(() => refreshRetryScheduler.stop());
+    expect(screen.getByRole("status", { hidden: true })).toHaveAttribute("data-retry-state", "stopped");
+  });
+
+  it("keeps the single-source retry after an ordinary refresh error", async () => {
+    vi.mocked(refreshAllData).mockResolvedValueOnce(partialResult as never)
+      .mockRejectedValueOnce(new Error("socket closed"))
+      .mockResolvedValueOnce(partialResult as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
+    await waitFor(() => expect(mockInvalidateUsageCache).toHaveBeenCalledTimes(2));
+    await user.click(screen.getByRole("button", { name: "Retry BTC wallet 1" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(refreshAllData).mock.calls[2][1]).toMatchObject({ retrySourceId: "btc:0" });
+  });
+
+  it("turns every retry into a full refresh once a source retry must stop", async () => {
+    vi.mocked(refreshAllData).mockResolvedValueOnce(partialResult as never)
+      .mockRejectedValueOnce(new FullRefreshRequiredError("Source changed"))
+      .mockResolvedValue(partialResult as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
+    await waitFor(() => expect(mockInvalidateUsageCache).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "Run full refresh" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Retry BTC wallet 1" })).toBeNull();
+    const failure = mockToast.mock.calls.map(([notice]) => notice).filter((notice) => notice.variant === "destructive").at(-1);
+    fireEvent.click(within(render(<div>{failure.action}</div>).container).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(refreshAllData).mock.calls[2][1]).not.toHaveProperty("retrySourceId");
+    expect(await screen.findByRole("button", { name: "Retry BTC wallet 1" })).toBeVisible();
+  });
+
+  const stopSourceRetries = async () => {
+    vi.mocked(refreshAllData).mockResolvedValueOnce(partialResult as never)
+      .mockRejectedValueOnce(new FullRefreshRequiredError("Source changed"))
+      .mockResolvedValue(partialResult as never);
+    const user = userEvent.setup();
+    render(<RefreshData loading={false} />);
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await user.click(await screen.findByRole("button", { name: "Retry BTC wallet 1" }));
+    await waitFor(() => expect(mockInvalidateUsageCache).toHaveBeenCalledTimes(2));
+  };
+
+  it("runs a full refresh from an Overview or Wallet retry once a source retry must stop", async () => {
+    await stopSourceRetries();
+    act(() => requestRefreshSource("btc:0"));
+    await waitFor(() => expect(refreshAllData).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(refreshAllData).mock.calls[2][1]).not.toHaveProperty("retrySourceId");
+  });
+
+  it("checks the quota of every source when a source retry falls back to a full refresh", async () => {
+    await stopSourceRetries();
+    vi.mocked(getConfiguration).mockResolvedValue({} as never);
+    vi.mocked(isProVersion).mockResolvedValue({ isPro: true, license: "pro" });
+    vi.mocked(listPortfolioSources).mockReturnValue([
+      { sourceId: "btc:0", label: "BTC wallet 1" }, { sourceId: "trc20:0", label: "TRON wallet" }]);
+    mockGetUsage.mockResolvedValue({
+      enforced: true,
+      usage: {
+        erc20: { limit: 300, used: 0, remaining: 300, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+        tron: { limit: 300, used: 300, remaining: 0, periodStart: "2026-10-01", periodEnd: "2026-11-01" },
+      },
+    });
+    act(() => requestRefreshSource("btc:0"));
+    expect(await screen.findByRole("alertdialog", { name: "Refresh limit" })).toBeVisible();
+    expect(refreshAllData).toHaveBeenCalledTimes(2);
   });
 
   it("keeps a failed status visible when a single-source retry fails", async () => {
