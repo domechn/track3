@@ -7,7 +7,32 @@ export type UpdateAction =
   | { type: "progress"; bytes: number; elapsedMs: number }
   | { type: "fail"; reason: FailureReason; details: string };
 export const initialUpdateState: UpdateState = { phase: "none", visible: true, total: null, received: 0, percent: null, speed: null, etaSeconds: null, reason: null, details: "" };
+const active = ["connecting", "downloading", "verifying", "installing"] as const;
+const shown = [...active, "restart-required", "failed", "cancelled"] as const;
+// The phases each action is dispatched from (docs/state-machines/app.md). The reducer accepts every action; this table documents and warns, it does not guard.
+export const updateTransitions: Record<UpdateAction["type"], readonly UpdatePhase[]> = {
+  check: ["none"],
+  available: ["checking", "notes"],
+  none: ["checking", "available", "notes", "failed", "cancelled"],
+  notes: ["available"],
+  connect: ["none", "checking", "available", "notes", "failed", "cancelled"],
+  started: ["connecting"],
+  progress: ["downloading"],
+  verify: ["connecting", "downloading"],
+  install: ["connecting", "downloading", "verifying"],
+  ready: ["installing"],
+  fail: active,
+  cancel: ["connecting", "downloading"],
+  hide: shown,
+  show: shown,
+};
+export const isExpectedTransition = (phase: UpdatePhase, action: UpdateAction) => updateTransitions[action.type].includes(phase);
+const reported = new Set<string>();
 export function updateReducer(state: UpdateState, action: UpdateAction): UpdateState {
+  if (import.meta.env.DEV && !isExpectedTransition(state.phase, action)) {
+    const pair = `${action.type} from ${state.phase}`;
+    if (!reported.has(pair)) { reported.add(pair); console.warn(`Unexpected updater transition: ${pair}`); }
+  }
   switch (action.type) {
     case "check": return { ...initialUpdateState, phase: "checking" };
     case "available": return { ...state, phase: "available", visible: true };

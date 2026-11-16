@@ -22,3 +22,4 @@ Machines (one line per file, append only):
 - [Automatic retry scheduler](refresh-retry-scheduler.md)
 - [Source status](source-status.md)
 - [IBKR Flex](ibkr-flex.md)
+- [App domain: updater, Pro checkout, key rotation dialog, sources auto-save, alert rules, background auto backup](app.md)

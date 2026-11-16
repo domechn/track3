@@ -73,7 +73,7 @@ import { deliverAlerts, formatAlert } from "@/middlelayers/alert-notifications";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { toast } from "@/components/ui/use-toast";
 import { DisplayCurrencyContext, useDisplayCurrencyState } from "@/contexts/display-currency";
-import { sanitizeUntrustedText } from "@/middlelayers/security/redact";
+import { redactSecrets, sanitizeUntrustedText } from "@/middlelayers/security/redact";
 
 const Setting = React.lazy(() => import("../settings"));
 const HistoricalData = React.lazy(() => import("../historical-data"));
@@ -888,7 +888,7 @@ const App = () => {
         }
       }
     } catch (e) {
-      console.error("auto import failed");
+      console.error("auto import failed", redactSecrets(String(e)));
     }
 
     try {
@@ -896,7 +896,7 @@ const App = () => {
       // no page refresh is needed.
       await autoBackupHistoricalData();
     } catch (e) {
-      console.error("auto backup failed");
+      console.error("auto backup failed", redactSecrets(String(e)));
     } finally {
       if (activeRef.current) {
         setAutoBackupStatus("idle");
