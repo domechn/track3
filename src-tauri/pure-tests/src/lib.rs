@@ -16,6 +16,8 @@ pub mod refresh_persistence;
 pub mod snapshot_partial;
 #[path = "../../src/startup_security.rs"]
 pub mod startup_security;
+#[path = "../../src/startup_state.rs"]
+pub mod startup_state;
 #[path = "../../src/sync_persistence.rs"]
 pub mod sync_persistence;
 #[path = "../../src/types.rs"]
