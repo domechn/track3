@@ -354,6 +354,30 @@ describe("App data-changed version bumps on refresh and soft refresh", () => {
     await view.findByTestId("trigger-history-delete");
     expect(view.container.querySelectorAll(".desktop-sync-status-indicator")).toHaveLength(0);
   });
+  it("names the boot state on the shell: booting, ready, empty, failed and back to ready after Retry", async () => {
+    const shell = (view: ReturnType<typeof renderApp>) => view.container.querySelector(".t3-desktop-shell");
+    let finishDates!: (dates: Date[]) => void;
+    vi.mocked(getAvailableDates).mockReturnValueOnce(new Promise((resolve) => { finishDates = resolve; }));
+    const booting = renderApp();
+    expect(shell(booting)).toHaveAttribute("data-boot-state", "booting");
+    finishDates([new Date("2024-04-01T00:00:00.000Z")]);
+    await waitFor(() => expect(shell(booting)).toHaveAttribute("data-boot-state", "ready"));
+    booting.unmount();
+
+    vi.mocked(queryLastRefreshAt).mockResolvedValue(undefined);
+    const empty = renderApp();
+    await waitFor(() => expect(shell(empty)).toHaveAttribute("data-boot-state", "empty"));
+    empty.unmount();
+
+    vi.mocked(queryLastRefreshAt).mockResolvedValue("2024-04-13T00:00:00.000Z");
+    vi.mocked(getAvailableDates).mockRejectedValueOnce(new Error("database unavailable"));
+    const failed = renderApp();
+    await waitFor(() => expect(shell(failed)).toHaveAttribute("data-boot-state", "failed"));
+    expect(failed.getByRole("alert")).toHaveTextContent("database unavailable");
+    fireEvent.click(failed.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(shell(failed)).toHaveAttribute("data-boot-state", "ready"));
+  });
+
   it("finishes boot while startup alert evaluation is pending", async () => {
     vi.mocked(processAlerts).mockImplementation(() => new Promise(() => {}));
     const view = renderApp();

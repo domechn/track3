@@ -89,6 +89,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   const [itemPreview, setItemPreview] = useState<{ data: ExportData; rows: ImportPreviewRow[]; backup?: boolean }>();
   const [itemResult, setItemResult] = useState<ImportResult>();
   const [itemBusy, setItemBusy] = useState(false);
+  const [importBusy, setImportBusy] = useState(false);
   const [autoBackupDirectory, setAutoBackupDirectory] = useState<string>();
   const { run: runBackupFolderDelete } = useOptimisticDelete(setAutoBackupDirectory);
   const [lastBackupAt, setLastBackupAt] = useState<Date>();
@@ -229,16 +230,20 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   }
 
   async function onImportDataClick() {
-    const ed = await readHistoricalDataFromFile();
-    setExportData(ed);
-    if (!ed) {
-      return;
-    }
-    const hasConflicts = await checkIfDuplicatedHistoricalData(ed);
-    if (hasConflicts) {
-      setShowConflictResolverDialog(true);
-    } else {
-      importData("IGNORE", ed);
+    try {
+      const ed = await readHistoricalDataFromFile();
+      setExportData(ed);
+      if (!ed) {
+        return;
+      }
+      const hasConflicts = await checkIfDuplicatedHistoricalData(ed);
+      if (hasConflicts) {
+        setShowConflictResolverDialog(true);
+      } else {
+        importData("IGNORE", ed);
+      }
+    } catch (error) {
+      toast({ description: redactSecrets(String(error), [encKeyInput]), variant: "destructive" });
     }
   }
 
@@ -287,6 +292,9 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
       });
       return;
     }
+    // A second choice while one import runs would write the same file twice in parallel.
+    if (importBusy) return;
+    setImportBusy(true);
     return importHistoricalData(cr, selectedData, passphraseDialog.ask)
       .then((imported) => {
         if (!imported) {
@@ -305,6 +313,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
         });
       })
       .finally(() => {
+        setImportBusy(false);
         setExportData(undefined);
         setShowConflictResolverDialog(false);
       });
@@ -420,11 +429,11 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
               {t("data.conflictDesc")}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => importData("REPLACE")}>
+          <DialogFooter data-testid="import-conflict-choices" data-state={importBusy ? "importing" : "idle"} aria-busy={importBusy}>
+            <Button onClick={() => importData("REPLACE")} disabled={importBusy}>
               {t("data.conflictOverwrite")}
             </Button>
-            <Button onClick={() => importData("IGNORE")} variant="outline">
+            <Button onClick={() => importData("IGNORE")} variant="outline" disabled={importBusy}>
               {t("data.conflictIgnore")}
             </Button>
           </DialogFooter>
@@ -467,7 +476,7 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
             <p className="text-sm text-muted-foreground">
               {t("data.importDesc")}
             </p>
-            <Button onClick={onImportDataClick} size="sm" className="mt-auto w-fit">
+            <Button onClick={onImportDataClick} size="sm" className="mt-auto w-fit" disabled={importBusy}>
               {t("data.importButton")}
             </Button>
             <Button onClick={onReviewImportClick} size="sm" variant="outline" className="w-fit">

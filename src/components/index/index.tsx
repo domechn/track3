@@ -380,8 +380,11 @@ function Layout({
     };
   }, []);
 
+  // One name for the boot phase, for tests and agents; transition table in docs/state-machines/ui.md.
+  const bootState = initializing ? "booting" : loadError !== null ? "failed" : hasData ? "ready" : "empty";
+
   return (
-    <div className={["t3-desktop-shell", fidelityPage && `t3-fidelity-shell t3-fidelity-${fidelityPage}-shell`,
+    <div data-boot-state={bootState} className={["t3-desktop-shell", fidelityPage && `t3-fidelity-shell t3-fidelity-${fidelityPage}-shell`,
       location.pathname === "/comparison" && "t3-route-comparison", location.pathname === "/wallets" && "t3-route-wallets",
       location.pathname === "/overview" && !hasData && "t3-route-first-run",
       location.pathname === "/overview" && initializing && "t3-route-overview-loading"].filter(Boolean).join(" ")}>

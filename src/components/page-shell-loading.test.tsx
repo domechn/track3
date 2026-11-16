@@ -123,6 +123,37 @@ describe("Summary page shell", () => {
   });
 });
 
+describe("Page roots name the section gate state", () => {
+  const dateRange = { start: new Date("2024-04-15"), end: new Date("2024-04-16") };
+
+  it("Summary goes from loading to loaded once every section has reported", async () => {
+    const view = render(<Summary currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    const root = view.container.querySelector(".analyze-summary");
+    expect(root).toHaveAttribute("data-state", "loading");
+    view.unmount();
+
+    reportCounts.athValue = 1;
+    reportCounts.summaryProfitLoss = 1;
+    reportCounts.profitSummary = 1;
+    reportCounts.summaryMarketCard = 1;
+    const loaded = render(<Summary currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    await waitFor(() => expect(loaded.container.querySelector(".analyze-summary")).toHaveAttribute("data-state", "loaded"));
+    expect(loaded.container.querySelector(".analyze-summary")).toHaveAttribute("aria-busy", "false");
+  });
+
+  it("Wallets goes from loading to loaded once every section has reported", async () => {
+    const view = render(<WalletAnalytics currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    expect(view.container.querySelector(".analyze-wallets")).toHaveAttribute("data-state", "loading");
+    view.unmount();
+
+    reportCounts.walletAssetsPercentage = 1;
+    reportCounts.walletAssetsChange = 1;
+    const loaded = render(<WalletAnalytics currency={usdCurrency} dateRange={dateRange} quoteColor="green-up-red-down" />);
+    await waitFor(() => expect(loaded.container.querySelector(".analyze-wallets")).toHaveAttribute("data-state", "loaded"));
+    expect(loaded.container.querySelector(".analyze-wallets")).toHaveAttribute("aria-busy", "false");
+  });
+});
+
 describe("Wallets page shell", () => {
   it("shows a loading status and keeps it visible until wallet sections report loaded", () => {
     vi.useFakeTimers();
