@@ -15,6 +15,7 @@ Machines (one line per file, append only):
 - [Encryption key rotation journal and encrypt write gate](key-rotation.md)
 - [iOS privacy lock](ios-privacy-lock.md)
 - [iOS backup-folder access and folder picker](ios-backup-folder.md)
+- [Desktop UI: app boot, section load gate, configuration form, Quick Look, legacy import, comparison, coin page](ui.md)
 - [Live total](live-total.md)
 - [Refresh flow](refresh-flow.md)
 - [Automatic retry scheduler](refresh-retry-scheduler.md)

@@ -341,6 +341,67 @@ it("keeps loaded desktop transaction rows visible while a refresh is pending", a
   pending.resolve([transaction]);
 });
 
+it("keeps the current rows visible while the same coin reloads after a data change", async () => {
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([transaction]);
+  const mounted = render(<CoinAnalysisTestTree fidelity />);
+  await screen.findByRole("button", { name: /detail.*15 Apr 2024/i });
+  const pending = deferred<Transaction[]>();
+  mocks.queryTransactionsBySymbolAndDateRange.mockReturnValue(pending.promise);
+
+  mounted.rerender(<CoinAnalysisTestTree fidelity dataVersion={1} />);
+
+  expect(screen.getByRole("button", { name: /detail.*15 Apr 2024/i })).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  pending.resolve([transaction, secondTransaction]);
+  expect(await screen.findByRole("button", { name: /detail.*16 Apr 2024/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /detail.*15 Apr 2024/i })).toBeInTheDocument();
+});
+
+it("does not list the previous coin's transactions when the next coin fails to load, and retries the load", async () => {
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([transaction]);
+  mocks.queryLastAssetsBySymbol.mockResolvedValue({ symbol: "BTC", assetType: "crypto", amount: 1, price: 54321, value: 54321 });
+  render(<CoinAnalysisTestTree fidelity />);
+  await screen.findByRole("button", { name: /detail.*15 Apr 2024/i });
+  await screen.findAllByText("$54,321.00");
+  const failed = deferred<Transaction[]>();
+  mocks.queryTransactionsBySymbolAndDateRange.mockReturnValue(failed.promise);
+
+  fireEvent.click(screen.getByText("Next coin"));
+  const scrollArea = document.querySelector(".coin-fidelity-transaction-scroll")!;
+  await waitFor(() => expect(scrollArea).toHaveAttribute("aria-busy", "true"));
+  expect(document.querySelector(".coin-fidelity")).toHaveAttribute("data-state", "loading");
+  failed.reject(new Error("database is locked"));
+  await waitFor(() => expect(scrollArea).toHaveAttribute("aria-busy", "false"));
+  expect(document.querySelector(".coin-fidelity")).toHaveAttribute("data-state", "failed");
+
+  expect(screen.queryByRole("button", { name: /detail.*15 Apr 2024/i })).not.toBeInTheDocument();
+  expect(screen.queryByText("$54,321.00")).not.toBeInTheDocument();
+  const alert = screen.getByRole("alert");
+  expect(alert).toHaveTextContent("Could not read portfolio snapshots.");
+
+  mocks.queryTransactionsBySymbolAndDateRange.mockReset();
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([{ ...secondTransaction, symbol: "ETH" }]);
+  fireEvent.click(within(alert).getByRole("button", { name: "Retry" }));
+
+  expect(await screen.findByRole("button", { name: /detail.*16 Apr 2024/i })).toBeInTheDocument();
+  expect(mocks.queryTransactionsBySymbolAndDateRange).toHaveBeenCalledTimes(1);
+  expect(mocks.queryTransactionsBySymbolAndDateRange.mock.calls[0][0]).toBe("ETH");
+  await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  expect(document.querySelector(".coin-fidelity")).toHaveAttribute("data-state", "loaded");
+});
+
+it("keeps the rows and reports the failure when the same coin fails to reload", async () => {
+  mocks.queryTransactionsBySymbolAndDateRange.mockResolvedValue([transaction]);
+  const mounted = render(<CoinAnalysisTestTree fidelity />);
+  await screen.findByRole("button", { name: /detail.*15 Apr 2024/i });
+  mocks.queryTransactionsBySymbolAndDateRange.mockRejectedValue(new Error("database is locked"));
+
+  mounted.rerender(<CoinAnalysisTestTree fidelity dataVersion={1} />);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent("Could not read portfolio snapshots.");
+  expect(screen.getByRole("button", { name: /detail.*15 Apr 2024/i })).toBeInTheDocument();
+});
+
 beforeEach(() => {
   mocks.listAllowedSymbols.mockReset();
   mocks.queryTransactionsBySymbolAndDateRange.mockReset();

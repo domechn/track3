@@ -18,7 +18,7 @@ import {
   TransactionType,
 } from "@/middlelayers/types";
 import { AssetType } from "@/middlelayers/datafetch/types";
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { SummaryFidelityRangeContext } from "./summary-fidelity-range-context";
 import { useDataChangedVersion } from "@/contexts/data-changed";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -70,6 +70,7 @@ import {
 import { cn } from "@/lib/utils";
 import { StaggerContainer, FadeUp } from "./motion";
 import { OverviewLoadingContext } from "@/contexts/overview-loading";
+import { useSectionLoadGate } from "./use-section-load-gate";
 import AssetLabel from "./common/asset-label";
 import {
   buildAssetDetailsPath,
@@ -226,8 +227,6 @@ const App = ({
   const LOAD_COUNT = fidelity ? 1 : 3;
   const assetType = parseAssetTypeSearchParam(searchParams.get("assetType"));
 
-  const [pageLoading, setPageLoading] = useState(true);
-  const loadedCountRef = useRef(0);
   const loadGenRef = useRef(0);
   const queryKey = useMemo(
     () =>
@@ -236,18 +235,15 @@ const App = ({
   );
   const dataChangedVersion = useDataChangedVersion();
 
-  const reportLoaded = useCallback(() => {
-    loadedCountRef.current += 1;
-    if (loadedCountRef.current >= LOAD_COUNT) {
-      setPageLoading(false);
-    }
-  }, []);
-
   const [dataPage, setDataPage] = useState<number>(0);
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const transactionsQueryKey = useRef(queryKey);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadRetry, setLoadRetry] = useState(0);
+  const { loading: pageLoading, state: loadState, reportLoaded, markLoaded } =
+    useSectionLoadGate(LOAD_COUNT, `${queryKey}:${dataChangedVersion}:${loadRetry}`);
   const [lastAsset, setLastAsset] = useState<Asset | undefined>();
 
   const [buyAmount, setBuyAmount] = useState<number>();
@@ -369,23 +365,28 @@ const App = ({
   }, [dataChangedVersion]);
 
   useEffect(() => {
-    setPageLoading(true);
-    loadedCountRef.current = 0;
     loadGenRef.current += 1;
-  }, [queryKey, dataChangedVersion]);
+  }, [queryKey, dataChangedVersion, loadRetry]);
 
   useEffect(() => {
-    setTransactionsLoading(transactions.length === 0 || transactionsQueryKey.current !== queryKey);
+    const keyChanged = transactionsQueryKey.current !== queryKey;
+    // Rows of another coin or range must not survive a failed load; a reload of the same key keeps them.
+    if (keyChanged) setTransactions([]);
+    setLoadFailed(false);
+    setTransactionsLoading(transactions.length === 0 || keyChanged);
     transactionsQueryKey.current = queryKey;
     const gen = loadGenRef.current;
     loadSymbolData(symbol, dateRange, assetType).catch(() => {
-      if (gen === loadGenRef.current) setTransactionsLoading(false);
+      if (gen !== loadGenRef.current) return;
+      if (keyChanged) setLastAsset(undefined);
+      setTransactionsLoading(false);
+      setLoadFailed(true);
     });
     setDataPage(0);
 
-    const timer = setTimeout(() => setPageLoading(false), 8000);
+    const timer = setTimeout(markLoaded, 8000);
     return () => clearTimeout(timer);
-  }, [queryKey, dataChangedVersion]);
+  }, [queryKey, dataChangedVersion, loadRetry]);
 
   useEffect(() => {
     if (!coinSelectOpen) {
@@ -890,7 +891,7 @@ const App = ({
     );
   }
 
-  if (fidelity) return <CoinFidelityView symbol={symbol} assetType={assetType} currency={currency} dateRange={dateRange} lastAsset={lastAsset} transactions={transactions} transactionsLoading={transactionsLoading} walletAliasMap={walletAliasMap} quoteColor={quoteColor} onEdit={async (transaction, type, quotePrice) => {
+  if (fidelity) return <CoinFidelityView symbol={symbol} assetType={assetType} currency={currency} dateRange={dateRange} lastAsset={lastAsset} transactions={transactions} transactionsLoading={transactionsLoading} parentLoadError={loadFailed} onRetryParentLoad={() => setLoadRetry((value) => value + 1)} walletAliasMap={walletAliasMap} quoteColor={quoteColor} onEdit={async (transaction, type, quotePrice) => {
     if (quotePrice !== undefined && !await onUpdatePriceDialogSaveClick({
       id: transaction.id, value: String(quotePrice), rate: currency.rate, original: transaction.price, dirty: true,
     })) return false;
@@ -906,7 +907,7 @@ const App = ({
 
   return (
     <OverviewLoadingContext.Provider value={{ reportLoaded }}>
-      <div className="analyze-coin relative min-h-[400px]">
+      <div className="analyze-coin relative min-h-[400px]" data-state={loadState}>
         <div className="coin-page-heading">
           <div className="coin-page-identity">
             <div>
