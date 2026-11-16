@@ -1,14 +1,13 @@
 #[cfg(debug_assertions)]
 use std::io::Write;
 #[cfg(target_os = "ios")]
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Mutex,
-};
+use std::sync::Mutex;
 use std::{collections::HashMap, io, path::Path};
 
 #[cfg(not(target_os = "ios"))]
 use crate::key_rotation::reset_encryption_key_for_command as reset_encryption_key_recoverably;
+#[cfg(target_os = "ios")]
+use crate::startup_state::{dispatch, StartupEvent, StartupState};
 use crate::{
     database_path::{
         initialize_database_if_needed, resolve_database_path, sqlite_url, DatabasePath,
@@ -43,18 +42,19 @@ lazy_static! {
     static ref ENT: Ent = Ent::new();
 }
 #[cfg(target_os = "ios")]
-static IOS_STARTUP_FAILURE: Mutex<Option<String>> = Mutex::new(None);
-#[cfg(target_os = "ios")]
-static IOS_STARTUP_RETRYABLE: AtomicBool = AtomicBool::new(false);
+static IOS_STARTUP_STATE: Mutex<StartupState> = Mutex::new(StartupState::Starting);
 #[cfg(target_os = "ios")]
 static IOS_BACKUP_FOLDER_FAILURE: Mutex<Option<String>> = Mutex::new(None);
 
 #[cfg(target_os = "ios")]
 fn set_ios_startup_failure(error: String, retryable: bool) {
-    *IOS_STARTUP_FAILURE
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(error);
-    IOS_STARTUP_RETRYABLE.store(retryable, Ordering::SeqCst);
+    dispatch(
+        &IOS_STARTUP_STATE,
+        StartupEvent::Failed {
+            message: error,
+            retryable,
+        },
+    );
 }
 
 /// Decrypt data with an explicit key (for import where the current ENT key
@@ -285,7 +285,13 @@ fn get_database_url(database_path: tauri::State<'_, DatabasePath>) -> Result<Str
 #[cfg(target_os = "ios")]
 #[tauri::command]
 fn ios_startup_failure() -> Option<String> {
-    IOS_STARTUP_FAILURE
+    ios_startup_status().failure().map(str::to_string)
+}
+
+#[cfg(target_os = "ios")]
+#[tauri::command]
+fn ios_startup_status() -> StartupState {
+    IOS_STARTUP_STATE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .clone()
@@ -338,14 +344,12 @@ fn retry_ios_startup(handle: tauri::AppHandle) -> Result<(), (String, bool)> {
 #[cfg(target_os = "ios")]
 #[tauri::command]
 async fn ios_retry_startup(handle: tauri::AppHandle) -> Result<bool, String> {
-    if !IOS_STARTUP_RETRYABLE.swap(false, Ordering::SeqCst) {
+    if !dispatch(&IOS_STARTUP_STATE, StartupEvent::RetryRequested) {
         return Ok(false);
     }
     match tauri::async_runtime::spawn_blocking(move || retry_ios_startup(handle)).await {
         Ok(Ok(())) => {
-            *IOS_STARTUP_FAILURE
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+            dispatch(&IOS_STARTUP_STATE, StartupEvent::Succeeded);
             Ok(true)
         }
         Ok(Err((error, retryable))) => {
@@ -758,6 +762,8 @@ pub fn run() {
             }
             #[cfg(target_os = "ios")]
             app.manage(DatabasePath(database_path));
+            #[cfg(target_os = "ios")]
+            dispatch(&IOS_STARTUP_STATE, StartupEvent::Succeeded);
             Ok(())
         })();
         #[cfg(all(debug_assertions, target_os = "ios"))]
@@ -798,6 +804,7 @@ pub fn run() {
         get_database_url,
         ios_key_recovery_needed,
         ios_startup_failure,
+        ios_startup_status,
         ios_retry_startup,
         ios_lock_enabled,
         ios_auto_retry_allowed,
@@ -839,6 +846,7 @@ pub fn run() {
         get_database_url,
         ios_key_recovery_needed,
         ios_startup_failure,
+        ios_startup_status,
         ios_retry_startup,
         ios_lock_enabled,
         ios_auto_retry_allowed,

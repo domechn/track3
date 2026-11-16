@@ -353,6 +353,24 @@ const App = ({
   const yearlyPlan = getPlan("yearly");
   const yearlySavingsLabel = getYearlySavingsLabel(monthlyPlan, yearlyPlan);
 
+  // One card for both layouts, so every checkout phase is visible on the wide Pro page too.
+  const checkoutCard = showPro && checkoutPhase !== "idle" && (
+    <Card className="overflow-hidden" data-testid="checkout-status" data-state={checkoutPhase}>
+      <CardContent className="space-y-3 p-6 text-sm" role="status">
+        <p className="font-medium">{t(`system.checkout.${checkoutPhase}`)}</p>
+        {checkoutPhase === "error" && checkoutError && <p>{checkoutError}</p>}
+        {(checkoutPhase === "starting" || checkoutPhase === "waiting" || checkoutPhase === "timed-out" || checkoutPhase === "error") && (
+          <div className="flex flex-wrap gap-2">
+            {checkoutPhase !== "starting" && <Button variant="outline" onClick={() => checkoutRef.current?.checkAgain()}>{t("system.checkout.checkAgain")}</Button>}
+            <Button variant="outline" onClick={onCancelCheckout}>{t("common.cancel")}</Button>
+          </div>
+        )}
+        {(checkoutPhase === "completed" || checkoutPhase === "expired") &&
+          <Button variant="outline" onClick={() => checkoutRef.current?.dismiss()}>{t("common.close")}</Button>}
+      </CardContent>
+    </Card>
+  );
+
   if (!licenseLoaded) return <div className="space-y-6">
     <div>
       <h3 className="text-lg font-medium tracking-tight">{t("system.title")}</h3>
@@ -362,13 +380,14 @@ const App = ({
   </div>;
 
   if (section === "pro" && wide) {
-    return <ProDesign license={activeLicense} inputLicense={inputLicense} setInputLicense={(value) => { setInputLicense(value); setActivationError(undefined); }}
+    return <>{checkoutCard && <div className="mb-4">{checkoutCard}</div>}<ProDesign license={activeLicense} inputLicense={inputLicense} setInputLicense={(value) => { setInputLicense(value); setActivationError(undefined); }}
       subscriptionInfo={subscriptionInfo} usageEnforced={usageEnforced} devices={licenseDevices}
       saveLicenseLoading={saveLicenseLoading} inactiveLicenseLoading={inactiveLicenseLoading} portalLoading={portalLoading}
       activationError={activationError}
       onSaveLicenseClick={onSaveLicenseClick} onInactiveLicenseClick={onInactiveLicenseClick}
       onManageSubscription={() => { void onManageSubscription(); }} onSubscribe={() => { void onSubscribe("yearly"); }}
-      onViewBenefits={() => { void onViewBenefits(); }} />;
+      subscribeDisabled={checkoutPhase === "starting" || checkoutPhase === "waiting"}
+      onViewBenefits={() => { void onViewBenefits(); }} /></>;
   }
   if (section === "about" && wide) {
     return <AboutDesign version={version} />;
@@ -381,22 +400,7 @@ const App = ({
         <p className="text-sm text-muted-foreground">{t("system.subtitle")}</p>
       </div>
 
-      {showPro && checkoutPhase !== "idle" && (
-        <Card className="overflow-hidden">
-          <CardContent className="space-y-3 p-6 text-sm" role="status">
-            <p className="font-medium">{t(`system.checkout.${checkoutPhase}`)}</p>
-            {checkoutPhase === "error" && checkoutError && <p>{checkoutError}</p>}
-            {(checkoutPhase === "starting" || checkoutPhase === "waiting" || checkoutPhase === "timed-out" || checkoutPhase === "error") && (
-              <div className="flex flex-wrap gap-2">
-                {checkoutPhase !== "starting" && <Button variant="outline" onClick={() => checkoutRef.current?.checkAgain()}>{t("system.checkout.checkAgain")}</Button>}
-                <Button variant="outline" onClick={onCancelCheckout}>{t("common.cancel")}</Button>
-              </div>
-            )}
-            {(checkoutPhase === "completed" || checkoutPhase === "expired") &&
-              <Button variant="outline" onClick={() => checkoutRef.current?.dismiss()}>{t("common.close")}</Button>}
-          </CardContent>
-        </Card>
-      )}
+      {checkoutCard}
 
       {showPro && <SystemInfoCard
         title={activeLicense ? t("system.track3Pro") : t("system.track3Free")}

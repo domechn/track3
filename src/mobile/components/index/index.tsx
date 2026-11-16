@@ -56,6 +56,7 @@ import { APP_SOFT_REFRESH_EVENT } from "@/utils/hook";
 import { ASSISTANT_APP_ACTION_EVENT, validateActionArgs } from "@/middlelayers/ai/actions";
 import { setCurrentDateRange, clearCurrentDateRange, readAssistantDateRange, clearAssistantDateRange } from "@/middlelayers/ui-state/page-prefs";
 import { useTranslation } from "@/mobile/i18n";
+import { redactSecrets } from "@/middlelayers/security/redact";
 import { DataChangedContext } from "@/contexts/data-changed";
 import { LatestSourceNamesProvider } from "@/components/source-name-order";
 import { processAlerts } from "@/middlelayers/alerts";
@@ -1076,7 +1077,7 @@ const App = () => {
         }
       }
     } catch (e) {
-      console.error("auto import failed");
+      console.error("auto import failed", redactSecrets(String(e)));
     }
 
     try {
@@ -1084,7 +1085,7 @@ const App = () => {
       // no page refresh is needed.
       await autoBackupHistoricalData();
     } catch (e) {
-      console.error("auto backup failed");
+      console.error("auto backup failed", redactSecrets(String(e)));
     } finally {
       if (activeRef.current) {
         setAutoBackupStatus("idle");
