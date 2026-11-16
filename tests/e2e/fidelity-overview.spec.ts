@@ -77,7 +77,7 @@ test("Overview matches the approved phone card order and sample values", async (
     await expect(page.locator(".fd-overview-sources").getByText("Binance", { exact: true })).toBeVisible();
     await expect(page.locator(".fd-overview-sources").getByText("0x4f…a91c", { exact: true })).toBeVisible();
     await expect(page.getByText("AI insights", { exact: true })).toBeVisible();
-    await expect(page.getByText("Daily change", { exact: true })).toBeVisible();
+    await expect(page.locator(".fd-overview-daily h3")).toBeVisible();
     await expect(page.getByText("What moved", { exact: true })).toBeVisible();
     await expect(page.getByText("Top coins", { exact: true })).toBeVisible();
     await expect(page.getByText("Sources", { exact: true })).toBeVisible();
