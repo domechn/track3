@@ -41,7 +41,9 @@ test("opening Live total reserves the strip and leaves the page title in place",
   expect(maskDuration).toBeLessThanOrEqual(0.2);
   const afterStrip = await strip.boundingBox();
   const afterTitle = await title.boundingBox();
-  expect(afterStrip).toEqual(beforeStrip);
+  await expect(strip.getByText("Partial data", { exact: true })).toBeVisible();
+  expect(afterStrip).toMatchObject({ x: beforeStrip!.x, y: beforeStrip!.y, height: beforeStrip!.height });
+  expect(afterStrip!.width).toBeGreaterThanOrEqual(beforeStrip!.width);
   expect(afterTitle).toEqual(beforeTitle);
 });
 

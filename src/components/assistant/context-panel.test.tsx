@@ -6,7 +6,10 @@ import { listAlertHistory } from "@/middlelayers/alerts";
 import { useAssistantAttention } from "./context-panel";
 
 vi.mock("@/middlelayers/ai", () => ({ loadSession: vi.fn() }));
-vi.mock("@/middlelayers/alerts", () => ({ listAlertHistory: vi.fn() }));
+vi.mock("@/middlelayers/alerts", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/middlelayers/alerts")>(),
+  listAlertHistory: vi.fn(),
+}));
 
 afterEach(() => {
   vi.useRealTimers();

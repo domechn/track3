@@ -1,6 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { liveTotalTransition, useLiveTotal } from "./use-live-total";
+import { liveTotalTransition, safeLiveTotalError, useLiveTotal } from "./use-live-total";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -111,4 +111,97 @@ it("animates a later update down to zero", async () => {
   await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
   expect(result.current.value).toBe(0);
   expect(result.current.animate).toBe(true);
+});
+
+it("keeps a safe reason and retries failures at 5, 15, then 60 seconds", async () => {
+  vi.useFakeTimers();
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  const load = vi.fn().mockRejectedValue(new Error("CoinGecko 429 token=abc123secret"));
+  const { result } = renderHook(() => useLiveTotal({
+    key: "retry-schedule-test", load, enabled: true, live: true, intervalMs: 10_000_000,
+  }));
+  await act(async () => { await Promise.resolve(); });
+  expect(result.current.state).toBe("error");
+  expect(result.current.error).toBe("rateLimited");
+  expect(JSON.stringify(log.mock.calls)).toContain("Price service rate limited (HTTP 429)");
+  expect(JSON.stringify(log.mock.calls)).not.toContain("abc123secret");
+  await act(async () => { await vi.advanceTimersByTimeAsync(4_999); });
+  expect(load).toHaveBeenCalledTimes(1);
+  await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+  expect(load).toHaveBeenCalledTimes(2);
+  await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+  expect(load).toHaveBeenCalledTimes(3);
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(load).toHaveBeenCalledTimes(4);
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(load).toHaveBeenCalledTimes(5);
+});
+
+it("retries now and clears the error after a success", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const load = vi.fn().mockRejectedValueOnce(new Error("stock price offline")).mockResolvedValue(42);
+  const { result } = renderHook(() => useLiveTotal({
+    key: "retry-now-test", load, enabled: true, live: true, intervalMs: 60_000,
+  }));
+  await act(async () => { await Promise.resolve(); });
+  expect(result.current.error).toBeTruthy();
+  await act(async () => { result.current.retryNow(); await Promise.resolve(); });
+  expect(result.current.state).toBe("live");
+  expect(result.current.error).toBeUndefined();
+  expect(result.current.lastAt).toBeGreaterThan(0);
+});
+
+it("retains the last successful time when a later load fails", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-11-15T12:00:00Z"));
+  const load = vi.fn().mockResolvedValueOnce(42).mockRejectedValue(new Error("offline"));
+  const { result } = renderHook(() => useLiveTotal({
+    key: "last-at-test", load, enabled: true, live: true, intervalMs: 1000,
+  }));
+  await act(async () => { await Promise.resolve(); });
+  const successfulAt = result.current.lastAt;
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  expect(result.current.state).toBe("stale");
+  expect(result.current.error).toBeTruthy();
+  expect(result.current.lastAt).toBe(successfulAt);
+});
+
+it("retains a safe IBKR expiry reason when the live query has no priced holdings", () => {
+  expect(safeLiveTotalError(new Error("ibkrToken"))).toBe("ibkrToken");
+});
+
+it("retains only a numeric missing-price count from a failed live query", () => {
+  expect(safeLiveTotalError(new Error("pricesMissing:2"))).toBe("pricesMissing:2");
+  expect(safeLiveTotalError(new Error("pricesMissing:secret"))).toBe("pricesMissing");
+});
+
+it("does not let the 60-second polling tick preempt the 60-second retry", async () => {
+  vi.useFakeTimers();
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const load = vi.fn().mockRejectedValue(new Error("CoinGecko 429"));
+  renderHook(() => useLiveTotal({
+    key: "retry-poll-test", load, enabled: true, live: true, intervalMs: 60_000,
+  }));
+  await act(async () => { await Promise.resolve(); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(load).toHaveBeenCalledTimes(3);
+  await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+  expect(load).toHaveBeenCalledTimes(4);
+});
+
+it("remembers the last successful time when the live display remounts", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-11-15T12:00:00Z"));
+  const first = renderHook(() => useLiveTotal({
+    key: "remount-time-test", load: async () => 42,
+    enabled: true, live: true, intervalMs: 60_000,
+  }));
+  await act(async () => { await Promise.resolve(); });
+  first.unmount();
+  const second = renderHook(() => useLiveTotal({
+    key: "remount-time-test", load: () => new Promise<number>(() => {}),
+    enabled: true, live: true, intervalMs: 60_000,
+  }));
+  expect(second.result.current.lastAt).toBe(Date.parse("2026-11-15T12:00:00Z"));
 });

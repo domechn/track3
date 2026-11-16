@@ -91,8 +91,8 @@ for (const configured of [false, true]) {
       await expect(page.locator(".t3-live-trigger")).toBeVisible({ timeout: 30_000 });
       await expect(page.locator(".t3-hero-value")).toContainText("$763,809.27", { timeout: 30_000 });
       await page.locator(".t3-live-trigger").click();
-      await expect(page.locator(".t3-live-dot")).toHaveAttribute("data-state", "live", { timeout: 30_000 });
-      await expect(page.locator(".t3-live-popover")).toContainText("Live prices: connected");
+      await expect(page.locator(".t3-live-dot")).toHaveAttribute("data-state", "partial", { timeout: 30_000 });
+      await expect(page.locator(".t3-live-popover")).toContainText("Live prices: partial data");
       await page.mouse.click(450, 70);
       await expect(page.locator(".t3-live-popover")).toHaveCount(0);
       await expect(page.locator(".t3-hero-value")).toBeVisible();
@@ -110,7 +110,7 @@ for (const configured of [false, true]) {
       await page.screenshot({ path: `${output}/desktop-${theme}-${configured ? "configured" : "unconfigured"}.png`,
         clip: { x: 0, y: 0, width: 1280, height: 70 } });
       await expect(page.locator(".t3-live-trigger .t3-live-dot")).toHaveCount(1);
-      await expect(page.locator(".t3-live-dot")).toHaveAttribute("title", "Live prices: connected");
+      await expect(page.locator(".t3-live-dot")).toHaveAttribute("title", "Live prices: partial data");
       await expect(page.locator(".t3-refresh-source-trigger .t3-refresh-source-icon")).toBeVisible();
       await expect(page.locator(".t3-refresh-source-trigger")).toHaveAttribute("title", "Source status");
       expect(await page.locator(".t3-refresh-source-trigger").evaluate((el) => getComputedStyle(el, "::after").content)).toBe("none");
@@ -150,6 +150,7 @@ for (const configured of [false, true]) {
         for (const [state, label] of [
           ["connecting", "Live prices: connecting"],
           ["live", "Live prices: connected"],
+          ["partial", "Live prices: partial data"],
           ["stale", "Live prices: waiting for an update"],
           ["error", "Live prices: unavailable"],
         ] as const) {

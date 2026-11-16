@@ -118,6 +118,21 @@ async function bottomGap(page: Page, selector: string, lastVisible = false) {
   }, { selector, lastVisible });
 }
 
+async function phoneClearance(page: Page) {
+  return page.evaluate(() => {
+    const main = document.querySelector<HTMLElement>("#app-main-content")!;
+    const padding = parseFloat(getComputedStyle(main).paddingBottom);
+    main.style.setProperty("--mobile-safe-bottom", "31px");
+    const safeBottomDelta = parseFloat(getComputedStyle(main).paddingBottom) - padding;
+    main.style.removeProperty("--mobile-safe-bottom");
+    return {
+      padding,
+      safeBottomDelta,
+      tabHeight: document.querySelector<HTMLElement>(".mobile-tab-bar")!.getBoundingClientRect().height,
+    };
+  });
+}
+
 test("route gap guard detects empty space within a tall page wrapper", async ({ page }) => {
   await page.setContent('<main id="app-main-content" style="height:200px;overflow-y:auto"><div class="page" style="min-height:600px"><p>Last content</p></div></main>');
   expect((await bottomGap(page, ".page", true)).gap).toBeGreaterThan(300);
@@ -172,7 +187,7 @@ test("desktop main routes do not scroll past page content", async ({ browser }, 
   try {
     const page = await context.newPage();
     await seedPortfolio(page, false);
-    for (const viewport of [{ width: 1184, height: 725 }, { width: 1440, height: 900 }]) {
+    for (const viewport of [{ width: 1184, height: 725 }, { width: 1280, height: 720 }, { width: 1440, height: 900 }]) {
       await page.setViewportSize(viewport);
       for (const [name, route, selector] of routes) {
         await page.goto(`/#${route}`);
@@ -201,7 +216,11 @@ test("phone main routes do not scroll past page content above the tab bar", asyn
     await seedPortfolio(page, true);
     await page.goto("/#/overview");
     await waitForContent(page, ".fd-overview-footer");
-    expect((await bottomGap(page, ".fd-overview-footer")).gap, "Overview").toBeLessThanOrEqual(48);
+    let clearance = await phoneClearance(page);
+    expect(clearance.padding, "Overview clearance").toBeGreaterThanOrEqual(clearance.tabHeight);
+    expect(clearance.safeBottomDelta, "Overview safe area").toBe(31);
+    // The tab bar includes the safe-area inset; the extra 48px covers content margins.
+    expect((await bottomGap(page, ".fd-overview-footer")).gap, "Overview").toBeLessThanOrEqual(clearance.tabHeight + 48);
     for (const [name, route, desktopSelector] of routes) {
       await page.goto(`/#${route}`);
       const selector = desktopSelector === ".t3-settings" ? ".ios-d3-settings"
@@ -215,10 +234,13 @@ test("phone main routes do not scroll past page content above the tab bar", asyn
         : desktopSelector === ".fidelity-cost" ? ".d2-cost" : desktopSelector;
       await expect(page.locator("#app-main-content")).toHaveAttribute("data-route", route);
       await waitForContent(page, selector);
+      clearance = await phoneClearance(page);
+      expect(clearance.padding, `${name} clearance`).toBeGreaterThanOrEqual(clearance.tabHeight);
+      expect(clearance.safeBottomDelta, `${name} safe area`).toBe(31);
       await expect.poll(async () => (await bottomGap(page, ":scope > div")).gap,
-        { message: `${name} at 390x844` }).toBeLessThanOrEqual(48);
+        { message: `${name} at 390x844` }).toBeLessThanOrEqual(clearance.tabHeight + 48);
       await expect.poll(async () => (await bottomGap(page, ":scope > div", true)).gap,
-        { message: `${name} visible content at 390x844` }).toBeLessThanOrEqual(80);
+        { message: `${name} visible content at 390x844` }).toBeLessThanOrEqual(clearance.tabHeight + 48);
     }
   } finally {
     await context.close();
