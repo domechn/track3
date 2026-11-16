@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import SyncSettingsPage from "./sync";
 import { syncRuntime } from "@/middlelayers/sync/runtime";
 import { S3Error } from "@/middlelayers/sync/object-store";
@@ -441,6 +441,51 @@ describe("Sync settings page", () => {
     await waitFor(() => expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
       variant: "destructive", description: "Some sync data could not be processed. Track3 will retry automatically.",
     })));
+  });
+
+  it("marks the page with the running action so a test can wait for it to finish", async () => {
+    status.mode = "ready";
+    let finish!: () => void;
+    vi.mocked(syncRuntime.disable).mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(true); }));
+    const { container } = render(<SyncSettingsPage />);
+    const page = container.querySelector(".sync-settings-page")!;
+    expect(page).toHaveAttribute("data-busy", "");
+    fireEvent.click(screen.getByRole("button", { name: "Disable sync" }));
+    expect(page).toHaveAttribute("data-busy", "disable");
+    finish();
+    await waitFor(() => expect(page).toHaveAttribute("data-busy", ""));
+  });
+
+  it.each(["ready", "locked"])("lists devices while sync is %s", async (mode) => {
+    status.mode = mode;
+    vi.mocked(syncRuntime.devices).mockResolvedValue([{ id: "device-one", name: "Laptop", current: true }]);
+    render(<SyncSettingsPage />);
+    expect(await screen.findByDisplayValue("Laptop")).toBeInTheDocument();
+  });
+
+  it("clears the device list when sync is disabled", async () => {
+    configuredEndpoint = "https://s3.example.test";
+    status.mode = "ready";
+    vi.mocked(syncRuntime.devices).mockResolvedValue([{ id: "device-one", name: "Laptop", current: true }]);
+    const view = render(<SyncSettingsPage />);
+    expect(await screen.findByDisplayValue("Laptop")).toBeInTheDocument();
+    status.mode = "disabled";
+    view.rerender(<SyncSettingsPage />);
+    expect(screen.queryByDisplayValue("Laptop")).not.toBeInTheDocument();
+    expect(screen.getByText("No device has synced yet.")).toBeInTheDocument();
+  });
+
+  it("ignores a device response that arrives after sync was disabled", async () => {
+    configuredEndpoint = "https://s3.example.test";
+    status.mode = "ready";
+    let deliver!: (devices: Awaited<ReturnType<typeof syncRuntime.devices>>) => void;
+    vi.mocked(syncRuntime.devices).mockImplementation(() => new Promise((resolve) => { deliver = resolve; }));
+    const view = render(<SyncSettingsPage />);
+    status.mode = "disabled";
+    view.rerender(<SyncSettingsPage />);
+    await act(async () => { deliver([{ id: "device-one", name: "Laptop", current: true }]); });
+    expect(screen.queryByDisplayValue("Laptop")).not.toBeInTheDocument();
+    expect(screen.getByText("No device has synced yet.")).toBeInTheDocument();
   });
 
   it("marks the current device in the list", async () => {

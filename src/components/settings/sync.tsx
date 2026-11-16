@@ -209,7 +209,7 @@ export default function SyncSettingsPage() {
   }
 
   return (
-    <div className="sync-settings-page space-y-5" data-mode={status.mode}>
+    <div className="sync-settings-page space-y-5" data-mode={status.mode} data-busy={busy ?? ""}>
       <div className="t3-settings-page-head">
         <h3>{t("settings.phase6.sync")}</h3>
         <p>{t("sync.intro")}</p>
