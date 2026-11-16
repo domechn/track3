@@ -21,8 +21,7 @@ use journal::{CleanupFailpoint, RotationJournal};
 
 static ROTATION_MUTEX: Mutex<()> = Mutex::const_new(());
 const MAX_CIPHERTEXT_BYTES: usize = 16 * 1024 * 1024;
-pub const RECOVERY_REQUIRED_MESSAGE: &str =
-    "Encryption key recovery is required. Restart Track3 before making further changes.";
+pub use crate::ent::RECOVERY_REQUIRED_MESSAGE;
 
 pub use journal::RotationPhase;
 
@@ -95,6 +94,21 @@ impl RotationFailure {
     }
 }
 
+/// Blocks `Ent::encrypt` while a rotation journal is pending and allows it
+/// again once a later rotation or reset completes. A clean `Failed` result
+/// leaves the gate as it was.
+fn gate_writes(
+    ent: &Ent,
+    result: Result<(), RotationCommandError>,
+) -> Result<(), RotationCommandError> {
+    match &result {
+        Ok(()) => ent.unblock_writes(),
+        Err(RotationCommandError::RecoveryRequired { .. }) => ent.block_writes(),
+        Err(RotationCommandError::Failed { .. }) => {}
+    }
+    result
+}
+
 impl ExecutionError {
     fn crash(error: impl Into<String>) -> Self {
         Self::Crash(error.into())
@@ -140,7 +154,7 @@ pub async fn rotate_encryption_key_for_command(
     new_key: String,
 ) -> Result<(), RotationCommandError> {
     let _rotation_guard = ROTATION_MUTEX.lock().await;
-    rotate_locked(
+    let result = rotate_locked(
         database_path,
         app_data_dir,
         ent,
@@ -148,7 +162,8 @@ pub async fn rotate_encryption_key_for_command(
         RotationFailpoint::None,
     )
     .await
-    .map_err(RotationFailure::into_command_error)
+    .map_err(RotationFailure::into_command_error);
+    gate_writes(ent, result)
 }
 
 #[cfg(not(target_os = "ios"))]
@@ -158,6 +173,16 @@ pub async fn reset_encryption_key_for_command(
     ent: &Ent,
 ) -> Result<(), RotationCommandError> {
     let _rotation_guard = ROTATION_MUTEX.lock().await;
+    let result = reset_locked(database_path, app_data_dir, ent).await;
+    gate_writes(ent, result)
+}
+
+#[cfg(not(target_os = "ios"))]
+async fn reset_locked(
+    database_path: &Path,
+    app_data_dir: &Path,
+    ent: &Ent,
+) -> Result<(), RotationCommandError> {
     recover_locked(database_path, app_data_dir, ent)
         .await
         .map_err(|message| RotationCommandError::RecoveryRequired { message })?;
@@ -230,9 +255,10 @@ async fn rotate_for_command_with_failpoint(
     failpoint: RotationFailpoint,
 ) -> Result<(), RotationCommandError> {
     let _rotation_guard = ROTATION_MUTEX.lock().await;
-    rotate_locked(database_path, app_data_dir, ent, new_key, failpoint)
+    let result = rotate_locked(database_path, app_data_dir, ent, new_key, failpoint)
         .await
-        .map_err(RotationFailure::into_command_error)
+        .map_err(RotationFailure::into_command_error);
+    gate_writes(ent, result)
 }
 
 async fn rotate_locked(

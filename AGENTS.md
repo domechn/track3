@@ -44,6 +44,7 @@ Additional wiring:
 - Large time-series queries in `src/middlelayers/charts-timeseries.ts` aggregate in SQL. Chart components keep the returned full series for totals and tooltips, and use `downsampleIndices()` in `src/middlelayers/chart-downsample.ts` to bound plotted points by chart width while retaining endpoints and extremes.
 - Tauri backend commands/plugins are wired in `src-tauri/src/app.rs`, which desktop `main.rs` and the iOS library entry use; frontend calls via `invoke()` and Tauri plugins.
 - CEX fetchers follow the `Exchanger` pattern in `src/middlelayers/datafetch/coins/cex/cex.ts`.
+- State machines are documented in `docs/state-machines/` (one mermaid diagram and one transition table per machine, indexed in its `README.md`); update the matching file when a state or transition changes.
 
 ### Rust Backend (`src-tauri/`)
 
