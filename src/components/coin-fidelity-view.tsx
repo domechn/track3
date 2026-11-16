@@ -34,6 +34,8 @@ type Props = {
   lastAsset?: Asset;
   transactions: Transaction[];
   transactionsLoading?: boolean;
+  parentLoadError?: boolean;
+  onRetryParentLoad?: () => void;
   walletAliasMap: Record<string, string | undefined>;
   quoteColor: "green-up-red-down" | "red-up-green-down";
   onEdit: (transaction: Transaction, type: TransactionType, quotePrice: number | undefined) => Promise<boolean>;
@@ -55,7 +57,7 @@ function line(values: number[], indices: number[], total: number, lower: number,
   return values.map((value, index) => `${index ? "L" : "M"}${(indices[index] / Math.max(1, total - 1) * width).toFixed(2)} ${coinChartY(value, lower, upper, height).toFixed(2)}`).join(" ");
 }
 
-export default function CoinFidelityView({ symbol, assetType, currency, dateRange, lastAsset, transactions, transactionsLoading = false, walletAliasMap, quoteColor, onEdit }: Props) {
+export default function CoinFidelityView({ symbol, assetType, currency, dateRange, lastAsset, transactions, transactionsLoading = false, parentLoadError = false, onRetryParentLoad, walletAliasMap, quoteColor, onEdit }: Props) {
   const walletOrdinals = useLatestWalletOrdinals();
   const { t, locale } = useTranslation();
   const money = (value: number | undefined, sign = false, digits = 2) => value === undefined || !Number.isFinite(value) ? "–" : `${sign && value > 0 ? "+" : value < 0 ? "−" : ""}${currency.symbol}${num(Math.abs(value * currency.rate), digits)}`;
@@ -245,12 +247,12 @@ export default function CoinFidelityView({ symbol, assetType, currency, dateRang
 
   const sheetDisposals = sheet ? allDisposals.filter((disposal) => disposal.eventId === String(sheet.id)) : [];
   const sheetGain = sheetDisposals.reduce((total, disposal) => total + disposal.gainLoss, 0);
-  return <div className={`analyze-coin coin-fidelity${assetType === "stock" ? " coin-fidelity-stock" : ""}${custom ? " coin-fidelity-custom" : ""}${quoteColor === "red-up-green-down" ? " fidelity-reverse" : ""}`}>
+  return <div className={`analyze-coin coin-fidelity${assetType === "stock" ? " coin-fidelity-stock" : ""}${custom ? " coin-fidelity-custom" : ""}${quoteColor === "red-up-green-down" ? " fidelity-reverse" : ""}`} data-state={loadError || parentLoadError ? "failed" : transactionsLoading ? "loading" : "loaded"}>
     <div className="coin-fidelity-heading">
       <div><div className="coin-fidelity-crumb"><span>{t("coin.fidelity.overview")}</span><CoinChevron /><span>{t("coin.fidelity.coins")}</span><CoinChevron /><span>{symbol}</span></div><h1>{coinName} <b>{custom ? t("coin.fidelity.customAsset") : assetType === "stock" ? t("coin.assetType.stock") : t("coin.assetType.crypto")}</b></h1>{sourceNames.length > 0 && <CoinSourceSummary names={sourceNames} template={sourceTemplate} locale={locale} moreLabel={t("coin.sourcesMore")} allLabel={t("coin.sourcesAll")} lastPrefix={lastSourcePrefix} />}</div>
       <Button variant="outline" onClick={() => navigate("/cost-basis")}><svg aria-hidden="true" viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 2.5v13M12 5.5c0-1.2-1.3-2-3-2s-3 .8-3 2 1.3 1.8 3 2.2 3 1 3 2.3-1.3 2-3 2-3-.8-3-2" /></svg> {t("coin.openCostBasis")}</Button>
     </div>
-    {loadError && <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => setRetry((value) => value + 1)}>{t("summary.fidelity.retry")}</button></div>}
+    {(loadError || parentLoadError) && <div className="fidelity-empty" role="alert">{t("summary.fidelity.loadError")} <button onClick={() => { setRetry((value) => value + 1); onRetryParentLoad?.(); }}>{t("summary.fidelity.retry")}</button></div>}
     <section className="coin-fidelity-card coin-fidelity-hero">
       {custom ? <div className="coin-fidelity-metrics top custom">
         {metric(customPrice.kind === "manual" ? t("coin.fidelity.manualPrice") : t("coin.fidelity.currentPrice"), money(price, false, 4), customPrice.kind === "manual" ? t("coin.fidelity.setByYou").replace("{date}", date(customPrice.setAt)) : t("coin.customPrice.follow").replace("{symbol}", customPrice.symbol), "primary")}

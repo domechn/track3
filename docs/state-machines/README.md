@@ -11,6 +11,8 @@ Conventions:
 Domains (one line each, append only):
 
 - [Assistant, phone shell, comparison, goals](assistant.md)
+One file per domain. Each machine in a file has a mermaid `stateDiagram-v2`, a short events table (event, from, to), the single place in the code that changes the state, and the `data-*` attributes a test can read instead of sleeping.
+- [Sync](sync.md): scheduler, runtime mode, badge, recovery unlock, config conflict
 Track3 has state machines that are spread over statics, files, flags and component state. Each file in this directory describes one of them so that a change to a transition is a change to a table, not a hunt through the code.
 Conventions for every file:
 - One mermaid `stateDiagram-v2` and one transition table (event, from, to) per machine.
@@ -23,4 +25,10 @@ Machines (one line per file, append only):
 - [Encryption key rotation journal and encrypt write gate](key-rotation.md)
 - [iOS privacy lock](ios-privacy-lock.md)
 - [iOS backup-folder access and folder picker](ios-backup-folder.md)
+- [Desktop UI: app boot, section load gate, configuration form, Quick Look, legacy import, comparison, coin page](ui.md)
+- [Live total](live-total.md)
+- [Refresh flow](refresh-flow.md)
+- [Automatic retry scheduler](refresh-retry-scheduler.md)
+- [Source status](source-status.md)
+- [IBKR Flex](ibkr-flex.md)
 - [App domain: updater, Pro checkout, key rotation dialog, sources auto-save, alert rules, background auto backup](app.md)

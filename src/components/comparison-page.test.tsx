@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Comparison from "@/components/comparison";
@@ -355,5 +355,63 @@ describe("Comparison page", () => {
       await user.click(screen.getByRole("button", { name: /head date/i }));
       expect(screen.getByRole("button", { name: /select 2024-04-16 16:30:00 snapshot/i })).toBeInTheDocument();
     });
+  });
+
+  const twoSnapshots = [
+    { id: "2", date: "2024-04-16", createdAt: "2024-04-16T00:00:00Z" },
+    { id: "1", date: "2024-04-15", createdAt: "2024-04-15T00:00:00Z" },
+  ];
+  const threeSnapshots = [{ id: "3", date: "2024-04-17", createdAt: "2024-04-17T00:00:00Z" }, ...twoSnapshots];
+  const atVersion = (version: number) => <DataChangedContext.Provider value={version}>
+    <Comparison currency={usdCurrency} quoteColor="green-up-red-down" />
+  </DataChangedContext.Provider>;
+  const dayCell = (day: string) => [...document.querySelectorAll("button")]
+    .filter((button) => button.textContent?.trim() === day);
+
+  it("keeps the selected pair when the data version changes", async () => {
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+    vi.mocked(queryAllDataDates).mockResolvedValue(twoSnapshots as never);
+    const view = render(atVersion(0));
+    await waitFor(() => expect(screen.getByRole("button", { name: /head date/i })).toHaveTextContent("2024-04-16"));
+
+    vi.mocked(queryAllDataDates).mockResolvedValue(threeSnapshots as never);
+    vi.mocked(queryCoinDataByUUID).mockClear();
+    view.rerender(atVersion(1));
+
+    await waitFor(() => expect(queryAllDataDates).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(screen.getByRole("button", { name: /base date/i })).toHaveTextContent("2024-04-15");
+    expect(screen.getByRole("button", { name: /head date/i })).toHaveTextContent("2024-04-16");
+  });
+
+  it("reloads the pair and reports loaded after the data version changes", async () => {
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+    vi.mocked(queryAllDataDates).mockResolvedValue(twoSnapshots as never);
+    const view = render(atVersion(0));
+    await waitFor(() => expect(screen.getByRole("button", { name: /head date/i })).toHaveTextContent("2024-04-16"));
+
+    vi.mocked(queryAllDataDates).mockResolvedValue(threeSnapshots as never);
+    vi.mocked(queryCoinDataByUUID).mockClear();
+    view.rerender(atVersion(1));
+
+    await waitFor(() => expect(queryCoinDataByUUID).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("status")).not.toBeInTheDocument());
+    expect(document.querySelector(".analyze-comparison")).toHaveAttribute("data-state", "loaded");
+  });
+
+  it("offers a snapshot added by a data change in the head date picker", async () => {
+    const user = userEvent.setup();
+    vi.mocked(queryCoinDataByUUID).mockResolvedValue([]);
+    vi.mocked(queryAllDataDates).mockResolvedValue(twoSnapshots as never);
+    const view = render(atVersion(0));
+    await waitFor(() => expect(screen.getByRole("button", { name: /head date/i })).toHaveTextContent("2024-04-16"));
+    await user.click(screen.getByRole("button", { name: /head date/i }));
+    expect(dayCell("16").some((cell) => !cell.disabled)).toBe(true);
+    expect(dayCell("17").every((cell) => cell.disabled)).toBe(true);
+
+    vi.mocked(queryAllDataDates).mockResolvedValue(threeSnapshots as never);
+    view.rerender(atVersion(1));
+
+    await waitFor(() => expect(dayCell("17").some((cell) => !cell.disabled)).toBe(true));
   });
 });

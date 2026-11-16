@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CurrencyRateDetail, QuoteColor, TDateRange } from "@/middlelayers/types";
 import { queryAttribution } from "@/middlelayers/charts-attribution-data";
 import { useDataChangedVersion } from "@/contexts/data-changed";
@@ -13,6 +13,7 @@ import ProfitSummary from "./profit-summary";
 import SummaryMarketCard from "./summary-market-card";
 import { SummaryLoadingContext } from "./summary-loading-context";
 import { SummaryFidelityRangeContext, SummaryFidelityYearContext } from "./summary-fidelity-range-context";
+import { useSectionLoadGate } from "./use-section-load-gate";
 
 const SECTION_COUNT = 6;
 function SkeletonCard({ title, caption, kind }: { title: string; caption: string; kind: "pnl" | "ath" | "months" | "years" | "attribution" | "leaders" }) {
@@ -33,16 +34,17 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
   const { t, locale } = useTranslation();
   const setSummaryLoading = useContext(SummaryLoadingContext);
   const dataVersion = useDataChangedVersion();
-  const [loading, setLoading] = useState(true);
   const [subtitle, setSubtitle] = useState("");
   const [subtitleEmphasis, setSubtitleEmphasis] = useState("");
   const [selectedYear, setSelectedYear] = useState(dateRange.end.getFullYear());
   const [moverNames, setMoverNames] = useState<string[]>([]);
-  const loaded = useRef(0);
   const summaryGridRef = useRef<HTMLDivElement>(null);
   const rangeKey = `${dateRange.start.getTime()}-${dateRange.end.getTime()}`;
   const hasValidRange = dateRange.start.getTime() > new Date("1970-01-01").getTime() &&
     dateRange.end.getTime() >= dateRange.start.getTime();
+  // An invalid range renders no section, so nothing would ever report: the gate stays open.
+  const { loading, state: loadState, reportLoaded } =
+    useSectionLoadGate(SECTION_COUNT, `${rangeKey}:${dataVersion}`, hasValidRange);
   const { availableDates, label: rangePreset } = useContext(SummaryFidelityRangeContext);
   const selectedRange = useMemo(() => selectSummaryRange(availableDates, dateRange), [availableDates, rangeKey]);
   const oneSnapshot = selectedRange.databaseCount < 2;
@@ -66,10 +68,8 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
   }, [loading, oneSnapshot]);
 
   useLayoutEffect(() => {
-    setLoading(hasValidRange);
     setSubtitle("");
     setSubtitleEmphasis("");
-    loaded.current = 0;
   }, [rangeKey, dataVersion, hasValidRange]);
 
   useEffect(() => {
@@ -91,10 +91,6 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
     return () => { active = false; };
   }, [rangeKey, dataVersion, hasValidRange, oneSnapshot, t, locale, selectedRange.baseline?.getTime()]);
 
-  const reportLoaded = useCallback(() => {
-    loaded.current += 1;
-    if (loaded.current >= SECTION_COUNT) setLoading(false);
-  }, []);
   const context = useMemo(() => ({ reportLoaded }), [reportLoaded]);
   const cardCaption = t("summary.fidelity.netPnlUsd").replace("{currency}", currency.currency);
   const periodCaption = t("summary.fidelity.monthsOf").replace("{year}", String(dateRange.end.getFullYear()));
@@ -103,7 +99,7 @@ function FidelitySummary({ currency, dateRange, quoteColor }: {
 
   return <OverviewLoadingContext.Provider value={context}>
     <SummaryFidelityYearContext.Provider value={{ year: selectedYear, setYear: setSelectedYear, moverNames, setMoverNames }}>
-    <div className={`analyze-summary fidelity-summary${oneSnapshot ? " fidelity-summary-single" : ""}${quoteColor === "red-up-green-down" ? " fidelity-reverse" : ""}`} aria-busy={loading}>
+    <div className={`analyze-summary fidelity-summary${oneSnapshot ? " fidelity-summary-single" : ""}${quoteColor === "red-up-green-down" ? " fidelity-reverse" : ""}`} aria-busy={loading} data-state={loadState}>
       <header className="fidelity-page-head">
         <h1>{t("summary.h1")}</h1>
         <p>{loading ? t("summary.fidelity.loadingSubtitle") : oneSnapshot ? (() => {

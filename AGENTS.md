@@ -44,7 +44,8 @@ Additional wiring:
 - Large time-series queries in `src/middlelayers/charts-timeseries.ts` aggregate in SQL. Chart components keep the returned full series for totals and tooltips, and use `downsampleIndices()` in `src/middlelayers/chart-downsample.ts` to bound plotted points by chart width while retaining endpoints and extremes.
 - Tauri backend commands/plugins are wired in `src-tauri/src/app.rs`, which desktop `main.rs` and the iOS library entry use; frontend calls via `invoke()` and Tauri plugins.
 - CEX fetchers follow the `Exchanger` pattern in `src/middlelayers/datafetch/coins/cex/cex.ts`.
-- State machines are documented in `docs/state-machines/` (one mermaid diagram and one transition table per machine, indexed in its `README.md`); update the matching file when a state or transition changes. Frontend machines (updater, Pro checkout, key rotation dialog, sources auto-save, alert rules, background auto backup) are in `app.md`, which also holds the UI conventions: the phase is exposed as `data-state` on the element that represents the machine, a failed step is its own state, and tests wait on the marker instead of sleeping or matching copy.
+- State machines are documented in `docs/state-machines/` (one mermaid diagram and one transition table per machine, indexed in its `README.md`); update the matching file when a state or transition changes. Frontend machines (updater, Pro checkout, key rotation dialog, sources auto-save, alert rules, background auto backup) are in `app.md`, which also holds the UI conventions: the phase is exposed as `data-state` on the element that represents the machine, a failed step is its own state, and tests wait on the marker instead of sleeping or matching copy. `src/test/state-machine-docs.test.ts` checks that each frontend page is linked from the README and names every state value in the code.
+
 
 ### Rust Backend (`src-tauri/`)
 
@@ -126,6 +127,7 @@ Assistant prompt, skill, orchestrator, provider, and chat-loop changes should ru
 - Sync settings live in `src/components/settings/sync.tsx`; `src/middlelayers/sync/runtime.ts` owns the in-memory passphrase and scheduler. Encrypted local configuration ID `991` holds S3 credentials and is never synced.
 - The app starts sync only after the user unlocks each session. A successful refresh schedules background sync; sync pulls use the existing soft refresh event. Keep delete/undo wired through `sync/delete-hook.ts`.
 - Conditional S3 writes depend on both HTTP 409 and 412 conflict handling. Never retry a conditional PUT without disambiguating the outcome, and keep encryption and naming HKDF contexts separate.
+- Sync state machines (scheduler, runtime mode, badge, config conflict) are documented in `docs/state-machines/sync.md` with their transition tables and the `data-mode`, `data-busy`, `data-sync-state` and `data-sync-retry` test attributes. Every sync surface derives its state from `syncBadge()` in `src/middlelayers/ui-state/sync-badge.ts`; do not derive it again in a component.
 
 ## Internationalization (i18n)
 

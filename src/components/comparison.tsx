@@ -493,7 +493,7 @@ const App = ({
   }, [baseOption?.value, headOption?.value, dataChangedVersion, windowSize.width]);
 
   return (
-    <div className="analyze-comparison relative min-h-[400px]" aria-busy={pageLoading}>
+    <div className="analyze-comparison relative min-h-[400px]" aria-busy={pageLoading} data-state={pageLoading ? "loading" : "loaded"}>
       {wide && <ComparisonFidelity
         currency={currency}
         quoteColor={quoteColor}
