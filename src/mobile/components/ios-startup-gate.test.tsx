@@ -45,6 +45,18 @@ it("recovers when only the first startup-status request fails", async () => {
   expect(await screen.findByText("Private portfolio")).toBeInTheDocument();
 });
 
+it("marks the skeleton as checking while the startup status is pending", () => {
+  mocks.invoke.mockReturnValue(new Promise(() => {}));
+  const { container } = render(<IOSStartupGate><div>Private portfolio</div></IOSStartupGate>);
+  expect(container.querySelector("[aria-busy='true']")).toHaveAttribute("data-state", "checking");
+});
+
+it("marks the lock screen as locked", async () => {
+  mocks.invoke.mockResolvedValue("iOS Keychain and legacy key file differ");
+  render(<IOSStartupGate><div>Private portfolio</div></IOSStartupGate>);
+  expect(await screen.findByRole("alert")).toHaveAttribute("data-state", "locked");
+});
+
 it("stays locked when retry reports false", async () => {
   mocks.invoke.mockImplementation(async (command: string) => {
     if (command === "ios_startup_failure") return "iOS Keychain read failed (OSStatus -25308)";

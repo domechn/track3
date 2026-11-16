@@ -28,3 +28,14 @@ it("shows preparation for a forced backup after startup", () => {
   act(() => window.dispatchEvent(new CustomEvent("track3:backup-folder-preparation", { detail: false })));
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });
+
+it("renders nothing while idle", () => {
+  const { container } = render(<AutoBackupIndicator status="idle" />);
+  expect(container).toBeEmptyDOMElement();
+});
+
+it.each([true, false])("marks the indicator as running (iOS: %s)", (ios) => {
+  vi.mocked(isIOS).mockReturnValue(ios);
+  render(<AutoBackupIndicator status="running" />);
+  expect(screen.getByRole("status")).toHaveAttribute("data-state", "running");
+});

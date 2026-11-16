@@ -18,6 +18,7 @@ type Props = {
   onInactiveLicenseClick: () => void;
   onManageSubscription: () => void;
   onSubscribe: () => void;
+  subscribeDisabled?: boolean;
   onViewBenefits: () => void;
 };
 
@@ -96,7 +97,7 @@ export function ProDesign(p: Props) {
       </dl>
       <div className="t3-b-plan-actions">
         {active ? <button className="t3-b-button" onClick={p.onManageSubscription} disabled={p.portalLoading}>{t("fidelity.settingsB.pro.manage")}</button>
-          : <button className="t3-b-button primary" onClick={p.onSubscribe}>{t(expired ? "fidelity.settingsB.pro.subscribeAgain" : "fidelity.settingsB.pro.subscribe")}</button>}
+          : <button className="t3-b-button primary" onClick={p.onSubscribe} disabled={p.subscribeDisabled}>{t(expired ? "fidelity.settingsB.pro.subscribeAgain" : "fidelity.settingsB.pro.subscribe")}</button>}
         {expired ? <button className="t3-b-button" onClick={p.onManageSubscription} disabled={p.portalLoading}>{t("fidelity.settingsB.pro.manage")}</button>
           : !active && <button className="t3-b-button" onClick={p.onViewBenefits}><ExternalLinkIcon />{t("fidelity.settingsB.pro.compare")}</button>}
       </div>
