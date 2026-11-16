@@ -251,16 +251,20 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   async function onImportDataClick() {
     setFolderReview(undefined);
     setUseImportForAuto(false);
-    const ed = await readHistoricalDataFromFile();
-    setExportData(ed);
-    if (!ed) {
-      return;
+    try {
+      const ed = await readHistoricalDataFromFile();
+      setExportData(ed);
+      if (!ed) {
+        return;
+      }
+      if (isIOS()) {
+        setShowImportConfirm(true);
+        return;
+      }
+      await inspectImport(ed);
+    } catch (error) {
+      toast({ description: redactSecrets(String(error), [encKeyInput]), variant: "destructive" });
     }
-    if (isIOS()) {
-      setShowImportConfirm(true);
-      return;
-    }
-    await inspectImport(ed);
   }
 
   async function onReviewImportClick() {
@@ -301,11 +305,15 @@ const App = ({ onDataImported, currency }: { onDataImported?: () => void; curren
   }
 
   async function inspectImport(ed: ExportData) {
-    const hasConflicts = await checkIfDuplicatedHistoricalData(ed);
-    if (hasConflicts) {
-      setShowConflictResolverDialog(true);
-    } else {
-      await importData("IGNORE", ed);
+    try {
+      const hasConflicts = await checkIfDuplicatedHistoricalData(ed);
+      if (hasConflicts) {
+        setShowConflictResolverDialog(true);
+      } else {
+        await importData("IGNORE", ed);
+      }
+    } catch (error) {
+      toast({ description: redactSecrets(String(error), [encKeyInput]), variant: "destructive" });
     }
   }
 

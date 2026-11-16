@@ -228,6 +228,75 @@ describe("updater download failures", () => {
     } finally { log.mockRestore(); vi.useRealTimers(); }
   });
 
+  it("retries a download rejection with a generic message after 2 seconds", async () => {
+    vi.useFakeTimers();
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const second = update(() => new Promise(() => {}));
+      vi.mocked(check).mockResolvedValueOnce(update(async () => { throw new Error("connection reset by peer"); }) as never)
+        .mockResolvedValueOnce(second as never);
+      render(<AutoUpdater />);
+      await act(async () => {});
+      fireEvent.click(screen.getByRole("button", { name: "Download and install" }));
+      await act(async () => {});
+      expect(screen.getByRole("dialog")).toHaveTextContent("Could not download the update. GitHub may be slow or blocked on your network.");
+      expect(screen.getByRole("dialog")).toHaveTextContent("Retrying in 2s");
+      await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+      expect(second.download).toHaveBeenCalledOnce();
+    } finally { log.mockRestore(); vi.useRealTimers(); }
+  });
+
+  it("exposes each phase of a successful update on the state marker", async () => {
+    let emit!: (event: never) => void;
+    let finishCheck!: (value: never) => void;
+    let finishDownload!: () => void;
+    let finishInstall!: () => void;
+    const found = update((onEvent) => { emit = onEvent; return new Promise((resolve) => { finishDownload = resolve; }); });
+    found.install.mockImplementationOnce(() => new Promise((resolve) => { finishInstall = resolve; }));
+    vi.mocked(check).mockReturnValueOnce(new Promise((resolve) => { finishCheck = resolve; }));
+    render(<AutoUpdater />);
+    const marker = screen.getByTestId("update-state");
+    expect(marker).not.toBeVisible();
+    expect(marker).toHaveAttribute("data-state", "checking");
+    await act(async () => { finishCheck(found as never); });
+    expect(marker).toHaveAttribute("data-state", "available");
+    fireEvent.click(screen.getByRole("button", { name: "Download and install" }));
+    expect(marker).toHaveAttribute("data-state", "connecting");
+    await act(async () => { emit({ event: "Started", data: { contentLength: 100 } } as never); });
+    expect(marker).toHaveAttribute("data-state", "downloading");
+    await act(async () => { emit({ event: "Finished" } as never); });
+    expect(marker).toHaveAttribute("data-state", "verifying");
+    await act(async () => { finishDownload(); });
+    expect(marker).toHaveAttribute("data-state", "installing");
+    expect(marker).toHaveAttribute("data-visible", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Hide" }));
+    expect(marker).toHaveAttribute("data-visible", "false");
+    await act(async () => { finishInstall(); });
+    expect(marker).toHaveAttribute("data-state", "restart-required");
+    expect(marker).toHaveAttribute("data-visible", "true");
+  });
+
+  it("does not retry when the update is gone at the next attempt", async () => {
+    vi.useFakeTimers();
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      vi.mocked(check).mockResolvedValueOnce(update(async () => { throw new Error("HTTP 503"); }) as never)
+        .mockResolvedValueOnce(null);
+      render(<AutoUpdater />);
+      await act(async () => {});
+      fireEvent.click(screen.getByRole("button", { name: "Download and install" }));
+      await act(async () => {});
+      expect(screen.getByRole("dialog")).toHaveTextContent("Retrying in 2s");
+      await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+      expect(check).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId("update-state")).toHaveAttribute("data-state", "failed");
+      expect(screen.getByRole("dialog")).toHaveTextContent("The download could not be completed.");
+      expect(screen.getByRole("dialog")).not.toHaveTextContent("Retrying in");
+      await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+      expect(check).toHaveBeenCalledTimes(2);
+    } finally { log.mockRestore(); vi.useRealTimers(); }
+  });
+
   it("labels a hidden cancelled update as cancelled", async () => {
     vi.mocked(check).mockResolvedValueOnce(update(() => new Promise(() => {})) as never);
     render(<AutoUpdater />);
