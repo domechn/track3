@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import RealtimeTotalValue from "./realtime-total-value";
 import { MobileHeaderTotal } from "@/mobile/components/mobile/header-total";
 import { useLiveTotal, type LiveTotalState } from "./use-live-total";
+import { queryLatestAssets } from "@/middlelayers/charts";
 
 vi.mock("./use-live-total", () => ({ useLiveTotal: vi.fn() }));
 vi.mock("@/middlelayers/charts", () => ({
@@ -102,6 +103,38 @@ it("shows the partial marker with the known value on desktop and phone", () => {
   const phone = render(<MobileHeaderTotal live fidelity currency={currency} />);
   expect(phone.container.querySelector(".mobile-header-total")).toHaveTextContent("$123");
   expect(phone.container.querySelector(".mobile-header-total")).toHaveTextContent("Partial data");
+});
+
+it("shows five missing symbols, expands the rest and separates small balances", () => {
+  vi.mocked(queryLatestAssets).mockResolvedValue([]);
+  vi.mocked(useLiveTotal).mockReturnValue({
+    state: "partial", value: 123, animatedValue: 123, announcedValue: 123,
+    firstReveal: false, animate: false, partial: true, error: "pricesMissing:6",
+    missingSymbols: ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX"].map((symbol, index) => ({
+      symbol, assetType: "crypto" as const, lastValue: 60 - index * 10,
+    })),
+    dustSymbols: [{ symbol: "DUST", assetType: "crypto", lastValue: 0.01 }],
+    missingShare: 0.125,
+    retryNow: vi.fn(),
+  });
+  render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />);
+  fireEvent.click(screen.getByRole("button", { name: "Live total" }));
+  expect(screen.getByText("Prices for 6 coins missing")).toBeVisible();
+  expect(screen.getByText("about 12.5% of the last snapshot value is not live-priced")).toBeVisible();
+  const list = screen.getByTestId("live-missing-list");
+  expect(list).toHaveAttribute("data-state", "collapsed");
+  for (const symbol of ["ONE", "TWO", "THREE", "FOUR", "FIVE"]) {
+    expect(list).toHaveTextContent(symbol);
+  }
+  expect(list).not.toHaveTextContent("SIX");
+  expect(screen.queryByText("Small balances without a price")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "+1 more" }));
+  expect(list).toHaveAttribute("data-state", "expanded");
+  expect(list).toHaveTextContent("SIX");
+  expect(screen.getByText("Small balances without a price")).toBeVisible();
+  expect(list).toHaveTextContent("DUST");
+  fireEvent.click(screen.getByRole("button", { name: "Show less" }));
+  expect(list).toHaveAttribute("data-state", "collapsed");
 });
 
 it("shows a safe error reason, last success time and retry on both popovers", () => {

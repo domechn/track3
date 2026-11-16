@@ -1,13 +1,16 @@
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import type { LiveMissingSymbol } from "@/middlelayers/charts-refresh";
 
 export type LiveTotalState = "idle" | "connecting" | "live" | "partial" | "stale" | "error" | "off";
 
 type Snapshot = { state: LiveTotalState; value?: number; lastAt?: number; firstReveal: boolean;
-  partial?: boolean; error?: string };
+  partial?: boolean; error?: string; missingSymbols?: LiveMissingSymbol[];
+  dustSymbols?: LiveMissingSymbol[]; missingShare?: number };
 type Event =
   | { type: "reset"; value?: number; at?: number }
   | { type: "start" }
-  | { type: "success"; value: number; at: number; live: boolean; stale?: boolean; partial?: boolean; reason?: string }
+  | { type: "success"; value: number; at: number; live: boolean; stale?: boolean; partial?: boolean; reason?: string;
+    missingSymbols?: LiveMissingSymbol[]; dustSymbols?: LiveMissingSymbol[]; missingShare?: number }
   | { type: "stale" }
   | { type: "error"; reason?: string }
   | { type: "off" };
@@ -53,13 +56,15 @@ export function liveTotalTransition(snapshot: Snapshot, event: Event): Snapshot 
     case "success":
       return { state: event.stale ? "stale" : event.partial ? "partial" : event.live ? "live" : "off",
         value: event.value, lastAt: event.stale || event.partial ? snapshot.lastAt : event.at,
-        firstReveal: snapshot.value === undefined, partial: event.partial, error: event.reason };
+        firstReveal: snapshot.value === undefined, partial: event.partial, error: event.reason,
+        missingSymbols: event.missingSymbols, dustSymbols: event.dustSymbols, missingShare: event.missingShare };
     case "stale":
       return snapshot.state === "connecting" || snapshot.state === "live" || snapshot.state === "partial"
         ? { ...snapshot, state: "stale", firstReveal: false } : snapshot;
     case "error":
       return { ...snapshot, state: snapshot.value === undefined ? "error" : "stale",
-        error: event.reason, firstReveal: false };
+        error: event.reason, firstReveal: false,
+        missingSymbols: undefined, dustSymbols: undefined, missingShare: undefined };
     case "off":
       return { ...snapshot, state: "off", firstReveal: false };
   }
@@ -67,7 +72,8 @@ export function liveTotalTransition(snapshot: Snapshot, event: Event): Snapshot 
 
 export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues = false, refreshToken }: {
   key: string;
-  load: () => Promise<number | { value: number; stale?: boolean; partial?: boolean; reason?: string }>;
+  load: () => Promise<number | { value: number; stale?: boolean; partial?: boolean; reason?: string;
+    missingSymbols?: LiveMissingSymbol[]; dustSymbols?: LiveMissingSymbol[]; missingShare?: number }>;
   enabled: boolean;
   live: boolean;
   intervalMs: number;
@@ -119,11 +125,15 @@ export function useLiveTotal({ key, load, enabled, live, intervalMs, hideValues 
         const stale = typeof result === "number" ? false : result.stale;
         const partial = typeof result === "number" ? false : result.partial;
         const reason = typeof result === "number" ? undefined : result.reason;
+        const missingSymbols = typeof result === "number" ? undefined : result.missingSymbols;
+        const dustSymbols = typeof result === "number" ? undefined : result.dustSymbols;
+        const missingShare = typeof result === "number" ? undefined : result.missingShare;
         failures = 0;
         lastAt = Date.now();
         if (live) sessionValues.set(key, value);
         if (live && !stale && !partial) sessionSuccessAt.set(key, lastAt);
-        dispatch({ type: "success", value, at: lastAt, live, stale, partial, reason });
+        dispatch({ type: "success", value, at: lastAt, live, stale, partial, reason,
+          missingSymbols, dustSymbols, missingShare });
         if (lastAnnouncedAt.current === 0 || lastAt - lastAnnouncedAt.current >= 300_000) {
           lastAnnouncedAt.current = lastAt || 1;
           setAnnouncedValue(value);

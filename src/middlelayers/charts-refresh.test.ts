@@ -245,7 +245,7 @@ describe("live partial prices", () => {
     ].map(([assetType, wallet, symbol, amount, price], index) => ({
       id: index + 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
       assetType, wallet: md5(String(wallet)), symbol, amount, price,
-      value: Number(amount) * Number(price),
+      value: symbol === "PLUME" ? 3 : symbol === "KAT" ? 4 : Number(amount) * Number(price),
     }));
     vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
     vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
@@ -324,7 +324,7 @@ describe("live partial prices", () => {
     expect(live.partial).toBe(false);
   });
 
-  it("does not apply an Others rule to a symbol shared with another wallet", async () => {
+  it("uses the full saved value, not an Others rule, for a symbol shared with another wallet", async () => {
     vi.mocked(getConfiguration).mockResolvedValue({ configs: { groupUSD: false },
       others: [{ symbol: "NOVA", amount: 2,
         price: { kind: "manual", usd: 3, setAt: "2026-11-15T00:00:00.000Z" } }] } as never);
@@ -342,9 +342,169 @@ describe("live partial prices", () => {
 
     const live = await queryRealTimeAssetsValue();
 
-    expect(live.partial).toBe(true);
-    expect(live.missingCount).toBe(1);
+    expect(live.partial).toBe(false);
+    expect(live.missingCount).toBe(0);
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "NOVA", value: 8, price: 8 / 3 }));
     expect(live).not.toContainEqual(expect.objectContaining({ symbol: "NOVA", price: 3 }));
+  });
+
+  it("counts distinct unresolved symbols from three wallets and excludes dust", async () => {
+    const symbols = ["BTC", "USDT", ...Array.from({ length: 17 }, (_, index) => `S${index}`), "DUST"];
+    const rows = ["wallet-a", "wallet-b", "wallet-c"].flatMap((wallet, walletIndex) =>
+      symbols.map((symbol, symbolIndex) => {
+        const missingIndex = Number(symbol.slice(1));
+        const unresolved = /^S[0-5]$/.test(symbol);
+        const price = unresolved || symbol === "DUST" ? 0 : symbol === "BTC" ? 90 : symbol === "USDT" ? 1 : 2;
+        const value = unresolved ? 60 - missingIndex * 10 : symbol === "DUST" ? 0.01 : price;
+        return { id: walletIndex * 20 + symbolIndex + 1, uuid: "saved",
+          createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+          wallet: md5(wallet), symbol, amount: 1, price, value };
+      }));
+    const grouped = symbols.map((symbol) => {
+      const matching = rows.filter((row) => row.symbol === symbol);
+      return { ...matching[0], amount: 3, value: matching.reduce((sum, row) => sum + row.value, 0) };
+    });
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([grouped] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 100, USDT: 1, s7: 7 });
+    const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.missingCount).toBe(6);
+    expect(live.missingSymbols).toEqual([0, 1, 2, 3, 4, 5].map((index) => ({
+      symbol: `S${index}`, assetType: "crypto", lastValue: 3 * (60 - index * 10),
+    })));
+    expect(live.dustSymbols).toEqual([{ symbol: "DUST", assetType: "crypto", lastValue: 0.03 }]);
+    expect(live.missingShare).toBeCloseTo(630 / 969.03);
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "BTC", price: 100, value: 300 }));
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "S6", price: 2, value: 6 }));
+    expect(live.some((asset) => ["S0", "S1", "S2", "S3", "S4", "S5", "DUST"].includes(asset.symbol))).toBe(false);
+    expect(debug).toHaveBeenCalledOnce();
+    expect(debug).toHaveBeenCalledWith("Live missing price symbols:", ["S0", "S1", "S2", "S3", "S4", "S5", "DUST"]);
+  });
+
+  it("does not mark a dust-only missing quote partial", async () => {
+    const rows = [
+      { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "BTC", amount: 1, price: 10000, value: 10000 },
+      { id: 2, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "DUST", amount: 1, price: 0, value: 0.1 },
+    ];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.partial).toBe(false);
+    expect(live.reason).toBeUndefined();
+    expect(live.missingCount).toBe(0);
+    expect(live.dustSymbols).toEqual([{ symbol: "DUST", assetType: "crypto", lastValue: 0.1 }]);
+  });
+
+  it("keeps a failed quote request partial and uncached even when saved prices cover the total", async () => {
+    const rows = [
+      { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "BTC", amount: 1, price: 10000, value: 10000 },
+      { id: 2, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "DUST", amount: 1, price: 0, value: 0.1 },
+    ];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+    vi.mocked(queryCoinPrices).mockRejectedValue(new Error("generic quote error"));
+    const entries = new Map<string, unknown>();
+    vi.mocked(getMemoryCacheInstance).mockReturnValue({
+      getCache: (key: string) => entries.get(key),
+      setCache: (key: string, value: unknown) => { entries.set(key, value); },
+    } as never);
+
+    const live = await queryRealTimeAssetsValue();
+    await queryRealTimeAssetsValue();
+
+    expect(live.partial).toBe(true);
+    expect(live.reason).toBe("pricesMissing");
+    expect(live.missingCount).toBe(0);
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "BTC", price: 10000 }));
+    expect(queryCoinPrices).toHaveBeenCalledTimes(2);
+    expect(entries.size).toBe(0);
+  });
+
+  it("counts an unpriced coin with unknown snapshot value as missing, not dust", async () => {
+    const rows = [
+      { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "BTC", amount: 1, price: 100, value: 100 },
+      { id: 2, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "UNKNOWN", amount: 1000, price: 0, value: 0 },
+    ];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.partial).toBe(true);
+    expect(live.reason).toBe("pricesMissing");
+    expect(live.missingCount).toBe(1);
+    expect(live.missingSymbols).toEqual([{ symbol: "UNKNOWN", assetType: "crypto", lastValue: 0 }]);
+    expect(live.dustSymbols).toEqual([]);
+    expect(live.missingShare).toBeUndefined();
+  });
+
+  it("does not price a grouped holding from only its first wallet", async () => {
+    const rows = [
+      { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "NOVA", amount: 2, price: 2, value: 4 },
+      { id: 2, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-b"), symbol: "NOVA", amount: 1, price: 0, value: 10 },
+      { id: 3, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "BTC", amount: 1, price: 100, value: 100 },
+    ];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([[
+      { ...rows[0], amount: 3, value: 14 }, rows[2],
+    ]] as never);
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.missingSymbols).toEqual([{ symbol: "NOVA", assetType: "crypto", lastValue: 14 }]);
+    expect(live).not.toContainEqual(expect.objectContaining({ symbol: "NOVA" }));
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "BTC", price: 100 }));
+  });
+
+  it("uses a valid saved per-wallet price even when the saved value rounded to zero", async () => {
+    const rows = [
+      { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "NOVA", amount: 1, price: 2, value: 0 },
+      { id: 2, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-b"), symbol: "NOVA", amount: 1, price: 4, value: 4 },
+    ];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([[
+      { ...rows[0], amount: 2, value: 4 },
+    ]] as never);
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.missingCount).toBe(0);
+    expect(live).toContainEqual(expect.objectContaining({ symbol: "NOVA", amount: 2, price: 3, value: 6 }));
+  });
+
+  it("bases missing value on the grouped snapshot when snapshots share a timestamp", async () => {
+    const latest = [
+      { id: 3, uuid: "latest", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "BTC", amount: 1, price: 100, value: 100 },
+      { id: 4, uuid: "latest", createdAt: "2026-11-15T00:00:00.000Z", assetType: "crypto" as const,
+        wallet: md5("wallet-a"), symbol: "KAT", amount: 1, price: 0, value: 20 },
+    ];
+    const older = latest.map((row, index) => ({
+      ...row, id: index + 1, uuid: "older", value: 999,
+    }));
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([latest, older] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([latest, older] as never);
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.missingSymbols).toEqual([{ symbol: "KAT", assetType: "crypto", lastValue: 20 }]);
+    expect(live.missingShare).toBeCloseTo(20 / 120);
   });
 
   it("keeps coin and cash values when a stock quote fails", async () => {

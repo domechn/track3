@@ -167,6 +167,24 @@ it("retains the last successful time when a later load fails", async () => {
   expect(result.current.lastAt).toBe(successfulAt);
 });
 
+it("clears an old missing-price list when a later request fails", () => {
+  const initial = { state: "idle" as const, firstReveal: false };
+  const partial = liveTotalTransition(initial, {
+    type: "success", value: 80, at: 1000, live: true, partial: true, reason: "pricesMissing",
+    missingSymbols: [{ symbol: "OLD", assetType: "crypto", lastValue: 20 }],
+    dustSymbols: [{ symbol: "DUST", assetType: "crypto", lastValue: 0.01 }],
+    missingShare: 0.2,
+  });
+  const failed = liveTotalTransition(partial, { type: "error", reason: "pricesMissing" });
+
+  expect(failed.state).toBe("stale");
+  expect(failed.value).toBe(80);
+  expect(failed.error).toBe("pricesMissing");
+  expect(failed.missingSymbols).toBeUndefined();
+  expect(failed.dustSymbols).toBeUndefined();
+  expect(failed.missingShare).toBeUndefined();
+});
+
 it("retains a safe IBKR expiry reason when the live query has no priced holdings", () => {
   expect(safeLiveTotalError(new Error("ibkrToken"))).toBe("ibkrToken");
 });

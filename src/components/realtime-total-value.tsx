@@ -52,7 +52,9 @@ const App = ({
       setRealtimeAssetValues(assets);
       return { value: assets.reduce((sum, asset) => sum + asset.value, 0),
         partial: result.partial, reason: result.reason === "pricesMissing"
-          ? `pricesMissing:${result.missingCount ?? 1}` : result.reason };
+          ? `pricesMissing:${result.missingCount ?? 1}` : result.reason,
+        missingSymbols: result.missingSymbols, dustSymbols: result.dustSymbols,
+        missingShare: result.missingShare };
     },
   });
   const realtimeTotalValue = liveTotal.value ?? 0;
@@ -213,7 +215,8 @@ const App = ({
               ? liveTotal.state === "error" ? <div className="flex min-h-[110px] flex-col items-start justify-center gap-2">
                   <span className="text-sm text-muted-foreground">{t("realtime.state.error")}</span>
                   <LiveTotalDetails error={liveTotal.error} lastAt={liveTotal.lastAt}
-                    retryNow={liveTotal.retryNow} t={t} />
+                    retryNow={liveTotal.retryNow} t={t} missingSymbols={liveTotal.missingSymbols}
+                    dustSymbols={liveTotal.dustSymbols} missingShare={liveTotal.missingShare} />
                 </div> : <div className="space-y-4 pt-2" aria-hidden="true">
                 <div className="t3-live-skeleton h-3 w-1/2" />
                 <div className="t3-live-skeleton ml-auto h-5 w-3/4" />
@@ -223,7 +226,9 @@ const App = ({
               : <div className="space-y-3">
                   <RealtimeView />
                   {(liveTotal.error || liveTotal.partial) && <LiveTotalDetails error={liveTotal.error}
-                    lastAt={liveTotal.lastAt} retryNow={liveTotal.retryNow} t={t} />}
+                    lastAt={liveTotal.lastAt} retryNow={liveTotal.retryNow} t={t}
+                    missingSymbols={liveTotal.missingSymbols} dustSymbols={liveTotal.dustSymbols}
+                    missingShare={liveTotal.missingShare} />}
                 </div>}
             {liveTotal.value !== undefined && <div
               className={`absolute inset-0 rounded-md backdrop-blur-md bg-background/60 transition-opacity duration-200 ${
