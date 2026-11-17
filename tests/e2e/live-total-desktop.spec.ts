@@ -5,7 +5,11 @@ import { installTauriBridge } from "./tauri-bridge";
 test("opening Live total reserves the strip and leaves the page title in place", async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1280, height: 720 });
-  await installTauriBridge(page, { richPortfolio: true });
+  await installTauriBridge(page, {
+    richPortfolio: true,
+    coinPrices: { BTC: 42000, USDT: 1, ETH: 3650.29, SOL: 193.96, USDC: 1, AVAX: 38.83, LINK: 19.26 },
+    stockPrices: { AAPL: 237.96 },
+  });
   await page.goto("/#/overview");
   const title = page.getByRole("heading", { name: "Overview" }).first();
   await expect(title).toBeVisible();

@@ -133,14 +133,21 @@ it("shows the live reason on phone and retries the quote query now", async () =>
 it("marks a phone total partial while preserving its known amount", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: true }));
   vi.mocked(queryRealTimeAssetsValue).mockResolvedValue(Object.assign(
-    [{ symbol: "ETH", assetType: "crypto" as const, amount: 1, price: 120, value: 120 }],
-    { partial: true, reason: "pricesMissing" as const, missingCount: 2 },
+    [
+      { symbol: "BTC", assetType: "crypto" as const, amount: 1, price: 10000, value: 10000 },
+      { symbol: "ETH", assetType: "crypto" as const, amount: 2, price: 100, value: 200 },
+      { symbol: "DUST", assetType: "crypto" as const, amount: 1, price: 0.1, value: 0.1 },
+    ],
+    { partial: true, reason: "pricesMissing" as const, missingCount: 1,
+      missingSymbols: [{ symbol: "ETH", assetType: "crypto" as const, lastValue: 200 }],
+      dustSymbols: [{ symbol: "DUST", assetType: "crypto" as const, lastValue: 0.1 }] },
   ));
   render(<MobileHeaderTotal live fidelity
     currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }} />);
   await act(async () => { await Promise.resolve(); });
-  expect(screen.getByLabelText("Live total")).toHaveTextContent("$120");
+  expect(screen.getByLabelText("Live total")).toHaveTextContent("$10,200.10");
   expect(screen.getByLabelText("Live total")).toHaveTextContent("Partial data");
+  expect(screen.getByTitle("Live prices: partial data")).toHaveAttribute("data-state", "partial");
 });
 
 it("passes structured missing symbols and snapshot share to the phone popover", async () => {

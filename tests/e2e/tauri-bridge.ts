@@ -44,6 +44,8 @@ type BridgeOptions = {
   dailyChangesFixture?: 30 | 90 | 264;
   appVersion?: string;
   licenseDevices?: "absent" | "present" | "error";
+  coinPrices?: Record<string, number>;
+  stockPrices?: Record<string, number>;
 };
 
 export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions | FakeS3 = {}, legacySeedReviewContent = false) {
@@ -82,6 +84,8 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
     dailyChangesFixture,
     appVersion = "0.8.2",
     licenseDevices = "absent",
+    coinPrices,
+    stockPrices,
   } = options;
   if (!options.onboarding) {
     await page.addInitScript(() => localStorage.setItem("track3-onboarding-v1", "completed"));
@@ -857,7 +861,10 @@ export async function installTauriBridge(page: Page, optionsOrS3: BridgeOptions 
         body = JSON.stringify({ error: "Monthly ERC20 wallet refresh limit reached", code: "USAGE_LIMIT_EXCEEDED",
           resource: "erc20", usage: { ...usage.erc20, used: 300, remaining: 0 } });
       } else if (proApi && requestPath === "/api/coins/price") {
-        body = '{"data":{"BTC":42000,"USDT":1}}';
+        body = JSON.stringify({ data: coinPrices ?? { BTC: 42000, USDT: 1 } });
+      } else if (proApi && requestPath === "/api/stock/price" && stockPrices) {
+        body = JSON.stringify({ data: Object.fromEntries(Object.entries(stockPrices).map(([symbol, price]) =>
+          [symbol, { price, currency: "USD" }])) });
       } else if (proApi && requestPath === "/api/coins/listStableCoins") {
         body = '{"data":[{"symbol":"USDT"},{"symbol":"USDC"}]}';
       } else if (currencyApi && requestPath.startsWith("/api/currency-rate/")) {

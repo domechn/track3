@@ -1048,6 +1048,7 @@ async function queryCoinsDataByWalletCoins(
     valueContext,
     blacklistedSymbols,
   );
+  const savedPriceIdentities = new Set<string>();
   if (liveStatus) {
     const savedByIdentity = new Map<string, { amount: number; quotedValue: number; valid: boolean }>();
     for (const row of lastAssets) {
@@ -1066,6 +1067,7 @@ async function queryCoinsDataByWalletCoins(
       if ((!Number.isFinite(current) || current <= 0) && !asset.customPrice &&
         saved?.valid && saved.amount > 0 && saved.quotedValue > 0) {
         valueContext.priceMap[identity] = saved.quotedValue / saved.amount;
+        savedPriceIdentities.add(identity);
       }
     }
   }
@@ -1082,7 +1084,8 @@ async function queryCoinsDataByWalletCoins(
   );
   if (!liveStatus) return resolved;
   const pricedIdentities = new Set(resolved
-    .filter((row) => Number.isFinite(row.price) && row.price > 0)
+    .filter((row) => Number.isFinite(row.price) && row.price > 0 &&
+      !savedPriceIdentities.has(getAssetIdentity(row)))
     .map((row) => getAssetIdentity(row)));
   const lastValueByIdentity = new Map<string, number>();
   const lastTotal = lastAssets.reduce((sum, asset) => {
