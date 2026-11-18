@@ -40,6 +40,7 @@ import {
   getAssetType,
 } from "./datafetch/utils/coins";
 import { fetchStockPrices } from "./datafetch/utils/price";
+import { COIN_PRICE_ISSUES, normalizedCoinSymbol, supportedCoinSymbol, type CoinPriceResult } from "./datafetch/coins/price";
 import { isBrokerCashSymbol } from "./entities/currency";
 import { WalletAnalyzer } from "./wallet";
 import { OthersAnalyzer } from "./datafetch/coins/others";
@@ -69,7 +70,10 @@ export type LiveAssets = Asset[] & {
   missingShare?: number;
 };
 
-export type LiveMissingSymbol = Pick<AssetModel, "symbol" | "assetType"> & { lastValue: number };
+export type LiveMissingSymbol = Pick<AssetModel, "symbol" | "assetType"> & {
+  lastValue: number;
+  reason?: "unsupported" | "requestFailed" | "skipped";
+};
 
 type LivePriceStatus = {
   reason?: LiveAssets["reason"];
@@ -78,6 +82,8 @@ type LivePriceStatus = {
   missingSymbols: LiveMissingSymbol[];
   dustSymbols: LiveMissingSymbol[];
   missingShare?: number;
+  requestFailedSymbols: Set<string>;
+  skippedSymbols: Set<string>;
 };
 
 function liveQuoteReason(error: unknown, fallback: LiveAssets["reason"]): LiveAssets["reason"] {
@@ -703,6 +709,7 @@ export async function queryRealTimeAssetsValue(): Promise<LiveAssets> {
   const liveStatus: LivePriceStatus = {
     missingRateSymbols: new Set(), missingCount: 0,
     missingSymbols: [], dustSymbols: [], missingShare: 0,
+    requestFailedSymbols: new Set(), skippedSymbols: new Set(),
   };
   const customSymbols = config.others?.map((entry) => entry.symbol) ?? [];
 
@@ -759,7 +766,8 @@ export async function queryRealTimeAssetsValue(): Promise<LiveAssets> {
   const sourceProblems = readStoredStatuses().filter((status) => status.status !== "ok");
   const ibkrProblem = sourceProblems.find((status) => status.detail === "IBKR token expired");
   const limitedProblem = sourceProblems.find((status) => status.category === "rateLimit");
-  assetRes.partial = liveStatus.reason !== undefined || liveStatus.missingCount > 0 || sourceProblems.length > 0;
+  assetRes.partial = liveStatus.reason !== undefined || liveStatus.missingCount > 0 ||
+    sourceProblems.length > 0;
   assetRes.missingCount = liveStatus.missingCount;
   assetRes.missingSymbols = liveStatus.missingSymbols;
   assetRes.dustSymbols = liveStatus.dustSymbols;
@@ -778,6 +786,9 @@ export async function queryRealTimeAssetsValue(): Promise<LiveAssets> {
 
 async function queryWalletCoinValueContext(
   assets: WalletCoin[],
+  config: GlobalConfig,
+  lastAssets: AssetModel[],
+  blacklistedSymbols: string[],
   userProInfo: UserLicenseInfo,
   addProgress?: AddProgressFunc,
   savedStockRows = false,
@@ -785,6 +796,24 @@ async function queryWalletCoinValueContext(
 ): Promise<WalletCoinValueContext> {
   const needPriceAssets = assets.filter((a) => !a.price);
   const followTargets = customFollowTargets(assets);
+  const customSymbols = config.others?.map((entry) => entry.symbol) ?? [];
+  const pricedInOthers = new Set(config.others?.filter((entry) =>
+    !entry.attachTo && entry.price && validateCustomPrice(entry.price, customSymbols, entry.symbol))
+    .map((entry) => normalizedCoinSymbol(entry.symbol)) ?? []);
+  const noPriceCache = getMemoryCacheInstance("missing-coin-prices");
+  const now = Date.now();
+  const blacklisted = new Set(blacklistedSymbols);
+  const lastTotal = lastAssets.reduce((total, asset) =>
+    total + (!blacklisted.has(asset.symbol.toUpperCase()) &&
+      Number.isFinite(asset.value) && asset.value > 0 ? asset.value : 0), 0);
+  const lastValues = new Map<string, number>();
+  for (const asset of lastAssets) {
+    if (getAssetType(asset) !== "crypto" || blacklisted.has(asset.symbol.toUpperCase()) ||
+      !Number.isFinite(asset.value) || asset.value <= 0) continue;
+    const symbol = normalizedCoinSymbol(asset.symbol);
+    lastValues.set(symbol, (lastValues.get(symbol) ?? 0) + asset.value);
+  }
+  const skippedSymbols = new Set<string>();
   const cryptoPriceSymbols = Array.from(
     new Set(
       needPriceAssets
@@ -793,7 +822,22 @@ async function queryWalletCoinValueContext(
         .concat(followTargets.filter((target) => target.assetType === "crypto").map((target) => target.symbol))
         .concat(["USDT", "BTC"]),
     ),
-  ).filter((x): x is string => !!x);
+  ).filter((x): x is string => {
+    if (!x) return false;
+    const symbol = normalizedCoinSymbol(x);
+    const lastValue = lastValues.get(symbol);
+    const checkedAt = noPriceCache.getCache<number>(symbol);
+    if (lastValue !== undefined && lastValue < 1 && lastValue < lastTotal * 0.0001 &&
+      !pricedInOthers.has(symbol) &&
+      !assets.some((asset) => normalizedCoinSymbol(asset.symbol) === symbol && asset.customPrice) &&
+      !followTargets.some((target) => target.assetType === "crypto" && normalizedCoinSymbol(target.symbol) === symbol) &&
+      checkedAt !== undefined && checkedAt <= now && now - checkedAt < 24 * 60 * 60 * 1000) {
+      skippedSymbols.add(symbol);
+      return false;
+    }
+    return true;
+  });
+  if (liveStatus) liveStatus.skippedSymbols = skippedSymbols;
   const stockPriceSymbols = Array.from(
     new Set(
       needPriceAssets
@@ -808,12 +852,15 @@ async function queryWalletCoinValueContext(
     needPriceAssets.filter((asset) => savedStockRows && getAssetType(asset) === "stock" && isBrokerCashSymbol(asset.symbol))
       .map((asset) => asset.symbol.toUpperCase())
   )];
+  let coinQuoteFailed = false;
   const [cryptoPriceMap, stockPriceMap, currencyRates]: [
-    Record<string, number>, Record<string, number>, Awaited<ReturnType<typeof listAllCurrencyRates>>,
+    CoinPriceResult, Record<string, number>, Awaited<ReturnType<typeof listAllCurrencyRates>>,
   ] = await Promise.all([
     cryptoPriceSymbols.length > 0
       ? queryCoinPrices(cryptoPriceSymbols, userProInfo).catch((error: unknown) => {
         if (!liveStatus) throw error;
+        coinQuoteFailed = true;
+        for (const symbol of cryptoPriceSymbols) liveStatus.requestFailedSymbols.add(normalizedCoinSymbol(symbol));
         // USDT and BTC are always requested, so the call also runs when no holding needs a coin quote.
         const reason = liveQuoteReason(error, coinQuoteNeeded ? "pricesMissing" : undefined);
         if (reason === "rateLimited" || (reason && !liveStatus.reason)) liveStatus.reason = reason;
@@ -833,6 +880,18 @@ async function queryWalletCoinValueContext(
       })
       : Promise.resolve([]),
   ]);
+  if (liveStatus) {
+    for (const symbol of cryptoPriceMap[COIN_PRICE_ISSUES]?.requestFailed ?? []) {
+      liveStatus.requestFailedSymbols.add(symbol);
+    }
+  }
+  for (const symbol of coinQuoteFailed ? [] : cryptoPriceSymbols) {
+    const normalized = normalizedCoinSymbol(symbol);
+    if (!supportedCoinSymbol(normalized) || cryptoPriceMap[COIN_PRICE_ISSUES]?.requestFailed.has(normalized)) continue;
+    if (Number.isFinite(cryptoPriceMap[normalized]) && cryptoPriceMap[normalized] > 0) {
+      if (noPriceCache.getCache<number>(normalized) !== undefined) noPriceCache.deleteCache(normalized);
+    } else noPriceCache.setCache(normalized, Date.now(), 24 * 60 * 60);
+  }
   const typedCryptoPriceMap: Record<string, number> = {};
   for (const symbol of Object.keys(cryptoPriceMap)) {
     typedCryptoPriceMap[getAssetIdentity({ symbol, assetType: "crypto" })] =
@@ -1035,14 +1094,11 @@ async function queryCoinsDataByWalletCoins(
   savedStockRows = false,
   liveStatus?: LivePriceStatus,
 ): Promise<WalletCoinUSD[]> {
-  const [valueContext, blacklistedSymbols] = await Promise.all([
-    queryWalletCoinValueContext(assets, userProInfo, addProgress, savedStockRows, liveStatus),
-    knownBlacklistedSymbols
-      ? Promise.resolve(knownBlacklistedSymbols)
-      : getBlacklistCoins().then((symbols) =>
-          symbols.map((symbol) => symbol.toUpperCase()),
-        ),
-  ]);
+  const blacklistedSymbols = knownBlacklistedSymbols ??
+    (await getBlacklistCoins()).map((symbol) => symbol.toUpperCase());
+  const valueContext = await queryWalletCoinValueContext(
+    assets, config, lastAssets, blacklistedSymbols, userProInfo, addProgress, savedStockRows, liveStatus,
+  );
   const canonicalization = getPortfolioCanonicalization(
     config,
     valueContext,
@@ -1108,7 +1164,14 @@ async function queryCoinsDataByWalletCoins(
   const byLastValue = (left: LiveMissingSymbol, right: LiveMissingSymbol) =>
     right.lastValue - left.lastValue || left.symbol.localeCompare(right.symbol);
   for (const item of unresolved.values()) {
-    if (item.lastValue > 0 && item.lastValue < lastTotal * 0.0001 && item.lastValue < 1) {
+    if (item.assetType === "crypto" && !supportedCoinSymbol(item.symbol)) item.reason = "unsupported";
+    else if (item.assetType === "crypto" && liveStatus.skippedSymbols.has(normalizedCoinSymbol(item.symbol)))
+      item.reason = "skipped";
+    else if (item.assetType === "crypto" && liveStatus.requestFailedSymbols.has(normalizedCoinSymbol(item.symbol)))
+      item.reason = "requestFailed";
+    if (item.reason === "unsupported" ||
+      item.reason === "skipped" ||
+      (item.lastValue > 0 && item.lastValue < lastTotal * 0.0001 && item.lastValue < 1)) {
       liveStatus.dustSymbols.push(item);
     } else {
       liveStatus.missingSymbols.push(item);
@@ -1120,9 +1183,17 @@ async function queryCoinsDataByWalletCoins(
   liveStatus.missingShare = lastTotal > 0 && liveStatus.missingSymbols.every((item) => item.lastValue > 0)
     ? liveStatus.missingSymbols.reduce((sum, item) => sum + item.lastValue, 0) / lastTotal : undefined;
   if (unresolved.size) {
-    console.debug("Live missing price symbols:", [
-      ...liveStatus.missingSymbols, ...liveStatus.dustSymbols,
-    ].map((item) => item.symbol));
+    const allMissing = [...liveStatus.missingSymbols, ...liveStatus.dustSymbols];
+    const group = (reason?: LiveMissingSymbol["reason"]) => {
+      const symbols = allMissing.filter((item) => item.reason === reason).map((item) => item.symbol);
+      return { count: symbols.length, symbols };
+    };
+    console.debug("Live missing price symbols:", {
+      noPrice: group(),
+      unsupported: group("unsupported"),
+      requestFailed: group("requestFailed"),
+      skipped: group("skipped"),
+    });
   }
   if (liveStatus.missingRateSymbols.size) liveStatus.reason = "rateUnavailable";
   else if (liveStatus.missingCount && !liveStatus.reason) liveStatus.reason = "pricesMissing";
@@ -1204,8 +1275,15 @@ async function queryCoinsData(
   const blacklistedSymbols = (await getBlacklistCoins()).map((symbol) =>
     symbol.toUpperCase(),
   );
+  // This prefetch only chooses quote symbols; the write barrier rereads the baseline.
+  const latestBefore = selectLatestPersistedSnapshot(
+    await ASSET_HANDLER.listAssets(1),
+  ).assets;
   const valueContext = await queryWalletCoinValueContext(
     portfolioResult.coins,
+    config,
+    latestBefore,
+    blacklistedSymbols,
     userProInfo,
     addProgress,
   );
@@ -1224,10 +1302,6 @@ async function queryCoinsData(
       valueContext.priceMap[identity] = price;
     }
   }
-  // This prefetch only chooses quote symbols; the write barrier rereads the baseline.
-  const latestBefore = selectLatestPersistedSnapshot(
-    await ASSET_HANDLER.listAssets(1),
-  ).assets;
   const vanished = latestBefore.filter((asset) =>
     asset.amount > 0 &&
     !portfolioResult.failedSources.some((source) =>

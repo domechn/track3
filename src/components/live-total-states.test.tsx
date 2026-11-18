@@ -144,6 +144,67 @@ it("shows five missing symbols, expands the rest and separates small balances", 
   expect(list).toHaveAttribute("data-state", "collapsed");
 });
 
+it("shows counted source, failed-request, and unsupported groups on desktop and phone", () => {
+  vi.mocked(useLiveTotal).mockReturnValue({
+    state: "partial", value: 123, animatedValue: 123, announcedValue: 123,
+    firstReveal: false, animate: false, partial: true, error: "pricesMissing:2",
+    missingSymbols: [
+      { symbol: "NOPRICE", assetType: "crypto", lastValue: 10 },
+      { symbol: "FAIL", assetType: "crypto", lastValue: 8, reason: "requestFailed" },
+    ],
+    dustSymbols: [
+      { symbol: "FOUR WIN", assetType: "crypto", lastValue: 1, reason: "unsupported" },
+      { symbol: "DUST", assetType: "crypto", lastValue: 0.1, reason: "skipped" },
+    ],
+    retryNow: vi.fn(),
+  });
+  for (const device of ["desktop", "phone"]) {
+    const view = device === "desktop"
+      ? render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />)
+      : render(<MobileHeaderTotal live fidelity currency={currency} />);
+    fireEvent.click(device === "desktop"
+      ? screen.getByRole("button", { name: "Live total" })
+      : screen.getByRole("button", { name: /Live total.*Live prices/ }));
+    const list = screen.getByTestId("live-missing-list");
+    expect(list.querySelector('[data-reason="noPrice"]')).toHaveTextContent("No price from the source (1)");
+    expect(list.querySelector('[data-reason="requestFailed"]')).toHaveTextContent("Request failed, retrying (1)");
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    expect(list.querySelector('[data-reason="unsupported"]')).toHaveTextContent("Symbol not supported by the price source (1)");
+    expect(list.querySelector('[data-reason="skipped"]')).toHaveTextContent("No price from the source, skipped (1)");
+    expect(list).toHaveTextContent("FOUR WIN");
+    expect(list).toHaveTextContent("DUST");
+    view.unmount();
+  }
+});
+
+it("shows unsupported and skipped dust in the details while Live remains complete", () => {
+  vi.mocked(useLiveTotal).mockReturnValue({
+    state: "live", value: 123, animatedValue: 123, announcedValue: 123,
+    firstReveal: false, animate: false, partial: false,
+    dustSymbols: [
+      { symbol: "FOUR WIN", assetType: "crypto", lastValue: 0.1, reason: "unsupported" },
+      { symbol: "DUST", assetType: "crypto", lastValue: 0.1, reason: "skipped" },
+    ],
+    retryNow: vi.fn(),
+  });
+  for (const device of ["desktop", "phone"]) {
+    const view = device === "desktop"
+      ? render(<RealtimeTotalValue currency={currency} quoteColor="green-up-red-down" />)
+      : render(<MobileHeaderTotal live fidelity currency={currency} />);
+    fireEvent.click(device === "desktop"
+      ? screen.getByRole("button", { name: "Live total" })
+      : screen.getByRole("button", { name: /Live total.*Live prices/ }));
+    const list = screen.getByTestId("live-missing-list");
+    expect(list).toHaveAttribute("data-state", "collapsed");
+    expect(list.querySelector('[data-reason="unsupported"]')).toHaveTextContent("Symbol not supported by the price source (1)");
+    expect(list.querySelector('[data-reason="skipped"]')).toHaveTextContent("No price from the source, skipped (1)");
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    expect(list).toHaveTextContent("FOUR WIN");
+    expect(list).toHaveTextContent("DUST");
+    view.unmount();
+  }
+});
+
 it("shows a safe error reason, last success time and retry on both popovers", () => {
   const retryNow = vi.fn();
   vi.mocked(useLiveTotal).mockReturnValue({

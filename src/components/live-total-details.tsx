@@ -14,26 +14,38 @@ export function LiveTotalDetails({ error, lastAt, retryNow, t, missingSymbols, d
   const [expanded, setExpanded] = useState(false);
   const [kind, count] = (error ?? "unknown").split(":");
   const safeKind = (LIVE_TOTAL_REASONS as readonly string[]).includes(kind) && (kind !== "pricesMissing" || /^[1-9]\d*$/.test(count ?? "")) ? kind : "unknown";
-  const showMissing = safeKind === "pricesMissing" && missingSymbols && missingSymbols.length > 0;
+  const showMissing = !!missingSymbols?.length || !!dustSymbols?.some((item) =>
+    item.reason === "unsupported" || item.reason === "skipped");
   const moreCount = Math.max(0, (missingSymbols?.length ?? 0) - 5);
   const showToggle = showMissing && (moreCount > 0 || (dustSymbols?.length ?? 0) > 0);
+  const groups = (visible: LiveMissingSymbol[], all: LiveMissingSymbol[], countsOnly = false) =>
+    (["noPrice", "requestFailed", "unsupported", "skipped"] as const).map((reason) => {
+      const hasReason = (item: LiveMissingSymbol) => (item.reason ?? "noPrice") === reason;
+      const items = visible.filter(hasReason);
+      const count = all.filter(hasReason).length;
+      return items.length || (countsOnly && count) ? <div key={reason}>
+        <p data-reason={reason} className="mt-1 text-xs text-muted-foreground">
+          {t(`realtime.missing.reason.${reason}`).replace("{count}", String(count))}
+        </p>
+        {!!items.length && <ul className="space-y-1">
+          {items.map((item) =>
+            <li key={`${item.assetType}:${item.symbol}`} className="break-all">{item.symbol}</li>)}
+        </ul>}
+      </div> : null;
+    });
   return <div className="space-y-2 text-sm">
-    <p className="text-muted-foreground">
+    {(error || !showMissing) && <p className="text-muted-foreground">
       {t(`realtime.error.${safeKind}`).replace("{count}", count ?? "")}
-    </p>
+    </p>}
     {showMissing && <>
       <div data-testid="live-missing-list" data-state={expanded ? "expanded" : "collapsed"}
         className={expanded ? "max-h-40 overflow-y-auto" : undefined}>
-        <ul className="space-y-1">
-          {(expanded ? missingSymbols : missingSymbols.slice(0, 5)).map((item) =>
-            <li key={`${item.assetType}:${item.symbol}`} className="break-all">{item.symbol}</li>)}
-        </ul>
+        {groups(expanded ? missingSymbols ?? [] : missingSymbols?.slice(0, 5) ?? [], missingSymbols ?? [])}
+        {!expanded && groups([], dustSymbols?.filter((item) =>
+          item.reason === "unsupported" || item.reason === "skipped") ?? [], true)}
         {expanded && !!dustSymbols?.length && <>
           <p className="mt-2 text-xs text-muted-foreground">{t("realtime.missing.dustHeading")}</p>
-          <ul className="mt-1 space-y-1">
-            {dustSymbols.map((item) =>
-              <li key={`${item.assetType}:${item.symbol}`} className="break-all">{item.symbol}</li>)}
-          </ul>
+          {groups(dustSymbols, dustSymbols)}
         </>}
       </div>
       {showToggle && <button type="button" onClick={() => setExpanded((value) => !value)}
