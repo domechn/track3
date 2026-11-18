@@ -73,7 +73,8 @@ export function MobileHeaderTotal({ currency, live, range, fidelity = false }: {
       </button></PopoverTrigger>
       <PopoverContent align="start" sideOffset={4} aria-label={priceLabel} className="w-auto max-w-64 space-y-2 text-sm">
         <p>{priceLabel}</p>
-        {(current.error || current.state === "error") && <LiveTotalDetails error={current.error}
+        {(current.error || current.partial || current.state === "error" || current.dustSymbols?.some((item) =>
+          item.reason === "unsupported" || item.reason === "skipped")) && <LiveTotalDetails error={current.error}
           lastAt={current.lastAt} retryNow={current.retryNow} t={t}
           missingSymbols={current.missingSymbols} dustSymbols={current.dustSymbols}
           missingShare={current.missingShare} />}

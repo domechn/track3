@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import md5 from "md5";
 import {
@@ -33,6 +33,7 @@ import { calculateCostBasis, fromStoredTransactions } from "./cost-basis";
 import { calculateSnapshotProfit } from "./charts-interval-profit";
 import { readStoredStatuses } from "./ui-state/source-status-store";
 import { getMemoryCacheInstance } from "./datafetch/utils/cache";
+import { COIN_PRICE_ISSUES } from "./datafetch/coins/price";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -192,6 +193,8 @@ function mockCanonicalStablecoinDiff(
   return storedWallet;
 }
 
+afterEach(() => vi.restoreAllMocks());
+
 beforeEach(() => {
   vi.resetAllMocks();
   operation = {
@@ -220,6 +223,203 @@ beforeEach(() => {
 });
 
 describe("live partial prices", () => {
+  it("does not mark unsupported-only dust partial", async () => {
+    const rows = [
+      { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "crypto" as const, wallet: md5("wallet-a"), symbol: "BTC", amount: 1, price: 10000, value: 10000 },
+      { id: 2, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "crypto" as const, wallet: md5("wallet-a"), symbol: "FOUR WIN", amount: 1, price: 0, value: 0.1 },
+    ];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 10000, USDT: 1 });
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.partial).toBe(false);
+    expect(live.reason).toBeUndefined();
+    expect(live.dustSymbols).toEqual([
+      { symbol: "FOUR WIN", assetType: "crypto", lastValue: 0.1, reason: "unsupported" },
+    ]);
+  });
+
+  it("skips only known unpriced dust in Live and refresh, while querying custom, material, and new holdings", async () => {
+    let now = Date.parse("2026-11-18T00:00:00Z");
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    const cacheEntries = new Map<string, { value: unknown; validUntil: number }>();
+    vi.mocked(getMemoryCacheInstance).mockImplementation((group) => group === "missing-coin-prices"
+      ? {
+          getCache: (key: string) => {
+            const entry = cacheEntries.get(key);
+            return entry && entry.validUntil >= Date.now() ? entry.value : undefined;
+          },
+          setCache: (key: string, value: unknown, ttl: number) =>
+            cacheEntries.set(key, { value, validUntil: Date.now() + ttl * 1000 }),
+        } as never
+      : { getCache: () => undefined, setCache: () => undefined } as never);
+    vi.mocked(getConfiguration).mockResolvedValue({
+      configs: { groupUSD: false },
+      others: [{ symbol: "CUSTOM", amount: 1,
+        price: { kind: "manual", usd: 0.1, setAt: "2026-11-15T00:00:00.000Z" } }],
+    } as never);
+    const row = (id: number, symbol: string, value: number, wallet = "wallet-a") => ({
+      id, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+      assetType: "crypto" as const, wallet: md5(wallet), symbol, amount: 1, price: 0, value,
+    });
+    const rows = [row(1, "BTC", 10000), row(2, "DUST", 0.1), row(3, "BIG", 2),
+      row(4, "CUSTOM", 0.1, "others")];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 10000, USDT: 1 });
+
+    await queryRealTimeAssetsValue();
+    expect(vi.mocked(queryCoinPrices).mock.calls[0][0]).toContain("DUST");
+
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([[...rows, row(5, "NEW", 0.1)]] as never);
+    const second = await queryRealTimeAssetsValue();
+    const secondRequest = vi.mocked(queryCoinPrices).mock.calls[1][0];
+    expect(secondRequest).not.toContain("DUST");
+    expect(secondRequest).toEqual(expect.arrayContaining(["BIG", "CUSTOM", "NEW"]));
+    expect(second.dustSymbols).toContainEqual({
+      symbol: "DUST", assetType: "crypto", lastValue: 0.1, reason: "skipped",
+    });
+
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [
+        { assetType: "crypto", wallet: "wallet-a", symbol: "BTC", amount: 1 },
+        { assetType: "crypto", wallet: "wallet-a", symbol: "DUST", amount: 1 },
+        { assetType: "crypto", wallet: "wallet-a", symbol: "BIG", amount: 1 },
+        { assetType: "crypto", wallet: "others", symbol: "CUSTOM", amount: 1 },
+      ],
+      failedSources: [],
+    } as never);
+    await refreshAllData(vi.fn(), {}, operation);
+    expect(vi.mocked(queryCoinPrices).mock.calls[2][0]).not.toContain("DUST");
+
+    now += 24 * 60 * 60 * 1000;
+    await queryRealTimeAssetsValue();
+    expect(vi.mocked(queryCoinPrices).mock.calls[3][0]).toContain("DUST");
+  });
+
+  it("keeps polling a small coin with a valid Others price when the coin is also in a wallet", async () => {
+    const checked = new Map<string, number>();
+    vi.mocked(getMemoryCacheInstance).mockImplementation((group) => group === "missing-coin-prices"
+      ? { getCache: (key: string) => checked.get(key),
+          setCache: (key: string, value: number) => { checked.set(key, value); } } as never
+      : { getCache: () => undefined, setCache: () => undefined } as never);
+    vi.mocked(getConfiguration).mockResolvedValue({
+      configs: { groupUSD: false },
+      others: [{ symbol: "XYZ", amount: 1,
+        price: { kind: "manual", usd: 0.1, setAt: "2026-11-15T00:00:00.000Z" } }],
+    } as never);
+    const rows = [
+      { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "crypto" as const, wallet: md5("wallet-a"), symbol: "BTC", amount: 1, price: 10000, value: 10000 },
+      { id: 2, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "crypto" as const, wallet: md5("others"), symbol: "XYZ", amount: 1, price: 0, value: 0.1 },
+      { id: 3, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "crypto" as const, wallet: md5("wallet-a"), symbol: "XYZ", amount: 0.05, price: 0, value: 0.005 },
+    ];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([[
+      rows[0], { ...rows[1], amount: 1.05, value: 0.105 },
+    ]] as never);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 10000, USDT: 1 });
+
+    await queryRealTimeAssetsValue();
+    const second = await queryRealTimeAssetsValue();
+
+    expect(vi.mocked(queryCoinPrices).mock.calls[1][0]).toContain("XYZ");
+    expect(second.dustSymbols).not.toContainEqual(expect.objectContaining({
+      symbol: "XYZ", reason: "skipped",
+    }));
+  });
+
+  it("does not use blacklisted value to classify an active coin as dust", async () => {
+    const checked = new Map<string, number>();
+    vi.mocked(getMemoryCacheInstance).mockImplementation((group) => group === "missing-coin-prices"
+      ? { getCache: (key: string) => checked.get(key),
+          setCache: (key: string, value: number) => { checked.set(key, value); } } as never
+      : { getCache: () => undefined, setCache: () => undefined } as never);
+    const rows = [
+      ["BTC", 100], ["DUST", 0.5], ["WHALE", 1_000_000],
+    ].map(([symbol, value], index) => ({
+      id: index + 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+      assetType: "crypto" as const, wallet: md5("wallet-a"), symbol, amount: 1, price: 0, value,
+    }));
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+    vi.mocked(getBlacklistCoins).mockResolvedValue(["WHALE"]);
+    vi.mocked(queryCoinPrices).mockResolvedValue({ BTC: 100, USDT: 1 });
+
+    await queryRealTimeAssetsValue();
+    const second = await queryRealTimeAssetsValue();
+
+    expect(vi.mocked(queryCoinPrices).mock.calls[1][0]).toContain("DUST");
+    expect(second.missingSymbols).toContainEqual({
+      symbol: "DUST", assetType: "crypto", lastValue: 0.5,
+    });
+  });
+
+  it("clears a no-price marker after a later query returns a price", async () => {
+    const checked = new Map<string, number>();
+    vi.mocked(getMemoryCacheInstance).mockImplementation((group) => group === "missing-coin-prices"
+      ? { getCache: (key: string) => checked.get(key),
+          setCache: (key: string, value: number) => { checked.set(key, value); },
+          deleteCache: (key: string) => { checked.delete(key); } } as never
+      : { getCache: () => undefined, setCache: () => undefined } as never);
+    const rows = [
+      { id: 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "crypto" as const, wallet: md5("wallet-a"), symbol: "BTC", amount: 1, price: 10000, value: 10000 },
+      { id: 2, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+        assetType: "crypto" as const, wallet: md5("wallet-a"), symbol: "DUST", amount: 1, price: 0, value: 0.1 },
+    ];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+    vi.mocked(queryCoinPrices)
+      .mockResolvedValueOnce({ BTC: 10000, USDT: 1 })
+      .mockResolvedValue({ BTC: 10000, USDT: 1, DUST: 2 });
+
+    await queryRealTimeAssetsValue();
+    const materialRows = [rows[0], { ...rows[1], value: 2 }];
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([materialRows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([materialRows] as never);
+    await queryRealTimeAssetsValue();
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+    await queryRealTimeAssetsValue();
+
+    expect(vi.mocked(queryCoinPrices).mock.calls[2][0]).toContain("DUST");
+  });
+
+  it("keeps unsupported symbols in the small group and identifies failed requests separately", async () => {
+    const symbols = ["BTC", "SOL", "比特币", "FOUR WIN", "FAIL", "NOPRICE"];
+    const rows = symbols.map((symbol, index) => ({
+      id: index + 1, uuid: "saved", createdAt: "2026-11-15T00:00:00.000Z",
+      assetType: "crypto" as const, wallet: md5("wallet-a"), symbol, amount: 1,
+      price: symbol === "BTC" ? 1000 : 0, value: symbol === "BTC" ? 1000 : 2,
+    }));
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([rows] as never);
+    vi.mocked(ASSET_HANDLER.listSymbolGroupedAssets).mockResolvedValue([rows] as never);
+    const prices = { BTC: 1000, SOL: 10 };
+    Object.defineProperty(prices, COIN_PRICE_ISSUES, {
+      value: { unsupported: new Set(["比特币", "FOUR WIN"]), requestFailed: new Set(["FAIL"]) },
+    });
+    vi.mocked(queryCoinPrices).mockResolvedValue(prices);
+
+    const live = await queryRealTimeAssetsValue();
+
+    expect(live.missingCount).toBe(2);
+    expect(live.missingSymbols).toEqual([
+      { symbol: "FAIL", assetType: "crypto", lastValue: 2, reason: "requestFailed" },
+      { symbol: "NOPRICE", assetType: "crypto", lastValue: 2 },
+    ]);
+    expect(live.dustSymbols).toEqual([
+      { symbol: "FOUR WIN", assetType: "crypto", lastValue: 2, reason: "unsupported" },
+      { symbol: "比特币", assetType: "crypto", lastValue: 2, reason: "unsupported" },
+    ]);
+  });
+
   function domSnapshot() {
     vi.mocked(getConfiguration).mockResolvedValue({
       configs: { groupUSD: false },
@@ -441,7 +641,12 @@ describe("live partial prices", () => {
     expect(live).toContainEqual(expect.objectContaining({ symbol: "S6", price: 2, value: 6 }));
     expect(live.some((asset) => ["S0", "S1", "S2", "S3", "S4", "S5", "DUST"].includes(asset.symbol))).toBe(false);
     expect(debug).toHaveBeenCalledOnce();
-    expect(debug).toHaveBeenCalledWith("Live missing price symbols:", ["S0", "S1", "S2", "S3", "S4", "S5", "DUST"]);
+    expect(debug).toHaveBeenCalledWith("Live missing price symbols:", {
+      noPrice: { count: 7, symbols: ["S0", "S1", "S2", "S3", "S4", "S5", "DUST"] },
+      unsupported: { count: 0, symbols: [] },
+      requestFailed: { count: 0, symbols: [] },
+      skipped: { count: 0, symbols: [] },
+    });
   });
 
   it("does not mark a dust-only missing quote partial", async () => {
@@ -484,8 +689,8 @@ describe("live partial prices", () => {
     expect(live.partial).toBe(true);
     expect(live.reason).toBe("pricesMissing");
     expect(live.missingCount).toBe(1);
-    expect(live.missingSymbols).toEqual([{ symbol: "BTC", assetType: "crypto", lastValue: 10000 }]);
-    expect(live.dustSymbols).toEqual([{ symbol: "DUST", assetType: "crypto", lastValue: 0.1 }]);
+    expect(live.missingSymbols).toEqual([{ symbol: "BTC", assetType: "crypto", lastValue: 10000, reason: "requestFailed" }]);
+    expect(live.dustSymbols).toEqual([{ symbol: "DUST", assetType: "crypto", lastValue: 0.1, reason: "requestFailed" }]);
     expect(live).toContainEqual(expect.objectContaining({ symbol: "BTC", price: 10000 }));
     expect(queryCoinPrices).toHaveBeenCalledTimes(2);
     expect(entries.size).toBe(0);

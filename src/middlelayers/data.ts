@@ -27,6 +27,7 @@ import {
   CoinPriceQuerier,
   CoinPriceQuery,
   ProCoinPriceQuery,
+  type CoinPriceResult,
 } from "./datafetch/coins/price";
 import { TonAnalyzer } from "./datafetch/coins/ton";
 import { getClientID, getVersion } from "@/utils/app";
@@ -72,7 +73,7 @@ export async function queryStableCoins(): Promise<string[]> {
 export async function queryCoinPrices(
   symbols: string[],
   userInfo: UserLicenseInfo,
-): Promise<{ [k: string]: number }> {
+): Promise<CoinPriceResult> {
   let cpq: CoinPriceQuerier;
   if (userInfo.isPro) {
     console.debug("pro license, use pro coin price query");

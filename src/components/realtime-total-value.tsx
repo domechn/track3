@@ -225,7 +225,8 @@ const App = ({
               </div>
               : <div className="space-y-3">
                   <RealtimeView />
-                  {(liveTotal.error || liveTotal.partial) && <LiveTotalDetails error={liveTotal.error}
+                  {(liveTotal.error || liveTotal.partial || liveTotal.dustSymbols?.some((item) =>
+                    item.reason === "unsupported" || item.reason === "skipped")) && <LiveTotalDetails error={liveTotal.error}
                     lastAt={liveTotal.lastAt} retryNow={liveTotal.retryNow} t={t}
                     missingSymbols={liveTotal.missingSymbols} dustSymbols={liveTotal.dustSymbols}
                     missingShare={liveTotal.missingShare} />}

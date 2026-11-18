@@ -15,12 +15,12 @@ test("opening Live total reserves the strip and leaves the page title in place",
   await expect(title).toBeVisible();
   await page.evaluate(async () => {
     const tauri = (window as any).__TAURI_INTERNALS__;
-    for (const [index, symbol] of ["MISS0", "MISS1", "MISS2", "MISS3", "MISS4", "MISS5", "DUST"].entries()) {
+    for (const [index, symbol] of ["MISS0", "MISS1", "MISS2", "MISS3", "MISS4", "MISS5", "DUST", "FOUR WIN"].entries()) {
       await tauri.invoke("plugin:sql|execute", {
         query: `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
           SELECT uuid, createdAt, 'wallet-missing', 'crypto', ?, 1, ?, 0
           FROM assets_v2 WHERE uuid = 'demo-59' LIMIT 1`,
-        values: [symbol, symbol === "DUST" ? 0.01 : 600 - index * 100],
+        values: [symbol, symbol === "DUST" || symbol === "FOUR WIN" ? 0.01 : 600 - index * 100],
       });
     }
   });
@@ -35,6 +35,10 @@ test("opening Live total reserves the strip and leaves the page title in place",
     const tauri = (window as any).__TAURI_INTERNALS__;
     const original = tauri.invoke;
     tauri.invoke = async (cmd: string, args: any, options: unknown) => {
+      if (cmd === "query_coins_prices" &&
+        args.symbols.some((symbol: string) => !/^[0-9A-Za-z$@-]+$/.test(symbol))) {
+        throw new Error("price source rejects malformed symbol");
+      }
       if (cmd === "plugin:sql|select" && /SELECT \* FROM assets_v2 WHERE 1 = 1 AND createdAt >=/i.test(args.query)) {
         await new Promise((resolve) => setTimeout(resolve, 400));
       }
@@ -68,6 +72,8 @@ test("opening Live total reserves the strip and leaves the page title in place",
   await expect(missing).toContainText("MISS5");
   await expect(missing).toContainText("Small balances without a price");
   await expect(missing).toContainText("DUST");
+  await expect(missing.locator('[data-reason="unsupported"]')).toContainText("Symbol not supported by the price source (1)");
+  await expect(missing).toContainText("FOUR WIN");
   expect(afterStrip).toMatchObject({ x: beforeStrip!.x, y: beforeStrip!.y, height: beforeStrip!.height });
   expect(afterStrip!.width).toBeGreaterThanOrEqual(beforeStrip!.width);
   expect(afterTitle).toEqual(beforeTitle);
