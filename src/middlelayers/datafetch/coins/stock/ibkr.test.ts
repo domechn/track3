@@ -19,11 +19,11 @@ vi.mock("../../../configuration", () => ({
   listAllCurrencyRates: vi.fn(),
 }));
 vi.mock("../../utils/price", () => ({ fetchStockPrices: vi.fn() }));
-vi.mock("../../../../utils/app", () => ({ getVersion: vi.fn(async () => "0.9.17") }));
+vi.mock("../../../../utils/app", () => ({ getVersion: vi.fn(async () => "0.9.18") }));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(getVersion).mockResolvedValue("0.9.17");
+  vi.mocked(getVersion).mockResolvedValue("0.9.18");
 });
 
 describe("IBKR Flex parser", () => {
@@ -511,8 +511,8 @@ describe("IBKR Flex parser", () => {
     });
     await broker.fetchPositions();
     expect(sendHttpTextRequest).toHaveBeenNthCalledWith(1, "GET",
-      expect.stringContaining("/SendRequest"), 20000, { "User-Agent": "Track3/0.9.17" });
+      expect.stringContaining("/SendRequest"), 20000, { "User-Agent": "Track3/0.9.18" });
     expect(sendHttpTextRequest).toHaveBeenNthCalledWith(2, "GET",
-      expect.stringContaining("/GetStatement"), 30000, { "User-Agent": "Track3/0.9.17" });
+      expect.stringContaining("/GetStatement"), 30000, { "User-Agent": "Track3/0.9.18" });
   });
 });
