@@ -58,7 +58,7 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
-  it("keeps unchanged USD 60000 cash above 25 changing junk rows on iPhone", async () => {
+  it("keeps USD first without extra asset controls when no small holdings are hidden on iPhone", async () => {
     const ios = vi.spyOn(platform, "isIOS").mockReturnValue(true);
     const previousWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 390 });
@@ -84,12 +84,11 @@ describe("Comparison page", () => {
       expect(symbols().slice(1).every((symbol) => symbol.includes("JUNK"))).toBe(true);
       const mover = ".fd-comparison-movers .fd-comparison-mover:first-child b";
       expect(document.querySelector(mover)).toHaveTextContent("JUNK0");
-      const sort = screen.getByRole("combobox", { name: "Sort assets" });
-      await userEvent.selectOptions(sort, "valueChange");
-      expect(symbols()[0]).toContain("JUNK0");
-      await userEvent.selectOptions(sort, "percentChange");
-      expect(symbols()[0]).toContain("JUNK24");
-      expect(document.querySelector(mover)).toHaveTextContent("JUNK0");
+      expect(screen.queryByRole("combobox", { name: "Sort assets" })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("small-holdings-toggle")).not.toBeInTheDocument();
+      const assets = document.querySelector(".fd-comparison-assets");
+      expect(assets?.querySelector(".comparison-sort")).not.toBeInTheDocument();
+      expect(assets?.querySelector(".fd-card-heading")?.nextElementSibling).toBe(assets?.querySelector(".fd-comparison-asset"));
     } finally {
       ios.mockRestore();
       Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: previousWidth });
