@@ -36,8 +36,10 @@ import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, isSameDay, isSameM
 import { useTranslation } from "@/i18n";
 import ComparisonMoversPanel from "./comparison-movers-panel";
 import ComparisonFidelity from "./comparison-fidelity";
+import { ComparisonSortSelect, sortComparisonRows, type ComparisonSort } from "./comparison-sort";
 import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
-import { getStableCoins } from "@/middlelayers/configuration";
+import { getConfiguration, getStableCoins } from "@/middlelayers/configuration";
+import { isInsignificantHolding } from "@/middlelayers/entities/insignificant-holding";
 import { useWindowSize } from "@/utils/hook";
 import { TRANSACTION_HANDLER } from "@/middlelayers/entities/transactions";
 
@@ -116,11 +118,23 @@ const App = ({
 
   const [baseData, setBaseData] = useState<Asset[]>([]);
   const [stableSymbols, setStableSymbols] = useState<Set<string>>(new Set());
+  const [customSymbols, setCustomSymbols] = useState<Set<string>>(new Set());
+  const [showSmallHoldings, setShowSmallHoldings] = useState(false);
+  const [sort, setSort] = useState<ComparisonSort>("currentValue");
   useEffect(() => {
     void getStableCoins().catch(() => []).then(async (symbols) => {
       const chosen = symbols.length ? symbols : await new StableCoinsQuery().listAllStableCoins();
       setStableSymbols(new Set(chosen.map((symbol) => symbol.toUpperCase())));
     }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void getConfiguration().then((config) => {
+      if (active) setCustomSymbols(new Set(config?.others?.filter((item) => !!item.price)
+        .map((item) => item.symbol.toUpperCase()) ?? []));
+    }).catch(() => undefined);
+    return () => { active = false; };
   }, []);
   const [headData, setHeadData] = useState<Asset[]>([]);
 
@@ -299,6 +313,14 @@ const App = ({
         : 0,
     };
   }, [baseData, headData]);
+
+  const smallComparisons = coinComparisons.filter((coin) =>
+    isInsignificantHolding({ symbol: coin.symbol, assetType: coin.assetType,
+      value: coin.value.base, isStableCoin: coin.isStable, customPrice: customSymbols.has(coin.symbol.toUpperCase()) }) &&
+    isInsignificantHolding({ symbol: coin.symbol, assetType: coin.assetType,
+      value: coin.value.head, isStableCoin: coin.isStable, customPrice: customSymbols.has(coin.symbol.toUpperCase()) }));
+  const visibleComparisons = showSmallHoldings ? coinComparisons :
+    coinComparisons.filter((coin) => !smallComparisons.includes(coin));
 
   useEffect(() => {
     if (!currentQuickCompare || dateOptions.length === 0) {
@@ -497,7 +519,16 @@ const App = ({
       {wide && <ComparisonFidelity
         currency={currency}
         quoteColor={quoteColor}
-        rows={coinComparisons}
+        rows={visibleComparisons}
+        allRows={coinComparisons}
+        sort={sort}
+        onSortChange={setSort}
+        smallHoldingsToggle={smallComparisons.length > 0 ? <button type="button"
+          data-testid="small-holdings-toggle" className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
+          onClick={() => setShowSmallHoldings((shown) => !shown)}>
+          {t(showSmallHoldings ? "holdings.small.hide" : "holdings.small.show")
+            .replace("{count}", String(smallComparisons.length))}
+        </button> : undefined}
         baseOption={baseOption}
         headOption={headOption}
         basePicker={<ComparisonDatePicker label={t("comparison.fidelity.snapshotA")} value={baseId}
@@ -681,7 +712,10 @@ const App = ({
             <FadeUp>
               <Card className="comparison-assets-card">
                 <CardContent className="overflow-x-auto pt-5" tabIndex={0} aria-label={t("comparison.perAsset")}>
-                  <h2 className="mb-3 text-base font-semibold">{t("comparison.perAsset")}</h2>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h2 className="text-base font-semibold">{t("comparison.perAsset")}</h2>
+                    <ComparisonSortSelect value={sort} onChange={setSort} t={t} />
+                  </div>
                   <table className="comparison-assets-table w-full min-w-[850px] text-sm">
                     <caption className="sr-only">{t("comparison.perAsset")}</caption>
                     <thead><tr className="border-b text-xs text-muted-foreground">
@@ -694,9 +728,7 @@ const App = ({
                       <th className="py-3 text-right">{t("common.valueLabel")} B</th>
                       <th className="py-3 text-right">{t("common.changeLabel")}</th>
                     </tr></thead>
-                    <tbody>{[...coinComparisons].sort((a, b) =>
-                      Math.abs(b.value.head - b.value.base) - Math.abs(a.value.head - a.value.base),
-                    ).map((coin) => <tr key={getAssetKey(coin)} className="border-b last:border-b-0">
+                    <tbody>{sortComparisonRows(visibleComparisons, sort).map((coin) => <tr key={getAssetKey(coin)} className="border-b last:border-b-0">
                       <td className="py-3 font-semibold">{formatAssetLabel(coin)}</td>
                       <td className="py-3 text-right">{formatVal(coin.amount.base, "amount")}</td>
                       <td className="py-3 text-right">{formatVal(coin.amount.head, "amount")}</td>
@@ -710,6 +742,12 @@ const App = ({
                       </td>
                     </tr>)}</tbody>
                   </table>
+                  {smallComparisons.length > 0 && <button type="button" data-testid="small-holdings-toggle"
+                    className="mt-3 text-sm text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowSmallHoldings((shown) => !shown)}>
+                    {t(showSmallHoldings ? "holdings.small.hide" : "holdings.small.show")
+                      .replace("{count}", String(smallComparisons.length))}
+                  </button>}
                 </CardContent>
               </Card>
             </FadeUp>

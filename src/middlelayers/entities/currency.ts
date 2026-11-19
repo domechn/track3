@@ -252,7 +252,7 @@ export function isSupportedCurrencyCode(symbol: string): boolean {
 // shortcut: Saved stock rows lack a cash flag; persist one if IBKR cash uses another currency.
 const BROKER_CASH_SYMBOLS = new Set([
   "AUD", "CAD", "CHF", "CNH", "CZK", "DKK", "EUR", "GBP", "HKD", "HUF",
-  "ILS", "JPY", "MXN", "NOK", "NZD", "PLN", "SEK", "SGD", "USD", "ZAR",
+  "CNY", "ILS", "JPY", "MXN", "NOK", "NZD", "PLN", "SEK", "SGD", "USD", "ZAR",
 ]);
 
 export function isBrokerCashSymbol(symbol: string): boolean {

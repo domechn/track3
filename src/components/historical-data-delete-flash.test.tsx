@@ -50,6 +50,8 @@ vi.mock("@/middlelayers/charts", async () => ({
 
 vi.mock("@/middlelayers/configuration", () => ({
   addToBlacklist: vi.fn(),
+  getConfiguration: vi.fn(async () => ({ others: [] })),
+  getStableCoins: vi.fn(async () => []),
 }));
 
 import {

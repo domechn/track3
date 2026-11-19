@@ -20,13 +20,17 @@ import { matchSourceStatus } from "@/components/source-status-match";
 import { useCurrentSourceStatuses } from "@/components/use-current-source-statuses";
 import "@/mobile/components/mobile/fidelity.css";
 import { directionTone } from "@/utils/color";
+import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
+import { isInsignificantHolding } from "@/middlelayers/entities/insignificant-holding";
+import { normalizeWalletToMD5 } from "@/lib/utils";
+import type { AssetType } from "@/middlelayers/datafetch/types";
 
 const WalletAssetsPercentage = lazy(() => import("@/mobile/components/wallet-assets-percentage"));
 const WalletAssetsChange = lazy(() => import("@/mobile/components/wallet-assets-change"));
 const WalletSourceChanges = lazy(() => import("@/components/wallet-source-changes"));
 
 type Snap = Awaited<ReturnType<typeof queryHistoricalPage>>["rows"][number];
-type Row = { symbol: string; assetType: string; amount: number; value: number };
+type Row = { symbol: string; assetType: AssetType; amount: number; value: number };
 type Source = { id: string; label: string; kind: string; value: number; baseValue: number; rows: Row[]; baseRows: Row[]; status?: PortfolioSourceStatus };
 type WalletView = { latest: Snap; base: Snap | null; sources: Source[]; total: number; baseTotal: number; allQuantityEqual: boolean };
 // color-semantics: neutral the palette separates wallet sources by category.
@@ -73,6 +77,15 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [view, setView] = useState<WalletView | null>(null);
   const [busy, setBusy] = useState(true);
+  const [showSmallHoldings, setShowSmallHoldings] = useState(false);
+  const [stableSymbols, setStableSymbols] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let active = true;
+    void new StableCoinsQuery().listAllStableCoins().then((symbols) => {
+      if (active) setStableSymbols(new Set(symbols.map((symbol) => symbol.toUpperCase())));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
   useEffect(() => setRange(rangeLabel(dateRange)), [dateRange.start.getTime(), dateRange.end.getTime()]);
   useEffect(() => {
     const changed = (event: Event) => setStatuses((event as CustomEvent<PortfolioSourceStatus[]>).detail);
@@ -126,6 +139,12 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
 
   const sources = view?.sources ?? [];
   const chosen = sources.find((source) => source.id === selected) ?? null;
+  const smallRows = chosen?.rows.filter((row) => isInsignificantHolding({
+    ...row, wallet: chosen.id, isStableCoin: stableSymbols.has(row.symbol.toUpperCase()),
+    customPrice: chosen.id === normalizeWalletToMD5("others"),
+  })) ?? [];
+  const visibleRows = showSmallHoldings ? chosen?.rows ?? [] :
+    chosen?.rows.filter((row) => !smallRows.includes(row)) ?? [];
   const diff = view?.base ? view.total - view.baseTotal : null;
   const sourceDiff = chosen && view?.base ? chosen.value - chosen.baseValue : null;
   const baseline = view?.base ? new Date(view.base.createdAt) : null;
@@ -220,13 +239,19 @@ export default function WalletFidelity({ currency, dateRange, quoteColor, onRefr
           <div className="fd-wallet-legend">{shareItems.map((item, index) => <span key={item.label}><i style={{ background: colors[index % colors.length] }} />{item.label} <b>{percent(item.fraction)}</b></span>)}</div>
         </section>
         <section className="fd-card fd-wallet-balances"><div className="fd-card-heading"><h3>{chosen ? t("fidelity.wallets.balances") : t("fidelity.wallets.balancesBySource")}</h3><span>{chosen ? selectedFailed ? t("fidelity.wallets.asOf").replace("{time}", time(lastGood)) : t("fidelity.wallets.refreshedLower").replace("{time}", time(chosen.status?.lastSuccessAt)) : t("fidelity.wallets.changeVs").replace("{date}", date)}</span></div>
-          {chosen ? chosen.rows.map((row, index) => { const change = assetDiff(row, chosen.baseRows); const old = chosen.baseRows.find((item) => rowKey(item) === rowKey(row));
+          {chosen ? visibleRows.map((row, index) => { const change = assetDiff(row, chosen.baseRows); const old = chosen.baseRows.find((item) => rowKey(item) === rowKey(row));
             const price = row.amount ? row.value / row.amount : 0; const oldPrice = old?.amount ? old.value / old.amount : 0;
             return <div key={rowKey(row)} className="fd-wallet-balance"><b><i style={{ background: colors[index % colors.length] }} />{row.symbol} <em>{qty(row.amount, row.symbol === "USDT" || row.symbol === "USDC")}</em></b><strong>{money(row.value, currency)}</strong>
               <small>{money(price, currency)} · {percent(row.value / chosen.value)}</small><small data-tone={directionTone(view.base ? change : null)}>{view.base ? `${money(change, currency, 0, true)} · ${percent(oldPrice ? price / oldPrice - 1 : 0, 2, true)}` : "—"}</small></div>; }) :
             sources.map((source, index) => { const change = source.value - source.baseValue; return <button type="button" key={source.id} className="fd-wallet-balance" onClick={() => setSelected(source.id)}>
               <b><i style={{ background: colors[index % colors.length] }} />{source.label}</b><strong>{money(source.value, currency)}</strong>
               <small>{t(`fidelity.overview.kind.${source.kind}`)} · {percent(share(source))}</small><small data-tone={directionTone(view.base ? change : null)}>{view.base ? `${money(change, currency, 0, true)} · ${percent(source.baseValue ? change / source.baseValue : 0, 2, true)}` : "—"}</small></button>; })}
+          {chosen && smallRows.length > 0 && <button type="button" data-testid="small-holdings-toggle"
+            className="px-4 py-2 text-sm text-muted-foreground"
+            onClick={() => setShowSmallHoldings((shown) => !shown)}>
+            {t(showSmallHoldings ? "holdings.small.hide" : "holdings.small.show")
+              .replace("{count}", String(smallRows.length))}
+          </button>}
         </section>
         {!chosen && <section className="fd-card fd-wallet-status"><div className="fd-card-heading"><h3>{t("fidelity.wallets.sourceStatus")}</h3><span>{t("fidelity.wallets.today")}</span></div>
           <div className="fd-wallet-status-scroll" role="region" aria-label={t("fidelity.wallets.sourceStatus")} tabIndex={0}>

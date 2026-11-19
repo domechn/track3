@@ -44,6 +44,8 @@ it("shows failed exchange and broker statuses on mobile Wallets with real source
     { id: 1, uuid: "latest", wallet: alphaId, assetType: "crypto", symbol: "BTC", amount: 1, value: 100 },
     { id: 2, uuid: "latest", wallet: betaId, assetType: "crypto", symbol: "ETH", amount: 1, value: 50 },
     { id: 3, uuid: "latest", wallet: brokerId, assetType: "stock", symbol: "AAPL", amount: 1, value: 30 },
+    { id: 4, uuid: "latest", wallet: brokerId, assetType: "stock", symbol: "USD", amount: 60000, price: 1, value: 60000 },
+    { id: 5, uuid: "latest", wallet: brokerId, assetType: "stock", symbol: "DUST", amount: 2, price: 0.2, value: 0.4 },
   ] as never);
   writeStoredStatuses([
     { sourceId: "cex:0", label: "Old savings", kind: "exchange", provider: "Binance",
@@ -61,13 +63,19 @@ it("shows failed exchange and broker statuses on mobile Wallets with real source
   await waitFor(() => {
     const rows = container.querySelectorAll(".fd-wallet-status-row");
     expect(rows).toHaveLength(3);
-    expect(rows[0]).not.toHaveTextContent("Retry");
-    expect(rows[1]).toHaveTextContent("Trading");
-    expect(rows[1]).toHaveTextContent("Retry");
-    expect(rows[2]).toHaveTextContent("Brokerage");
+    expect(rows[0]).toHaveTextContent("Brokerage");
+    expect(rows[0]).toHaveTextContent("Retry");
+    expect(rows[1]).toHaveTextContent("Savings");
+    expect(rows[1]).not.toHaveTextContent("Retry");
+    expect(rows[2]).toHaveTextContent("Trading");
     expect(rows[2]).toHaveTextContent("Retry");
   });
   expect(screen.getByRole("region", { name: "Source status" })).toHaveAttribute("tabindex", "0");
   fireEvent.click(await screen.findByRole("button", { name: "Trading" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Trading");
+  fireEvent.click(screen.getByRole("button", { name: "Brokerage" }));
+  await waitFor(() => expect(screen.getByTestId("small-holdings-toggle")).toHaveTextContent("Show 1 small holdings"));
+  expect(container.querySelectorAll(".fd-wallet-balance")).toHaveLength(2);
+  fireEvent.click(screen.getByTestId("small-holdings-toggle"));
+  expect(container.querySelectorAll(".fd-wallet-balance")).toHaveLength(3);
 });

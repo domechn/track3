@@ -37,6 +37,8 @@ import {
 } from "@/utils/assets";
 import { useTranslation } from "@/mobile/i18n";
 import { useDataChangedVersion } from "@/contexts/data-changed";
+import { getConfiguration, getStableCoins } from "@/middlelayers/configuration";
+import { isInsignificantHolding } from "@/middlelayers/entities/insignificant-holding";
 import { useIsMobile } from "@/mobile/components/mobile";
 
 const chartName = "Percentage of Assets";
@@ -59,9 +61,23 @@ const App = ({
   const [dataPage, setDataPage] = useState<number>(0);
   const [latestAssetsPercentageData, setLatestAssetsPercentageData] =
     useState<LatestAssetsPercentageData>([]);
+  const [showSmallHoldings, setShowSmallHoldings] = useState(false);
+  const [stableSymbols, setStableSymbols] = useState<Set<string>>(new Set());
+  const [customSymbols, setCustomSymbols] = useState<Set<string>>(new Set());
   const chartRef =
     useRef<ChartJSOrUndefined<"doughnut", number[], unknown>>(null);
   const pageSize = 5;
+  useEffect(() => {
+    let active = true;
+    void getStableCoins().then((symbols) => {
+      if (active) setStableSymbols(new Set(symbols.map((symbol) => symbol.toUpperCase())));
+    }).catch(() => undefined);
+    void getConfiguration().then((config) => {
+      if (active) setCustomSymbols(new Set(config?.others?.filter((item) => !!item.price)
+        .map((item) => item.symbol.toUpperCase()) ?? []));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   const percentageData = useMemo(() => {
     return splitTopAndOtherData(latestAssetsPercentageData);
@@ -95,21 +111,34 @@ const App = ({
 
   useEffect(() => resizeChart(chartName), [needResize]);
 
+  const smallHoldings = latestAssetsPercentageData.filter((asset) => isInsignificantHolding({
+    symbol: asset.coin, assetType: asset.assetType, value: asset.value,
+    isStableCoin: stableSymbols.has(asset.coin.toUpperCase()),
+    customPrice: customSymbols.has(asset.coin.toUpperCase()),
+  }));
+  const visibleHoldings = showSmallHoldings ? latestAssetsPercentageData :
+    latestAssetsPercentageData.filter((asset) => !smallHoldings.includes(asset));
+  const smallHoldingsToggle = smallHoldings.length > 0 && <button type="button"
+    data-testid="small-holdings-toggle" className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
+    onClick={() => { setShowSmallHoldings((shown) => !shown); setDataPage(0); }}>
+    {t(showSmallHoldings ? "holdings.small.hide" : "holdings.small.show")
+      .replace("{count}", String(smallHoldings.length))}
+  </button>;
   const maxDataPage = useMemo(() => {
     // - 0.000000000001 is for float number precision
     const mp = Math.floor(
-      latestAssetsPercentageData.length / pageSize - 0.000000000001,
+      visibleHoldings.length / pageSize - 0.000000000001,
     );
     return mp >= 0 ? mp : 0;
-  }, [latestAssetsPercentageData]);
+  }, [visibleHoldings]);
 
   const pagedLatestAssetsPercentageData = useMemo(
     () =>
-      latestAssetsPercentageData.slice(
+      visibleHoldings.slice(
         dataPage * pageSize,
         (dataPage + 1) * pageSize,
       ),
-    [latestAssetsPercentageData, dataPage],
+    [visibleHoldings, dataPage],
   );
 
 
@@ -284,6 +313,7 @@ const App = ({
             ))}
           </TableBody>
         </Table>
+        {smallHoldingsToggle}
       </>
     );
   }
@@ -316,6 +346,7 @@ const App = ({
         <Button variant="ghost" size="icon" aria-label={t("latestAssets.nextPage")}
           disabled={dataPage >= maxDataPage} onClick={() => setDataPage(Math.min(maxDataPage, dataPage + 1))}><ChevronRightIcon /></Button>
       </div>}
+      {smallHoldingsToggle}
     </>;
   }
 
@@ -323,11 +354,11 @@ const App = ({
     <Card className="t3-overview-panel t3-holdings-panel">
       <header className="t3-overview-panel-heading">
         <h2>{t("overview.design.holdings")}</h2>
-        <span>{t("overview.design.assetCount").replace("{count}", String(latestAssetsPercentageData.length))}</span>
+        <span>{t("overview.design.assetCount").replace("{count}", String(visibleHoldings.length))}</span>
       </header>
       <div className="t3-holdings-head"><span>{t("overview.design.asset")}</span><span>{t("overview.design.amount")}</span><span>{t("overview.design.value")}</span></div>
       <div className="t3-holdings-body">
-        {latestAssetsPercentageData.map((asset) => <Link key={getAssetKey({ symbol: asset.coin, assetType: asset.assetType })}
+        {visibleHoldings.map((asset) => <Link key={getAssetKey({ symbol: asset.coin, assetType: asset.assetType })}
           to={buildAssetDetailsPath({ symbol: asset.coin, assetType: asset.assetType })}
           className="t3-holdings-row">
           <span><span className="sr-only">{t("common.openAssetDetails").replace("{asset}", formatAssetLabel({ symbol: asset.coin, assetType: asset.assetType }))} </span><strong>{asset.coin}</strong><small>{asset.percentage.toFixed(1)}%</small></span>
@@ -335,6 +366,7 @@ const App = ({
           <span>{currency.symbol + prettyNumberToLocaleString(currencyWrapper(currency)(asset.value))}</span>
         </Link>)}
       </div>
+      {smallHoldingsToggle}
     </Card>
   );
 

@@ -41,6 +41,76 @@ async function openComparison(page: Page) {
 }
 
 test.describe("Comparison desktop fidelity", () => {
+  test("keeps unchanged USD 60000 cash ahead of 25 visible changing junk coins", async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop");
+    const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, timezoneId: "UTC" });
+    try {
+      const page = await context.newPage();
+      await installTauriBridge(page, { fidelitySample: "full" });
+      await page.evaluate(async () => {
+        const run = (query: string, values: unknown[]) =>
+          (window as any).__e2eInvoke("plugin:sql|execute", { query, values });
+        const insert = `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        for (const [uuid, at, isHead] of [
+          ["fidelity-day-0", "2026-10-01T09:41:00.000Z", false],
+          ["fidelity-day-30", "2026-10-31T09:41:00.000Z", true],
+        ] as const) {
+          await run(insert, [uuid, at, "22222222222222222222222222222222", "stock", "USD", 60000, 60000, 1]);
+          for (let index = 0; index < 25; index++) {
+            const base = index === 0 ? 10 : 2;
+            const value = base + (isHead ? index === 0 ? 0.1 : (index + 1) / 1000 : 0);
+            await run(insert, [uuid, at, "11111111111111111111111111111111",
+              "crypto", `JUNK${index}`, 1, value, value]);
+          }
+        }
+      });
+      await page.goto("/#/comparison");
+      const assets = page.locator(".t3-cmp-assets");
+      await expect(assets.locator("tbody tr").filter({ hasText: "JUNK" })).toHaveCount(25);
+      const symbols = await assets.locator("tbody tr").evaluateAll((rows) =>
+        rows.map((row) => row.querySelector("th")?.firstChild?.textContent?.trim() ?? ""));
+      const cashIndex = symbols.indexOf("USD");
+      expect(cashIndex).toBeGreaterThanOrEqual(0);
+      expect(symbols.filter((symbol) => symbol.startsWith("JUNK"))).toHaveLength(25);
+      for (const [index, symbol] of symbols.entries()) {
+        if (symbol.startsWith("JUNK")) expect(index).toBeGreaterThan(cashIndex);
+      }
+      await assets.getByRole("combobox", { name: "Sort assets" }).selectOption("valueChange");
+      const changed = await assets.locator("tbody tr").evaluateAll((rows) =>
+        rows.map((row) => row.querySelector("th")?.firstChild?.textContent?.trim() ?? ""));
+      expect(changed.indexOf("USD")).toBeGreaterThan(changed.indexOf("JUNK0"));
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("twenty saved dust rows are hidden until the footer toggle is used", async ({ browser }, testInfo) => {
+    test.skip(testInfo.project.name !== "desktop");
+    const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, timezoneId: "UTC" });
+    try {
+      const page = await context.newPage();
+      await installTauriBridge(page, { fidelitySample: "full" });
+      await page.evaluate(async () => {
+        const run = (query: string, values: unknown[]) =>
+          (window as any).__e2eInvoke("plugin:sql|execute", { query, values });
+        const insert = `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+          VALUES ('fidelity-day-30', '2026-10-31T09:41:00.000Z', '11111111111111111111111111111111',
+            'crypto', ?, 1, 0.4, 0.4)`;
+        for (let index = 0; index < 20; index++) await run(insert, [`DUST${index}`]);
+      });
+      await page.goto("/#/comparison");
+      const assets = page.locator(".t3-cmp-assets");
+      await expect(assets.getByTestId("small-holdings-toggle")).toHaveText("Show 20 small holdings");
+      await expect(assets.locator("tbody tr").filter({ hasText: "DUST" })).toHaveCount(0);
+      const total = await assets.locator("tfoot").innerText();
+      await assets.getByTestId("small-holdings-toggle").click();
+      await expect(assets.locator("tbody tr").filter({ hasText: "DUST" })).toHaveCount(20);
+      expect(await assets.locator("tfoot").innerText()).toBe(total);
+    } finally {
+      await context.close();
+    }
+  });
   test("1001px CNY legacy table keeps each amount on one line", async ({ browser }, testInfo) => {
     test.skip(testInfo.project.name !== "desktop");
     const context = await browser.newContext({ viewport: { width: 1001, height: 900 }, timezoneId: "UTC" });

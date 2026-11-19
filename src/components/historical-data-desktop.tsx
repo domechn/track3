@@ -18,8 +18,9 @@ import type { CurrencyRateDetail, HistoricalData, QuoteColor } from "@/middlelay
 import type { AssetModel } from "@/middlelayers/types";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
 import { WalletAnalyzer } from "@/middlelayers/wallet";
-import { addToBlacklist } from "@/middlelayers/configuration";
+import { addToBlacklist, getConfiguration } from "@/middlelayers/configuration";
 import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
+import { isInsignificantHolding } from "@/middlelayers/entities/insignificant-holding";
 import { useOptimisticDelete } from "./common/use-optimistic-delete";
 import { HistoryPartialDetails } from "./history-partial";
 import SyncStatusIndicator from "./sync-status-indicator";
@@ -57,6 +58,8 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   const [sourceAssets, setSourceAssets] = useState<AssetModel[]>([]);
   const [sourceIdentities, setSourceIdentities] = useState<Awaited<ReturnType<WalletAnalyzer["listWalletAliases"]>>>({});
   const [stablecoins, setStablecoins] = useState<Set<string>>(new Set());
+  const [customSymbols, setCustomSymbols] = useState<Set<string>>(new Set());
+  const [showSmallHoldings, setShowSmallHoldings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
@@ -85,6 +88,15 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
     void new StableCoinsQuery().listAllStableCoins().then((symbols) => {
       if (active) setStablecoins(new Set(symbols.map((symbol) => symbol.toUpperCase())));
     });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void getConfiguration().then((config) => {
+      if (active) setCustomSymbols(new Set(config?.others?.filter((item) => !!item.price)
+        .map((item) => item.symbol.toUpperCase()) ?? []));
+    }).catch(() => undefined);
     return () => { active = false; };
   }, []);
 
@@ -126,6 +138,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   useEffect(() => {
     if (!selectedId) { setDetail(null); setEdits(null); setSourceAssets([]); setSourceIdentities({}); return; }
     setDetailPage(0);
+    setShowSmallHoldings(false);
     let active = true;
     if (detailRef.current?.id !== selectedId) {
       setDetail(null);
@@ -190,7 +203,15 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
   const previous = rowIndex >= 0 ? rows[rowIndex + 1] : undefined;
   const previousForChange = filter === "all" ? previous : undefined;
   const previousTotal = previousForChange?.total ?? (selected?.change === null || !selected ? 0 : selected.total - selected.change);
-  const assets = detail?.assets.slice().sort((a, b) => b.value - a.value) ?? [];
+  const allAssets = detail?.assets.slice().sort((a, b) => b.value - a.value) ?? [];
+  const smallAssets = allAssets.filter((asset) => isInsignificantHolding({
+    ...asset, isStableCoin: stablecoins.has(asset.symbol.toUpperCase()),
+    customPrice: customSymbols.has(asset.symbol.toUpperCase()),
+  }));
+  const assets = showSmallHoldings ? allAssets : allAssets.filter((asset) => !isInsignificantHolding({
+    ...asset, isStableCoin: stablecoins.has(asset.symbol.toUpperCase()),
+    customPrice: customSymbols.has(asset.symbol.toUpperCase()),
+  }));
   const visibleAssets = assets.slice(detailPage * PAGE_SIZE, (detailPage + 1) * PAGE_SIZE);
   const editDelta = (edits ?? []).reduce((sum, edit) => {
     if (edit.target !== "asset" || (edit.action !== "delete" && edit.action !== "restore")) return sum;
@@ -437,7 +458,7 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "price");
               const restoredAsset = (edits ?? []).find((edit) => edit.symbol === asset.symbol &&
                 edit.asset_type === asset.assetType && edit.target === "asset" && edit.action === "restore");
-              return <tr key={`${asset.assetType}:${asset.symbol}`}><td>{asset.symbol}
+              return <tr data-testid="history-detail-row" key={`${asset.assetType}:${asset.symbol}`}><td>{asset.symbol}
                 <button type="button" className="t3-icon-button" aria-label={t("history.fidelity.deleteAsset").replace("{asset}", asset.symbol)}
                   disabled={isDeletingAsset} onClick={() => setDeleteAssetId(asset.id)}><TrashIcon aria-hidden="true" /></button></td>
               <td>{restoredAsset ? <><span className="fidelity-edited-value">{quantity(asset.assetType === "crypto" &&
@@ -452,6 +473,12 @@ export default function HistoricalDataDesktop({ currency, quoteColor, afterDataC
             <tr className="fidelity-history-total"><td>{t("cost.fidelity.total")}</td><td /><td />
               <td>{money(valueTotal)}</td><td>{valueTotal ? "100.0%" : "–"}</td></tr>
           </tbody></table>
+          {smallAssets.length > 0 && <button type="button" data-testid="small-holdings-toggle"
+            className="text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => { setShowSmallHoldings((shown) => !shown); setDetailPage(0); }}>
+            {t(showSmallHoldings ? "holdings.small.hide" : "holdings.small.show")
+              .replace("{count}", String(smallAssets.length))}
+          </button>}
           {assets.length > PAGE_SIZE && <div className="fidelity-history-pager fidelity-detail-pager">
             <span>{t("history.fidelity.showingAssets")
               .replace("{start}", String(detailPage * PAGE_SIZE + 1))

@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import HistoricalData from "@/mobile/components/historical-data";
 import { DataChangedContext } from "@/contexts/data-changed";
-import { queryHistoricalPage } from "@/middlelayers/charts";
+import { queryHistoricalDetail, queryHistoricalPage } from "@/middlelayers/charts";
 
 vi.mock("@/components/motion", () => ({
   StaggerContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -12,7 +12,11 @@ vi.mock("@/components/motion", () => ({
 vi.mock("@tauri-apps/api/path", () => ({ appCacheDir: vi.fn().mockResolvedValue("/tmp") }));
 vi.mock("@/utils/app", () => ({ getImageApiPath: vi.fn().mockResolvedValue("/logo") }));
 vi.mock("@/middlelayers/data", () => ({ downloadCoinLogos: vi.fn() }));
-vi.mock("@/middlelayers/configuration", () => ({ addToBlacklist: vi.fn() }));
+vi.mock("@/middlelayers/configuration", () => ({
+  addToBlacklist: vi.fn(),
+  getStableCoins: vi.fn(async () => []),
+  getConfiguration: vi.fn(async () => ({ others: [] })),
+}));
 vi.mock("@/middlelayers/charts", () => ({
   queryHistoricalPage: vi.fn(),
   queryHistoricalDetail: vi.fn(),
@@ -87,4 +91,27 @@ it("maps history changes to physical tones under red-up and mutes zero", async (
   await screen.findByText("1–3 of 3");
   expect([...document.querySelectorAll(".history-mobile-snapshot-delta")].map((node) =>
     node.getAttribute("data-tone"))).toEqual(["loss", "gain", "neutral"]);
+});
+
+it("shows broker USD cash and reveals a saved small coin in phone detail", async () => {
+  vi.mocked(queryHistoricalPage).mockResolvedValue({
+    totalCount: 1, latest: null, rows: [row("cash")],
+  });
+  vi.mocked(queryHistoricalDetail).mockResolvedValue({
+    id: "cash", createdAt: row("cash").createdAt, total: 60000.4, transactions: [],
+    assets: [
+      { id: 1, uuid: "cash", createdAt: row("cash").createdAt, assetType: "stock",
+        wallet: "6b09e3e969b8cf3b2f1a99bdc1ed510c",
+        symbol: "USD", amount: 60000, price: 1, value: 60000 },
+      { id: 2, uuid: "cash", createdAt: row("cash").createdAt, assetType: "crypto",
+        wallet: "wallet", symbol: "DUST", amount: 2, price: 0.2, value: 0.4 },
+    ],
+  });
+  render(<DataChangedContext.Provider value={0}><HistoricalData {...props} /></DataChangedContext.Provider>);
+  fireEvent.click(await screen.findByTestId("history-mobile-row"));
+  await waitFor(() => expect(screen.getByTestId("small-holdings-toggle")).toHaveTextContent("Show 1 small holdings"));
+  expect(screen.getByTestId("history-detail-row")).toHaveTextContent("USD");
+  expect(screen.queryByText("DUST")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("small-holdings-toggle"));
+  expect(screen.getByText("DUST")).toBeInTheDocument();
 });

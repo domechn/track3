@@ -7,6 +7,7 @@ import { currencyWrapper } from "@/utils/currency";
 import SyncStatusIndicator from "./sync-status-indicator";
 import { barGeometry, comparisonMoverFacts, divergingScale } from "./comparison-fidelity-movers";
 import { boundedPercentText } from "./profit-percentage";
+import { ComparisonSortSelect, sortComparisonRows, type ComparisonSort } from "./comparison-sort";
 
 export type FidelityComparisonRow = {
   symbol: string;
@@ -27,10 +28,14 @@ const time = (date?: string) => date
 export default function ComparisonFidelity({
   currency, quoteColor, rows, baseOption, headOption, basePicker, headPicker,
   baseTotal, headTotal, snapshotCount, noTransactions, quickRange, onQuickRange, onSwap, mask, onToggleMask, onCopy,
+  smallHoldingsToggle, allRows, sort, onSortChange,
 }: {
   currency: CurrencyRateDetail;
   quoteColor: QuoteColor;
   rows: FidelityComparisonRow[];
+  allRows?: FidelityComparisonRow[];
+  sort?: ComparisonSort;
+  onSortChange?: (value: ComparisonSort) => void;
   baseOption?: Option;
   headOption?: Option;
   basePicker: ReactNode;
@@ -45,6 +50,7 @@ export default function ComparisonFidelity({
   mask: boolean;
   onToggleMask: () => void;
   onCopy: () => void;
+  smallHoldingsToggle?: ReactNode;
 }) {
   const { t } = useTranslation();
   const convert = currencyWrapper(currency);
@@ -66,9 +72,10 @@ export default function ComparisonFidelity({
   const [expanded, setExpanded] = useState({ value: false, percent: false });
   const diff = headTotal - baseTotal;
   const diffPct = baseTotal ? diff / baseTotal * 100 : 0;
-  const facts = comparisonMoverFacts(rows);
+  const facts = comparisonMoverFacts(allRows ?? rows);
   const { byValue, byPercent, topShare } = facts;
-  const sorted = byValue;
+  const sorted = sortComparisonRows(rows, sort ?? "currentValue");
+  const topMovers = new Set(byValue.slice(0, 2));
   const sameAmounts = rows.length > 0 && rows.every((row) => Math.abs(row.amount.base - row.amount.head) < 1e-8);
   const days = baseOption?.createdAt && headOption?.createdAt
     ? Math.round((new Date(headOption.createdAt).getTime() - new Date(baseOption.createdAt).getTime()) / 86400000) : 0;
@@ -78,8 +85,8 @@ export default function ComparisonFidelity({
       .replace("{percent}", pct(diffPct))
       .replace("{from}", shortDate(baseOption?.createdAt))
       .replace("{to}", shortDate(headOption?.createdAt))
-      .replace("{first}", sorted[0]?.symbol ?? "")
-      .replace("{second}", sorted[1]?.symbol ?? "")
+      .replace("{first}", byValue[0]?.symbol ?? "")
+      .replace("{second}", byValue[1]?.symbol ?? "")
       .replace("{share}", mask ? "***" : String(topShare))
     : t("comparison.fidelity.emptySubtitle");
   const changeText = signedMoney(diff);
@@ -180,6 +187,7 @@ export default function ComparisonFidelity({
           <span>{t("comparison.fidelity.assetNote")
             .replace("{from}", shortDate(baseOption?.createdAt))
             .replace("{to}", shortDate(headOption?.createdAt))}</span></div>
+        {onSortChange && <ComparisonSortSelect value={sort ?? "currentValue"} onChange={onSortChange} t={t} />}
         <div className="t3-cmp-table-scroll" tabIndex={0} aria-label={t("comparison.perAsset")}>
           <table className="t3-cmp-table">
             <thead><tr className="t3-cmp-table-groups">
@@ -190,10 +198,10 @@ export default function ComparisonFidelity({
               <th colSpan={2}>{t("comparison.fidelity.change")}</th>
             </tr><tr>{["A", "B", "A", "B", "A", "B"].map((name, i) => <th key={i}>{name}</th>)}
               <th>{t("comparison.fidelity.absolute")}</th><th>{t("comparison.fidelity.relative")}</th></tr></thead>
-            <tbody>{sorted.map((row, index) => {
+            <tbody>{sorted.map((row) => {
               const delta = row.value.head - row.value.base;
-              return <tr key={`${row.assetType}:${row.symbol}`} className={index < 2 ? "top" : ""}>
-                <th>{row.symbol}{index < 2 && <span>{t("comparison.fidelity.topMover")}</span>}</th>
+              return <tr key={`${row.assetType}:${row.symbol}`} className={topMovers.has(row) ? "top" : ""}>
+                <th>{row.symbol}{topMovers.has(row) && <span>{t("comparison.fidelity.topMover")}</span>}</th>
                 <td>{amount(row.amount.base, row.symbol)}</td><td>{amount(row.amount.head, row.symbol)}</td>
                 <td>{price(row.price.base)}</td><td>{price(row.price.head)}</td>
                 <td>{money(row.value.base)}</td><td>{money(row.value.head)}</td>
@@ -206,6 +214,7 @@ export default function ComparisonFidelity({
               <td className={tone(diff)}>{signedMoney(diff)}</td><td className={tone(diffPct)}>{pct(diffPct)}</td></tr></tfoot>
           </table>
         </div>
+        {smallHoldingsToggle}
         {sameAmounts && noTransactions && <div className="t3-cmp-info"><InfoCircledIcon aria-hidden="true" />
           <div><strong>{t("comparison.fidelity.sameAmounts")}</strong>
             <p>{t("comparison.fidelity.sameAmountsDetail").replace("{change}", signedMoney(diff))}</p></div></div>}
@@ -220,8 +229,8 @@ export default function ComparisonFidelity({
         {moverRows(byValue, "value")}
         {more("value", byValue.length)}
         <p>{t("comparison.fidelity.topShare")
-          .replace("{first}", sorted[0]?.symbol ?? "")
-          .replace("{second}", sorted[1]?.symbol ?? "")
+          .replace("{first}", byValue[0]?.symbol ?? "")
+          .replace("{second}", byValue[1]?.symbol ?? "")
           .replace("{share}", mask ? "***" : String(topShare))}</p>
       </section>
       <section className="t3-cmp-card t3-cmp-movers-card">

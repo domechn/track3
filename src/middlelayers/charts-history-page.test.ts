@@ -10,7 +10,8 @@ vi.mock("./database", () => ({
   selectFromDatabase: dbSelect,
 }));
 
-import { queryHistoricalPage, queryHistoricalDetail, queryEditLog } from "./charts-history";
+import { queryHistoricalPage, queryHistoricalDetail, queryHistoricalData, queryEditLog } from "./charts-history";
+import { ASSET_HANDLER } from "./entities/assets";
 
 const range = {
   start: new Date("2021-01-01T00:00:00.000Z"),
@@ -151,6 +152,27 @@ describe("paged historical queries", () => {
     const withTransactions = await queryHistoricalDetail("snapshot-000042", true);
     expect(withTransactions.transactions).toHaveLength(1);
     expect(withTransactions.transactions[0].assetType).toBe("crypto");
+  });
+
+  it("retains grouped broker cash beside crypto USD in History detail", async () => {
+    addRows(`INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES
+      ('snapshot-000042', '2022-01-02T18:00:00.000Z', '6b09e3e969b8cf3b2f1a99bdc1ed510c', 'stock', 'USD', 60000, 60000, 1),
+      ('snapshot-000042', '2022-01-02T18:00:00.000Z', 'wallet', 'crypto', 'USD', 2, 2, 1),
+      ('snapshot-000042', '2022-01-02T18:00:00.000Z', '6b09e3e969b8cf3b2f1a99bdc1ed510c', 'stock', 'EUR', 50, 55, 1.1),
+      ('snapshot-000042', '2022-01-02T18:00:00.000Z', '6b09e3e969b8cf3b2f1a99bdc1ed510c', 'stock', 'JPY', 500, 3.3, 0.0066),
+      ('snapshot-000042', '2022-01-02T18:00:00.000Z', '6b09e3e969b8cf3b2f1a99bdc1ed510c', 'stock', 'CNY', 100, 14, 0.14),
+      ('snapshot-000042', '2022-01-02T18:00:00.000Z', '6b09e3e969b8cf3b2f1a99bdc1ed510c', 'stock', 'HKD', 100, 12.8, 0.128)`);
+    const grouped = await ASSET_HANDLER.listSymbolGroupedAssetsByUUID("snapshot-000042");
+    const detail = await queryHistoricalDetail("snapshot-000042");
+    const historical = await queryHistoricalData(1, true, { includeTransactions: false });
+    for (const assets of [grouped, detail.assets, historical[0].assets]) {
+      expect(assets.filter((asset) => asset.symbol === "USD").map((asset) =>
+        [asset.assetType, asset.value]).sort()).toEqual([["crypto", 2], ["stock", 60000]]);
+      expect(assets.filter((asset) => asset.assetType === "stock" &&
+        ["EUR", "JPY", "CNY", "HKD"].includes(asset.symbol))).toHaveLength(4);
+    }
+    expect(detail.total).toBeCloseTo(88587.1);
   });
 
   it("keeps the count and latest snapshot when the requested page is past the end", async () => {

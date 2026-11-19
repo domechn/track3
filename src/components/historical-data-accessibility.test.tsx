@@ -61,6 +61,8 @@ vi.mock("@/middlelayers/charts", async () => ({
 
 vi.mock("@/middlelayers/configuration", () => ({
   addToBlacklist: vi.fn(),
+  getConfiguration: vi.fn(async () => ({ others: [] })),
+  getStableCoins: vi.fn(async () => []),
 }));
 vi.mock("@/middlelayers/entities/assets", () => ({
   ASSET_HANDLER: { listAssetsByUUIDs: vi.fn(async () => []) },
@@ -83,6 +85,7 @@ const dateRange = {
 };
 
 beforeEach(() => {
+  vi.unstubAllGlobals();
   vi.useRealTimers();
   vi.clearAllMocks();
   vi.mocked(addToBlacklist).mockResolvedValue(undefined);
