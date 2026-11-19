@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import PNL from "@/mobile/components/pnl";
@@ -106,6 +106,19 @@ beforeEach(() => {
 });
 
 describe("Overview mobile density", () => {
+  it("hides saved dust in the mobile holdings table until requested", async () => {
+    vi.mocked(queryLatestAssetsPercentage).mockResolvedValue([
+      { coin: "BTC", assetType: "crypto", amount: 1, value: 1000, percentage: 99.9, chartColor: "#f59e0b" },
+      { coin: "USD", assetType: "stock", amount: 0.5, value: 0.5, percentage: 0.05, chartColor: "#3b82f6" },
+      { coin: "DUST", assetType: "crypto", amount: 1, value: 0.4, percentage: 0.04, chartColor: "#3b82f6" },
+    ]);
+    renderWithProviders(<LatestAssetsPercentage currency={usdCurrency} holdings
+      dateRange={{ start: new Date("2024-04-15"), end: new Date("2024-04-16") }} />);
+    await waitFor(() => expect(screen.getByTestId("small-holdings-toggle")).toHaveTextContent("Show 1 small holdings"));
+    expect(document.querySelectorAll(".t3-holdings-row")).toHaveLength(2);
+    fireEvent.click(screen.getByTestId("small-holdings-toggle"));
+    expect(document.querySelectorAll(".t3-holdings-row")).toHaveLength(3);
+  });
   it("uses a stacked-first responsive grid for the pnl summary metrics", async () => {
     renderWithProviders(
       <PNL

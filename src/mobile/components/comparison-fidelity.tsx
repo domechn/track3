@@ -9,6 +9,7 @@ import "@/mobile/components/mobile/fidelity.css";
 import { barGeometry, comparisonMoverFacts, divergingScale } from "@/components/comparison-fidelity-movers";
 import { directionTone } from "@/utils/color";
 import { boundedPercentText } from "@/components/profit-percentage";
+import { ComparisonSortSelect, sortComparisonRows, type ComparisonSort } from "@/components/comparison-sort";
 
 const dateAt = (option?: DateOption) => option ? new Date(option.createdAt ?? `${option.label}T00:00:00`) : null;
 const day = (date: Date, locale: string, year = true) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB",
@@ -38,10 +39,12 @@ const barStyle = (value: number, scale: ReturnType<typeof divergingScale>): CSSP
 const quickPresets = ["Yesterday", "7 days", "30 days", "Start of month"] as const;
 
 export default function ComparisonFidelity({ currency, quoteColor, busy, dateOptions, baseId, headId, onBaseChange, onHeadChange,
-  coins, baseTotal, headTotal, masked, onToggleMask }: {
+  coins, moverCoins, sort, onSortChange, baseTotal, headTotal, masked, onToggleMask, smallHoldingsToggle }: {
   currency: CurrencyRateDetail; quoteColor: QuoteColor; busy: boolean; dateOptions: DateOption[];
   baseId: string; headId: string; onBaseChange: (id: string) => void; onHeadChange: (id: string) => void;
   coins: CoinComparison[]; baseTotal: number; headTotal: number; masked: boolean; onToggleMask: () => void;
+  moverCoins?: CoinComparison[]; sort?: ComparisonSort; onSortChange?: (value: ComparisonSort) => void;
+  smallHoldingsToggle?: React.ReactNode;
 }) {
   const { t, locale } = useTranslation();
   const [picker, setPicker] = useState<"A" | "B" | null>(null);
@@ -56,9 +59,10 @@ export default function ComparisonFidelity({ currency, quoteColor, busy, dateOpt
   const change = headTotal - baseTotal;
   const changeFraction = baseTotal ? change / baseTotal : 0;
   const days = baseDate && headDate ? Math.round((headDate.getTime() - baseDate.getTime()) / 86400000) : 0;
-  const facts = useMemo(() => comparisonMoverFacts(coins), [coins]);
-  const sorted = facts.byValue.map((coin) => ({ coin, change: coin.value.head - coin.value.base }));
-  const movers = sorted;
+  const facts = useMemo(() => comparisonMoverFacts(moverCoins ?? coins), [moverCoins, coins]);
+  const sorted = sortComparisonRows(coins, sort ?? "currentValue").map((coin) => ({ coin, change: coin.value.head - coin.value.base }));
+  const movers = facts.byValue.map((coin) => ({ coin, change: coin.value.head - coin.value.base }));
+  const topMovers = new Set(facts.byValue.slice(0, 2));
   const relative = facts.byPercent.map((coin) => ({ coin, change: coin.value.head - coin.value.base }));
   const topShare = facts.topShare / 100;
   const sameAmounts = sorted.every(({ coin }) => Math.abs(coin.amount.base - coin.amount.head) < 1e-8);
@@ -120,7 +124,7 @@ export default function ComparisonFidelity({ currency, quoteColor, busy, dateOpt
       ? t("fidelity.comparison.summary").replace("{change}", currencyValue(change, 2, true))
         .replace("{percent}", percentText(changeFraction, 2, true, masked))
         .replace("{from}", aDate).replace("{to}", bDate)
-        .replace("{first}", sorted[0]?.coin.symbol ?? "—").replace("{second}", sorted[1]?.coin.symbol ?? "—")
+        .replace("{first}", movers[0]?.coin.symbol ?? "—").replace("{second}", movers[1]?.coin.symbol ?? "—")
         .replace("{share}", percentText(topShare, 0, false, masked))
       : t("fidelity.comparison.summaryEmpty")}</p></header>
     {busy ? <div className="fd-card fd-overview-loading"><span className="fd-skeleton" style={{ width: 130, height: 20 }} /><span className="fd-skeleton" style={{ width: 260, height: 36 }} /></div>
@@ -153,13 +157,15 @@ export default function ComparisonFidelity({ currency, quoteColor, busy, dateOpt
           </div>
         </section>
         <section className="fd-card fd-comparison-assets"><div className="fd-card-heading"><h3>{t("fidelity.comparison.perAsset")}</h3><span>{t("fidelity.comparison.assetSubtitle").replace("{from}", aDate).replace("{to}", bDate)}</span></div>
-          {sorted.map(({ coin, change: value }, index) => <div key={`${coin.assetType}:${coin.symbol}`} className={`fd-comparison-asset${index < 2 ? " top" : ""}`}>
+          {onSortChange && <ComparisonSortSelect value={sort ?? "currentValue"} onChange={onSortChange} t={t} />}
+          {sorted.map(({ coin, change: value }) => <div key={`${coin.assetType}:${coin.symbol}`} className={`fd-comparison-asset${topMovers.has(coin) ? " top" : ""}`}>
             <b>{coin.symbol} <em>{numberText(coin.amount.head, coin.symbol === "USDT" || coin.symbol === "USDC" ? 2 : 0, 4, masked)}</em></b>
             <strong data-tone={tone(value)}>{currencyValue(value, 2, true)}</strong>
             <span>{currencyText(coin.price.base, currency)} → {currencyText(coin.price.head, currency)}</span>
             <span>{percentText(coin.value.changePercent / 100, 2, true, masked)}</span>
             <small>{t("fidelity.comparison.value") + " "}{currencyValue(coin.value.base)} → {currencyValue(coin.value.head)}</small></div>)}
           <div className="fd-comparison-total"><b>{t("fidelity.comparison.total")}</b><strong data-tone={tone(change)}>{currencyValue(change, 2, true)}</strong><small>{currencyValue(baseTotal)} → {currencyValue(headTotal)}</small><small>{percentText(changeFraction, 2, true, masked)}</small></div>
+          {smallHoldingsToggle}
           {sameAmounts && <div className="fd-comparison-info"><svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6.5" /><path d="M9 8v4M9 5.8v.2" /></svg><div><b>{t("fidelity.comparison.amountsSame")}</b><span>{t("fidelity.comparison.priceOnly").replace("{change}", currencyValue(change, 2, true))}</span></div></div>}
         </section>
         <div className="comparison-movers">
@@ -168,7 +174,7 @@ export default function ComparisonFidelity({ currency, quoteColor, busy, dateOpt
               {movers.slice(0, expanded.value ? undefined : 10).map(({ coin, change: value }) => <div key={coin.symbol} className="fd-comparison-mover"><b>{coin.symbol}</b><span style={{ "--fd-zero": `${valueBars.zero}%` } as CSSProperties}>{barGeometry(value, valueBars) && <i data-tone={tone(value)} style={barStyle(value, valueBars)} />}</span><strong data-tone={tone(value)}>{currencyValue(value, 0, true)}</strong></div>)}
             </div>
             {more("value", movers.length)}
-            <p>{t("fidelity.comparison.topShare").replace("{first}", sorted[0]?.coin.symbol ?? "—").replace("{second}", sorted[1]?.coin.symbol ?? "—").replace("{share}", percentText(topShare, 0, false, masked))}</p>
+            <p>{t("fidelity.comparison.topShare").replace("{first}", movers[0]?.coin.symbol ?? "—").replace("{second}", movers[1]?.coin.symbol ?? "—").replace("{share}", percentText(topShare, 0, false, masked))}</p>
           </section>
           <section className="fd-card fd-comparison-movers percent"><div className="fd-card-heading"><h3>{t("fidelity.comparison.moversPercent")}</h3><span>{t("fidelity.comparison.relative")}</span></div>
             <div className="fd-comparison-mover-list">

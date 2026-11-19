@@ -12,7 +12,10 @@ vi.mock("./motion", () => ({
 vi.mock("@tauri-apps/api/path", () => ({ appCacheDir: vi.fn().mockResolvedValue("/tmp") }));
 vi.mock("@/utils/app", () => ({ getImageApiPath: vi.fn().mockResolvedValue("/logo") }));
 vi.mock("@/middlelayers/data", () => ({ downloadCoinLogos: vi.fn() }));
-vi.mock("@/middlelayers/configuration", () => ({ addToBlacklist: vi.fn() }));
+vi.mock("@/middlelayers/configuration", () => ({
+  addToBlacklist: vi.fn(),
+  getConfiguration: vi.fn(async () => undefined),
+}));
 vi.mock("@/middlelayers/charts", () => ({
   queryHistoricalPage: vi.fn(),
   queryHistoricalDetail: vi.fn(),
@@ -68,9 +71,9 @@ it("renders one SQL page and windows a 200-asset detail table", async () => {
   await waitFor(() => expect(within(dialog).getAllByTestId("history-detail-row").length).toBeGreaterThan(0));
   expect(within(dialog).getByRole("region", { name: "Assets" })).toHaveAttribute("tabindex", "0");
   expect(queryHistoricalDetail).toHaveBeenCalledTimes(1);
-  expect(within(dialog).getByRole("table")).toHaveAttribute("aria-rowcount", "200");
+  expect(within(dialog).getByRole("table")).toHaveAttribute("aria-rowcount", "201");
   fireEvent.click(within(dialog).getByRole("button", { name: /show more/i }));
-  await waitFor(() => expect(within(dialog).getByRole("table")).toHaveAttribute("aria-rowcount", "200"));
+  await waitFor(() => expect(within(dialog).getByRole("table")).toHaveAttribute("aria-rowcount", "201"));
   expect(within(dialog).getAllByTestId("history-detail-row").length).toBeLessThan(50);
 });
 
@@ -151,6 +154,31 @@ it("keeps an open snapshot detail when new history pushes it off the current pag
   view.rerender(<DataChangedContext.Provider value={1}><HistoricalData {...props} /></DataChangedContext.Provider>);
   await screen.findByText("new");
   expect(screen.getByRole("dialog", { name: /historical data detail/i })).toBeVisible();
+});
+
+it("shows sub dollar broker cash and lets the user reveal a saved small coin", async () => {
+  vi.mocked(queryHistoricalPage).mockResolvedValue({
+    totalCount: 1, latest: null,
+    rows: [{ id: "cash", createdAt: "2024-01-01T00:00:00.000Z", total: 0.9,
+      change: null, assetCount: 2, topAssets: [] }],
+  });
+  vi.mocked(queryHistoricalDetail).mockResolvedValue({
+    id: "cash", createdAt: "2024-01-01T00:00:00.000Z", total: 0.9, transactions: [],
+    assets: [
+      { id: 1, uuid: "cash", createdAt: "2024-01-01T00:00:00.000Z",
+        symbol: "USD", assetType: "stock", amount: 0.5, value: 0.5, price: 1 },
+      { id: 2, uuid: "cash", createdAt: "2024-01-01T00:00:00.000Z",
+        symbol: "DUST", assetType: "crypto", amount: 2, value: 0.4, price: 0.2 },
+    ],
+  });
+  render(<HistoricalData dateRange={{ start: new Date("2023-01-01"), end: new Date("2025-01-01") }}
+    currency={{ currency: "USD", symbol: "$", rate: 1, alias: "usd" }}
+    quoteColor="green-up-red-down" />);
+  fireEvent.click(await screen.findByTestId("history-snapshot-row"));
+  await waitFor(() => expect(screen.getByTestId("small-holdings-toggle")).toHaveTextContent("Show 1 small holdings"));
+  expect(screen.getByTestId("history-detail-row")).toHaveTextContent("USD");
+  fireEvent.click(screen.getByTestId("small-holdings-toggle"));
+  expect(screen.getAllByTestId("history-detail-row")).toHaveLength(2);
 });
 
 it("shows a loading status while a snapshot detail query is pending", async () => {

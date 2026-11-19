@@ -42,6 +42,7 @@ import {
 import { fetchStockPrices } from "./datafetch/utils/price";
 import { COIN_PRICE_ISSUES, normalizedCoinSymbol, supportedCoinSymbol, type CoinPriceResult } from "./datafetch/coins/price";
 import { isBrokerCashSymbol } from "./entities/currency";
+import { isInsignificantHolding } from "./entities/insignificant-holding";
 import { WalletAnalyzer } from "./wallet";
 import { OthersAnalyzer } from "./datafetch/coins/others";
 import { ASSET_HANDLER } from "./entities/assets";
@@ -453,16 +454,34 @@ export async function refreshAllData(
           missingQuoteWallets,
           missingQuoteAssets,
         );
+        const previousByIdentity = new Map(latestBaseline.map((asset) =>
+          [getStoredAssetIdentity(asset), asset]));
+        const savedCoins = coins.filter((coin) => {
+          const previous = previousByIdentity.get(getRefreshCoinIdentity(coin));
+          if (coin.amount === 0) return !!previous && previous.amount !== 0 ||
+            (getAssetType(coin) === "crypto" && coin.symbol === "BTC" &&
+              readyQueryResult.failedSources.length > 0);
+          if (previous) return true;
+          return !isInsignificantHolding({
+            symbol: coin.symbol,
+            assetType: getAssetType(coin),
+            wallet: coin.wallet,
+            value: coin.usdValue,
+            isStableCoin: readyQueryResult.valueContext.upperCaseStableCoins.includes(coin.symbol.toUpperCase()),
+            customPrice: readyQueryResult.config.others?.some((entry) =>
+              entry.symbol === coin.symbol && coin.wallet === OthersAnalyzer.wallet && !!entry.price),
+          });
+        });
         const transactions = generateTransactions(
           operation.operationUuid,
           refreshCreatedAt,
           latestBaseline,
-          coins,
+          savedCoins,
           readyQueryResult.blacklistedSymbols,
           currentPrices,
           missingQuoteAssets,
         );
-        const refreshAssets = generateRefreshAssets(coins, transactions);
+        const refreshAssets = generateRefreshAssets(savedCoins, transactions);
         let partial = sourceStatuses && partialFromSourceStatuses(
           sourceStatuses, readyQueryResult.portfolioResult.sourceResults, refreshCreatedAt,
         );

@@ -13,7 +13,8 @@ import {
 } from "@/middlelayers/charts";
 import type { HistoricalLatest, HistoricalPageRow, SnapshotEdit } from "@/middlelayers/charts-history";
 import { displayEditValue } from "@/middlelayers/charts-history";
-import { addToBlacklist, getConfiguration } from "@/middlelayers/configuration";
+import { addToBlacklist, getConfiguration, getStableCoins } from "@/middlelayers/configuration";
+import { isInsignificantHolding } from "@/middlelayers/entities/insignificant-holding";
 import {
   CurrencyRateDetail,
   HistoricalData,
@@ -152,12 +153,26 @@ const App = ({
   const [phoneCounts, setPhoneCounts] = useState<{ all: number; partial: number; edited: number } | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [detailLimit, setDetailLimit] = useState(DETAIL_PAGE_SIZE);
+  const [showSmallHoldings, setShowSmallHoldings] = useState(false);
+  const [stableSymbols, setStableSymbols] = useState<Set<string>>(new Set());
+  const [customSymbols, setCustomSymbols] = useState<Set<string>>(new Set());
   const [detailSearch, setDetailSearch] = useState("");
   const [detailScrollTop, setDetailScrollTop] = useState(0);
   const [measuredDetailHeights, setMeasuredDetailHeights] = useState<Map<number, number>>(() => new Map());
   const [pageLoading, setPageLoading] = useState(true);
   const [deleteCandidate, setDeleteCandidate] = useState<string | null>(null);
   const [deleteAssetCandidate, setDeleteAssetCandidate] = useState<{ id: number; symbol: string } | null>(null);
+  useEffect(() => {
+    let active = true;
+    void getStableCoins().then((symbols) => {
+      if (active) setStableSymbols(new Set(symbols.map((symbol) => symbol.toUpperCase())));
+    }).catch(() => undefined);
+    void getConfiguration().then((config) => {
+      if (active) setCustomSymbols(new Set(config?.others?.filter((item) => !!item.price)
+        .map((item) => item.symbol.toUpperCase()) ?? []));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
   const phoneBackRef = useRef<HTMLButtonElement>(null);
   const phoneOpenerRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -336,7 +351,10 @@ const App = ({
     }
 
     return selectedData.assets
-      .filter((asset) => asset.value > 1)
+      .filter((asset) => showSmallHoldings || !isInsignificantHolding({
+        ...asset, isStableCoin: stableSymbols.has(asset.symbol.toUpperCase()),
+        customPrice: customSymbols.has(asset.symbol.toUpperCase()),
+      }))
       .sort((a, b) => b.value - a.value)
       .map((asset, idx) => ({
         id: idx,
@@ -348,7 +366,11 @@ const App = ({
         value: asset.value,
         price: asset.price,
       }));
-  }, [selectedData]);
+  }, [selectedData, showSmallHoldings, stableSymbols, customSymbols]);
+  const smallHoldingCount = selectedData?.assets.filter((asset) => isInsignificantHolding({
+    ...asset, isStableCoin: stableSymbols.has(asset.symbol.toUpperCase()),
+    customPrice: customSymbols.has(asset.symbol.toUpperCase()),
+  })).length ?? 0;
 
   const visibleRankData = useMemo(() => {
     const keyword = detailSearch.trim().toUpperCase();
@@ -592,6 +614,7 @@ const App = ({
     setSelectedDataId(id);
     setPhonePreviousDate(null);
     setDetailLimit(DETAIL_PAGE_SIZE);
+    setShowSmallHoldings(false);
     setDetailSearch("");
     setDetailScrollTop(0);
     setMeasuredDetailHeights(new Map());
@@ -724,7 +747,7 @@ const App = ({
           {visibleRankData.map((item) => <SwipeableRow key={item.assetId} className="fidelity-history-detail-asset" allowImmediateAction
             actions={[{ label: t("common.delete"), destructive: true, disabled: deletingDetail,
               onClick: () => setDeleteAssetCandidate({ id: item.assetId, symbol: item.symbol }) }]}>
-            <div className="fidelity-history-detail-asset-body">
+            <div className="fidelity-history-detail-asset-body" data-testid="history-detail-row">
               <div><strong>{item.symbol}</strong><b className="ios-money">{phoneMoney(item.value)}</b></div>
               <small className="ios-money">
                 <span>{phoneQuantity(item.amount, item.assetType, item.symbol)}</span>
@@ -736,6 +759,11 @@ const App = ({
           </SwipeableRow>)}
           {rankData.length > visibleRankData.length && <button type="button" onClick={() => setDetailLimit((count) => count + DETAIL_PAGE_SIZE)}>
             {t("fidelity.history.detail.loadMore")}</button>}
+          {smallHoldingCount > 0 && <button type="button" data-testid="small-holdings-toggle"
+            onClick={() => { setShowSmallHoldings((shown) => !shown); setDetailLimit(DETAIL_PAGE_SIZE); }}>
+            {t(showSmallHoldings ? "holdings.small.hide" : "holdings.small.show")
+              .replace("{count}", String(smallHoldingCount))}
+          </button>}
           <div className="fidelity-history-detail-sum"><strong>{t("history.total")}</strong><b className="ios-money">{phoneMoney(selectedData.total)}</b></div>
         </div>
         {phoneEditCount > 0 && <div role="region" aria-label={t("history.editLog.title")}
@@ -1048,6 +1076,12 @@ const App = ({
                       )))}
               </Button>
             ) : null}
+            {smallHoldingCount > 0 && <Button type="button" variant="ghost"
+              data-testid="small-holdings-toggle"
+              onClick={() => { setShowSmallHoldings((shown) => !shown); setDetailLimit(DETAIL_PAGE_SIZE); }}>
+              {t(showSmallHoldings ? "holdings.small.hide" : "holdings.small.show")
+                .replace("{count}", String(smallHoldingCount))}
+            </Button>}
           </DetailSurface>
           </DetailWrapper>
         </Dialog>

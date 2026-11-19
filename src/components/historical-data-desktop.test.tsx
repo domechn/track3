@@ -104,3 +104,23 @@ it("mutes a zero edit-log delta", async () => {
   const log = await screen.findByRole("region", { name: "Edits" });
   expect(within(log).getByText("$0.00")).toHaveClass("zero");
 });
+
+it("shows IBKR USD cash and reveals saved small coins on request", async () => {
+  vi.mocked(queryHistoricalDetail).mockResolvedValue({
+    id: "new", createdAt, total: 60000.4, transactions: [],
+    assets: [
+      { id: 10, uuid: "new", createdAt, assetType: "stock", wallet: "6b09e3e969b8cf3b2f1a99bdc1ed510c",
+        symbol: "USD", amount: 60000, price: 1, value: 60000 },
+      { id: 11, uuid: "new", createdAt, assetType: "crypto", wallet: "wallet",
+        symbol: "DUST", amount: 2, price: 0.2, value: 0.4 },
+    ],
+  });
+  render(<MemoryRouter><HistoricalDataDesktop currency={currency} quoteColor="green-up-red-down" /></MemoryRouter>);
+  await waitFor(() => expect(screen.getAllByTestId("history-detail-row")).toHaveLength(1));
+  expect(screen.getByTestId("history-detail-row")).toHaveTextContent("USD");
+  expect(screen.getByTestId("history-detail-row")).toHaveTextContent("$60,000.00");
+  expect(screen.getByTestId("small-holdings-toggle")).toHaveTextContent("Show 1 small holdings");
+  fireEvent.click(screen.getByTestId("small-holdings-toggle"));
+  expect(screen.getAllByTestId("history-detail-row")).toHaveLength(2);
+  expect(screen.getByTestId("history-desktop-detail")).toHaveTextContent("$60,000.40");
+});

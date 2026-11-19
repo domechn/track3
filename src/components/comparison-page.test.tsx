@@ -54,6 +54,69 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
+  it.each([1024, 1600])("keeps unchanged USD 60000 cash above 25 changing junk rows at %ipx", async (width) => {
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: width });
+    try {
+      vi.mocked(queryAllDataDates).mockResolvedValue([
+        { id: "head", date: "2024-04-16", createdAt: "2024-04-16T00:00:00Z" },
+        { id: "base", date: "2024-04-15", createdAt: "2024-04-15T00:00:00Z" },
+      ]);
+      vi.mocked(queryCoinDataByUUID).mockImplementation(async (id) => [
+        { symbol: "USD", assetType: "stock", amount: 60000, value: 60000, price: 1 },
+        ...Array.from({ length: 25 }, (_, index) => {
+          const base = index === 0 ? 10 : 2;
+          const head = base + (index === 0 ? 0.1 : (index + 1) / 1000);
+          const value = id === "head" ? head : base;
+          return { symbol: `JUNK${index}`, assetType: "crypto" as const, amount: 1, value, price: value };
+        }),
+      ]);
+      render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+      const rowSelector = width >= 1400 ? ".t3-cmp-assets tbody tr" : ".comparison-assets-table tbody tr";
+      await waitFor(() => expect(document.querySelectorAll(rowSelector)).toHaveLength(26));
+      const symbols = () => [...document.querySelectorAll(rowSelector)].map((row) =>
+        row.querySelector("th, td")?.textContent ?? "");
+      expect(symbols()[0]).toContain("USD");
+      expect(symbols().slice(1).every((symbol) => symbol.includes("JUNK"))).toBe(true);
+      const mover = width >= 1400
+        ? ".t3-cmp-movers-card .t3-cmp-movers li:first-child strong"
+        : ".comparison-movers section:first-child li:first-child strong";
+      expect(document.querySelector(mover)).toHaveTextContent("JUNK0");
+      if (width >= 1400) {
+        expect(document.querySelector(`${rowSelector}:first-child`)).not.toHaveTextContent("Top mover");
+        expect(document.querySelector(`${rowSelector}:nth-child(2)`)).toHaveTextContent("Top mover");
+      }
+      const sort = screen.getByRole("combobox", { name: "Sort assets" });
+      await userEvent.selectOptions(sort, "valueChange");
+      expect(symbols()[0]).toContain("JUNK0");
+      await userEvent.selectOptions(sort, "percentChange");
+      expect(symbols()[0]).toContain("JUNK24");
+      expect(document.querySelector(mover)).toHaveTextContent("JUNK0");
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: previousWidth });
+    }
+  });
+
+  it("hides twenty small rows until toggled while retaining their total", async () => {
+    vi.mocked(queryAllDataDates).mockResolvedValue([
+      { id: "head", date: "2024-04-16", createdAt: "2024-04-16T00:00:00Z" },
+      { id: "base", date: "2024-04-15", createdAt: "2024-04-15T00:00:00Z" },
+    ]);
+    vi.mocked(queryCoinDataByUUID).mockImplementation(async (id) => id === "head"
+      ? [{ symbol: "BTC", assetType: "crypto", amount: 1, value: 1000, price: 1000 },
+        ...Array.from({ length: 20 }, (_, index) => ({
+          symbol: `DUST${index}`, assetType: "crypto" as const, amount: 1, value: 0.4, price: 0.4,
+        }))]
+      : []);
+    render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+    await waitFor(() => expect(screen.getByTestId("small-holdings-toggle")).toHaveTextContent("Show 20 small holdings"));
+    expect(document.querySelectorAll(".comparison-assets-table tbody tr")).toHaveLength(1);
+    expect(screen.getByText("$1,008.00")).toBeInTheDocument();
+    const moversBefore = document.querySelector(".comparison-movers")?.textContent;
+    await userEvent.click(screen.getByTestId("small-holdings-toggle"));
+    expect(document.querySelectorAll(".comparison-assets-table tbody tr")).toHaveLength(21);
+    expect(document.querySelector(".comparison-movers")?.textContent).toBe(moversBefore);
+  });
   it("starts from the same 30-day comparison at narrow desktop widths", async () => {
     const width = window.innerWidth;
     window.innerWidth = 1024;

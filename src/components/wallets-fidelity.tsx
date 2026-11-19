@@ -15,6 +15,9 @@ import { matchSourceStatus } from "./source-status-match";
 import { useLatestWalletOrdinals } from "./source-name-order";
 import { overviewRefreshRequestedEvent } from "./source-status-event";
 import SyncStatusIndicator from "./sync-status-indicator";
+import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
+import { isInsignificantHolding } from "@/middlelayers/entities/insignificant-holding";
+import { normalizeWalletToMD5 } from "@/lib/utils";
 
 type Source = ReturnType<typeof deriveSourceChanges>["sources"][number];
 type Matrix = ReturnType<typeof deriveSourceChanges>;
@@ -58,6 +61,15 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
   const [data, setData] = useState<SnapshotData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [showSmallHoldings, setShowSmallHoldings] = useState(false);
+  const [stableSymbols, setStableSymbols] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let active = true;
+    void new StableCoinsQuery().listAllStableCoins().then((symbols) => {
+      if (active) setStableSymbols(new Set(symbols.map((symbol) => symbol.toUpperCase())));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     if (!window.matchMedia("(min-width: 1400px)").matches) return;
     let active = true;
@@ -119,6 +131,12 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
     const delta = asset.value - (previous?.value ?? 0);
     return { ...asset, delta, pct: previous?.value ? delta / previous.value * 100 : 0 };
   });
+  const smallSourceAssets = sourceAssets.filter((asset) => isInsignificantHolding({
+    ...asset, isStableCoin: stableSymbols.has(asset.symbol.toUpperCase()),
+    customPrice: asset.wallet === normalizeWalletToMD5("others"),
+  }));
+  const visibleSourceAssets = showSmallHoldings ? sourceAssets :
+    sourceAssets.filter((asset) => !smallSourceAssets.includes(asset));
   const matrixAssets = [...(data?.matrix.assets ?? [])].sort((a, b) => {
     const currentValue = (symbol: string) => (data?.latest ?? []).filter((asset) => asset.symbol === symbol)
       .reduce((sum, asset) => sum + asset.value, 0);
@@ -267,7 +285,7 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
           <div className="t3-wallet-table-scroll"><table><thead><tr>{(chosen
             ? ["asset", "amount", "price", "value", "share", "change30", "changePct"]
             : ["source", "value", "share", "change30", "changePct"]).map((field) => <th key={field}>{t(`wallets.fidelity.col.${field}`)}</th>)}</tr></thead>
-          <tbody>{chosen ? sourceAssets.map((asset, index) => <tr key={`${asset.assetType}:${asset.symbol}`}><th><i style={{ background: sourceColors[index % sourceColors.length] }} />{asset.symbol}{knownAssetNames[asset.symbol] && <small>{knownAssetNames[asset.symbol]}</small>}</th>
+          <tbody>{chosen ? visibleSourceAssets.map((asset, index) => <tr key={`${asset.assetType}:${asset.symbol}`}><th><i style={{ background: sourceColors[index % sourceColors.length] }} />{asset.symbol}{knownAssetNames[asset.symbol] && <small>{knownAssetNames[asset.symbol]}</small>}</th>
             <td>{asset.amount.toLocaleString("en-US", { maximumFractionDigits: 4, minimumFractionDigits: ["USDT", "USDC"].includes(asset.symbol) ? 2 : 0 })}</td>
             <td>{money(asset.price)}</td><td>{money(asset.value)}</td><td>{`${(asset.value / allocationTotal * 100).toFixed(1)}%`}</td>
             <td className={tone(asset.delta)}>{signedMoney(asset.delta)}</td><td className={tone(asset.pct)}>{percent(asset.pct)}</td></tr>)
@@ -277,7 +295,13 @@ export default function WalletsFidelity({ currency, dateRange, quoteColor, selec
           <tfoot><tr><th>{t("wallets.fidelity.total")}</th>{chosen && <><td /><td /></>}
             <td>{money(allocationTotal)}</td><td>100.0%</td><td className={tone(chosen?.change ?? change)}>{signedMoney(chosen?.change ?? change)}</td>
             <td className={tone(chosen?.percentage ?? (previousTotal ? change / previousTotal * 100 : 0))}>{percent(chosen?.percentage ?? (previousTotal ? change / previousTotal * 100 : 0))}</td></tr></tfoot>
-          </table></div></section>
+          </table></div>
+          {chosen && smallSourceAssets.length > 0 && <button type="button" data-testid="small-holdings-toggle"
+            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground"
+            onClick={() => setShowSmallHoldings((shown) => !shown)}>
+            {t(showSmallHoldings ? "holdings.small.hide" : "holdings.small.show")
+              .replace("{count}", String(smallSourceAssets.length))}
+          </button>}</section>
         <section className="t3-wallet-card t3-wallet-side"><div className="t3-wallet-card-head"><h2>{chosen ? t("wallets.fidelity.assetChanges") : t("wallets.fidelity.sourceStatus")}</h2>
           <span>{chosen ? t("wallets.fidelity.thirtyUsd") : t("wallets.fidelity.today")}</span></div>
           {chosen ? <>{renderMovers(movers)}<div className="t3-wallet-facts"><div><span>{t("wallets.fidelity.sourceChange")}</span><b className={tone(chosen.change)}>{signedMoney(chosen.change)}</b></div>

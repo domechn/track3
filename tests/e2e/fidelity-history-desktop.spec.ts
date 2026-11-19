@@ -3,11 +3,35 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { installTauriBridge, seedFidelityCompletedSync } from "./fidelity-bridge-captures";
 import { installTauriBridge as installSampleBridge } from "./fidelity-scenes";
 import { installTauriBridge as installBaseBridge } from "./tauri-bridge";
+import { createHash } from "node:crypto";
 
 test.use({ viewport: { width: 1600, height: 1024 }, colorScheme: "dark", timezoneId: "UTC" });
 
 const directory = "/tmp/fidelity-desktop/history";
 const backupDirectory = "/tmp/fidelity-wdb-locked/history";
+
+test("saved IBKR USD cash appears in History beside crypto USD while dust can be revealed", async ({ page }) => {
+  await installSampleBridge(page, { fidelitySample: "full" });
+  const brokerWallet = createHash("md5").update("ibkr:history-cash").digest("hex");
+  await page.evaluate(async (wallet) => {
+    const run = (query: string, values: unknown[]) =>
+      (window as any).__e2eInvoke("plugin:sql|execute", { query, values });
+    const insert = `INSERT INTO assets_v2 (uuid, createdAt, wallet, asset_type, symbol, amount, value, price)
+      VALUES ('fidelity-day-30', '2026-10-31T09:41:00.000Z', ?, ?, ?, ?, ?, ?)`;
+    await run(insert, [wallet, "stock", "USD", 60000, 60000, 1]);
+    await run(insert, ["11111111111111111111111111111111", "crypto", "USD", 2, 2, 1]);
+    await run(insert, ["11111111111111111111111111111111", "crypto", "DUST", 2, 0.4, 0.2]);
+  }, brokerWallet);
+  await page.goto("/#/history");
+  const detail = page.getByTestId("history-desktop-detail");
+  await expect(detail).toBeVisible();
+  await expect(detail.getByRole("button", { name: "Delete USD from snapshot" })).toHaveCount(2);
+  await expect(detail.getByTestId("history-detail-row").filter({ hasText: "USD" }).filter({ hasText: "$60,000.00" })).toHaveCount(1);
+  await expect(detail.getByTestId("history-detail-row").filter({ hasText: "DUST" })).toHaveCount(0);
+  await expect(detail.getByTestId("small-holdings-toggle")).toHaveText("Show 1 small holdings");
+  await detail.getByTestId("small-holdings-toggle").click();
+  await expect(detail.getByTestId("history-detail-row").filter({ hasText: "DUST" })).toHaveCount(1);
+});
 // Keep the source column positions as the reference while reserving room for the 32px delete target.
 function reflowedDetailHeader(sourceX: number, sourceFirstWidth: number) {
   const left = 973.58;

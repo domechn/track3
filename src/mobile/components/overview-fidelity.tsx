@@ -33,6 +33,8 @@ import { isValid, parse } from "date-fns";
 import { enUS, zhCN } from "date-fns/locale";
 import "@/mobile/components/mobile/fidelity.css";
 import { directionColorVar, directionTone } from "@/utils/color";
+import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
+import { isInsignificantHolding } from "@/middlelayers/entities/insignificant-holding";
 
 type Snapshot = Awaited<ReturnType<typeof queryHistoricalData>>[number];
 type Asset = Awaited<ReturnType<typeof queryLatestAssetsPercentage>>[number];
@@ -180,6 +182,20 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
   const { t, locale } = useTranslation();
   const version = useDataChangedVersion();
   const [view, setView] = useState<View | null>(null);
+  const [showSmallHoldings, setShowSmallHoldings] = useState(false);
+  const [stableSymbols, setStableSymbols] = useState<Set<string>>(new Set());
+  const [customSymbols, setCustomSymbols] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let active = true;
+    void new StableCoinsQuery().listAllStableCoins().then((symbols) => {
+      if (active) setStableSymbols(new Set(symbols.map((symbol) => symbol.toUpperCase())));
+    }).catch(() => undefined);
+    void getConfiguration().then((config) => {
+      if (active) setCustomSymbols(new Set(config?.others?.filter((item) => !!item.price)
+        .map((item) => item.symbol.toUpperCase()) ?? []));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
   const walletOrdinals = useLatestWalletOrdinals();
   const [withLastKnown, setWithLastKnown] = useState(false);
   useEffect(() => {
@@ -267,6 +283,13 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
     return () => { active = false; };
   }, [allTimeRange.start.getTime(), allTimeRange.end.getTime(), version, t, walletOrdinals]);
   const points = view?.points ?? [];
+  const smallHoldings = view?.holdings.filter((asset) => isInsignificantHolding({
+    symbol: asset.coin, assetType: asset.assetType, value: asset.value,
+    isStableCoin: stableSymbols.has(asset.coin.toUpperCase()),
+    customPrice: customSymbols.has(asset.coin.toUpperCase()),
+  })) ?? [];
+  const visibleHoldings = showSmallHoldings ? view?.holdings ?? [] :
+    view?.holdings.filter((asset) => !smallHoldings.includes(asset)) ?? [];
   const last = points.at(-1);
   const lastAt = last?.timestamp ?? 0;
   const count = { "1D": 1, "7D": 7, "30D": 30, "90D": 90, "1Y": 365, All: Infinity }[range] ?? 30;
@@ -460,8 +483,8 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
           <span>{pct(ratio(high - current, high), 2, false)} {t("fidelity.overview.belowHigh")}</span></div>
         {!!view?.excluded?.length && <div className="fd-overview-excluded">{t("totalValue.withLastKnown")}: {view.excluded.map((source) => source.provider).join(", ")}</div>}
       </section>
-      <section className="fd-card fd-overview-holdings"><div className="fd-card-heading"><h3>{t("overview.design.holdings")}</h3><span>{t("overview.design.assetCount").replace("{count}", String(view?.holdings.length ?? 0))}</span></div>
-        {view?.holdings.map((asset) => {
+      <section className="fd-card fd-overview-holdings"><div className="fd-card-heading"><h3>{t("overview.design.holdings")}</h3><span>{t("overview.design.assetCount").replace("{count}", String(visibleHoldings.length))}</span></div>
+        {visibleHoldings.map((asset) => {
           const key = `${asset.assetType}:${asset.coin}`;
           const old = weekAssets.get(key);
           const oldPrice = old && old.amount ? old.value / old.amount : 0;
@@ -473,6 +496,12 @@ export default function OverviewFidelity({ currency, dateRange, allTimeRange, qu
             <small data-tone={change === null ? "neutral" : tone(change)}>{change === null ? dash : pct(change, 1)} <i>7D</i></small>
           </Link>;
         })}
+        {smallHoldings.length > 0 && <button type="button" data-testid="small-holdings-toggle"
+          className="px-4 py-2 text-sm text-muted-foreground"
+          onClick={() => setShowSmallHoldings((shown) => !shown)}>
+          {t(showSmallHoldings ? "holdings.small.hide" : "holdings.small.show")
+            .replace("{count}", String(smallHoldings.length))}
+        </button>}
       </section>
       {!insightsDismissed && (insightsEnabled
         ? <section className="fd-overview-insights"><InsightsCard currency={currency} overview fidelity />

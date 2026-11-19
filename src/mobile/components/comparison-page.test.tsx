@@ -58,6 +58,72 @@ beforeEach(() => {
 });
 
 describe("Comparison page", () => {
+  it("keeps unchanged USD 60000 cash above 25 changing junk rows on iPhone", async () => {
+    const ios = vi.spyOn(platform, "isIOS").mockReturnValue(true);
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 390 });
+    try {
+      vi.mocked(queryAllDataDates).mockResolvedValue([
+        { id: "head", date: "2024-04-16", createdAt: "2024-04-16T00:00:00Z" },
+        { id: "base", date: "2024-04-15", createdAt: "2024-04-15T00:00:00Z" },
+      ]);
+      vi.mocked(queryCoinDataByUUID).mockImplementation(async (id) => [
+        { symbol: "USD", assetType: "stock", amount: 60000, value: 60000, price: 1 },
+        ...Array.from({ length: 25 }, (_, index) => {
+          const base = index === 0 ? 10 : 2;
+          const head = base + (index === 0 ? 0.1 : (index + 1) / 1000);
+          const value = id === "head" ? head : base;
+          return { symbol: `JUNK${index}`, assetType: "crypto" as const, amount: 1, value, price: value };
+        }),
+      ]);
+      render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+      await waitFor(() => expect(document.querySelectorAll(".fd-comparison-asset")).toHaveLength(26));
+      const symbols = () => [...document.querySelectorAll(".fd-comparison-asset")].map((row) =>
+        row.querySelector("b")?.textContent ?? "");
+      expect(symbols()[0]).toContain("USD");
+      expect(symbols().slice(1).every((symbol) => symbol.includes("JUNK"))).toBe(true);
+      const mover = ".fd-comparison-movers .fd-comparison-mover:first-child b";
+      expect(document.querySelector(mover)).toHaveTextContent("JUNK0");
+      const sort = screen.getByRole("combobox", { name: "Sort assets" });
+      await userEvent.selectOptions(sort, "valueChange");
+      expect(symbols()[0]).toContain("JUNK0");
+      await userEvent.selectOptions(sort, "percentChange");
+      expect(symbols()[0]).toContain("JUNK24");
+      expect(document.querySelector(mover)).toHaveTextContent("JUNK0");
+    } finally {
+      ios.mockRestore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: previousWidth });
+    }
+  });
+
+  it("hides twenty phone comparison dust rows and keeps the total", async () => {
+    const ios = vi.spyOn(platform, "isIOS").mockReturnValue(true);
+    const previousWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    try {
+      vi.mocked(queryAllDataDates).mockResolvedValue([
+        { id: "head", date: "2024-04-16", createdAt: "2024-04-16T00:00:00Z" },
+        { id: "base", date: "2024-04-15", createdAt: "2024-04-15T00:00:00Z" },
+      ]);
+      vi.mocked(queryCoinDataByUUID).mockImplementation(async (id) => id === "head"
+        ? [{ symbol: "BTC", assetType: "crypto", amount: 1, value: 1000, price: 1000 },
+          ...Array.from({ length: 20 }, (_, index) => ({
+            symbol: `DUST${index}`, assetType: "crypto" as const, amount: 1, value: 0.4, price: 0.4,
+          }))]
+        : []);
+      render(<Comparison currency={usdCurrency} quoteColor="green-up-red-down" />);
+      await waitFor(() => expect(screen.getByTestId("small-holdings-toggle")).toHaveTextContent("Show 20 small holdings"));
+      expect(document.querySelectorAll(".fd-comparison-asset")).toHaveLength(1);
+      expect(document.querySelector(".fd-comparison-total")).toHaveTextContent("1,008");
+      const moversBefore = document.querySelector(".comparison-movers")?.textContent;
+      await userEvent.click(screen.getByTestId("small-holdings-toggle"));
+      expect(document.querySelectorAll(".fd-comparison-asset")).toHaveLength(21);
+      expect(document.querySelector(".comparison-movers")?.textContent).toBe(moversBefore);
+    } finally {
+      ios.mockRestore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: previousWidth });
+    }
+  });
   it("uses the shared stablecoin list for the phone mover note", async () => {
     const stableQuery = vi.spyOn(StableCoinsQuery.prototype, "listAllStableCoins").mockResolvedValue(["XUSD"]);
     const savedStable = vi.spyOn(configuration, "getStableCoins").mockResolvedValue([]);

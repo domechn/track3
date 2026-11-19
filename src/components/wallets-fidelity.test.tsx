@@ -4,6 +4,7 @@ import { queryHistoricalPage } from "@/middlelayers/charts";
 import { ASSET_HANDLER } from "@/middlelayers/entities/assets";
 import WalletsFidelity from "./wallets-fidelity";
 import { overviewRefreshRequestedEvent } from "./source-status-event";
+import md5 from "md5";
 
 vi.mock("@/middlelayers/charts", () => ({ queryHistoricalPage: vi.fn() }));
 vi.mock("@/middlelayers/entities/assets", () => ({ ASSET_HANDLER: { listAssetsByUUIDs: vi.fn() } }));
@@ -26,6 +27,22 @@ beforeEach(() => {
 });
 
 describe("WalletsFidelity", () => {
+  it("shows IBKR cash but hides a small broker holding until requested", async () => {
+    const broker = md5("ibkr:one");
+    vi.mocked(ASSET_HANDLER.listAssetsByUUIDs).mockResolvedValue([
+      { id: 1, uuid: "new", createdAt: "2026-10-31T09:41:00Z", wallet: broker,
+        assetType: "stock", symbol: "USD", amount: 60000, price: 1, value: 60000 },
+      { id: 2, uuid: "new", createdAt: "2026-10-31T09:41:00Z", wallet: broker,
+        assetType: "stock", symbol: "DUST", amount: 2, price: 0.2, value: 0.4 },
+    ] as never);
+    const { container } = render(<WalletsFidelity currency={currency} dateRange={dateRange}
+      quoteColor="green-up-red-down" selectedSource={broker} onSelectSource={vi.fn()} statuses={[]} />);
+    await waitFor(() => expect(screen.getByTestId("small-holdings-toggle")).toHaveTextContent("Show 1 small holdings"));
+    expect(container.querySelectorAll(".t3-wallet-balances tbody tr")).toHaveLength(1);
+    expect(container.querySelector(".t3-wallet-balances tfoot")).toHaveTextContent("$60,000.40");
+    fireEvent.click(screen.getByTestId("small-holdings-toggle"));
+    expect(container.querySelectorAll(".t3-wallet-balances tbody tr")).toHaveLength(2);
+  });
   it("exposes the source status list as a keyboard scroll region", async () => {
     render(<WalletsFidelity currency={currency} dateRange={dateRange}
       quoteColor="green-up-red-down" selectedSource={null} onSelectSource={vi.fn()} statuses={[]} />);

@@ -10,7 +10,9 @@ import {
   restoreHistoricalData,
 } from "@/middlelayers/charts";
 import type { HistoricalLatest, HistoricalPageRow, SnapshotEdit } from "@/middlelayers/charts-history";
-import { addToBlacklist } from "@/middlelayers/configuration";
+import { addToBlacklist, getConfiguration } from "@/middlelayers/configuration";
+import { StableCoinsQuery } from "@/middlelayers/datafetch/coins/stable";
+import { isInsignificantHolding } from "@/middlelayers/entities/insignificant-holding";
 import {
   CurrencyRateDetail,
   HistoricalData,
@@ -112,6 +114,20 @@ const App = ({
   const [historyFilter, setHistoryFilter] = useState<"all" | "edited" | "complete" | "partial">("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [detailLimit, setDetailLimit] = useState(DETAIL_PAGE_SIZE);
+  const [showSmallHoldings, setShowSmallHoldings] = useState(false);
+  const [stableSymbols, setStableSymbols] = useState<Set<string>>(new Set());
+  const [customSymbols, setCustomSymbols] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let active = true;
+    void new StableCoinsQuery().listAllStableCoins().then((symbols) => {
+      if (active) setStableSymbols(new Set(symbols.map((symbol) => symbol.toUpperCase())));
+    }).catch(() => undefined);
+    void getConfiguration().then((config) => {
+      if (active) setCustomSymbols(new Set(config?.others?.filter((item) => !!item.price)
+        .map((item) => item.symbol.toUpperCase()) ?? []));
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
   const [detailSearch, setDetailSearch] = useState("");
   const [detailScrollTop, setDetailScrollTop] = useState(0);
   const [measuredDetailHeights, setMeasuredDetailHeights] = useState<Map<number, number>>(() => new Map());
@@ -249,7 +265,10 @@ const App = ({
     }
 
     return selectedData.assets
-      .filter((asset) => asset.value > 1)
+      .filter((asset) => showSmallHoldings || !isInsignificantHolding({
+        ...asset, isStableCoin: stableSymbols.has(asset.symbol.toUpperCase()),
+        customPrice: customSymbols.has(asset.symbol.toUpperCase()),
+      }))
       .sort((a, b) => b.value - a.value)
       .map((asset, idx) => ({
         id: idx,
@@ -261,7 +280,11 @@ const App = ({
         value: asset.value,
         price: asset.price,
       }));
-  }, [selectedData]);
+  }, [selectedData, showSmallHoldings, stableSymbols, customSymbols]);
+  const smallHoldingCount = selectedData?.assets.filter((asset) => isInsignificantHolding({
+    ...asset, isStableCoin: stableSymbols.has(asset.symbol.toUpperCase()),
+    customPrice: customSymbols.has(asset.symbol.toUpperCase()),
+  })).length ?? 0;
 
   const visibleRankData = useMemo(() => {
     const keyword = detailSearch.trim().toUpperCase();
@@ -501,6 +524,7 @@ const App = ({
     setDetailError(false);
     setSelectedDataId(id);
     setDetailLimit(DETAIL_PAGE_SIZE);
+    setShowSmallHoldings(false);
     setDetailSearch("");
     setDetailScrollTop(0);
     setMeasuredDetailHeights(new Map());
@@ -717,6 +741,12 @@ const App = ({
                       )))}
               </Button>
             ) : null}
+            {smallHoldingCount > 0 && <Button type="button" variant="ghost"
+              data-testid="small-holdings-toggle"
+              onClick={() => { setShowSmallHoldings((shown) => !shown); setDetailLimit(DETAIL_PAGE_SIZE); }}>
+              {t(showSmallHoldings ? "holdings.small.hide" : "holdings.small.show")
+                .replace("{count}", String(smallHoldingCount))}
+            </Button>}
           </DialogContent>
         </Dialog>
 

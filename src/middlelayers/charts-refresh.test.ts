@@ -222,6 +222,127 @@ beforeEach(() => {
   vi.mocked(readStoredStatuses).mockReturnValue([]);
 });
 
+describe("small holding save rule", () => {
+  it("omits a new 0.4 USD coin without changing the snapshot transaction", async () => {
+    const payloads = mockCommittedRefreshMarkers();
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ assetType: "crypto", wallet: "wallet-a", symbol: "DUST", amount: 2,
+        price: { base: "usd", value: 0.2 } }],
+      failedSources: [],
+    });
+    await refreshAllData(() => undefined, {}, operation);
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0].assets).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ symbol: "DUST" }),
+    ]));
+    expect(payloads[0].txns).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ symbol: "DUST" }),
+    ]));
+  });
+
+  it("keeps an existing 0.4 USD coin at its real amount and value", async () => {
+    const payloads = mockCommittedRefreshMarkers();
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[
+      { id: 1, uuid: "old", createdAt: "2026-07-13T00:00:00.000Z",
+        assetType: "crypto", wallet: md5("wallet-a"), symbol: "DUST",
+        amount: 2, price: 1, value: 2 },
+    ]] as never);
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ assetType: "crypto", wallet: "wallet-a", symbol: "DUST", amount: 2,
+        price: { base: "usd", value: 0.2 } }],
+      failedSources: [],
+    });
+    await refreshAllData(() => undefined, {}, operation);
+    expect(payloads[0].assets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ symbol: "DUST", amount: 2, value: 0.4 }),
+    ]));
+  });
+
+  it("records a zero quantity once and omits its repeated zero", async () => {
+    const payloads = mockCommittedRefreshMarkers();
+    const previous = { id: 1, uuid: "old", createdAt: "2026-07-13T00:00:00.000Z",
+      assetType: "crypto" as const, wallet: md5("wallet-a"), symbol: "DUST",
+      amount: 2, price: 1, value: 2 };
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[previous]] as never);
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ assetType: "crypto", wallet: "wallet-a", symbol: "DUST", amount: 0,
+        price: { base: "usd", value: 1 } }],
+      failedSources: [],
+    });
+    await refreshAllData(() => undefined, {}, operation);
+    expect(payloads[0].assets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ symbol: "DUST", amount: 0, value: 0 }),
+    ]));
+    vi.mocked(ASSET_HANDLER.listAssets).mockResolvedValue([[{ ...previous, amount: 0, value: 0 }]] as never);
+    await refreshAllData(() => undefined, {}, {
+      operationUuid: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      refreshCreatedAt: "2026-07-15T08:09:10.123Z",
+    });
+    expect(payloads[1].assets).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ symbol: "DUST" }),
+    ]));
+  });
+
+  it.each([0.5, 60000])("keeps IBKR USD cash worth %s through refresh", async (amount) => {
+    const payloads = mockCommittedRefreshMarkers();
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [
+        { assetType: "stock", wallet: "ibkr:one", symbol: "USD", amount,
+          price: { base: "usd", value: 1 } },
+        { assetType: "crypto", wallet: "wallet-a", symbol: "USD", amount: 2,
+          price: { base: "usd", value: 1 } },
+      ],
+      failedSources: [],
+    });
+    await refreshAllData(() => undefined, {}, operation);
+    expect(payloads[0].assets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ assetType: "stock", wallet: md5("ibkr:one"),
+        symbol: "USD", amount, price: 1, value: amount }),
+    ]));
+    expect(payloads[0].assets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ assetType: "crypto", wallet: md5("wallet-a"),
+        symbol: "USD", amount: 2, price: 1, value: 2 }),
+    ]));
+  });
+
+  it.each(["EUR", "JPY", "CNY", "HKD"])("keeps small IBKR %s cash through refresh", async (symbol) => {
+    const payloads = mockCommittedRefreshMarkers();
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [{ assetType: "stock", wallet: "ibkr:one", symbol, amount: 0.5,
+        price: { base: "usd", value: 1 } }],
+      failedSources: [],
+    });
+    await refreshAllData(() => undefined, {}, operation);
+    expect(payloads[0].assets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ assetType: "stock", symbol, amount: 0.5, value: 0.5 }),
+    ]));
+  });
+
+  it("keeps small stablecoin and custom price holdings through refresh", async () => {
+    const payloads = mockCommittedRefreshMarkers();
+    vi.mocked(getConfiguration).mockResolvedValue({
+      configs: { groupUSD: false },
+      others: [{ symbol: "CUSTOM", amount: 5,
+        price: { kind: "manual", usd: 0.1, setAt: "2026-07-14T00:00:00.000Z" } }],
+    } as never);
+    vi.mocked(queryStableCoins).mockResolvedValue(["USDC"]);
+    vi.mocked(fetchPortfolios).mockResolvedValue({
+      coins: [
+        { assetType: "crypto", wallet: "wallet-a", symbol: "USDC", amount: 0.5,
+          price: { base: "usd", value: 1 } },
+        { assetType: "crypto", wallet: "others", symbol: "CUSTOM", amount: 5,
+          price: { base: "usd", value: 0.1 } },
+      ],
+      failedSources: [],
+    });
+    await refreshAllData(() => undefined, {}, operation);
+    expect(payloads[0].assets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ symbol: "USDC", value: 0.5 }),
+      expect.objectContaining({ symbol: "CUSTOM", value: 0.5 }),
+    ]));
+  });
+});
+
 describe("live partial prices", () => {
   it("does not mark unsupported-only dust partial", async () => {
     const rows = [
