@@ -9,7 +9,7 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn(async () => {}) }))
 vi.mock("@/utils/app", () => ({ reloadApp: vi.fn() }));
 
 const update = (download: (onEvent: (event: never) => void) => Promise<void>) => ({
-  available: true, version: "0.9.19", currentVersion: "0.9.18", date: "2026-11-08", body: "", rawJson: {},
+  available: true, version: "0.9.20", currentVersion: "0.9.19", date: "2026-11-08", body: "", rawJson: {},
   download: vi.fn(download), install: vi.fn(async () => {}), close: vi.fn(async () => {}),
 });
 const start = async () => fireEvent.click(await screen.findByRole("button", { name: "Download and install" }));
