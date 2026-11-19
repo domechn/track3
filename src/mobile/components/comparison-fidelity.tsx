@@ -9,7 +9,7 @@ import "@/mobile/components/mobile/fidelity.css";
 import { barGeometry, comparisonMoverFacts, divergingScale } from "@/components/comparison-fidelity-movers";
 import { directionTone } from "@/utils/color";
 import { boundedPercentText } from "@/components/profit-percentage";
-import { ComparisonSortSelect, sortComparisonRows, type ComparisonSort } from "@/components/comparison-sort";
+import { sortComparisonRows, type ComparisonSort } from "@/components/comparison-sort";
 
 const dateAt = (option?: DateOption) => option ? new Date(option.createdAt ?? `${option.label}T00:00:00`) : null;
 const day = (date: Date, locale: string, year = true) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-GB",
@@ -39,11 +39,11 @@ const barStyle = (value: number, scale: ReturnType<typeof divergingScale>): CSSP
 const quickPresets = ["Yesterday", "7 days", "30 days", "Start of month"] as const;
 
 export default function ComparisonFidelity({ currency, quoteColor, busy, dateOptions, baseId, headId, onBaseChange, onHeadChange,
-  coins, moverCoins, sort, onSortChange, baseTotal, headTotal, masked, onToggleMask, smallHoldingsToggle }: {
+  coins, moverCoins, sort, baseTotal, headTotal, masked, onToggleMask, smallHoldingsToggle }: {
   currency: CurrencyRateDetail; quoteColor: QuoteColor; busy: boolean; dateOptions: DateOption[];
   baseId: string; headId: string; onBaseChange: (id: string) => void; onHeadChange: (id: string) => void;
   coins: CoinComparison[]; baseTotal: number; headTotal: number; masked: boolean; onToggleMask: () => void;
-  moverCoins?: CoinComparison[]; sort?: ComparisonSort; onSortChange?: (value: ComparisonSort) => void;
+  moverCoins?: CoinComparison[]; sort?: ComparisonSort;
   smallHoldingsToggle?: React.ReactNode;
 }) {
   const { t, locale } = useTranslation();
@@ -157,7 +157,6 @@ export default function ComparisonFidelity({ currency, quoteColor, busy, dateOpt
           </div>
         </section>
         <section className="fd-card fd-comparison-assets"><div className="fd-card-heading"><h3>{t("fidelity.comparison.perAsset")}</h3><span>{t("fidelity.comparison.assetSubtitle").replace("{from}", aDate).replace("{to}", bDate)}</span></div>
-          {onSortChange && <ComparisonSortSelect value={sort ?? "currentValue"} onChange={onSortChange} t={t} />}
           {sorted.map(({ coin, change: value }) => <div key={`${coin.assetType}:${coin.symbol}`} className={`fd-comparison-asset${topMovers.has(coin) ? " top" : ""}`}>
             <b>{coin.symbol} <em>{numberText(coin.amount.head, coin.symbol === "USDT" || coin.symbol === "USDC" ? 2 : 0, 4, masked)}</em></b>
             <strong data-tone={tone(value)}>{currencyValue(value, 2, true)}</strong>

@@ -489,7 +489,7 @@ const App = ({
   if (compact) return <ComparisonFidelity currency={currency} quoteColor={quoteColor} busy={pageLoading}
     dateOptions={dateOptions} baseId={baseId} headId={headId} onBaseChange={onBaseDateChange}
     onHeadChange={onHeadDateChange} coins={visibleComparisons} moverCoins={coinComparisons}
-    sort={sort} onSortChange={setSort} baseTotal={totalValue.base} headTotal={totalValue.head}
+    sort={sort} baseTotal={totalValue.base} headTotal={totalValue.head}
     masked={shouldMaskValue} onToggleMask={onViewOrHideClick}
     smallHoldingsToggle={smallComparisons.length > 0 ? <button type="button" data-testid="small-holdings-toggle"
       className="px-4 py-2 text-sm text-muted-foreground"
