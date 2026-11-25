@@ -971,6 +971,7 @@ body:has(.fd-page), .app-layout:has(.fd-page) { background:hsl(var(--background)
 .app-layout:has(.fd-coin)[data-header-collapsed="true"] #app-top-bar { display:block; position:fixed; inset:0 0 auto; z-index:30; }
 @media (max-width:699px) {
   #app-main-content:has(.fd-summary) .mobile-analytics-hub { height:0; margin:0; }
+  .fd-summary > .fd-card:last-child { margin-bottom:0; }
 }
 .fd-sheet.detail .mobile-sheet-handle-area { margin-top:19px; margin-bottom:23px; }
 .fd-sheet.detail .mobile-sheet-heading { padding-inline:23px; }

@@ -273,7 +273,7 @@ export default function GoalsAlerts({ currency, isProUser }: { currency?: Curren
     })} />;
 
   return (
-    <div className="t3-manage-goals mx-auto gap-4 pb-8">
+    <div className="t3-manage-goals mx-auto gap-4">
       <div className="t3-goals-heading">
         <div>
         <h1 className="text-2xl font-semibold">{t("goals.title")}</h1>
